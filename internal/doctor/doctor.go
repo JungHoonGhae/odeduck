@@ -9,6 +9,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/JungHoonGhae/gongctl/internal/apicall"
 	"github.com/JungHoonGhae/gongctl/internal/catalog"
@@ -91,5 +92,47 @@ func describeCheck(ctx context.Context, fc *fetch.Client, baseURL string) Check 
 		return Check{"describe", StatusDrift, "상세기능 0건 파싱 — openapi.do 마크업이 바뀌었을 수 있음 (pk=" + CanaryPK + ")"}
 	default:
 		return Check{"describe", StatusOK, fmt.Sprintf("%d개 상세기능 파싱 (pk=%s)", len(spec.Operations), CanaryPK)}
+	}
+}
+
+// ApplyCanaryPK is a dataset the account must NOT have applied for, used to check
+// that the 활용신청 form still has the fields apply drives. The probe never submits,
+// so the form stays available and the same pk keeps working indefinitely. Applying
+// for it by hand would turn this check into "skipped" — pick another pk then.
+//
+// 국토교통부_아파트매매 실거래 상세 자료: high-traffic, long-lived, unlikely to be retired.
+const ApplyCanaryPK = "15057511"
+
+// ApplyCheck drives the 활용신청 form without submitting and reports whether apply
+// could still fill it. This is the only automated coverage of 활용신청 — the one
+// capability nothing else replaces, and until now the only seam doctor did not
+// touch, so a portal redesign would have left every other check green while the
+// thing that matters was broken.
+//
+// It lives in the CLI's check set rather than Run because it needs a session and
+// starts a browser, which the read-only checks deliberately avoid.
+func ApplyCheck(ctx context.Context, pk string) Check {
+	if pk == "" {
+		pk = ApplyCanaryPK
+	}
+	probe, err := portal.ProbeApplyForm(ctx, pk)
+	switch {
+	case errors.Is(err, portal.ErrNotLoggedIn):
+		return Check{"apply", StatusSkipped, "세션 없음 — `gongctl login` 후 재점검"}
+	case errors.Is(err, portal.ErrFormUnreachable):
+		// Not drift: the portal serves the form once, so an already-applied-for
+		// canary is the expected reason. Say what to do instead of crying wolf.
+		return Check{"apply", StatusSkipped, fmt.Sprintf(
+			"카나리 pk=%s 의 신청 폼에 접근할 수 없습니다 — 이미 신청한 데이터셋일 수 있습니다. "+
+				"신청하지 않은 pk 로 `--apply-pk` 를 지정해 재점검하세요", pk)}
+	case err != nil:
+		return Check{"apply", StatusDrift, "폼 점검 실패: " + err.Error()}
+	case !probe.OK():
+		return Check{"apply", StatusDrift, fmt.Sprintf(
+			"신청 폼에서 다음 요소를 찾지 못했습니다: %s — 이 상태로는 활용신청이 동작하지 않습니다",
+			strings.Join(probe.Missing(), ", "))}
+	default:
+		return Check{"apply", StatusOK, fmt.Sprintf(
+			"신청 폼 정상 — 상세기능 %d개 확인, 제출하지 않음 (pk=%s)", probe.Operations, pk)}
 	}
 }

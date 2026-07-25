@@ -11,13 +11,19 @@ import (
 )
 
 func doctorCmd() *cobra.Command {
-	return &cobra.Command{
+	var applyPK string
+	var skipApply bool
+	c := &cobra.Command{
 		Use:   "doctor",
 		Short: "스크래핑 상태 점검 — data.go.kr 마크업 변경(drift) 감지",
 		Long: `gongctl 의 fragile scraping 이 아직 동작하는지 라이브로 점검합니다.
 data.go.kr 이 HTML 을 바꾸면 파서가 조용히 빈 결과를 내므로, doctor 가 각 seam
 (검색·describe·활용신청 현황)을 실제로 호출해 데이터가 나오는지 확인합니다.
-drift 가 하나라도 있으면 종료코드 1 을 반환합니다(CI 용).`,
+drift 가 하나라도 있으면 종료코드 1 을 반환합니다(CI 용).
+
+apply 점검은 활용신청 폼을 실제로 열어 필요한 입력요소가 남아 있는지 확인하되 **제출하지 않습니다.**
+이미 신청한 데이터셋은 폼이 열리지 않으므로, 신청하지 않은 pk 를 --apply-pk 로 지정하세요.
+브라우저를 띄우지 않으려면 --skip-apply 를 쓰세요.`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			format, err := resolveFormat()
 			if err != nil {
@@ -30,6 +36,9 @@ drift 가 하나라도 있으면 종료코드 1 을 반환합니다(CI 용).`,
 
 			checks := doctor.Run(cmd.Context(), newFetchClient(), base)
 			checks = append(checks, sessionCheck(cmd))
+			if !skipApply {
+				checks = append(checks, doctor.ApplyCheck(cmd.Context(), applyPK))
+			}
 
 			if err := renderChecks(cmd, format, checks); err != nil {
 				return err
@@ -42,6 +51,9 @@ drift 가 하나라도 있으면 종료코드 1 을 반환합니다(CI 용).`,
 			return nil
 		},
 	}
+	c.Flags().StringVar(&applyPK, "apply-pk", "", "apply 폼 점검에 쓸 publicDataPk (아직 신청하지 않은 것)")
+	c.Flags().BoolVar(&skipApply, "skip-apply", false, "apply 폼 점검 생략 (브라우저를 띄우지 않음)")
+	return c
 }
 
 // sessionCheck probes the login-gated 활용신청 현황 seam. Without a session it is

@@ -3,8 +3,8 @@ package portal
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -54,13 +54,39 @@ func Apply(ctx context.Context, pk, purpose, category string, confirm func(Apply
 	if category == "" {
 		category = PurposeResearch
 	}
+	var res *ApplyResult
+	err := onApplyForm(ctx, pk, func(tctx context.Context, dialog func() string) error {
+		var aerr error
+		res, aerr = fillAndSubmit(tctx, pk, purpose, category, confirm, dialog)
+		return aerr
+	})
+	if err != nil {
+		return nil, err
+	}
+	return res, nil
+}
+
+// onApplyForm opens the 활용신청 form for pk in a browser carrying the saved session
+// and hands the tab to body. Everything it does before that — injecting the session,
+// completing the SSO trampoline, setting the currentMyMenuId precondition, settling
+// on the form — is portal-shaped and is exactly what breaks when data.go.kr changes.
+//
+// ProbeApplyForm goes through this same function rather than its own copy. A harness
+// that reaches the form by a different route proves nothing about whether apply can
+// still reach it, which is the failure this project has to detect: apply is the one
+// capability nothing else replaces, and its only previous check was a human running
+// it against a real account.
+//
+// dialog, passed to body, returns the last JavaScript dialog message the page raised
+// (validation alerts and the success notice both arrive that way).
+func onApplyForm(ctx context.Context, pk string, body func(tctx context.Context, dialog func() string) error) error {
 	// Submission has to run in a browser: gongctl drives the portal's own
 	// fn_save() so the page builds and validates the payload (see
 	// docs/adr/0001). Reuse a live browser if there is one; otherwise start a
 	// headless one and inject the saved session, so no window appears.
 	st, sess, err := browserForApply(ctx)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	allocCtx, cancelAlloc := chromedp.NewRemoteAllocator(ctx, st.WebSocketURL)
@@ -72,7 +98,7 @@ func Apply(ctx context.Context, pk, purpose, category string, confirm func(Apply
 
 	if sess != nil {
 		if err := injectSession(tctx, sess); err != nil {
-			return nil, fmt.Errorf("세션 주입 실패: %w", err)
+			return fmt.Errorf("세션 주입 실패: %w", err)
 		}
 		defer closeBrowser(ctx, st) // headless instance is ours; don't leave it running
 	}
@@ -92,6 +118,11 @@ func Apply(ctx context.Context, pk, purpose, category string, confirm func(Apply
 			go chromedp.Run(tctx, page.HandleJavaScriptDialog(true))
 		}
 	})
+	dialog := func() string {
+		dialogMu.Lock()
+		defer dialogMu.Unlock()
+		return lastDialog
+	}
 
 	// 워밍업: 새 탭의 www 세션을 먼저 인증 상태로 만든다(SSO 트램펄린 완료).
 	// 이걸 안 하면 폼 진입의 첫 네비게이션이 트램펄린을 타며 리다이렉트를 잃는다.
@@ -107,7 +138,7 @@ func Apply(ctx context.Context, pk, purpose, category string, confirm func(Apply
 		time.Sleep(400 * time.Millisecond)
 	}
 	if strings.Contains(warmLoc, "common-login") || strings.Contains(warmLoc, "auth.data.go.kr") {
-		return nil, ErrNotLoggedIn
+		return ErrNotLoggedIn
 	}
 
 	// 신청 폼 진입: currentMyMenuId 쿠키가 전제조건(없으면 index.do 로 튕김).
@@ -117,7 +148,7 @@ func Apply(ctx context.Context, pk, purpose, category string, confirm func(Apply
 		network.SetCookie("currentMyMenuId", "M020105").WithDomain("www.data.go.kr").WithPath("/"),
 		chromedp.Navigate(formURL),
 	); err != nil {
-		return nil, err
+		return err
 	}
 	// settle: 폼(selectDevAcountRequestForm) 또는 index.do 로 안착할 때까지.
 	deadline := time.Now().Add(15 * time.Second)
@@ -129,50 +160,45 @@ func Apply(ctx context.Context, pk, purpose, category string, confirm func(Apply
 		time.Sleep(400 * time.Millisecond)
 	}
 	if strings.Contains(loc, "common-login") || strings.Contains(loc, "auth.data.go.kr") {
-		return nil, ErrNotLoggedIn
+		return ErrNotLoggedIn
 	}
 	if strings.Contains(loc, "index.do") || !strings.Contains(loc, "selectDevAcountRequestForm.do") {
-		return nil, fmt.Errorf("신청 폼에 접근하지 못했습니다 (pk=%s) — 이미 신청했거나 신청 불가한 데이터일 수 있습니다", pk)
+		return fmt.Errorf("%w (pk=%s) — 이미 신청했거나 신청 불가한 데이터일 수 있습니다", ErrFormUnreachable, pk)
 	}
+	return body(tctx, dialog)
+}
 
-	// 폼 채우기 + 요약 추출 (페이지의 jQuery 사용).
-	fillJS := `(function(purpose, cat){
-		var f = document.getElementById('reqForm');
-		if(!f) return JSON.stringify({err:'no-form'});
-		var r = document.querySelector("input[name='prcusePrpos'][value='"+cat+"']");
-		if(r){ r.checked = true; }
-		var ta = document.getElementById('prcusePurps');
-		if(ta){ ta.value = purpose; }
-		var n = 0;
-		document.querySelectorAll('.col-table input[type=checkbox]').forEach(function(o){
-			if(!o.classList.contains('all-chk')){ o.checked = true; n++; }
-		});
-		var ag = document.getElementById('useScopeAgreAt');
-		if(ag){ ag.checked = true; }
-		var name = '';
-		var tag = document.querySelector('.tagset');
-		if(tag){ var box = tag.closest('div'); var t = box && box.querySelector('.tit'); if(t){ name = t.textContent.replace(/\s+/g,' ').trim(); } }
-		return JSON.stringify({ops:n, name:name});
-	})(` + strconv.Quote(purpose) + `,` + strconv.Quote(category) + `)`
+// ErrFormUnreachable means the 활용신청 form did not load for this pk. It is a
+// distinct sentinel because the two reasons demand opposite reactions: an
+// already-applied-for dataset is normal and expected, while markup or flow changes
+// mean apply is broken. A checker that cannot tell them apart either cries wolf or
+// stays quiet through a real breakage.
+var ErrFormUnreachable = errors.New("신청 폼에 접근하지 못했습니다")
+
+func fillAndSubmit(tctx context.Context, pk, purpose, category string,
+	confirm func(ApplySummary) bool, dialog func() string) (*ApplyResult, error) {
+	// 폼 채우기 + 요약 추출. fill=true 이므로 실제로 값이 채워진다.
+	fillJS := applyFormJS(purpose, category, true)
 
 	var raw string
 	if err := chromedp.Run(tctx, chromedp.Evaluate(fillJS, &raw)); err != nil {
 		return nil, fmt.Errorf("폼 채우기 실패: %w", err)
 	}
-	var filled struct {
-		Ops  int    `json:"ops"`
-		Name string `json:"name"`
-		Err  string `json:"err"`
+	var filled FormProbe
+	if err := json.Unmarshal([]byte(strings.TrimSpace(raw)), &filled); err != nil {
+		return nil, fmt.Errorf("폼 채우기 결과를 읽지 못했습니다: %w", err)
 	}
-	json.Unmarshal([]byte(raw), &filled)
-	if filled.Err != "" {
-		return nil, fmt.Errorf("신청 폼 구조를 찾지 못했습니다 (%s)", filled.Err)
+	// Refuse to submit a form we could not fill. fn_save() on a page whose fields
+	// moved would post whatever the page happens to hold, against a real account.
+	if missing := filled.Missing(); len(missing) > 0 {
+		return nil, fmt.Errorf("신청 폼 구조가 예상과 다릅니다 — 없는 요소: %s (포털 마크업 변경 가능성, `gongctl doctor` 로 확인)",
+			strings.Join(missing, ", "))
 	}
 
 	summary := ApplySummary{
 		PublicDataPk: pk,
-		DataName:     filled.Name,
-		Operations:   filled.Ops,
+		DataName:     filled.DataName,
+		Operations:   filled.Operations,
 		Category:     category,
 		Purpose:      purpose,
 	}
@@ -189,14 +215,12 @@ func Apply(ctx context.Context, pk, purpose, category string, confirm func(Apply
 
 	// 성공 판정 = 목록(ground truth)에 반영됐는지. 폼은 AJAX 제출이라 위치로는
 	// 판별이 안 되므로 활용신청 현황을 다시 읽어 데이터명이 나타났는지 확인한다.
-	dialogMu.Lock()
-	dlg := lastDialog
-	dialogMu.Unlock()
+	dlg := dialog()
 
 	if listHTML, _, lerr := probeListLenient(tctx); lerr == nil {
 		if apps, perr := parseApplications(listHTML); perr == nil {
 			for _, a := range apps {
-				if filled.Name != "" && strings.Contains(a.Title, strings.TrimSpace(filled.Name)) {
+				if filled.DataName != "" && strings.Contains(a.Title, strings.TrimSpace(filled.DataName)) {
 					return &ApplyResult{Submitted: true, Message: "신청 완료 (자동승인): " + a.Status}, nil
 				}
 			}
