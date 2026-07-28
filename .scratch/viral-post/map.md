@@ -2,6 +2,11 @@
 
 Label: `wayfinder:map`
 
+## Status: PAUSED
+
+제품의 형태가 먼저 정해져야 한다 — `.scratch/product-shape/map.md` 참조. 형태가 바뀌면
+이 지도의 목적지(무엇을 증명해 보일 것인가)도 바뀌므로, 그 결정이 날 때까지 멈춰 둔다.
+
 ## Destination
 
 링크드인 피드의 **낯선 사람**이 스크롤을 멈추는 글 하나. 답하기 어려운 질문을 던지면 AI가
