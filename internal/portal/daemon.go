@@ -230,3 +230,41 @@ func wsAlive(port int) bool {
 	resp.Body.Close()
 	return resp.StatusCode == http.StatusOK
 }
+
+// browserUsable reports whether a recorded browser can actually be driven, not
+// merely that its debug port answers.
+//
+// On macOS, closing Chrome's last window leaves the process running with the debug
+// port still listening and zero page targets. /json/version answers 200 exactly as
+// a healthy browser does, so a liveness check cannot tell them apart — but every
+// attempt to open a tab in that state fails with "Failed to open new tab - no
+// browser is open (-32000)". login used to attach to such a browser and die there
+// instead of starting a fresh one, which is a dead end for the user: the state is
+// invisible, and nothing in the error says to kill Chrome.
+//
+// wsAlive stays as it was and keeps meaning "the process is up" — closeBrowser
+// waits on exactly that, and must not read a window-less browser as already gone.
+func browserUsable(port int) bool {
+	if !wsAlive(port) {
+		return false
+	}
+	resp, err := http.Get(fmt.Sprintf("http://127.0.0.1:%d/json/list", port))
+	if err != nil {
+		return false
+	}
+	defer resp.Body.Close()
+	var targets []struct {
+		Type string `json:"type"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&targets); err != nil {
+		return false
+	}
+	// Only a page target can host our work. A browser left with just a service
+	// worker or an extension target still cannot open a tab.
+	for _, t := range targets {
+		if t.Type == "page" {
+			return true
+		}
+	}
+	return false
+}

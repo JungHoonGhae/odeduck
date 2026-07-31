@@ -213,7 +213,7 @@ func refreshSessionFrom(ctx context.Context, tctx context.Context) {
 // Otherwise a headless Chrome is started and the saved session is returned for
 // the caller to inject — that instance belongs to the caller, which closes it.
 func browserForApply(ctx context.Context) (*daemonState, *Session, error) {
-	if st, err := loadState(); err == nil && wsAlive(st.Port) {
+	if st, err := loadState(); err == nil && browserUsable(st.Port) {
 		return st, nil, nil
 	}
 	sess, err := loadSession()

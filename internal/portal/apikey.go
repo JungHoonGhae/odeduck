@@ -48,7 +48,7 @@ func APIKey(ctx context.Context) (string, error) {
 	}
 
 	st, err := loadState()
-	if err != nil || !wsAlive(st.Port) {
+	if err != nil || !browserUsable(st.Port) {
 		return "", sessErr
 	}
 	html, err := probeViaBrowser(ctx, st, APIKeyListPath)

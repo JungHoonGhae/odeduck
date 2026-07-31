@@ -32,7 +32,17 @@ func Login(ctx context.Context, progress io.Writer, keepBrowser bool) error {
 	}
 
 	st, _ := loadState()
-	if st == nil || !wsAlive(st.Port) {
+	if st == nil || !browserUsable(st.Port) {
+		// A recorded browser that is alive but unusable (window closed, zero page
+		// targets) still holds the debug port, so launching a fresh one on the same
+		// port would collide with it. End it first — it is ours, we recorded its pid.
+		if st != nil && st.PID > 0 && wsAlive(st.Port) {
+			logln("이전 브라우저가 창 없이 남아 있어 정리하고 새로 띄웁니다.")
+			killTree(st.PID)
+			for i := 0; i < 20 && wsAlive(st.Port); i++ {
+				time.Sleep(150 * time.Millisecond)
+			}
+		}
 		logln("브라우저를 띄웁니다… 열리는 창에서 data.go.kr 에 로그인하세요 (네이버/카카오/아이디).")
 		cmd, err := launchBrowser(BaseURL + "/sso/login.do")
 		if err != nil {
@@ -184,7 +194,7 @@ func Applications(ctx context.Context) ([]Application, error) {
 	if err != nil {
 		return nil, err
 	}
-	if !wsAlive(st.Port) {
+	if !browserUsable(st.Port) {
 		return nil, ErrNotLoggedIn
 	}
 	allocCtx, cancelAlloc := chromedp.NewRemoteAllocator(ctx, st.WebSocketURL)
