@@ -27,7 +27,10 @@ func applyFormJS(purpose, category string, fill bool) string {
 		out.form = !!f;
 		if(!f) return JSON.stringify(out);
 		var r = document.querySelector("input[name='prcusePrpos'][value='"+cat+"']");
-		out.purposeRadio = !!r;
+		// Filling needs the one radio for this category; checking structure asks the
+		// broader question, because apply accepts any category and a probe that only
+		// ever looks at one value would pass while the others vanished.
+		out.purposeRadio = fill ? !!r : !!document.querySelector("input[name='prcusePrpos']");
 		if(r && fill){ r.checked = true; }
 		var ta = document.getElementById('prcusePurps');
 		out.purposeText = !!ta;

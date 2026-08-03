@@ -20,9 +20,21 @@ func TestApplyFormJSSharesSelectorsWithFill(t *testing.T) {
 			t.Errorf("fill script missing selector %q", sel)
 		}
 	}
-	// Only the fill flag differs.
-	if strings.Replace(probeJS, ",false)", ",true)", 1) == fillJS {
-		t.Log("scripts differ only in the fill flag and the purpose argument, as intended")
+	// The two scripts must be one script: build both with identical arguments and
+	// assert they differ ONLY in the fill flag. Anything else means a second copy of
+	// the selectors has been introduced, which is the failure this design exists to
+	// prevent — a probe checking selectors apply no longer uses would report health
+	// while apply is broken.
+	//
+	// Scope, verified by mutation: returning a different script body when fill is
+	// false makes this fail. A `fill ? a : b` branch *inside* the shared script does
+	// not, because both modes then emit the same source. Runtime branches are caught
+	// in review, not here; there is one deliberate branch today (the purpose radio,
+	// where filling needs a specific value and checking wants the whole group).
+	same := applyFormJS("연구", PurposeResearch, false)
+	filled := applyFormJS("연구", PurposeResearch, true)
+	if strings.Replace(same, ",false)", ",true)", 1) != filled {
+		t.Error("probe and fill scripts differ by more than the fill flag — a second copy of the selectors has crept in")
 	}
 	if !strings.HasSuffix(strings.TrimSpace(probeJS), ",false)") {
 		t.Errorf("probe must pass fill=false so it cannot modify the page: %q", probeJS[len(probeJS)-20:])

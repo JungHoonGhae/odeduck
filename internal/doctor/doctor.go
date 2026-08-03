@@ -95,13 +95,24 @@ func describeCheck(ctx context.Context, fc *fetch.Client, baseURL string) Check 
 	}
 }
 
-// ApplyCanaryPK is a dataset the account must NOT have applied for, used to check
-// that the 활용신청 form still has the fields apply drives. The probe never submits,
-// so the form stays available and the same pk keeps working indefinitely. Applying
-// for it by hand would turn this check into "skipped" — pick another pk then.
+// ApplyCanaryPKs are datasets to try opening the 활용신청 form for. There is more
+// than one on purpose.
 //
-// 국토교통부_아파트매매 실거래 상세 자료: high-traffic, long-lived, unlikely to be retired.
-const ApplyCanaryPK = "15057511"
+// The portal serves the form only until the account applies, so a single fixed pk
+// stops testing anything the moment someone applies for it — and the check cannot
+// tell that apart from the form having moved, which is the one thing it exists to
+// catch. Reading the ambiguous case as "already applied" reports skipped and exits
+// 0 through a real breakage; reading it as drift cries wolf every time.
+//
+// Trying several removes the ambiguity without matching anything: one account
+// having already applied for all of them is unlikely, so all of them failing is
+// evidence about the form rather than about this account. The healthy case still
+// costs one attempt, because the first success returns.
+//
+// Chosen for being REST, auto-approved at 개발단계, and obscure enough that an
+// account is unlikely to hold them: 공정거래위원회 기업집단, 영천시 태양광 허가,
+// 국립무형유산원 기증기탁.
+var ApplyCanaryPKs = []string{"15091886", "15157823", "15094326"}
 
 // ApplyCheck drives the 활용신청 form without submitting and reports whether apply
 // could still fill it. This is the only automated coverage of 활용신청 — the one
@@ -112,27 +123,45 @@ const ApplyCanaryPK = "15057511"
 // It lives in the CLI's check set rather than Run because it needs a session and
 // starts a browser, which the read-only checks deliberately avoid.
 func ApplyCheck(ctx context.Context, pk string) Check {
-	if pk == "" {
-		pk = ApplyCanaryPK
+	candidates := ApplyCanaryPKs
+	explicit := pk != ""
+	if explicit {
+		candidates = []string{pk}
 	}
-	probe, err := portal.ProbeApplyForm(ctx, pk)
-	switch {
-	case errors.Is(err, portal.ErrNotLoggedIn):
-		return Check{"apply", StatusSkipped, "세션 없음 — `gongctl login` 후 재점검"}
-	case errors.Is(err, portal.ErrFormUnreachable):
-		// Not drift: the portal serves the form once, so an already-applied-for
-		// canary is the expected reason. Say what to do instead of crying wolf.
+
+	var refused []string
+	for _, c := range candidates {
+		probe, err := portal.ProbeApplyForm(ctx, c)
+		switch {
+		case errors.Is(err, portal.ErrNotLoggedIn):
+			return Check{"apply", StatusSkipped, "세션 없음 — `gongctl login` 후 재점검"}
+		case errors.Is(err, portal.ErrFormUnreachable):
+			// Ambiguous on its own: either this account already applied, or the
+			// form moved. Try the next candidate rather than guess.
+			refused = append(refused, c)
+			continue
+		case err != nil:
+			return Check{"apply", StatusDrift, "폼 점검 실패: " + err.Error()}
+		case !probe.OK():
+			return Check{"apply", StatusDrift, fmt.Sprintf(
+				"신청 폼에서 다음 요소를 찾지 못했습니다: %s — 이 상태로는 활용신청이 동작하지 않습니다",
+				strings.Join(probe.Missing(), ", "))}
+		default:
+			return Check{"apply", StatusOK, fmt.Sprintf(
+				"신청 폼 정상 — 상세기능 %d개 확인, 제출하지 않음 (pk=%s)", probe.Operations, c)}
+		}
+	}
+
+	if explicit {
+		// The caller picked the pk, so "you picked one you already applied for" is
+		// the likely reading and the fix is theirs.
 		return Check{"apply", StatusSkipped, fmt.Sprintf(
-			"카나리 pk=%s 의 신청 폼에 접근할 수 없습니다 — 이미 신청한 데이터셋일 수 있습니다. "+
-				"신청하지 않은 pk 로 `--apply-pk` 를 지정해 재점검하세요", pk)}
-	case err != nil:
-		return Check{"apply", StatusDrift, "폼 점검 실패: " + err.Error()}
-	case !probe.OK():
-		return Check{"apply", StatusDrift, fmt.Sprintf(
-			"신청 폼에서 다음 요소를 찾지 못했습니다: %s — 이 상태로는 활용신청이 동작하지 않습니다",
-			strings.Join(probe.Missing(), ", "))}
-	default:
-		return Check{"apply", StatusOK, fmt.Sprintf(
-			"신청 폼 정상 — 상세기능 %d개 확인, 제출하지 않음 (pk=%s)", probe.Operations, pk)}
+			"지정한 pk=%s 의 신청 폼이 열리지 않았습니다 — 이미 신청한 데이터셋일 수 있습니다. "+
+				"신청하지 않은 pk 를 `--apply-pk` 로 지정하세요", pk)}
 	}
+	return Check{"apply", StatusDrift, fmt.Sprintf(
+		"카나리 %d개(%s) 전부 신청 폼이 열리지 않았습니다 — 한 계정이 전부 이미 신청했을 가능성은 낮으므로 "+
+			"폼 경로·진입 플로우가 바뀐 것을 의심하세요. 이 계정이 정말 전부 신청했다면 "+
+			"`--apply-pk` 로 신청하지 않은 pk 를 지정해 재점검하세요",
+		len(refused), strings.Join(refused, ", "))}
 }
