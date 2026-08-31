@@ -86,5 +86,7 @@ the redesigned page did not introduce a stable data API.
   reports it as skipped, while non-empty lists report the parsed count. The
   API-key selector has a value-free probe so layout drift can be detected without
   exposing the credential.
-- CDP stays. The one-time human SSO login plus a long-lived re-attachable session
-  is the requirement that rules out managed/remote browser services anyway.
+- CDP stays for the one-time human SSO login and short-lived form submission.
+  OpenDataCTL extracts a reusable cookie session, closes the login browser, uses
+  plain HTTP for authenticated reads, and starts an isolated headless browser only
+  when `apply` must drive the portal's own form.

@@ -5,11 +5,15 @@ Go CLI + MCP. 사람은 정부 SSO 로그인 한 번만 하고 이후 포털 작
 
 ## 현재 상태 (2026-08-31)
 
-- v0.8은 목표 기반 카탈로그 검색, 선택형 Ollama 의미 검색, 검색→상세→활용신청→호출 MCP 흐름을 제공한다.
+- v0.9는 제품·명령 이름을 OpenDataCTL/`opendatactl`로 바꾸고, v0.8 자동화를 위한 `gongctl`
+  호환 바이너리·설정 경로·환경변수·MCP 가이드 URI를 유지한다.
+- 목표 기반 카탈로그 검색, 선택형 Ollama 의미 검색, 검색→상세→활용신청→호출 MCP 흐름을 제공한다.
 - data.go.kr KRDS 개편 파서와 세션 쿠키 회전 갱신을 적용했다.
 - 온비드·나라장터·도매시장·중소기업 지원사업 API를 실계정으로 신청·승인·호출했다.
-- 설계 근거는 `docs/adr/`, 검색 평가는 `docs/research/semantic-search-evaluation.md`, 경쟁 조사는
-  `docs/research/competitive-workflow-audit.md`가 단일 소스다.
+- 현재 설계 근거는 `docs/adr/`, 검색 평가는 `docs/research/semantic-search-evaluation.md`, 경쟁 조사는
+  `docs/research/competitive-workflow-audit.md`, 포털 경계는 `docs/reverse-engineering/portal-catalog.md`가
+  단일 소스다. `docs/superpowers/specs/`와 `docs/superpowers/plans/`는 최초 구현의 역사적 기록이고,
+  홍보 영상 제작 기록은 `docs/promo/opendatactl-agent-explainer.md`에 있다.
 
 ## 확정된 핵심 결정 (스펙 요약)
 
@@ -26,7 +30,7 @@ Go CLI + MCP. 사람은 정부 SSO 로그인 한 번만 하고 이후 포털 작
   읽기는 순수 HTTP(`internal/portal/session.go`), `apply`만 headless Chrome에 쿠키 주입해 폼 구동.
   tossinvest-cli의 storage-state 패턴을 이식(단, Python helper 없이 chromedp in-process).
 
-## kvote에서 복사 이식할 것 (검증된 코드)
+## kvote에서 이식한 기반 (검증된 코드)
 
 `~/workspace/projects/oss-k-vote-cli` 의 다음을 복사 이식(공유 라이브러리 추출 안 함 — §5):
 - `internal/datagokr/*` (browser·apply·accounts·daemon·config) — 활용신청 CDP-attach 자동화의
@@ -36,7 +40,7 @@ Go CLI + MCP. 사람은 정부 SSO 로그인 한 번만 하고 이후 포털 작
 - `internal/output`, `internal/version`, CLI/MCP 패턴, goreleaser·install.sh/ps1 파이프라인.
 - NEC 전용 하드코딩 API(turnout/winners/elections)는 **가져오지 않음** — 범용 call_api로 대체.
 
-## 신규로 짤 것 (스펙 §4)
+## 신규로 구현한 것 (스펙 §4)
 
 - `internal/apicall/describe.go` — OpenAPI 상세페이지 → 엔드포인트·요청변수·가이드문서 surface.
 - `internal/apicall/call.go` — 계정 인증키 주입 + HTTP GET + XML→JSON + 에러코드 surface.

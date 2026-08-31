@@ -2,6 +2,10 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+> **Historical plan:** This records the original implementation sequence and is no longer the
+> current runbook. The shipped session lifecycle, catalog search, MCP surface, and release layout
+> have since changed. Use `README.md`, `docs/adr/`, current CLI help, and the code as the source of truth.
+
 **Goal:** Ship a Go CLI + MCP server that lets an AI agent search data.go.kr datasets, submit 활용신청 (application) through a live browser session, and call arbitrary approved OpenAPIs — with zero human portal-UI operation beyond a one-time browser login.
 
 **Architecture:** One binary, two faces (CLI for humans via cobra, MCP for agents via stdio), same backend. Deterministic steps (login, apply, key injection, HTTP, XML→JSON) are automated by tools; heterogeneous API specs are *surfaced* (scraped and handed to the agent), never parsed into claims. The 활용신청 automation is a CDP-attach daemon: opendatactl launches a real Chrome, the human logs in once, opendatactl keeps it alive and re-attaches over the DevTools Protocol for later commands.
