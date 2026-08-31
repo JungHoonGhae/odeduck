@@ -63,7 +63,7 @@ func TestProviderCommandsAreReadOnly(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.provider, func(t *testing.T) {
-			spec := providerCommand(tt.provider, tt.provider, nil, "/tmp/gongctl-test", "goal")
+			spec := providerCommand(tt.provider, tt.provider, nil, "/tmp/opendatactl-test", "goal")
 			joined := strings.Join(spec.args, " ")
 			for _, want := range tt.want {
 				if !strings.Contains(joined, want) {
@@ -77,7 +77,7 @@ func TestProviderCommandsAreReadOnly(t *testing.T) {
 func TestProviderCommandsKeepGoalOutOfArgv(t *testing.T) {
 	const sensitive = "미공개 신사업 목표"
 	for _, provider := range providerOrder {
-		spec := providerCommand(provider, provider, nil, "/tmp/gongctl-test", sensitive)
+		spec := providerCommand(provider, provider, nil, "/tmp/opendatactl-test", sensitive)
 		if strings.Contains(strings.Join(spec.args, " "), sensitive) {
 			t.Errorf("%s exposes the goal in argv: %q", provider, spec.args)
 		}

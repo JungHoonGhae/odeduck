@@ -27,3 +27,58 @@ jobs:
 
       - name: Build
         run: go build ./...
+
+      - name: Verify release packaging
+        uses: goreleaser/goreleaser-action@v6
+        with:
+          version: "~> v2"
+          args: release --snapshot --clean --skip=publish
+
+      - name: Verify current and compatibility binaries
+        shell: bash
+        run: |
+          set -euo pipefail
+          archive="$(find dist -maxdepth 1 -name 'opendatactl_*_linux_amd64.tar.gz' -print -quit)"
+          test -n "$archive"
+          archive_entries="$(tar -tzf "$archive")"
+          grep -qx 'opendatactl' <<<"$archive_entries"
+          grep -qx 'gongctl' <<<"$archive_entries"
+
+          extract_dir="$(mktemp -d)"
+          trap 'rm -rf "$extract_dir"' EXIT
+          tar -xzf "$archive" -C "$extract_dir"
+          "$extract_dir/opendatactl" version | grep -q '^opendatactl '
+          "$extract_dir/gongctl" version | grep -q '^gongctl '
+          "$extract_dir/opendatactl" --help | grep -q '^  opendatactl '
+          "$extract_dir/gongctl" --help | grep -q '^  gongctl '
+
+          legacy_archive="$(find dist -maxdepth 1 -name 'gongctl_*_linux_amd64.tar.gz' -print -quit)"
+          test -n "$legacy_archive"
+          legacy_entries="$(tar -tzf "$legacy_archive")"
+          grep -qx 'gongctl' <<<"$legacy_entries"
+
+  windows-installer:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+
+      - name: Test Windows build and config migration
+        run: go test ./...
+
+      - name: Parse PowerShell installer
+        shell: pwsh
+        run: |
+          $tokens = $null
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile(
+            (Resolve-Path ./install.ps1), [ref]$tokens, [ref]$errors
+          ) | Out-Null
+          if ($errors.Count -gt 0) {
+            $errors | Format-List | Out-String | Write-Error
+            exit 1
+          }

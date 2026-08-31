@@ -1,15 +1,22 @@
-# gongctl
+# OpenDataCTL
 
-**정확한 검색어를 몰라도, AI가 필요한 공공데이터를 찾아 신청하고 실제 응답까지 가져옵니다.**
+> The AI control plane for Korean open data.
+
+**공공데이터를 찾고, 신청하고, 호출하는 AI 컨트롤 플레인.**
+정확한 검색어를 몰라도 AI가 필요한 공공데이터를 찾아 신청하고 실제 응답까지 가져옵니다.
 data.go.kr에 한 번 로그인하면 Codex, Claude, Gemini, Cursor가 자연어 목표를 검색축으로 바꾸고,
 11,900여 개 API의 검색·명세 확인·활용신청·승인 확인·호출을 CLI/MCP 한 경로로 끝냅니다.
+
+이름의 `Open Data`는 누구나 재사용할 수 있도록 공개된 공공데이터를, `CTL`은 검색부터 실제
+호출까지 하나의 명령 표면으로 연결하는 control plane을 뜻합니다. 데이터를 통제한다는 의미가
+아니라, 흩어진 이용 절차를 AI가 실행할 수 있는 한 경로로 묶는다는 의미입니다.
 
 실제 계정에서 온비드 공매, 나라장터 입찰, 공영도매시장 경매, 중소기업 지원사업 API를
 신청하고 승인된 데이터까지 호출해 검증했습니다.
 
 ## 포털에서 끊기던 네 번을 한 번에
 
-| 기존 흐름의 병목 | gongctl 원스톱 흐름 |
+| 기존 흐름의 병목 | OpenDataCTL 원스톱 흐름 |
 | --- | --- |
 | 포털이 알아듣는 정확한 검색어를 사람이 추측 | 자연어 목표를 여러 기회축으로 나눠 전체 카탈로그 검색 |
 | 결과가 호출 가능한지, 어떤 값이 필수인지 상세페이지를 돌며 판별 | `describe_api`가 상세기능·엔드포인트·필수 요청변수·심의유형 확인 |
@@ -19,7 +26,7 @@ data.go.kr에 한 번 로그인하면 Codex, Claude, Gemini, Cursor가 자연어
 공개된 대체 CLI/MCP와의 기능별 비교 근거는
 [경쟁 워크플로 조사](docs/research/competitive-workflow-audit.md)에 기록했습니다. 검색→상세→호출
 형태의 MCP 자체는 이미 있습니다. 2026-08-31에 확인한 공개 구현과의 차이는 그 앞뒤입니다.
-gongctl은 keyword gateway를 목표 기반 discovery로 확장하고, 기존 구현에서 빠져 있던
+OpenDataCTL은 keyword gateway를 목표 기반 discovery로 확장하고, 기존 구현에서 빠져 있던
 **활용신청·승인 확인·키 재사용**을 첫 실호출까지 연결합니다.
 
 > [!WARNING]
@@ -30,53 +37,67 @@ gongctl은 keyword gateway를 목표 기반 discovery로 확장하고, 기존 �
 ## 설치
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/JungHoonGhae/gongctl/main/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/JungHoonGhae/opendatactl/main/install.sh | sh
 ```
 
 Windows:
 
 ```powershell
-irm https://raw.githubusercontent.com/JungHoonGhae/gongctl/main/install.ps1 | iex
+irm https://raw.githubusercontent.com/JungHoonGhae/opendatactl/main/install.ps1 | iex
+```
+
+Homebrew:
+
+```sh
+brew install --cask JungHoonGhae/opendatactl/opendatactl
 ```
 
 또는 Go가 있다면:
 
 ```sh
-go install github.com/JungHoonGhae/gongctl/cmd/gongctl@latest
+go install github.com/JungHoonGhae/opendatactl/cmd/opendatactl@latest
 ```
+
+### `gongctl`에서 이전
+
+v0.9에는 새 `opendatactl`과 기존 스크립트·자동화를 위한 `gongctl` 호환 바이너리가 함께
+들어 있습니다. 기존 사용자의 설정 디렉터리 로그인 세션·인증키·카탈로그도 복사 없이 그대로
+사용합니다. 새 설치만 운영체제의 표준 설정 위치 아래 `opendatactl` 디렉터리에 상태를 저장합니다.
+기존 Homebrew cask는 tap의 rename 매핑을 따라 `brew update && brew upgrade --cask gongctl`로
+새 cask로 전환됩니다.
 
 ## 사용법
 
 ```sh
 # 1. 브라우저가 한 번 열립니다 — data.go.kr에 로그인하세요 (SSO는 자동화하지 않음)
-gongctl login
+opendatactl login
 
 # 2. 자연어 목표로 호출 가능한 후보 탐색
-gongctl catalog discover "우리 동네 대기질 서비스에 쓸 데이터" --rest-only
+opendatactl catalog discover "우리 동네 대기질 서비스에 쓸 데이터" --rest-only
 
 # 3. 명세·필수 요청변수·개발단계 승인유형 확인
-gongctl describe <PK>
+opendatactl describe <PK>
 
 # 4. 활용신청 (AI/MCP에서는 확인 없이 자동 제출, 첫 신청 때 인증키 자동 발급)
-gongctl apply <PK> --purpose "대기질 분석 프로젝트" --category research
+opendatactl apply <PK> --purpose "대기질 분석 프로젝트" --category research
 
 # 5. 승인 확인
-gongctl applications -f table
+opendatactl applications -f table
 
 # 6. 실제 호출 (XML 응답도 JSON으로 변환해 돌려줍니다)
-gongctl call --pk <PK> --param numOfRows=5   # 엔드포인트·인증키 자동
+opendatactl call --pk <PK> --param numOfRows=5   # 엔드포인트·인증키 자동
 ```
 
 ```bash
 # 무엇이 존재하는지 먼저 훑기 — 로컬 카탈로그(한 번 sync 후 즉시 검색)
-gongctl catalog sync              # 전체 오픈API 목록 수집 (약 2~3분)
-gongctl catalog search 폭염 온열   # 활용신청 많은 순, 설명문 없이 간결하게
-gongctl catalog discover "내가 몰랐던 돈 될 만한 공공데이터"  # 로그인된 AI CLI로 검색축 생성
-gongctl catalog discover "지역 소멸로 생길 사업 기회" --agent gemini
-gongctl catalog search 폭염               # 기본: 실제로 호출 가능한 REST만
-gongctl catalog search 폭염 --rest-only=false  # LINK까지 포함한 전체 탐색
-gongctl catalog info               # 수집 시각 + 유형 분포
-gongctl catalog orgs 폭염          # 그 주제를 개방한 기관 순위
+opendatactl catalog sync              # 전체 오픈API 목록 수집 (약 2~3분)
+opendatactl catalog search 폭염 온열   # 활용신청 많은 순, 설명문 없이 간결하게
+opendatactl catalog discover "내가 몰랐던 돈 될 만한 공공데이터"  # 로그인된 AI CLI로 검색축 생성
+opendatactl catalog discover "지역 소멸로 생길 사업 기회" --agent gemini
+opendatactl catalog search 폭염               # 기본: 실제로 호출 가능한 REST만
+opendatactl catalog search 폭염 --rest-only=false  # LINK까지 포함한 전체 탐색
+opendatactl catalog info               # 수집 시각 + 유형 분포
+opendatactl catalog orgs 폭염          # 그 주제를 개방한 기관 순위
 ```
 
 ### 자연어 기회 탐색: 기존 AI 구독 우선, Ollama는 선택
@@ -84,7 +105,7 @@ gongctl catalog orgs 폭염          # 그 주제를 개방한 기관 순위
 `catalog discover`는 설치되어 있고 로그인된 **Codex, Claude Code, Gemini CLI, Cursor Agent** 중 하나를
 검색 계획기로 사용합니다. 사용자가 정부 데이터의 정확한 명칭을 몰라도 목표를 거래·가격, 선행지표,
 제약·위험, 지원·인프라 같은 3~8개의 서로 다른 검색축으로 바꾼 뒤 전체 카탈로그를 탐색합니다.
-`--agent auto`가 기본이며 `codex | claude | gemini | cursor`로 고정할 수 있습니다. gongctl은 로그인
+`--agent auto`가 기본이며 `codex | claude | gemini | cursor`로 고정할 수 있습니다. OpenDataCTL은 로그인
 토큰을 읽거나 저장하지 않고, 각 CLI가 평소 사용하는 인증·요금제를 그대로 사용합니다. 검색 목표는
 CLI의 stdin으로 전달해 로컬 프로세스 목록에 남기지 않으며, 읽기 전용/질문 모드로 실행합니다.
 `auto`는 한 CLI가 실패하면 설치된 다음 CLI에도 같은 목표를 전달하므로 민감한 내용은 넣지 마세요.
@@ -103,8 +124,8 @@ Ollama 의미 벡터는 에이전트가 만든 검색축 밖의 표현까지 추
 API 키는 필요하지 않습니다.
 
 ```bash
-gongctl catalog semantic-build
-gongctl catalog discover "시세보다 싸게 살 수 있는 물건" --rest-only
+opendatactl catalog semantic-build
+opendatactl catalog discover "시세보다 싸게 살 수 있는 물건" --rest-only
 ```
 
 기본 모델은 한국어를 포함한 100개 이상 언어를 지원하는 약 238MB의
@@ -131,15 +152,15 @@ gongctl catalog discover "시세보다 싸게 살 수 있는 물건" --rest-only
 > 걸러집니다. 모든 단어를 포함하는 결과가 없으면 조용히 0건을 주는 대신 일부만 일치하는
 > 것까지 보여주고, 그렇게 넓혔다는 사실을 `relaxed`로 알려줍니다. 모호한 목표는 MCP 호스트 모델이
 > 여러 검색축으로 의미 분해합니다. 독립 터미널에서는 `catalog discover`가 같은 일을 로그인된 AI
-> CLI로 수행합니다. gongctl은 축별 검색·선택적 벡터 검색을 합쳐 다양하게 반환합니다.
+> CLI로 수행합니다. OpenDataCTL은 축별 검색·선택적 벡터 검색을 합쳐 다양하게 반환합니다.
 
 ```bash
 # 호출 — 엔드포인트 URL 을 타이핑하지 않습니다
-gongctl call --pk 15077974 --param pageNo=1 --param numOfRows=3 --param type=xml
+opendatactl call --pk 15077974 --param pageNo=1 --param numOfRows=3 --param type=xml
 ```
 
 > **승인 조건은 `describe`의 `approval`에 나옵니다.** 포털은 개발단계와 운영단계를 따로
-> 심의하는데, gongctl이 쓰는 개발계정 경로는 조사한 데이터셋에서 사실상 모두 자동승인이었습니다
+> 심의하는데, OpenDataCTL이 쓰는 개발계정 경로는 조사한 데이터셋에서 사실상 모두 자동승인이었습니다
 > (무작위 90건 표본에 개발단계 심의는 0건). 운영단계는 약 1/3이 심의승인이므로, 나중에 상용으로
 > 옮길 계획이면 미리 확인할 값입니다. 그 행이 없는 데이터셋(대개 LINK)은 자동승인으로
 > 가정하지 않고 `approval` 없음으로 보고합니다.
@@ -151,26 +172,26 @@ gongctl call --pk 15077974 --param pageNo=1 --param numOfRows=3 --param type=xml
 
 ```bash
 # 계정 인증키 조회 (call 은 생략 시 자동으로 이 키를 씁니다)
-gongctl key
+opendatactl key
 
 # 스크래핑이 아직 살아있는지 점검 (data.go.kr HTML 변경 감지, CI용 exit 1)
-gongctl doctor -f table
+opendatactl doctor -f table
 ```
 
-> **사람의 개입은 `gongctl login` 한 번뿐입니다.** 검색 → 활용신청 → 승인 확인 → 인증키 획득 →
+> **사람의 개입은 `opendatactl login` 한 번뿐입니다.** 검색 → 활용신청 → 승인 확인 → 인증키 획득 →
 > 호출까지 에이전트가 스스로 끝냅니다. 인증키를 사람이 복사해 붙여넣을 필요가 없습니다.
 >
-> **신청 직후 403은 정상입니다.** (`call --wait 10m` 을 주면 gongctl이 1분 간격으로 재시도하며
+> **신청 직후 403은 정상입니다.** (`call --wait 10m` 을 주면 opendatactl이 1분 간격으로 재시도하며
 > 기다립니다.) 승인은 즉시 끝나지만 게이트웨이 반영에 시간이 걸립니다 —
 > 실측 **7~10분**, 포털 안내상 최대 1시간. `list_applications`에 '승인'으로 보여도 아직
 > 호출이 안 될 수 있습니다. 1~2분 간격으로 재시도하면 되고, 키를 바꾸거나 다시 신청할 필요는
 > 없습니다. 여러 개를 쓸 계획이면 **먼저 다 신청해두고 함께 기다리는 편이 빠릅니다.**
 
-`gongctl status` / `gongctl logout` / `gongctl version`도 있습니다.
+`opendatactl status` / `opendatactl logout` / `opendatactl version`도 있습니다.
 
 ## MCP 서버로 쓰기
 
-`gongctl mcp`는 stdio MCP 서버로 동작합니다. 수천 개의 개별 API를 MCP 도구로 한꺼번에 노출하지
+`opendatactl mcp`는 stdio MCP 서버로 동작합니다. 수천 개의 개별 API를 MCP 도구로 한꺼번에 노출하지
 않고, 아래의 작은 흐름이 필요한 정보와 권한만 단계적으로 가져옵니다.
 
 1. `catalog_search` — 자연어 목표를 모델이 여러 검색축으로 의미 분해하고, 로컬 키워드·선택적 Ollama
@@ -190,9 +211,9 @@ Codex·Claude Code·Gemini CLI에서는 각자 한 줄로 등록할 수 있습�
 모델이 자연어 목표를 검색축으로 만들므로 `catalog discover`가 하위 에이전트를 다시 실행하지 않습니다.
 
 ```bash
-codex mcp add gongctl -- gongctl mcp
-claude mcp add gongctl -- gongctl mcp
-gemini mcp add --scope user gongctl gongctl mcp
+codex mcp add opendatactl -- opendatactl mcp
+claude mcp add opendatactl -- opendatactl mcp
+gemini mcp add --scope user opendatactl opendatactl mcp
 ```
 
 Cursor와 Claude Desktop처럼 JSON 설정을 쓰는 클라이언트의 예시는 같습니다:
@@ -200,26 +221,26 @@ Cursor와 Claude Desktop처럼 JSON 설정을 쓰는 클라이언트의 예시�
 ```json
 {
   "mcpServers": {
-    "gongctl": {
-      "command": "gongctl",
+    "opendatactl": {
+      "command": "opendatactl",
       "args": ["mcp"]
     }
   }
 }
 ```
 
-Cursor Agent는 `cursor-agent mcp list-tools gongctl`로 연결과 도구 목록을 확인할 수 있습니다.
-ACP는 편집기와 에이전트 사이의 세션 프로토콜이고, gongctl 같은 도구 서버를 연결하는 경계는 MCP입니다.
+Cursor Agent는 `cursor-agent mcp list-tools opendatactl`로 연결과 도구 목록을 확인할 수 있습니다.
+ACP는 편집기와 에이전트 사이의 세션 프로토콜이고, opendatactl 같은 도구 서버를 연결하는 경계는 MCP입니다.
 따라서 Gemini/Cursor의 ACP 실행 모드를 별도 추론 API처럼 중첩하지 않고, 호스트가 MCP
 `catalog_search → describe_api → (미승인 시 apply) → call_api`를 호출하게 합니다.
 
 ## 보안 주의
 
-`gongctl login`은 브라우저 창을 한 번 띄웁니다(정부 SSO는 자동화하지 않습니다). 로그인이 확인되면
-gongctl이 세션 쿠키를 복사해 저장하고 **그 브라우저를 종료합니다** — 이후 명령은 창 없이 동작합니다.
+`opendatactl login`은 브라우저 창을 한 번 띄웁니다(정부 SSO는 자동화하지 않습니다). 로그인이 확인되면
+OpenDataCTL이 세션 쿠키를 복사해 저장하고 **그 브라우저를 종료합니다** — 이후 명령은 창 없이 동작합니다.
 세션이 유효한 동안에는 `applications`·`key` 같은 인증 요청에서 포털이 회전시킨 쿠키를 자동 병합해
 `datagokr-session.json`을 갱신하므로, 계속 사용하는 세션은 가능한 범위에서 연장됩니다. 정부 SSO의
-절대 만료나 재인증 요구가 오면 이를 우회하지 않고 다시 `gongctl login`을 안내합니다.
+절대 만료나 재인증 요구가 오면 이를 우회하지 않고 다시 `opendatactl login`을 안내합니다.
 
 **동작 방식**
 
@@ -232,7 +253,12 @@ gongctl이 세션 쿠키를 복사해 저장하고 **그 브라우저를 종료�
 - 인증키는 로그·명령 출력에 남기지 않고 전송 실패 메시지에서도 마스킹합니다. 호출 지속성을 위한
   로컬 캐시 한 곳에만 아래와 같이 `0600`으로 저장합니다.
 
-**디스크에 저장되는 것** (`~/.config/gongctl`, 디렉터리 `0700`)
+**디스크에 저장되는 것** (디렉터리 `0700`)
+
+- macOS: `~/Library/Application Support/opendatactl`
+- Linux: `~/.config/opendatactl`
+- Windows: `%AppData%\opendatactl`
+- 기존 사용자는 같은 위치의 `gongctl` 디렉터리를 자동으로 계속 사용
 
 | 파일 | 내용 | 권한 |
 | --- | --- | --- |
@@ -243,7 +269,7 @@ gongctl이 세션 쿠키를 복사해 저장하고 **그 브라우저를 종료�
 | `catalog.json` | 공개 OpenAPI 카탈로그 스냅샷 | `0644` |
 | `catalog-semantic.gob` | 선택 기능인 공개 카탈로그 의미 벡터 | `0600` |
 
-**`gongctl logout`은 세션·키·두 Chrome 프로파일을 삭제하고 공개 카탈로그 파일은 유지합니다.** 로그인 프로파일에는 사람이 로그인에 사용한
+**`opendatactl logout`은 세션·키·두 Chrome 프로파일을 삭제하고 공개 카탈로그 파일은 유지합니다.** 로그인 프로파일에는 사람이 로그인에 사용한
 SSO 제공자(네이버 등)의 쿠키도 함께 쌓이기 때문에, 쿠키 파일만 지우는 것으로는 충분하지 않습니다.
 작업이 끝나면 `logout`을 실행하세요.
 

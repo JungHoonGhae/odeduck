@@ -18,7 +18,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/JungHoonGhae/gongctl/internal/portal"
+	"github.com/JungHoonGhae/opendatactl/internal/portal"
 )
 
 const (
@@ -28,6 +28,15 @@ const (
 	DefaultEmbeddingModel = "embeddinggemma:300m-qat-q4_0"
 	semanticIndexVersion  = 1
 )
+
+// OllamaURLFromEnv returns the renamed environment setting while preserving the
+// v0.8 variable during the command compatibility window.
+func OllamaURLFromEnv() string {
+	if current := strings.TrimSpace(os.Getenv("OPENDATACTL_OLLAMA_URL")); current != "" {
+		return current
+	}
+	return strings.TrimSpace(os.Getenv("GONGCTL_OLLAMA_URL"))
+}
 
 var (
 	ErrSemanticIndexNotBuilt = errors.New("semantic index is not built")

@@ -60,7 +60,7 @@ type resolvedProvider struct {
 
 // Generate invokes one installed CLI in a non-interactive, read-only mode.
 // Authentication and billing remain entirely under that CLI's configuration;
-// gongctl never reads or stores its credentials.
+// opendatactl never reads or stores its credentials.
 func Generate(ctx context.Context, goal, requested string) (Plan, error) {
 	goal = strings.TrimSpace(goal)
 	if goal == "" {
@@ -90,7 +90,7 @@ func Generate(ctx context.Context, goal, requested string) (Plan, error) {
 
 func generateWithProvider(ctx context.Context, goal string, candidate resolvedProvider) (Plan, error) {
 	prompt := planningPrompt(goal)
-	workDir, err := os.MkdirTemp("", "gongctl-agent-")
+	workDir, err := os.MkdirTemp("", "opendatactl-agent-")
 	if err != nil {
 		return Plan{}, fmt.Errorf("agent 임시 작업공간 생성 실패: %w", err)
 	}

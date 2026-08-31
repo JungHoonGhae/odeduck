@@ -5,12 +5,13 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/JungHoonGhae/gongctl/internal/catalog"
-	"github.com/JungHoonGhae/gongctl/internal/fetch"
+	"github.com/JungHoonGhae/opendatactl/internal/catalog"
+	"github.com/JungHoonGhae/opendatactl/internal/fetch"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -28,6 +29,14 @@ func connectTestClient(t *testing.T, server *mcp.Server) *mcp.ClientSession {
 	}
 	t.Cleanup(func() { sess.Close() })
 	return sess
+}
+
+func isolateConfigHome(t *testing.T) {
+	t.Helper()
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, ".config"))
+	t.Setenv("APPDATA", filepath.Join(home, "AppData", "Roaming"))
 }
 
 func TestSearchToolRoundTrip(t *testing.T) {
@@ -153,6 +162,30 @@ func TestToolCatalogPresentsProgressiveDiscoveryWorkflow(t *testing.T) {
 	}
 }
 
+func TestGuideResourceUsesOpenDataCTLAndKeepsLegacyURI(t *testing.T) {
+	sess := connectTestClient(t, New(Deps{Fetch: fetch.New(fetch.WithDelay(0))}))
+	res, err := sess.ListResources(context.Background(), nil)
+	if err != nil {
+		t.Fatalf("list resources: %v", err)
+	}
+	seen := map[string]bool{}
+	for _, resource := range res.Resources {
+		seen[resource.URI] = true
+	}
+	for _, uri := range []string{"opendatactl://guide", "gongctl://guide"} {
+		if !seen[uri] {
+			t.Fatalf("missing guide resource %q; resources = %+v", uri, res.Resources)
+		}
+		read, err := sess.ReadResource(context.Background(), &mcp.ReadResourceParams{URI: uri})
+		if err != nil {
+			t.Fatalf("read %s: %v", uri, err)
+		}
+		if len(read.Contents) != 1 || !strings.Contains(read.Contents[0].Text, "OpenDataCTL") {
+			t.Fatalf("guide %s content = %+v", uri, read.Contents)
+		}
+	}
+}
+
 func TestCatalogSearchDefaultsToCallableDatasets(t *testing.T) {
 	if !((catalogIn{}).restOnly()) {
 		t.Fatal("omitting restOnly should search callable REST datasets")
@@ -204,7 +237,7 @@ func TestCatalogSearchSchemaSupportsSemanticQueryPlanning(t *testing.T) {
 }
 
 func TestCatalogSearchToolReturnsCompactCallableCandidatesByDefault(t *testing.T) {
-	t.Setenv("HOME", t.TempDir())
+	isolateConfigHome(t)
 	cat := &catalog.Catalog{
 		SyncedAt: time.Now(),
 		Type:     "API",
@@ -242,7 +275,7 @@ func TestCatalogSearchToolReturnsCompactCallableCandidatesByDefault(t *testing.T
 }
 
 func TestCatalogSearchToolExecutesAndDiversifiesSemanticConcepts(t *testing.T) {
-	t.Setenv("HOME", t.TempDir())
+	isolateConfigHome(t)
 	cat := &catalog.Catalog{
 		SyncedAt: time.Now(),
 		Type:     "API",

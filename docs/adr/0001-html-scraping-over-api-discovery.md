@@ -4,7 +4,7 @@ status: accepted
 
 # HTML scraping with loud drift detection, not API discovery or self-healing selectors
 
-gongctl reads data.go.kr by scraping HTML, which looks fragile enough that
+opendatactl reads data.go.kr by scraping HTML, which looks fragile enough that
 "surely there's a better way" keeps coming up — an adaptive-selector library
 (Scrapling), a crawler framework (goscrapy), an AI browser agent (Browser Use
 et al), or discovering the JSON APIs beneath the pages (Unbrowse's approach). We
@@ -12,7 +12,7 @@ investigated the last one against the live portal and it settled the rest:
 data.go.kr's read paths return **server-rendered HTML**, not a stable JSON data
 API. We therefore keep deterministic HTML parsing, prefer narrow first-party
 HTTP fragment endpoints when the portal exposes them, and manage markup
-fragility with a *loud* drift signal (`gongctl doctor`) rather than a clever
+fragility with a *loud* drift signal (`opendatactl doctor`) rather than a clever
 parser.
 
 ## Evidence (2026-07-25, live authenticated session)
@@ -64,9 +64,9 @@ the redesigned page did not introduce a stable data API.
   applications when a field changes.
 - **Adaptive/self-healing selectors (Scrapling)** — rejected: Python (breaks the
   single-binary distribution) and *probabilistic* — relocating an element by
-  similarity can silently match the wrong thing. gongctl's contract is
+  similarity can silently match the wrong thing. opendatactl's contract is
   surface-only: fail loudly, never fabricate.
-- **Crawler framework (goscrapy)** — rejected: gongctl hits three known
+- **Crawler framework (goscrapy)** — rejected: opendatactl hits three known
   endpoints; it is not a crawler, and a framework wouldn't make selectors any
   less brittle.
 - **AI browser agents (Browser Use, Stagehand, agent-browser)** — rejected: an
@@ -80,7 +80,7 @@ the redesigned page did not introduce a stable data API.
 ## Consequences
 
 - Markup drift is inevitable, so it must be *detected*, not absorbed: parsers
-  degrade to empty results, and `gongctl doctor` drives each seam live and exits
+  degrade to empty results, and `opendatactl doctor` drives each seam live and exits
   non-zero on drift (CI-friendly).
 - A zero-row authenticated application parse is ambiguous, not healthy. Doctor
   reports it as skipped, while non-empty lists report the parsed count. The

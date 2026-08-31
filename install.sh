@@ -1,15 +1,17 @@
 #!/bin/sh
-# gongctl 설치 스크립트 (macOS/Linux)
+# opendatactl 설치 스크립트 (macOS/Linux)
 #
-#   curl -fsSL https://raw.githubusercontent.com/JungHoonGhae/gongctl/main/install.sh | sh
+#   curl -fsSL https://raw.githubusercontent.com/JungHoonGhae/opendatactl/main/install.sh | sh
 #
 # 환경변수:
 #   INSTALL_DIR     설치 위치 (기본 /usr/local/bin)
-#   GONGCTL_VERSION 특정 버전 고정 (예: v0.4.0, 기본 latest)
+#   OPENDATACTL_VERSION 특정 버전 고정 (예: v0.4.0, 기본 latest)
+#   GONGCTL_VERSION  이전 변수명(호환용)
 set -e
 
-REPO="JungHoonGhae/gongctl"
-BINARY="gongctl"
+REPO="JungHoonGhae/opendatactl"
+BINARY="opendatactl"
+LEGACY_BINARY="gongctl"
 INSTALL_DIR="${INSTALL_DIR:-/usr/local/bin}"
 
 main() {
@@ -22,7 +24,7 @@ main() {
         exit 1
     fi
 
-    version="${GONGCTL_VERSION:-$(latest_version)}"
+    version="${OPENDATACTL_VERSION:-${GONGCTL_VERSION:-$(latest_version)}}"
     [ -n "$version" ] || { echo "Error: could not resolve latest version."; exit 1; }
     ver_no_v="${version#v}"
 
@@ -35,7 +37,12 @@ main() {
     tmpdir=$(mktemp -d)
     trap 'rm -rf "$tmpdir"' EXIT
 
-    curl -fsSL -o "${tmpdir}/${asset}" "${base}/${asset}"
+    if ! curl -fsSL -o "${tmpdir}/${asset}" "${base}/${asset}"; then
+        # A pinned pre-rename release only has gongctl_* archives. Install that
+        # executable under both names so legacy version pins keep working.
+        asset="${LEGACY_BINARY}_${ver_no_v}_${os}_${arch}.tar.gz"
+        curl -fsSL -o "${tmpdir}/${asset}" "${base}/${asset}"
+    fi
     curl -fsSL -o "${tmpdir}/checksums.txt" "${base}/checksums.txt"
 
     echo "Verifying checksum..."
@@ -50,6 +57,9 @@ main() {
     )
 
     tar -xzf "${tmpdir}/${asset}" -C "$tmpdir"
+    if [ ! -f "${tmpdir}/${BINARY}" ] && [ -f "${tmpdir}/${LEGACY_BINARY}" ]; then
+        cp "${tmpdir}/${LEGACY_BINARY}" "${tmpdir}/${BINARY}"
+    fi
 
     # 쓰기 가능하면 그대로, 아니면 sudo. 새 Apple Silicon 맥은 /usr/local/bin 이
     # 없을 수 있어(홈브루가 /opt/homebrew) mkdir -p 를 먼저 한다.
@@ -62,14 +72,19 @@ main() {
     $SUDO mkdir -p "$INSTALL_DIR"
     $SUDO mv "${tmpdir}/${BINARY}" "${INSTALL_DIR}/${BINARY}"
     $SUDO chmod +x "${INSTALL_DIR}/${BINARY}"
+    if [ -f "${tmpdir}/${LEGACY_BINARY}" ]; then
+        $SUDO mv "${tmpdir}/${LEGACY_BINARY}" "${INSTALL_DIR}/${LEGACY_BINARY}"
+        $SUDO chmod +x "${INSTALL_DIR}/${LEGACY_BINARY}"
+    fi
 
     echo ""
     echo "Installed: $("${INSTALL_DIR}/${BINARY}" version 2>/dev/null || echo "$BINARY")"
+    echo "Compatibility alias: ${LEGACY_BINARY}"
     echo ""
     echo "Next steps:"
-    echo "  gongctl login                                 # 브라우저 1회 로그인"
-    echo "  gongctl search 대기오염 --type api -f table    # 데이터셋 검색"
-    echo "  gongctl apply <pk> --purpose ... --category research"
+    echo "  opendatactl login                                 # 브라우저 1회 로그인"
+    echo "  opendatactl search 대기오염 --type api -f table    # 데이터셋 검색"
+    echo "  opendatactl apply <pk> --purpose ... --category research"
 }
 
 latest_version() {

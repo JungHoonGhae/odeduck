@@ -1,4 +1,4 @@
-// Package mcpserver exposes gongctl over the Model Context Protocol (stdio):
+// Package mcpserver exposes opendatactl over the Model Context Protocol (stdio):
 // dataset search, 활용신청, spec surfacing, and authenticated calls as tools.
 // It only assembles — the deterministic work lives in portal/apicall.
 package mcpserver
@@ -7,15 +7,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
 	"strings"
 	"time"
 
-	"github.com/JungHoonGhae/gongctl/internal/apicall"
-	"github.com/JungHoonGhae/gongctl/internal/catalog"
-	"github.com/JungHoonGhae/gongctl/internal/fetch"
-	"github.com/JungHoonGhae/gongctl/internal/portal"
-	"github.com/JungHoonGhae/gongctl/internal/version"
+	"github.com/JungHoonGhae/opendatactl/internal/apicall"
+	"github.com/JungHoonGhae/opendatactl/internal/catalog"
+	"github.com/JungHoonGhae/opendatactl/internal/fetch"
+	"github.com/JungHoonGhae/opendatactl/internal/portal"
+	"github.com/JungHoonGhae/opendatactl/internal/version"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -52,7 +51,7 @@ type callIn struct {
 type catalogIn struct {
 	Query string `json:"query" jsonschema:"the user's original natural-language need. For a concrete lookup this is also searched directly; for a broad or implicit goal, preserve it here and provide model-inferred concepts below"`
 	// Semantic interpretation belongs to the MCP host model that already
-	// understands the conversation. gongctl then executes the plan against all
+	// understands the conversation. opendatactl then executes the plan against all
 	// 11k+ rows locally; this avoids both a brittle synonym dictionary and a
 	// second embedding/LLM credential inside the CLI.
 	Concepts []string `json:"concepts,omitempty" jsonschema:"for broad, exploratory or implicit intent: 2-8 concrete Korean catalogue queries inferred from the user's goal. Cover distinct direct, adjacent, leading-indicator or constraint axes rather than mere synonyms; omit only for a concrete dataset lookup"`
@@ -130,8 +129,8 @@ func New(deps Deps) *mcp.Server {
 	// One shared transport → one throttle across search/describe/call.
 	pc := portal.New(deps.Fetch, portal.WithBaseURL(base))
 	s := mcp.NewServer(&mcp.Implementation{
-		Name:    "gongctl",
-		Title:   "gongctl — 공공데이터포털(data.go.kr) 자동화",
+		Name:    "opendatactl",
+		Title:   "OpenDataCTL — 대한민국 공공데이터 AI 컨트롤 플레인",
 		Version: version.Version,
 	}, nil)
 
@@ -143,7 +142,7 @@ func New(deps Deps) *mcp.Server {
 			"구체적인 데이터명을 찾을 때는 query 만 쓴다. 하지만 '돈 될 만한 것', '새 서비스를 기획하고 싶다', " +
 			"'대한민국이 어떻게 변하고 있나'처럼 의미 해석이 필요한 목표는 원문을 query 에 보존하고, **호출하기 전에 " +
 			"스스로 2~8개의 구체적인 데이터 축을 추론해 concepts 에 넣어라**. concepts 는 동의어 나열이 아니라 직접 대상, " +
-			"인접 시장, 선행지표, 제약·위험, 다른 기관 관점을 포함해야 한다. gongctl 은 각 축을 전체 카탈로그에서 독립 검색해 " +
+			"인접 시장, 선행지표, 제약·위험, 다른 기관 관점을 포함해야 한다. opendatactl 은 각 축을 전체 카탈로그에서 독립 검색해 " +
 			"중복을 제거하고 골고루 섞는다. 이것이 언어모델의 의미 이해와 결정적 로컬 검색을 결합하는 경계다. " +
 			"planned 결과는 matchedQuery 로 왜 발견됐는지 설명하며, 짧은 공식 preview 를 기본 포함한다. ranking=balanced 는 " +
 			"활용 수요가 검증된 데이터와 최근 수정된 저활용 데이터를 함께 보여준다. 데이터 탐색은 반드시 이 도구로 시작하고, " +
@@ -154,7 +153,7 @@ func New(deps Deps) *mcp.Server {
 			"relaxed=true 면 모든 단어를 포함하는 데이터가 없어 일부만 일치하는 것까지 보여준 것이므로 " +
 			"matched 가 낮은 결과는 무관할 수 있다. terms 로 실제 검색된 단어를 확인하라. " +
 			"stale=true 면 스냅샷이 오래되어 최근 신설 API 가 누락될 수 있다. " +
-			"카탈로그가 없으면 사람에게 `gongctl catalog sync` 를 안내하라.",
+			"카탈로그가 없으면 사람에게 `opendatactl catalog sync` 를 안내하라.",
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in catalogIn) (*mcp.CallToolResult, *catalogOut, error) {
 		if in.Limit < 0 || in.Limit > catalog.MaxSearchLimit {
 			return errResult(fmt.Sprintf("limit은 생략하거나 1~%d 사이여야 합니다", catalog.MaxSearchLimit)), nil, nil
@@ -189,7 +188,7 @@ func New(deps Deps) *mcp.Server {
 			}
 			if index != nil {
 				if embedder == nil {
-					embedder = catalog.NewOllamaEmbedder(os.Getenv("GONGCTL_OLLAMA_URL"), index.Model)
+					embedder = catalog.NewOllamaEmbedder(catalog.OllamaURLFromEnv(), index.Model)
 				}
 				res = cat.SearchHybrid(ctx, plan, index, embedder)
 			}
@@ -220,12 +219,12 @@ func New(deps Deps) *mcp.Server {
 		Name:        "call_api",
 		Annotations: readOnlyAnnotations("3단계 · 승인된 OpenAPI 호출", true),
 		Description: "[3단계: 호출] describe_api 로 확인한 승인 API 를 pk·op·params 로 호출한다. " +
-			"MCP에서는 endpoint URL과 인증키를 받지 않는다. gongctl 이 pk로 포털 명세에서 엔드포인트를 다시 조회하고, " +
+			"MCP에서는 endpoint URL과 인증키를 받지 않는다. opendatactl 이 pk로 포털 명세에서 엔드포인트를 다시 조회하고, " +
 			"로그인 세션의 키를 안전하게 주입하며, 명세의 필수 요청변수가 빠졌는지 호출 전에 " +
 			"확인한다(빠지면 data.go.kr 은 에러 대신 빈 결과를 주므로 스스로 알아채기 어렵다). " +
 			"상세기능이 여럿이면 op 로 지정하라(엔드포인트 마지막 경로 조각). " +
 			"**방금 apply 한 API 라면 waitSeconds=300 을 줘라** — 승인은 즉시지만 게이트웨이 반영에 " +
-			"보통 7~10분 걸려 403 이 오고, gongctl 이 그 동안 1분 간격으로 재시도한다. " +
+			"보통 7~10분 걸려 403 이 오고, opendatactl 이 그 동안 1분 간격으로 재시도한다. " +
 			"그래도 403 이면 실패가 아니라 아직 반영 전이니 잠시 후 다시 호출하라(키를 바꾸거나 " +
 			"다시 신청하지 마라). 응답 XML 은 JSON 으로 변환한다. body 의 resultCode 로 성공(00) 여부를 확인하라.",
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in callIn) (*mcp.CallToolResult, *apicall.CallResult, error) {
@@ -324,18 +323,21 @@ func New(deps Deps) *mcp.Server {
 		return nil, res, nil
 	})
 
-	s.AddResource(&mcp.Resource{
-		Name:        "guide",
-		URI:         "gongctl://guide",
-		MIMEType:    "text/markdown",
-		Description: "gongctl 도구 사용 순서와 인증키 Encoding/Decoding 주의. 먼저 읽으세요.",
-	}, func(ctx context.Context, req *mcp.ReadResourceRequest) (*mcp.ReadResourceResult, error) {
-		return &mcp.ReadResourceResult{Contents: []*mcp.ResourceContents{{
-			URI:      "gongctl://guide",
-			MIMEType: "text/markdown",
-			Text:     GuideDoc,
-		}}}, nil
-	})
+	for _, resource := range []struct {
+		name, uri, description string
+	}{
+		{"guide", "opendatactl://guide", "OpenDataCTL 도구 사용 순서와 인증키 Encoding/Decoding 주의. 먼저 읽으세요."},
+		{"guide-legacy", "gongctl://guide", "이전 gongctl 클라이언트를 위한 호환 리소스입니다. opendatactl://guide를 사용하세요."},
+	} {
+		resource := resource
+		s.AddResource(&mcp.Resource{
+			Name: resource.name, URI: resource.uri, MIMEType: "text/markdown", Description: resource.description,
+		}, func(context.Context, *mcp.ReadResourceRequest) (*mcp.ReadResourceResult, error) {
+			return &mcp.ReadResourceResult{Contents: []*mcp.ResourceContents{{
+				URI: resource.uri, MIMEType: "text/markdown", Text: GuideDoc,
+			}}}, nil
+		})
+	}
 
 	return s
 }

@@ -7,7 +7,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/JungHoonGhae/gongctl/internal/fetch"
+	"github.com/JungHoonGhae/opendatactl/internal/fetch"
 )
 
 // fixtureServer serves the real captured search + openapi.do markup (reused from

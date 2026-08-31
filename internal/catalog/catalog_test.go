@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/JungHoonGhae/gongctl/internal/portal"
+	"github.com/JungHoonGhae/opendatactl/internal/portal"
 )
 
 func sample() *Catalog {
@@ -26,10 +26,16 @@ func sample() *Catalog {
 	}
 }
 
-func TestCatalogSaveAtomicallyReplacesSnapshot(t *testing.T) {
+func isolateConfigHome(t *testing.T) {
+	t.Helper()
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, ".config"))
+	t.Setenv("APPDATA", filepath.Join(home, "AppData", "Roaming"))
+}
+
+func TestCatalogSaveAtomicallyReplacesSnapshot(t *testing.T) {
+	isolateConfigHome(t)
 	first := &Catalog{SyncedAt: time.Now(), Type: "API", Entries: []Entry{{PK: "1", Title: "first"}}}
 	if err := first.Save(); err != nil {
 		t.Fatal(err)

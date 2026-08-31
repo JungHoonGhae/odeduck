@@ -1,9 +1,43 @@
 # Changelog
 
-All notable changes to gongctl are documented here. Format follows
+All notable changes to OpenDataCTL are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); versions follow
 [SemVer](https://semver.org/). The release workflow uses the `## [X.Y.Z]`
 section matching a `vX.Y.Z` tag as the GitHub release notes.
+
+## [0.9.0]
+
+### Added
+
+- **OpenDataCTL is the new product and command name.** The name spells out the
+  product's job: an AI control plane for Korean open data, connecting natural-
+  language discovery, specification inspection, utilization application,
+  approval status, credential injection, and the first live API call.
+- Release archives contain both `opendatactl` and a `gongctl` compatibility
+  binary. Legacy `gongctl_*` archive names also remain available for saved v0.8
+  installer copies. The old `GONGCTL_VERSION` and `GONGCTL_OLLAMA_URL`
+  environment variables and `gongctl://guide` MCP resource remain supported
+  during the transition.
+
+### Changed
+
+- The Go module, GitHub repository references, release archives, installer,
+  Homebrew cask, MCP implementation identity, user agent, command help, and
+  current documentation now use `github.com/JungHoonGhae/opendatactl` and the
+  `OpenDataCTL` brand.
+- Fresh installations store state in the operating system's standard
+  `opendatactl` configuration directory. Existing users continue using their
+  `gongctl` directory in place, so login cookies, API keys, catalogues, and
+  semantic indexes are neither copied nor lost.
+
+### Migration
+
+- Replace `gongctl` with `opendatactl` in shell scripts and MCP configuration.
+  The old command remains functional in v0.9, but new integrations should use
+  `opendatactl`.
+- Go installations must use
+  `go install github.com/JungHoonGhae/opendatactl/cmd/opendatactl@latest` because
+  the module path follows the renamed repository.
 
 ## [0.8.0]
 

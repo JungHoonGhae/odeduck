@@ -21,6 +21,15 @@ jobs:
         with:
           go-version-file: go.mod
 
+      - name: Verify renamed release targets
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REPOSITORY" = "JungHoonGhae/opendatactl"
+          gh api repos/JungHoonGhae/homebrew-opendatactl >/dev/null
+
       - name: Verify module files
         run: go mod tidy -diff
 
@@ -64,5 +73,5 @@ jobs:
           args: release --clean --release-notes /tmp/release-notes.md
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # Doppler 에서 가져온 PAT 으로 Homebrew tap(homebrew-gongctl)에 cask 푸시.
+          # Doppler 에서 가져온 PAT 으로 Homebrew tap(homebrew-opendatactl)에 cask 푸시.
           HOMEBREW_TAP_GITHUB_TOKEN: ${{ steps.doppler.outputs.token }}

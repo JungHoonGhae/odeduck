@@ -1,4 +1,4 @@
-# CLAUDE.md — gongctl
+# CLAUDE.md — OpenDataCTL
 
 data.go.kr(공공데이터포털)의 OpenAPI **활용신청·인증키 발급·호출을 AI 에이전트가 대신**하게 하는
 Go CLI + MCP. 사람은 정부 SSO 로그인 한 번만 하고 이후 포털 작업을 에이전트가 잇는 것이 핵심.
@@ -22,7 +22,7 @@ Go CLI + MCP. 사람은 정부 SSO 로그인 한 번만 하고 이후 포털 작
   (로그인 1회 제외). 인증키는 `/iim/api/selectApiKeyList.do`의 `#pblisrCrtfcKeyPlain`에서 파싱.
 - **인증키**: data.go.kr은 **계정당 일반 인증키 하나**(첫 신청 시 발급). 엔드포인트별 매칭 불필요.
   Encoding/Decoding 키 함정 있음 — 잘못 쓰면 조용히 실패, 에러 힌트로 surface.
-- **로그인**: 정부 SSO는 자동화 안 함. 사람이 브라우저 1회(`gongctl login`) → **쿠키 추출 후 브라우저 종료**.
+- **로그인**: 정부 SSO는 자동화 안 함. 사람이 브라우저 1회(`opendatactl login`) → **쿠키 추출 후 브라우저 종료**.
   읽기는 순수 HTTP(`internal/portal/session.go`), `apply`만 headless Chrome에 쿠키 주입해 폼 구동.
   tossinvest-cli의 storage-state 패턴을 이식(단, Python helper 없이 chromedp in-process).
 
@@ -43,14 +43,14 @@ Go CLI + MCP. 사람은 정부 SSO 로그인 한 번만 하고 이후 포털 작
 
 ## 경쟁 지형
 
-검색→상세→호출 MCP는 이미 존재한다. gongctl의 검증된 차이는 목표 기반 전체 카탈로그 탐색과
+검색→상세→호출 MCP는 이미 존재한다. OpenDataCTL의 검증된 차이는 목표 기반 전체 카탈로그 탐색과
 data.go.kr 활용신청·승인·키 재사용·실호출을 하나로 연결하는 것이다. 비교 주장과 커밋 고정 근거는
 `docs/research/competitive-workflow-audit.md`만 갱신한다.
 
 ## 주의
 
 - `.github/workflows/` 커밋은 git 토큰 **workflow 스코프** 필요(kvote에서 겪음, 해결됨).
-- 이건 fragile scraping — data.go.kr HTML 바뀌면 파서가 조용히 빈 결과. `gongctl doctor`가
+- 이건 fragile scraping — data.go.kr HTML 바뀌면 파서가 조용히 빈 결과. `opendatactl doctor`가
   각 seam(search·describe·applications)을 라이브 호출해 drift를 시끄럽게 감지(CI용 exit 1).
 - **보안(HIGH, 해결됨)**: `daemon.go`에서 `--remote-allow-origins=*` 제거(스파이크
   `proto/cdp-origin`로 검증 — chromedp는 flag 없이 재부착, 외부 Origin은 Chrome이 403 거부).

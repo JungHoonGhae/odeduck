@@ -1,9 +1,9 @@
 package mcpserver
 
-// GuideDoc is the gongctl://guide resource. It keeps the normal path deliberately
+// GuideDoc is the opendatactl://guide resource. It keeps the normal path deliberately
 // small: thousands of portal endpoints stay behind three generic MCP tools, and
 // only one compact candidate list and one selected specification enter context.
-const GuideDoc = `# gongctl — data.go.kr 사용 가이드
+const GuideDoc = `# OpenDataCTL — data.go.kr 사용 가이드
 
 ## 기본 경로: 검색 → 상세 → 필요시 AI 활용신청 → 호출
 
@@ -31,7 +31,7 @@ const GuideDoc = `# gongctl — data.go.kr 사용 가이드
   포털에 명세가 없고 제공기관의 별도 사이트·계정·인증키가 필요할 수 있다.
 - lexical 결과의 relaxed=true면 모든 검색어를 만족하는 결과가 없어 일부 단어만 맞는 후보까지 확장한 것이다.
   terms와 각 hit의 matched를 보고 관련성을 다시 판단한다.
-- stale=true면 최근 신설 API가 빠졌을 수 있다. ` + "`gongctl catalog sync`" + `로 갱신한다.
+- stale=true면 최근 신설 API가 빠졌을 수 있다. ` + "`opendatactl catalog sync`" + `로 갱신한다.
 
 후보를 하나 고른 뒤 그 hit의 pk를 describe_api에 넘긴다. 검색 결과만 보고 엔드포인트나
 파라미터를 추측하지 않는다.
@@ -54,12 +54,12 @@ AI가 선택한 OpenAPI의 활용신청을 실제 제출한다. purpose에는 �
 
 - 이미 신청한 API는 다시 신청하지 말고 list_applications로 승인 상태를 확인한다.
 - 개발단계 자동승인이면 신청 결과를 확인한 뒤 3단계 call_api로 바로 이어간다.
-- 로그인 세션이 없으면 사람에게 ` + "`gongctl login`" + `을 안내한다. 로그인 이후에는 브라우저 조작,
+- 로그인 세션이 없으면 사람에게 ` + "`opendatactl login`" + `을 안내한다. 로그인 이후에는 브라우저 조작,
   인증키 복사, 신청 폼 입력을 AI가 대신한다.
 
 ### 3. call_api(pk, op, params)
 describe_api에서 확인한 pk·op·params로 승인된 API를 호출한다. MCP 입력에는 raw endpoint와
-serviceKey가 없다. gongctl이 pk로 명세를 다시 읽고 엔드포인트를 결정하며 필수 파라미터 누락을
+serviceKey가 없다. opendatactl이 pk로 명세를 다시 읽고 엔드포인트를 결정하며 필수 파라미터 누락을
 검사한 뒤 로그인 세션의 인증키를 주입한다. XML 응답은 JSON으로 변환한다.
 
 - 상세기능이 하나면 op를 생략할 수 있다. 여러 개면 describe_api에서 확인한 op를 지정한다.

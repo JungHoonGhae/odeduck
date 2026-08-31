@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/JungHoonGhae/gongctl/internal/fetch"
+	"github.com/JungHoonGhae/opendatactl/internal/fetch"
 )
 
 func TestDescribeReadsKRDSMetadata(t *testing.T) {
