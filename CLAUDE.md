@@ -65,7 +65,8 @@ data.go.kr 활용신청·승인·키 재사용·실호출을 하나로 연결하
 
 ### Issue tracker
 
-이슈·스펙은 원격 없이 `.scratch/<feature-slug>/` 에 markdown으로 관리. See `docs/agents/issue-tracker.md`.
+canonical tracker는 `JungHoonGhae/opendatactl`의 GitHub Issues다. 구현 spec과 장기 문서는 저장소에
+versioned Markdown으로 두고, 추적 이슈에서 링크한다. See `docs/agents/issue-tracker.md`.
 
 ### Triage labels
 

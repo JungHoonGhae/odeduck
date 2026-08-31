@@ -118,7 +118,33 @@ opendatactl catalog orgs 폭염          # 그 주제를 개방한 기관 순위
 `--agent auto`가 기본이며 `codex | claude | gemini | cursor`로 고정할 수 있습니다. OpenDataCTL은 로그인
 토큰을 읽거나 저장하지 않고, 각 CLI가 평소 사용하는 인증·요금제를 그대로 사용합니다. 검색 목표는
 CLI의 stdin으로 전달해 로컬 프로세스 목록에 남기지 않으며, 읽기 전용/질문 모드로 실행합니다.
-`auto`는 한 CLI가 실패하면 설치된 다음 CLI에도 같은 목표를 전달하므로 민감한 내용은 넣지 마세요.
+`auto`는 첫 검색 계획 생성이 실패하면 설치된 다음 CLI에도 같은 목표를 전달합니다. 이후 결과 기반
+단계는 처음 성공한 CLI를 계속 사용하며, 실패하면 1차 검색축으로 축소하거나 후보 생성을 중단합니다.
+어느 경우든 목표가 외부 CLI에 전달되므로 민감한 내용은 넣지 마세요.
+결과 기반 단계의 카탈로그 문장은 untrusted data로 표시하고 Codex·Claude Code·Gemini CLI의 도구를
+끕니다. Cursor Agent는 현재 no-tools 옵션이 없으므로 초기 검색 계획까지만 지원하며, 외부 metadata가
+들어가는 후속 단계는 실행하지 않고 연결 카드를 Abstention합니다. subprocess에는 필요한 최소 환경만
+전달합니다.
+
+`catalog discover`는 이제 첫 검색 결과를 본 뒤 빠진 역할의 Bridge 데이터를 한 번 더 찾고, 실제
+결과의 제목과 공식 설명이 역할을 뒷받침하는 PK만 최대 3개 연결 후보로 고릅니다. 예를 들어 공매
+물건을 찾는 질문에서 공매라는 단어가 없는 상권 변화·토양오염 데이터를 각각 수요 대리신호와 환경
+위험 후보로 발견할 수 있습니다. 검색 1위를 자동으로 연결하지 않으며, 역할·예상 결합키·둘을 함께
+볼 때 생기는 새 판단·metadata 근거가 모두 없는 결과는 버립니다.
+최종 단계에서도 원래 Anchor 검색축을 유지하므로, 임의의 카탈로그 PK를 Anchor라고 다시 붙이는
+선택은 서버에서 거부됩니다.
+
+```bash
+opendatactl catalog discover \
+  "시세보다 저렴한 공매 부동산의 숨은 위험과 실제 수요를 비교하고 싶다" \
+  --agent codex --max-connections 3
+```
+
+출력의 `connections`는 항상 `candidate`입니다. 지역 범위나 대상 유형의 제한은
+`candidateEvidence`에, 실제로 확인할 field·grain·값 교집합은 `evidenceRequired`에 나옵니다. 공식
+명세와 작은 응답 표본을 확인하기 전에는 join, 사업성, 인과관계가 검증됐다고 뜻하지 않습니다.
+적합한 항목이 없으면 `abstention`이 정상 결과입니다. 출시 전 세 시나리오에서 무엇이 달라졌고 어떤
+한계가 남았는지는 [연결 발견 평가](docs/research/connection-discovery-evaluation.md)에 기록했습니다.
 
 MCP에서 쓸 때는 상위 Codex·Claude·Gemini·Cursor가 이미 검색 계획기입니다. 에이전트가
 `catalog_search`의 `concepts`를 직접 채우므로 하위 CLI를 한 번 더 실행하지 않습니다. 즉 **MCP가
@@ -206,10 +232,13 @@ opendatactl doctor -f table
 않고, 아래의 작은 흐름이 필요한 정보와 권한만 단계적으로 가져옵니다.
 
 1. `catalog_search` — 자연어 목표를 모델이 여러 검색축으로 의미 분해하고, 로컬 키워드·선택적 Ollama
-   벡터 검색을 결합해 작은 후보 목록을 반환
+   벡터 검색을 결합해 작은 후보 목록을 반환. 교차 데이터 발견은 같은 도구를 세 번 점진적으로
+   호출해 Anchor 회수 → 실제 결과 기반 Bridge 회수 → 명시적 PK 선택을 수행
 2. `describe_api` — 선택한 `pk` 하나의 상세기능·엔드포인트·요청변수를 반환
    - `apply`(2.5단계) — 미승인 API라면 AI가 활용목적을 작성해 신청하고 자동승인 결과를 확인
-3. `call_api` — 같은 `pk`와 확인한 파라미터로 명세 검증 후 실제 호출
+3. `call_api` — 같은 `pk`와 확인한 파라미터로 명세 검증 후 실제 호출. 연결 검증에서는
+   `profileFields`로 응답 field의 raw 값·null·distinct·duplicate 표본을 함께 반환. 같은 leaf가 여러
+   path에 있으면 값을 섞지 않고 `ambiguous=true`와 dotted paths를 반환
 
 MCP의 `call_api`는 raw endpoint와 인증키를 입력받지 않습니다. 항상 `pk`로 명세를 다시 확인하고
 로그인 세션의 키를 주입하므로 상세 단계를 우회할 수 없습니다. 최신 데이터 재확인용
@@ -217,6 +246,12 @@ MCP의 `call_api`는 raw endpoint와 인증키를 입력받지 않습니다. 항
 `apply`는 보조 기능이 아니라 **발견한 데이터를 실제로 쓸 수 있게 만드는 핵심 연결 단계**입니다.
 로그인 한 번 뒤에는 에이전트가 명세 확인, 신청 폼 제출, 승인 상태 확인, 인증키 주입과 호출까지
 스스로 이어갑니다.
+
+연결 후보를 만들 때 MCP 호스트는 첫 `catalog_search`의 `axes`에 `role=anchor`와 서로 다른 역할을
+넣고, 실제 hits를 본 뒤 `anchorPks`, 원래 Anchor axis, 보완 `axes`로 두 번째 호출을 합니다. 마지막으로
+두 번째 hits 안의 실제 PK만 `bridgeSelections`에 명시합니다. 서버는 현재 hits 밖의 PK, 빈 후보 근거,
+예상 key가 없는 edge, 변환 설명이 없는 proxy, 중복 역할을 거부합니다. 전체 계약과 상태 승격 기준은
+[교차 데이터 연결 발견 v1 명세](docs/specs/cross-domain-connection-discovery-v1.md)에 있습니다.
 
 에이전트가 먼저 읽을 MCP 리소스는 `opendatactl://guide`입니다. 기존 `gongctl://guide` URI도
 v0.9 호환 기간에는 같은 가이드를 반환합니다.
