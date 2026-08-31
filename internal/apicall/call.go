@@ -1,6 +1,7 @@
 package apicall
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"encoding/xml"
@@ -64,9 +65,10 @@ func SecureEndpoint(endpoint string) (string, error) {
 // CallResult is a surfaced API response. Body is a map (XML→JSON or JSON),
 // or a string when the content isn't structured.
 type CallResult struct {
-	Status      int    `json:"status"`
-	ContentType string `json:"contentType"`
-	Body        any    `json:"body"`
+	Status      int            `json:"status"`
+	ContentType string         `json:"contentType"`
+	Body        any            `json:"body"`
+	Profile     *SampleProfile `json:"profile,omitempty"`
 }
 
 // Call injects serviceKey, GETs the endpoint, and surfaces the response. The
@@ -157,8 +159,13 @@ func decodeBody(contentType string, raw []byte) any {
 	trimmed := strings.TrimSpace(string(raw))
 	if strings.Contains(contentType, "json") || strings.HasPrefix(trimmed, "{") || strings.HasPrefix(trimmed, "[") {
 		var v any
-		if json.Unmarshal(raw, &v) == nil {
-			return v
+		decoder := json.NewDecoder(bytes.NewReader(raw))
+		decoder.UseNumber()
+		if decoder.Decode(&v) == nil {
+			var trailing any
+			if decoder.Decode(&trailing) == io.EOF {
+				return v
+			}
 		}
 	}
 	if strings.HasPrefix(trimmed, "<") {

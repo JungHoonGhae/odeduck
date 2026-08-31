@@ -5,12 +5,16 @@ Go CLI + MCP. 사람은 정부 SSO 로그인 한 번만 하고 이후 포털 작
 
 ## 현재 상태 (2026-08-31)
 
-- v0.9는 제품·명령 이름을 OpenDataCTL/`opendatactl`로 바꾸고, v0.8 자동화를 위한 `gongctl`
-  호환 바이너리·설정 경로·환경변수·MCP 가이드 URI를 유지한다.
+- v0.10은 여러 공공데이터 사이의 연결 후보를 제한된 탐색 예산 안에서 찾는 connection discovery와
+  응답 필드 프로파일링을 추가한다. v0.9에서 도입한 OpenDataCTL/`opendatactl` 이름과 v0.8 자동화를
+  위한 `gongctl` 호환 바이너리·설정 경로·환경변수·MCP 가이드 URI는 유지한다.
 - 목표 기반 카탈로그 검색, 선택형 Ollama 의미 검색, 검색→상세→활용신청→호출 MCP 흐름을 제공한다.
+  discovery는 Generate→Search→Expand→Search→Compose→Search의 세 단계 검색으로 동작하며,
+  Codex·Claude·Gemini는 전체 계획을, Cursor는 안전한 초기 검색 계획을 지원한다.
 - data.go.kr KRDS 개편 파서와 세션 쿠키 회전 갱신을 적용했다.
 - 온비드·나라장터·도매시장·중소기업 지원사업 API를 실계정으로 신청·승인·호출했다.
-- 현재 설계 근거는 `docs/adr/`, 검색 평가는 `docs/research/semantic-search-evaluation.md`, 경쟁 조사는
+- 현재 설계 근거는 `docs/adr/`, discovery 계약은 `docs/specs/cross-domain-connection-discovery-v1.md`, 실제 검색 평가는
+  `docs/research/connection-discovery-evaluation.md`와 `docs/research/semantic-search-evaluation.md`, 경쟁 조사는
   `docs/research/competitive-workflow-audit.md`, 포털 경계는 `docs/reverse-engineering/portal-catalog.md`가
   단일 소스다. `docs/superpowers/specs/`와 `docs/superpowers/plans/`는 최초 구현의 역사적 기록이고,
   홍보 영상 제작 기록은 `docs/promo/opendatactl-agent-explainer.md`에 있다.
@@ -44,6 +48,9 @@ Go CLI + MCP. 사람은 정부 SSO 로그인 한 번만 하고 이후 포털 작
 
 - `internal/apicall/describe.go` — OpenAPI 상세페이지 → 엔드포인트·요청변수·가이드문서 surface.
 - `internal/apicall/call.go` — 계정 인증키 주입 + HTTP GET + XML→JSON + 에러코드 surface.
+- `internal/agentplan/` — provider별 계획 생성과 검색 결과 기반 확장·조합, 안전한 abstention.
+- `internal/catalog/` — 키워드·의미 검색, connection discovery의 제한·중복 제거·증거 경계.
+- `internal/apicall/profile.go` — 호출 응답의 선택 필드에 대한 경로·고유값 프로파일링.
 
 ## 경쟁 지형
 
@@ -65,7 +72,8 @@ data.go.kr 활용신청·승인·키 재사용·실호출을 하나로 연결하
 
 ### Issue tracker
 
-이슈·스펙은 원격 없이 `.scratch/<feature-slug>/` 에 markdown으로 관리. See `docs/agents/issue-tracker.md`.
+canonical tracker는 `JungHoonGhae/opendatactl`의 GitHub Issues다. 구현 spec과 장기 문서는 저장소에
+versioned Markdown으로 두고, 추적 이슈에서 링크한다. See `docs/agents/issue-tracker.md`.
 
 ### Triage labels
 

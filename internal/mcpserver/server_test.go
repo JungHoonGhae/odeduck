@@ -131,6 +131,9 @@ func TestToolCatalogPresentsProgressiveDiscoveryWorkflow(t *testing.T) {
 	if _, ok := props["key"]; ok {
 		t.Error("MCP call_api should use the session key instead of exposing a credential input")
 	}
+	if _, ok := props["profileFields"]; !ok {
+		t.Error("MCP call_api should expose bounded response profiling for connection evidence")
+	}
 	required, ok := callSchema["required"].([]any)
 	if !ok || !containsString(required, "pk") {
 		t.Fatalf("call_api must require pk; required = %#v", callSchema["required"])
@@ -228,12 +231,112 @@ func TestCatalogSearchSchemaSupportsSemanticQueryPlanning(t *testing.T) {
 		if !ok {
 			t.Fatalf("catalog_search properties type = %T", schema["properties"])
 		}
-		if _, ok := props["concepts"]; !ok {
-			t.Fatal("catalog_search must let the host model provide semantic concept queries")
+		for _, name := range []string{"concepts", "axes", "anchorPks", "bridgeSelections", "maxConnections"} {
+			if _, ok := props[name]; !ok {
+				t.Fatalf("catalog_search schema missing %s", name)
+			}
 		}
 		return
 	}
 	t.Fatal("catalog_search tool missing")
+}
+
+func TestCatalogSearchReturnsConnectionsOnlyAfterExplicitBridgeSelection(t *testing.T) {
+	isolateConfigHome(t)
+	cat := &catalog.Catalog{
+		SyncedAt: time.Now(),
+		Type:     "API",
+		Entries: []catalog.Entry{
+			{PK: "anchor", Title: "온비드 공매 물건", SvcType: catalog.SvcREST},
+			{PK: "bridge", Title: "상권 점포 개폐업", SvcType: catalog.SvcREST},
+		},
+	}
+	if err := cat.Save(); err != nil {
+		t.Fatal(err)
+	}
+	sess := connectTestClient(t, New(Deps{Fetch: fetch.New(fetch.WithDelay(0))}))
+	res, err := sess.CallTool(context.Background(), &mcp.CallToolParams{
+		Name: "catalog_search",
+		Arguments: map[string]any{
+			"query": "공매 투자 판단", "anchorPks": []string{"anchor"}, "semantic": false,
+			"axes": []map[string]any{
+				{"role": "anchor", "query": "온비드 공매 물건"},
+				{
+					"role": "상권 수요", "query": "상권 점포 개폐업",
+					"contribution": "저가 매물과 쇠퇴 상권을 구분",
+					"edge": map[string]any{
+						"kinds":        []string{"spatial", "temporal"},
+						"expectedKeys": []string{"법정동코드", "기준연월"},
+					},
+				},
+			},
+			"bridgeSelections": []map[string]any{{
+				"pk": "bridge", "role": "상권 수요",
+				"incrementalValue": "저가 매물과 쇠퇴 상권을 구분",
+				"whyCandidate":     "점포 개폐업 title이 역할을 직접 뒷받침",
+				"edge": map[string]any{
+					"kinds":        []string{"spatial", "temporal"},
+					"expectedKeys": []string{"법정동코드", "기준연월"},
+				},
+			}},
+		},
+	})
+	if err != nil || res.IsError {
+		t.Fatalf("catalog_search err=%v result=%+v", err, res)
+	}
+	raw, _ := json.Marshal(res.StructuredContent)
+	var got catalogOut
+	if err := json.Unmarshal(raw, &got); err != nil {
+		t.Fatal(err)
+	}
+	if len(got.Connections) != 1 {
+		t.Fatalf("connections = %+v", got.Connections)
+	}
+	connection := got.Connections[0]
+	if connection.Status != catalog.ConnectionStatusCandidate || connection.Anchor.PK != "anchor" || connection.Bridge.PK != "bridge" {
+		t.Fatalf("connection = %+v", connection)
+	}
+	if strings.Contains(strings.ToLower(connection.Status), "verified") {
+		t.Fatalf("metadata search overclaimed verification: %+v", connection)
+	}
+}
+
+func TestDiscoveryAndProfileInputBoundsFailBeforeIO(t *testing.T) {
+	sess := connectTestClient(t, New(Deps{Fetch: fetch.New(fetch.WithDelay(0))}))
+	manyAxes := make([]map[string]any, 9)
+	for i := range manyAxes {
+		manyAxes[i] = map[string]any{"role": "role", "query": "query"}
+	}
+	tests := []struct {
+		name string
+		tool string
+		args map[string]any
+		want string
+	}{
+		{"too many axes", "catalog_search", map[string]any{"query": "x", "axes": manyAxes}, "axes는 최대 8개"},
+		{"too many anchors", "catalog_search", map[string]any{"query": "x", "anchorPks": []string{"1", "2", "3", "4"}}, "anchorPks는 최대 3개"},
+		{"too many selections", "catalog_search", map[string]any{"query": "x", "bridgeSelections": []map[string]any{
+			{"pk": "1", "whyCandidate": "a"}, {"pk": "2", "whyCandidate": "b"},
+			{"pk": "3", "whyCandidate": "c"}, {"pk": "4", "whyCandidate": "d"},
+		}}, "bridgeSelections는 최대 3개"},
+		{"too many cards", "catalog_search", map[string]any{"query": "x", "maxConnections": 4}, "maxConnections는 생략하거나 1~3"},
+		{"too many profile fields", "call_api", map[string]any{"pk": "x", "profileFields": []string{"1", "2", "3", "4", "5", "6", "7", "8", "9"}}, "profile field는 최대 8개"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			res, err := sess.CallTool(context.Background(), &mcp.CallToolParams{Name: tt.tool, Arguments: tt.args})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !res.IsError {
+				t.Fatalf("expected tool error: %+v", res)
+			}
+			raw, _ := json.Marshal(res.Content)
+			if !strings.Contains(string(raw), tt.want) {
+				t.Fatalf("error %s does not contain %q", raw, tt.want)
+			}
+		})
+	}
 }
 
 func TestCatalogSearchToolReturnsCompactCallableCandidatesByDefault(t *testing.T) {
