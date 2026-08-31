@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
 	"os"
 	"os/exec"
@@ -23,15 +24,22 @@ import (
 // debugPort is the fixed CDP remote-debugging port for gongctl's login browser.
 const debugPort = 9333
 
-// headlessPort is a separate port for the short-lived headless browser that
-// drives 활용신청 submission, so it never collides with a login browser.
-const headlessPort = 9334
+// The browser is dedicated to data.go.kr. Its TLS 1.3 endpoint returned corrupt
+// records to Chromium on 2026-08-31, while TLS 1.2 was healthy and certificate-
+// verified. Keep the workaround on this dedicated process rather than changing
+// the user's normal browser settings.
+const portalTLSMaxArg = "--ssl-version-max=tls1.2"
+
+const headlessStateFile = "gongctl-headless.json"
+
+var localCDPClient = &http.Client{Timeout: 2 * time.Second}
 
 // daemonState records the running browser so later commands can re-attach.
 type daemonState struct {
 	WebSocketURL string `json:"webSocketDebuggerUrl"`
 	PID          int    `json:"pid"`
 	Port         int    `json:"port"`
+	ProfileDir   string `json:"profileDir,omitempty"`
 }
 
 // ConfigDir is gongctl's config directory, exported so sibling packages (the
@@ -71,6 +79,17 @@ func saveState(s *daemonState) error {
 	}
 	data, _ := json.MarshalIndent(s, "", "  ")
 	return os.WriteFile(path, data, 0o600)
+}
+
+func saveHeadlessState(s *daemonState) error {
+	if s == nil || s.ProfileDir == "" {
+		return fmt.Errorf("headless 브라우저 상태 경로가 없습니다")
+	}
+	data, err := json.MarshalIndent(s, "", "  ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(filepath.Join(s.ProfileDir, headlessStateFile), data, 0o600)
 }
 
 func loadState() (*daemonState, error) {
@@ -138,21 +157,7 @@ func launchBrowser(startURL string) (*exec.Cmd, error) {
 	if err != nil {
 		return nil, err
 	}
-	args := []string{
-		fmt.Sprintf("--remote-debugging-port=%d", debugPort),
-		"--user-data-dir=" + profile,
-		"--password-store=basic", // avoid OS keychain prompt
-		"--use-mock-keychain",
-		"--no-first-run",
-		"--no-default-browser-check",
-		// NOTE: no --remote-allow-origins=*. chromedp attaches without an Origin
-		// header, which Chrome allows by default, so the flag is unnecessary —
-		// and setting it to * would let any local web page open the CDP
-		// WebSocket and hijack the authenticated session (spike-verified:
-		// omitting the flag makes Chrome reject a foreign-Origin WS upgrade with
-		// HTTP 403, while * accepts it with 101). See branch proto/cdp-origin.
-		startURL,
-	}
+	args := loginBrowserArgs(profile, startURL)
 	cmd := exec.Command(chrome, args...)
 	setDetached(cmd) // OS별로 gongctl 프로세스 그룹에서 분리 (browser 가 gongctl 종료 후에도 생존)
 	if err := cmd.Start(); err != nil {
@@ -161,37 +166,80 @@ func launchBrowser(startURL string) (*exec.Cmd, error) {
 	return cmd, nil
 }
 
+func loginBrowserArgs(profile, startURL string) []string {
+	return []string{
+		fmt.Sprintf("--remote-debugging-port=%d", debugPort),
+		"--user-data-dir=" + profile,
+		"--password-store=basic", // avoid OS keychain prompt
+		"--use-mock-keychain",
+		"--no-first-run",
+		"--no-default-browser-check",
+		portalTLSMaxArg,
+		// NOTE: no --remote-allow-origins=*. chromedp attaches without an Origin
+		// header, which Chrome allows by default, so the flag is unnecessary —
+		// and setting it to * would let any local web page open the CDP
+		// WebSocket and hijack the authenticated session (spike-verified:
+		// omitting the flag makes Chrome reject a foreign-Origin WS upgrade with
+		// HTTP 403, while * accepts it with 101). See branch proto/cdp-origin.
+		startURL,
+	}
+}
+
 // launchHeadless starts a throwaway headless Chrome for driving the 활용신청 form.
 // It uses its own profile (no login state — the caller injects the session
-// cookies) and is not detached: it dies with gongctl if the caller forgets to
-// close it, since nothing should outlive a single submission.
-func launchHeadless() (*exec.Cmd, error) {
+// cookies). It has its own process group so cleanup can terminate Chrome's
+// process tree if Browser.close fails; the caller always owns and closes it.
+func launchHeadless() (*exec.Cmd, int, string, error) {
 	chrome, err := findChrome()
 	if err != nil {
-		return nil, err
+		return nil, 0, "", err
 	}
 	dir, err := configDir()
 	if err != nil {
-		return nil, err
+		return nil, 0, "", err
 	}
-	profile := filepath.Join(dir, "chrome-headless")
-	if err := os.MkdirAll(profile, 0o700); err != nil {
-		return nil, err
+	profile, err := os.MkdirTemp(dir, "chrome-headless-")
+	if err != nil {
+		return nil, 0, "", err
 	}
-	cmd := exec.Command(chrome,
-		fmt.Sprintf("--remote-debugging-port=%d", headlessPort),
-		"--user-data-dir="+profile,
+	port, err := freeLocalPort()
+	if err != nil {
+		_ = os.RemoveAll(profile)
+		return nil, 0, "", err
+	}
+	cmd := exec.Command(chrome, headlessBrowserArgs(profile, port)...)
+	setDetached(cmd)
+	if err := cmd.Start(); err != nil {
+		_ = os.RemoveAll(profile)
+		return nil, 0, "", fmt.Errorf("headless 브라우저 실행 실패: %w", err)
+	}
+	return cmd, port, profile, nil
+}
+
+func freeLocalPort() (int, error) {
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		return 0, fmt.Errorf("headless 브라우저 포트 할당 실패: %w", err)
+	}
+	port := listener.Addr().(*net.TCPAddr).Port
+	if err := listener.Close(); err != nil {
+		return 0, err
+	}
+	return port, nil
+}
+
+func headlessBrowserArgs(profile string, port int) []string {
+	return []string{
+		fmt.Sprintf("--remote-debugging-port=%d", port),
+		"--user-data-dir=" + profile,
 		"--headless=new",
 		"--password-store=basic",
 		"--use-mock-keychain",
 		"--no-first-run",
 		"--no-default-browser-check",
+		portalTLSMaxArg,
 		"about:blank",
-	)
-	if err := cmd.Start(); err != nil {
-		return nil, fmt.Errorf("headless 브라우저 실행 실패: %w", err)
 	}
-	return cmd, nil
 }
 
 // discoverWS polls the CDP HTTP endpoint until the browser's WebSocket debugger
@@ -201,7 +249,7 @@ func discoverWS(ctx context.Context, port int, timeout time.Duration) (string, e
 	url := fmt.Sprintf("http://127.0.0.1:%d/json/version", port)
 	for time.Now().Before(deadline) {
 		req, _ := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
-		resp, err := http.DefaultClient.Do(req)
+		resp, err := localCDPClient.Do(req)
 		if err == nil {
 			var v struct {
 				WebSocketDebuggerURL string `json:"webSocketDebuggerUrl"`
@@ -223,7 +271,7 @@ func discoverWS(ctx context.Context, port int, timeout time.Duration) (string, e
 
 // wsAlive reports whether the recorded debugger endpoint still answers.
 func wsAlive(port int) bool {
-	resp, err := http.Get(fmt.Sprintf("http://127.0.0.1:%d/json/version", port))
+	resp, err := localCDPClient.Get(fmt.Sprintf("http://127.0.0.1:%d/json/version", port))
 	if err != nil {
 		return false
 	}
@@ -248,7 +296,7 @@ func browserUsable(port int) bool {
 	if !wsAlive(port) {
 		return false
 	}
-	resp, err := http.Get(fmt.Sprintf("http://127.0.0.1:%d/json/list", port))
+	resp, err := localCDPClient.Get(fmt.Sprintf("http://127.0.0.1:%d/json/list", port))
 	if err != nil {
 		return false
 	}

@@ -34,13 +34,24 @@ const MaxPropagationWait = time.Hour
 // caller can show progress rather than appearing to hang for ten minutes.
 func CallWaiting(ctx context.Context, f *fetch.Client, endpoint string, params map[string]string,
 	key string, wait time.Duration, notify func(elapsed, remaining time.Duration)) (*CallResult, error) {
+	secure, err := SecureEndpoint(endpoint)
+	if err != nil {
+		return nil, err
+	}
+	return callWaiting(ctx, f, secure, params, key, wait, notify, callTrusted)
+}
+
+type callAttempt func(context.Context, *fetch.Client, string, map[string]string, string) (*CallResult, error)
+
+func callWaiting(ctx context.Context, f *fetch.Client, endpoint string, params map[string]string,
+	key string, wait time.Duration, notify func(elapsed, remaining time.Duration), attemptCall callAttempt) (*CallResult, error) {
 	if wait > MaxPropagationWait {
 		wait = MaxPropagationWait
 	}
 	start := time.Now()
 	deadline := start.Add(wait)
 	for attempt := 1; ; attempt++ {
-		res, err := Call(ctx, f, endpoint, params, key)
+		res, err := attemptCall(ctx, f, endpoint, params, key)
 		if !errors.Is(err, ErrPropagating) {
 			return res, err
 		}

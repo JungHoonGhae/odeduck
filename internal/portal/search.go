@@ -45,9 +45,9 @@ type SearchOptions struct {
 }
 
 var (
-	rePkFile     = regexp.MustCompile(`/data/(\d+)/fileData\.do`)
-	rePkAPI      = regexp.MustCompile(`/data/(\d+)/openapi\.do`)
-	knownFormats = map[string]bool{"CSV": true, "XLSX": true, "XLS": true, "JSON": true, "XML": true, "HWP": true, "PDF": true, "ZIP": true}
+	rePkFile = regexp.MustCompile(`/data/(\d+)/fileData\.do`)
+	rePkAPI  = regexp.MustCompile(`/data/(\d+)/openapi\.do`)
+	reDigits = regexp.MustCompile(`\d[\d,]*`)
 )
 
 // SearchDatasets scrapes /tcs/dss/selectDataSetList.do. A blank keyword lists
@@ -82,16 +82,13 @@ func (c *Client) SearchDatasets(ctx context.Context, opts SearchOptions) ([]Data
 
 	var out []Dataset
 	seen := map[string]bool{}
-	// Each result is one <li> holding the <dl> (title/description) plus sibling
-	// .tag-area and .info-data blocks; iterating the <li> keeps a dataset's
-	// metadata attached to it instead of only reading the <dl>.
-	items := doc.Find(".result-list > ul > li")
-	if items.Length() == 0 {
-		items = doc.Find("dl").Parent() // older/simpler markup
-	}
-	items.Each(func(_ int, li *goquery.Selection) {
-		dl := li.Find("dl").First()
-		href, _ := dl.Find(`a[href*="/data/"]`).First().Attr("href")
+	// One .apply-result-item per dataset, as of the 2026-08 portal redesign
+	// (KRDS). A keyword search without dType groups the items under 파일데이터 /
+	// 오픈API / 연계데이터 headings; the items themselves are identical either way,
+	// so a flat sweep reads both layouts.
+	doc.Find(".apply-result-item").Each(func(_ int, item *goquery.Selection) {
+		link := item.Find(`.apply-result-link a[href*="/data/"]`).First()
+		href, _ := link.Attr("href")
 		var pk string
 		hasAPI := false
 		if m := rePkAPI.FindStringSubmatch(href); m != nil {
@@ -103,28 +100,35 @@ func (c *Client) SearchDatasets(ctx context.Context, opts SearchOptions) ([]Data
 			return
 		}
 		seen[pk] = true
-		title, formats := parseDt(dl)
 		d := Dataset{
 			PublicDataPk: pk,
-			Title:        title,
-			Description:  cleanText(dl.Find("dd").First().Text()),
-			Formats:      formats,
+			Title:        cleanText(link.Text()),
+			Description:  cleanText(item.Find(".apply-result-summary").First().Text()),
 			HasOpenAPI:   hasAPI,
-			Category:     cleanText(li.Find(".tag-area .labelset.brown").First().Text()),
-			OrgType:      cleanText(li.Find(".tag-area .labelset.red").First().Text()),
 		}
-		// .info-data is a list of label/value pairs (same shape as the 활용신청
-		// 현황 list): <p><span class="tit">제공기관</span><span class="data">…</span></p>
-		li.Find(".info-data p").Each(func(_ int, p *goquery.Selection) {
-			switch cleanText(p.Find(".tit").Text()) {
+		// Formats are their own badges now (data-ext="CSV"), no longer a prefix
+		// glued onto the title.
+		item.Find(".apply-result-link .krds-badge[data-ext]").Each(func(_ int, b *goquery.Selection) {
+			if ext, ok := b.Attr("data-ext"); ok {
+				d.Formats = append(d.Formats, strings.ToUpper(cleanText(ext)))
+			}
+		})
+		badges := item.Find(".apply-result-category .krds-badge")
+		d.Category = cleanText(badges.Eq(0).Text())
+		d.OrgType = cleanText(badges.Eq(1).Text())
+		// Metadata is a label/value list: <li><strong>제공기관</strong>기상청</li>
+		item.Find(".in-result-item ul li").Each(func(_ int, li *goquery.Selection) {
+			label := cleanText(li.Find("strong").First().Text())
+			value := strings.TrimSpace(strings.TrimPrefix(cleanText(li.Text()), label))
+			switch label {
 			case "제공기관":
-				d.Org = cleanText(p.Find(".data").Text())
+				d.Org = value
 			case "수정일":
-				d.ModifiedAt = cleanText(p.Find(".data").Text())
+				d.ModifiedAt = value
 			case "조회수":
-				d.ViewCount = atoiLoose(cleanText(p.Find(".data").Text()))
+				d.ViewCount = atoiLoose(value)
 			case "활용신청":
-				d.ApplyCount = atoiLoose(cleanText(p.Find(".data").Text()))
+				d.ApplyCount = atoiLoose(value)
 			}
 		})
 		out = append(out, d)
@@ -132,35 +136,15 @@ func (c *Client) SearchDatasets(ctx context.Context, opts SearchOptions) ([]Data
 	return out, nil
 }
 
-func parseDt(dl *goquery.Selection) (title string, formats []string) {
-	text := cleanText(dl.Find("dt").First().Text())
-	toks := strings.Fields(text)
-	seen := map[string]bool{}
-	i := 0
-	for i < len(toks) {
-		up := strings.ToUpper(toks[i])
-		if knownFormats[up] {
-			if !seen[up] {
-				seen[up] = true
-				formats = append(formats, up)
-			}
-			i++
-			continue
-		}
-		if toks[i] == "+" {
-			i++
-			continue
-		}
-		break
-	}
-	title = strings.TrimSpace(strings.TrimSuffix(strings.Join(toks[i:], " "), "미리보기"))
-	return title, formats
-}
-
-// atoiLoose parses a count that may carry thousands separators, returning 0 when
-// the portal renders something unexpected (never a fabricated number).
+// atoiLoose parses a count out of the portal's rendering of it — "132,828회",
+// "5,491건" — and returns 0 when there is no number to read (never a fabricated
+// one).
 func atoiLoose(s string) int {
-	n, err := strconv.Atoi(strings.ReplaceAll(strings.TrimSpace(s), ",", ""))
+	m := reDigits.FindString(s)
+	if m == "" {
+		return 0
+	}
+	n, err := strconv.Atoi(strings.ReplaceAll(m, ",", ""))
 	if err != nil {
 		return 0
 	}

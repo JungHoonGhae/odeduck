@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -23,6 +24,32 @@ const (
 	PurposeResearch = "PROS05" // 연구(논문 등)
 )
 
+// A headless apply browser uses one fixed profile and CDP port. Serializing the
+// flow prevents concurrent MCP calls in this process from corrupting the profile
+// or attaching to each other's authenticated tab.
+var applyBrowserSlot = make(chan struct{}, 1)
+
+// NormalizePurposeCategory accepts the human-facing names used by CLI/MCP and
+// the portal codes used internally. Refusing unknown values is safer than
+// silently filing a commercial app as academic research.
+func NormalizePurposeCategory(category string) (string, error) {
+	category = strings.TrimSpace(category)
+	switch strings.ToLower(category) {
+	case "web", strings.ToLower(PurposeWeb):
+		return PurposeWeb, nil
+	case "app", strings.ToLower(PurposeApp):
+		return PurposeApp, nil
+	case "etc", strings.ToLower(PurposeEtc):
+		return PurposeEtc, nil
+	case "ref", strings.ToLower(PurposeRef):
+		return PurposeRef, nil
+	case "research", strings.ToLower(PurposeResearch):
+		return PurposeResearch, nil
+	default:
+		return "", fmt.Errorf("활용목적 분류가 필요합니다: web | app | research | ref | etc")
+	}
+}
+
 // ApplySummary is shown to the user for confirmation before submitting.
 type ApplySummary struct {
 	PublicDataPk string `json:"publicDataPk"`
@@ -35,6 +62,7 @@ type ApplySummary struct {
 // ApplyResult reports the outcome.
 type ApplyResult struct {
 	Submitted bool   `json:"submitted"`
+	Canceled  bool   `json:"canceled,omitempty"`
 	Message   string `json:"message"`
 }
 
@@ -48,19 +76,27 @@ type ApplyResult struct {
 // portal's real logic rather than re-implementing the request, so it stays
 // robust to field changes. Any validation alert() is captured as the failure.
 func Apply(ctx context.Context, pk, purpose, category string, confirm func(ApplySummary) bool) (*ApplyResult, error) {
+	if err := ValidatePublicDataPK(pk); err != nil {
+		return nil, err
+	}
 	if strings.TrimSpace(purpose) == "" {
 		return nil, fmt.Errorf("활용목적이 필요합니다 (--purpose)")
 	}
-	if category == "" {
-		category = PurposeResearch
+	normalizedCategory, err := NormalizePurposeCategory(category)
+	if err != nil {
+		return nil, err
 	}
+	category = normalizedCategory
 	var res *ApplyResult
-	err := onApplyForm(ctx, pk, func(tctx context.Context, dialog func() string) error {
+	err = onApplyForm(ctx, pk, func(tctx context.Context, dialog func() string) error {
 		var aerr error
 		res, aerr = fillAndSubmit(tctx, pk, purpose, category, confirm, dialog)
 		return aerr
 	})
 	if err != nil {
+		if res != nil {
+			return res, fmt.Errorf("활용신청 결과(%s) 이후 세션 정리 실패: %w", res.Message, err)
+		}
 		return nil, err
 	}
 	return res, nil
@@ -79,7 +115,19 @@ func Apply(ctx context.Context, pk, purpose, category string, confirm func(Apply
 //
 // dialog, passed to body, returns the last JavaScript dialog message the page raised
 // (validation alerts and the success notice both arrive that way).
-func onApplyForm(ctx context.Context, pk string, body func(tctx context.Context, dialog func() string) error) error {
+func onApplyForm(ctx context.Context, pk string, body func(tctx context.Context, dialog func() string) error) (retErr error) {
+	releaseSession, err := acquireSessionOperation(ctx)
+	if err != nil {
+		return err
+	}
+	defer releaseSession()
+	select {
+	case applyBrowserSlot <- struct{}{}:
+		defer func() { <-applyBrowserSlot }()
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+
 	// Submission has to run in a browser: gongctl drives the portal's own
 	// fn_save() so the page builds and validates the payload (see
 	// docs/adr/0001). Reuse a live browser if there is one; otherwise start a
@@ -97,15 +145,27 @@ func onApplyForm(ctx context.Context, pk string, body func(tctx context.Context,
 	defer tcancel()
 
 	if sess != nil {
+		// Ownership starts when browserForApply launches the process. Register
+		// cleanup before cookie injection, because injection can partially succeed
+		// and then fail while leaving an authenticated browser behind.
+		defer func() {
+			cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), 12*time.Second)
+			defer cleanupCancel()
+			closeBrowser(cleanupCtx, st)
+			if st.ProfileDir != "" {
+				_ = os.RemoveAll(st.ProfileDir)
+			}
+		}() // headless instance is ours; don't leave it running
 		if err := injectSession(tctx, sess); err != nil {
 			return fmt.Errorf("세션 주입 실패: %w", err)
 		}
-		defer closeBrowser(ctx, st) // headless instance is ours; don't leave it running
 	}
-	// Registered after closeBrowser so it runs BEFORE it (LIFO): the portal rotates
-	// the session during this flow, and that rotated session lives only in this
-	// browser. Capture it or the next command finds a dead cookie on disk.
-	defer refreshSessionFrom(ctx, tctx)
+	// Registered after cleanup so it runs first. Every later exit path — including
+	// an unreachable form or canceled body — captures rotations before the owned
+	// browser is terminated. The named return preserves the original failure too.
+	defer func() {
+		retErr = errors.Join(retErr, refreshSessionFrom(ctx, tctx, st))
+	}()
 
 	// Capture any JS dialog (validation alert / success notice) and accept it.
 	var dialogMu sync.Mutex
@@ -203,7 +263,7 @@ func fillAndSubmit(tctx context.Context, pk, purpose, category string,
 		Purpose:      purpose,
 	}
 	if confirm != nil && !confirm(summary) {
-		return &ApplyResult{Submitted: false, Message: "사용자가 취소함 (제출 안 함)"}, nil
+		return &ApplyResult{Submitted: false, Canceled: true, Message: "사용자가 취소함 (제출 안 함)"}, nil
 	}
 
 	// 제출: 폼의 fn_save() 가 검증 → confirm("신청하시겠습니까?") → AJAX POST.
@@ -220,11 +280,19 @@ func fillAndSubmit(tctx context.Context, pk, purpose, category string,
 	if listHTML, _, lerr := probeListLenient(tctx); lerr == nil {
 		if apps, perr := parseApplications(listHTML); perr == nil {
 			for _, a := range apps {
-				if filled.DataName != "" && strings.Contains(a.Title, strings.TrimSpace(filled.DataName)) {
+				if sameApplicationTitle(a.Title, filled.DataName) {
 					return &ApplyResult{Submitted: true, Message: "신청 완료 (자동승인): " + a.Status}, nil
 				}
 			}
 		}
+	}
+	// The account list is eventually consistent: production showed the portal's
+	// success alert immediately but the reused tab still rendered the old list.
+	// The alert comes from this form's fn_save response, so its exact message is a
+	// valid success signal when list propagation lags. Keep the match narrow to
+	// avoid treating validation or unrelated "completed" dialogs as submission.
+	if isApplySuccessDialog(dlg) {
+		return &ApplyResult{Submitted: true, Message: "신청 완료 (포털 성공 응답; 신청내역 반영 대기 중)"}, nil
 	}
 	// 목록에 없으면 거부(검증 실패 등). dialog 메시지를 사유로.
 	msg := "제출이 반영되지 않았습니다"
@@ -232,6 +300,17 @@ func fillAndSubmit(tctx context.Context, pk, purpose, category string,
 		msg += ": " + strings.ReplaceAll(dlg, "\n", " ")
 	}
 	return &ApplyResult{Submitted: false, Message: msg}, nil
+}
+
+func sameApplicationTitle(applicationTitle, dataName string) bool {
+	applicationTitle = strings.Join(strings.Fields(applicationTitle), " ")
+	dataName = strings.Join(strings.Fields(dataName), " ")
+	return dataName != "" && applicationTitle == dataName
+}
+
+func isApplySuccessDialog(message string) bool {
+	message = strings.Join(strings.Fields(message), " ")
+	return message == "활용신청이 완료되었습니다."
 }
 
 // probeListLenient navigates the reused tab to the 활용신청 현황 list and returns

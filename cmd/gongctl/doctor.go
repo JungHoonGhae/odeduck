@@ -36,6 +36,7 @@ apply 점검은 활용신청 폼을 실제로 열어 필요한 입력요소가 �
 
 			checks := doctor.Run(cmd.Context(), newFetchClient(), base)
 			checks = append(checks, sessionCheck(cmd))
+			checks = append(checks, doctor.APIKeyCheck(cmd.Context()))
 			if !skipApply {
 				checks = append(checks, doctor.ApplyCheck(cmd.Context(), applyPK))
 			}
@@ -59,14 +60,16 @@ apply 점검은 활용신청 폼을 실제로 열어 필요한 입력요소가 �
 // sessionCheck probes the login-gated 활용신청 현황 seam. Without a session it is
 // reported skipped rather than drift — the parser can't be exercised.
 func sessionCheck(cmd *cobra.Command) doctor.Check {
-	_, err := portal.Applications(cmd.Context())
+	apps, err := portal.Applications(cmd.Context())
 	switch {
 	case errors.Is(err, portal.ErrNotLoggedIn):
 		return doctor.Check{Name: "applications", Status: doctor.StatusSkipped, Detail: "세션 없음 — `gongctl login` 후 재점검"}
 	case err != nil:
 		return doctor.Check{Name: "applications", Status: doctor.StatusDrift, Detail: "요청 실패: " + err.Error()}
+	case len(apps) == 0:
+		return doctor.Check{Name: "applications", Status: doctor.StatusSkipped, Detail: "활용신청 0건 — 빈 계정인지 마크업 변경인지 판별할 수 없음"}
 	default:
-		return doctor.Check{Name: "applications", Status: doctor.StatusOK, Detail: "활용신청 현황 파싱 성공"}
+		return doctor.Check{Name: "applications", Status: doctor.StatusOK, Detail: fmt.Sprintf("활용신청 %d건 파싱", len(apps))}
 	}
 }
 

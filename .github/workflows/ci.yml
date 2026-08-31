@@ -16,6 +16,9 @@ jobs:
         with:
           go-version-file: go.mod
 
+      - name: Verify module files
+        run: go mod tidy -diff
+
       - name: go vet
         run: go vet ./...
 

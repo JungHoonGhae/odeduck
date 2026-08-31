@@ -1,9 +1,14 @@
 package catalog
 
 import (
+	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/JungHoonGhae/gongctl/internal/portal"
 )
 
 func sample() *Catalog {
@@ -18,6 +23,38 @@ func sample() *Catalog {
 			{PK: "3", Title: "행정안전부_폭염 인명피해", Org: "행정안전부", ApplyCount: 508,
 				Desc: "온열질환자 지역별 현황"},
 		},
+	}
+}
+
+func TestCatalogSaveAtomicallyReplacesSnapshot(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, ".config"))
+	first := &Catalog{SyncedAt: time.Now(), Type: "API", Entries: []Entry{{PK: "1", Title: "first"}}}
+	if err := first.Save(); err != nil {
+		t.Fatal(err)
+	}
+	second := &Catalog{SyncedAt: time.Now(), Type: "API", Entries: []Entry{{PK: "2", Title: "second"}}}
+	if err := second.Save(); err != nil {
+		t.Fatal(err)
+	}
+	loaded, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(loaded.Entries) != 1 || loaded.Entries[0].PK != "2" {
+		t.Fatalf("loaded snapshot = %+v", loaded.Entries)
+	}
+	dir, err := portal.ConfigDir()
+	if err != nil {
+		t.Fatal(err)
+	}
+	temps, err := filepath.Glob(filepath.Join(dir, "catalog-*.tmp"))
+	if err != nil || len(temps) != 0 {
+		t.Fatalf("temporary files after save = %v, err=%v", temps, err)
+	}
+	if info, err := os.Stat(filepath.Join(dir, "catalog.json")); err != nil || info.Mode().Perm() != 0o644 {
+		t.Fatalf("catalog mode = %v, err=%v", info, err)
 	}
 }
 
@@ -102,6 +139,36 @@ func TestQueryTermsKeepsShortWordsIntact(t *testing.T) {
 	}
 }
 
+func TestQueryTermsSplitsAgentPunctuation(t *testing.T) {
+	got := queryTerms("공매·압류재산/매각-현황")
+	want := []string{"공매", "압류재산", "매각", "현황"}
+	if strings.Join(got, "|") != strings.Join(want, "|") {
+		t.Fatalf("queryTerms punctuation = %v, want %v", got, want)
+	}
+}
+
+func TestQueryTermsDropsFillersAfterParticleStripping(t *testing.T) {
+	got := queryTerms("폭염 데이터를 자료를 정보를 찾아줘")
+	if len(got) != 1 || got[0] != "폭염" {
+		t.Fatalf("queryTerms inflected fillers = %v, want [폭염]", got)
+	}
+}
+
+func TestSearchPlanRecentInspectsBeyondExternalResultCap(t *testing.T) {
+	c := &Catalog{}
+	for i := 0; i < 150; i++ {
+		c.Entries = append(c.Entries, Entry{
+			PK: fmt.Sprintf("%d", i), Title: "상권 매출", SvcType: SvcREST,
+			ApplyCount: 1000 - i, ModifiedAt: fmt.Sprintf("2025-01-%02d", i%28+1),
+		})
+	}
+	c.Entries[149].ModifiedAt = "2026-08-31"
+	res := c.SearchPlan(QueryPlan{Concepts: []string{"상권"}, Limit: 1, RESTOnly: true, Ranking: RankRecent})
+	if len(res.Hits) != 1 || res.Hits[0].PK != "149" {
+		t.Fatalf("recent result = %+v, want low-demand newest entry beyond top 100", res.Hits)
+	}
+}
+
 // The description is what makes matching work, and is exactly what must not be
 // handed back — ten descriptions is thousands of characters of an agent's context.
 func TestSearchDoesNotReturnDescriptions(t *testing.T) {
@@ -174,5 +241,65 @@ func TestSearchRESTOnlyExcludesLinkAndUnknown(t *testing.T) {
 	}
 	if r.Hits[0].SvcType != SvcREST {
 		t.Errorf("hit should carry its service type, got %q", r.Hits[0].SvcType)
+	}
+}
+
+// Semantic interpretation belongs to the MCP host model, not a growing list of
+// hard-coded synonyms in the catalogue. SearchPlan executes those inferred data
+// axes independently and interleaves them, so one prolific publisher cannot
+// bury every other way of satisfying a broad user goal.
+func TestSearchPlanDiversifiesSemanticQueries(t *testing.T) {
+	c := &Catalog{SyncedAt: time.Now(), Entries: []Entry{
+		{PK: "onbid-list", Title: "온비드 공매 부동산 물건", SvcType: SvcREST, ApplyCount: 1200},
+		{PK: "onbid-detail", Title: "온비드 공매 부동산 상세", SvcType: SvcREST, ApplyCount: 1100},
+		{PK: "bid", Title: "나라장터 입찰 공고", SvcType: SvcREST, ApplyCount: 9000},
+		{PK: "auction", Title: "도매시장 실시간 경매 가격", SvcType: SvcREST, ApplyCount: 800},
+		{PK: "noise", Title: "인기 관광 정보", SvcType: SvcREST, ApplyCount: 50000},
+	}}
+
+	r := c.SearchPlan(QueryPlan{
+		Intent: "돈이 될 만한 데이터를 찾아줘",
+		Concepts: []string{
+			"온비드 공매", "나라장터 입찰", "도매시장 경매",
+		},
+		Limit: 3, RESTOnly: true, IncludePreviews: true,
+	})
+	if r.Mode != SearchModePlanned {
+		t.Fatalf("mode = %q, want %q", r.Mode, SearchModePlanned)
+	}
+	if len(r.Hits) != 3 {
+		t.Fatalf("hits = %+v, want one candidate from each semantic query", r.Hits)
+	}
+	want := []string{"onbid-list", "bid", "auction"}
+	for i, pk := range want {
+		if r.Hits[i].PK != pk {
+			t.Errorf("hit[%d] = %s, want %s; hits=%+v", i, r.Hits[i].PK, pk, r.Hits)
+		}
+		if r.Hits[i].MatchedQuery == "" {
+			t.Errorf("hit[%d] does not explain which semantic query found it", i)
+		}
+	}
+	if r.Total != 4 { // both Onbid rows plus one row from each other axis
+		t.Errorf("total = %d, want 4 distinct candidates", r.Total)
+	}
+}
+
+func TestSearchPlanFallsBackToOrdinarySearch(t *testing.T) {
+	c := sample()
+	plain := c.Search("폭염", 10, false)
+	planned := c.SearchPlan(QueryPlan{Intent: "폭염", Limit: 10})
+	if planned.Mode != SearchModeLexical || len(planned.Hits) != len(plain.Hits) || planned.Hits[0].PK != plain.Hits[0].PK {
+		t.Fatalf("unplanned search changed behavior: plain=%+v planned=%+v", plain, planned)
+	}
+}
+
+func TestSearchPlanRelaxationRejectsSingleGenericWord(t *testing.T) {
+	c := &Catalog{SyncedAt: time.Now(), Entries: []Entry{
+		{PK: "relevant", Title: "국유재산 매각 공고", SvcType: SvcREST, ApplyCount: 10},
+		{PK: "noise", Title: "인기 대기오염 현황", SvcType: SvcREST, ApplyCount: 9000},
+	}}
+	r := c.SearchPlan(QueryPlan{Intent: "저가 자산", Concepts: []string{"국유재산 매각 현황"}, Limit: 10, RESTOnly: true})
+	if len(r.Hits) != 1 || r.Hits[0].PK != "relevant" {
+		t.Fatalf("planned relaxed hits = %+v, want only the two-term match", r.Hits)
 	}
 }

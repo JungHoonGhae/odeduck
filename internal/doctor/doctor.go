@@ -46,6 +46,7 @@ func Run(ctx context.Context, fc *fetch.Client, baseURL string) []Check {
 		searchCheck(ctx, fc, baseURL),
 		describeCheck(ctx, fc, baseURL),
 		catalogCheck(),
+		semanticCheck(),
 	}
 }
 
@@ -70,6 +71,31 @@ func catalogCheck() Check {
 	return Check{"catalog", StatusOK, fmt.Sprintf("%.1f일 전 수집 (%d건)", days, len(cat.Entries))}
 }
 
+// semanticCheck is optional-health, not an installation requirement. A missing
+// index is skipped; a built but unreadable one is drift because the user opted
+// into semantic search and would otherwise get a silent quality regression.
+func semanticCheck() Check {
+	cat, err := catalog.Load()
+	if err != nil {
+		return Check{"semantic", StatusSkipped, "카탈로그 없음 — 의미 인덱스 점검 생략"}
+	}
+	idx, err := catalog.LoadSemanticIndex(cat)
+	switch {
+	case err == nil:
+		dim := 0
+		if len(idx.Vectors) > 0 {
+			dim = len(idx.Vectors[0])
+		}
+		return Check{"semantic", StatusOK, fmt.Sprintf("%d건 × %d차원 · %s", len(idx.PKs), dim, idx.Model)}
+	case errors.Is(err, catalog.ErrSemanticIndexNotBuilt):
+		return Check{"semantic", StatusSkipped, "선택 기능 미설치 — `gongctl catalog semantic-build` 로 활성화"}
+	case errors.Is(err, catalog.ErrSemanticIndexStale):
+		return Check{"semantic", StatusSkipped, "카탈로그 갱신 후 의미 인덱스 재생성 필요"}
+	default:
+		return Check{"semantic", StatusDrift, "의미 인덱스를 읽지 못했습니다: " + err.Error()}
+	}
+}
+
 func searchCheck(ctx context.Context, fc *fetch.Client, baseURL string) Check {
 	pc := portal.New(fc, portal.WithBaseURL(baseURL))
 	ds, err := pc.SearchDatasets(ctx, portal.SearchOptions{})
@@ -88,11 +114,24 @@ func describeCheck(ctx context.Context, fc *fetch.Client, baseURL string) Check 
 	switch {
 	case err != nil:
 		return Check{"describe", StatusDrift, "요청 실패: " + err.Error()}
+	case spec.DataName == "":
+		return Check{"describe", StatusDrift, "OpenAPI 이름을 파싱하지 못함 — openapi.do 제목 마크업이 바뀌었을 수 있음 (pk=" + CanaryPK + ")"}
+	case spec.APIType == "":
+		return Check{"describe", StatusDrift, "API 유형을 파싱하지 못함 — openapi.do 요약 마크업이 바뀌었을 수 있음 (pk=" + CanaryPK + ")"}
+	case spec.Approval == nil || spec.Approval.Dev == "":
+		return Check{"describe", StatusDrift, "개발단계 심의유형을 파싱하지 못함 — 안전하게 활용신청 여부를 판단할 수 없음 (pk=" + CanaryPK + ")"}
 	case len(spec.Operations) == 0:
 		return Check{"describe", StatusDrift, "상세기능 0건 파싱 — openapi.do 마크업이 바뀌었을 수 있음 (pk=" + CanaryPK + ")"}
-	default:
-		return Check{"describe", StatusOK, fmt.Sprintf("%d개 상세기능 파싱 (pk=%s)", len(spec.Operations), CanaryPK)}
 	}
+	for _, op := range spec.Operations {
+		if op.Endpoint == "" || len(op.Params) == 0 {
+			return Check{"describe", StatusDrift, fmt.Sprintf(
+				"상세기능 %q 의 엔드포인트 또는 요청변수가 비어 있음 — 명세 조각 마크업이 바뀌었을 수 있음 (pk=%s)",
+				op.Name, CanaryPK)}
+		}
+	}
+	return Check{"describe", StatusOK, fmt.Sprintf(
+		"%d개 상세기능·요청변수와 심의유형 파싱 (pk=%s)", len(spec.Operations), CanaryPK)}
 }
 
 // ApplyCanaryPKs are datasets to try opening the 활용신청 form for. There is more
@@ -164,4 +203,21 @@ func ApplyCheck(ctx context.Context, pk string) Check {
 			"폼 경로·진입 플로우가 바뀐 것을 의심하세요. 이 계정이 정말 전부 신청했다면 "+
 			"`--apply-pk` 로 신청하지 않은 pk 를 지정해 재점검하세요",
 		len(refused), strings.Join(refused, ", "))}
+}
+
+// APIKeyCheck verifies the live key page without surfacing the credential. It
+// deliberately bypasses the cached key: a cache hit would make doctor report
+// green even after the portal removed or renamed the source field.
+func APIKeyCheck(ctx context.Context) Check {
+	err := portal.ProbeAPIKey(ctx)
+	switch {
+	case err == nil:
+		return Check{"api-key", StatusOK, "활성 인증키 필드 확인 (값은 출력하지 않음)"}
+	case errors.Is(err, portal.ErrNotLoggedIn):
+		return Check{"api-key", StatusSkipped, "세션 없음 — `gongctl login` 후 재점검"}
+	case errors.Is(err, portal.ErrAPIKeyNotIssued):
+		return Check{"api-key", StatusSkipped, "활성 인증키 필드는 있으나 아직 발급된 키 없음"}
+	default:
+		return Check{"api-key", StatusDrift, "인증키 페이지 점검 실패: " + err.Error()}
+	}
 }

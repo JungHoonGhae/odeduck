@@ -1,8 +1,6 @@
 package main
 
 import (
-	"context"
-
 	"github.com/JungHoonGhae/gongctl/internal/mcpserver"
 	"github.com/spf13/cobra"
 )
@@ -10,12 +8,15 @@ import (
 func mcpCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "mcp",
-		Short: "MCP 서버 실행 (stdio) — 에이전트가 검색·활용신청·호출",
+		Short: "MCP 서버 실행 — 검색→상세→AI 활용신청→호출",
 		Long: `gongctl 을 Model Context Protocol 서버로 노출합니다(stdio).
-search_datasets / list_applications / apply / describe_api / call_api tool 과
-gongctl://guide 리소스로 에이전트가 data.go.kr 을 다룹니다. 로그인 세션 전제.`,
+핵심 tool 은 catalog_search → describe_api → (미승인 시 apply) → call_api 흐름이며,
+AI가 데이터 발견뿐 아니라 활용신청·승인 확인·실제 호출까지 이어갑니다.
+search_datasets / list_applications 는 최신성·계정 확인을 위한 보조 tool 입니다. 인증키는 모델에
+노출하지 않고 call_api 내부에서만 주입합니다.
+gongctl://guide 리소스에 사용 순서가 있습니다. 호출·계정 기능은 로그인 세션 전제입니다.`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			return mcpserver.Serve(context.Background(), mcpserver.Deps{
+			return mcpserver.Serve(cmd.Context(), mcpserver.Deps{
 				Fetch:   newFetchClient(),
 				BaseURL: flagBaseURL,
 			})

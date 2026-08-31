@@ -5,6 +5,75 @@ All notable changes to gongctl are documented here. Format follows
 [SemVer](https://semver.org/). The release workflow uses the `## [X.Y.Z]`
 section matching a `vX.Y.Z` tag as the GitHub release notes.
 
+## [0.8.0]
+
+### Added
+
+- **Goal-based public-data discovery** with `catalog discover` and MCP
+  `catalog_search`. Codex, Claude Code, Gemini CLI, or Cursor Agent can turn an
+  everyday goal into distinct opportunity axes; deterministic catalogue search
+  then explores all 11,902 OpenAPIs without sending the catalogue to the model.
+  Optional Ollama/EmbeddingGemma vectors recover differently worded candidates
+  without making a model server or vector database mandatory.
+- **A progressive agent workflow that closes the access gap:**
+  `catalog_search → describe_api → (apply when needed) → call_api`. The application
+  tool is now presented as the explicit 2.5-stage bridge rather than a buried
+  account helper, so an agent can inspect approval terms, submit the real portal
+  form, confirm approval, reuse the account key, and make the first live call.
+- **Reproducible search and competitor research.** Ten natural-language queries
+  improved top-10 precision from 0.36 lexical to 0.78 with model-planned hybrid
+  search, while opportunity-axis diversity rose from 1.2 to 3.7. A primary-source
+  audit of public alternatives records the defensible positioning: search/detail/
+  call MCPs exist, but the surveyed implementations leave utilization application
+  and approval to the user.
+- **Sliding session refresh.** Authenticated HTTP reads use a cookie jar across
+  redirects and persist a rotated data.go.kr session only after the requested
+  account page is verified as authenticated. Active use can therefore extend a
+  portal session without leaving Chrome open; absolute SSO expiry still requires
+  `gongctl login`.
+
+### Changed
+
+- **The 2026-08 data.go.kr redesign is supported end to end.** KRDS search results,
+  account application lists, multi-operation detail pages, approval rows, and the
+  application success response have fixture-backed parsers. Four new APIs were
+  submitted, automatically approved, and called on a real account: Onbid bid
+  results, Nara procurement notices, wholesale-market auctions, and SME support
+  announcements.
+- The README now leads with the four user bottlenecks gongctl removes: exact keyword
+  guessing, manual specification triage, portal application/approval work, and
+  hand-written authenticated calls. Integration instructions cover Codex, Claude,
+  Gemini, Cursor, and optional Ollama without implying that consumer subscriptions
+  are generic model API credentials.
+
+### Fixed
+
+- data.go.kr's broken TLS 1.3 path no longer prevents portal access. The verified
+  TLS 1.2 workaround is scoped to data.go.kr transports and the dedicated browser;
+  unrelated API endpoints retain normal TLS negotiation.
+- `doctor` no longer reports a portal markup drift when an expired session sends
+  the key URL to the generic public homepage. Both application and key checks now
+  classify that state consistently as `gongctl login` required.
+- Exact lexical matches are protected from semantic reranking, mandatory request
+  variables are preserved across redesigned detail layouts, and application success
+  is confirmed from both the JavaScript dialog and the account list fallback.
+- Account-wide credentials now stay behind a stricter boundary: MCP no longer
+  returns the service key, calls upgrade and restrict key injection to the official
+  `https://apis.data.go.kr` gateway, response bodies and catalogue result counts are
+  bounded, and untrusted dataset identifiers are validated before portal navigation.
+- Agent auto-selection falls through installed but unavailable CLIs within one
+  three-minute budget, sends goals over stdin rather than process arguments, and
+  requires the real portal purpose category for every application.
+- Headless application browsers use isolated ports/profiles, are reaped on every
+  exit path and on signals, and leave a recoverable marker so `logout` can clean up
+  a browser left by an ungraceful process exit. Application pagination now works in
+  both cookie-HTTP and live-browser modes without returning duplicate pages.
+- Session operations use a cross-process advisory lock, so separate Codex, Claude,
+  Gemini, Cursor, CLI, and MCP processes cannot race while the portal rotates the
+  shared cookie. Local Chrome debugger probes are time-bounded as well.
+- Catalogue and semantic snapshots are fsynced and atomically replaced; release
+  tags independently run module, vet, test, and build gates before publishing.
+
 ## [0.7.0]
 
 ### Added

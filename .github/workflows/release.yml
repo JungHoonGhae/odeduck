@@ -21,6 +21,15 @@ jobs:
         with:
           go-version-file: go.mod
 
+      - name: Verify module files
+        run: go mod tidy -diff
+
+      - name: Verify release tree
+        run: |
+          go vet ./...
+          go test ./...
+          go build ./...
+
       # Homebrew tap 푸시 토큰을 Doppler(github-tokens/prd)에서 가져온다.
       # GitHub 시크릿에는 DOPPLER_TOKEN(서비스 토큰) 하나만 두고, 실제 PAT 은 Doppler 가 보관.
       - name: Install Doppler CLI

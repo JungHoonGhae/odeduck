@@ -58,6 +58,9 @@ func TestMissingRequired(t *testing.T) {
 	if m := MissingRequired(op, map[string]string{"pageNo": "1", "numOfRows": "10", "bas_yy": "2019"}); len(m) != 0 {
 		t.Errorf("all required supplied, still missing %v", m)
 	}
+	if m := MissingRequired(op, map[string]string{"pageNo": " ", "numOfRows": "10"}); len(m) != 1 || m[0] != "pageNo" {
+		t.Errorf("blank required value → missing %v, want pageNo", m)
+	}
 }
 
 // A dataset whose parameters the portal never published must stay callable: an

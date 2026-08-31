@@ -2,11 +2,13 @@ package apicall
 
 import (
 	"context"
-	"github.com/JungHoonGhae/gongctl/internal/fetch"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/JungHoonGhae/gongctl/internal/fetch"
 )
 
 func TestCallXMLToJSON(t *testing.T) {
@@ -24,7 +26,7 @@ func TestCallXMLToJSON(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	res, err := Call(context.Background(), fetch.New(fetch.WithDelay(0)), srv.URL+"/svc/op", map[string]string{"numOfRows": "10"}, "abc+def==")
+	res, err := callTrusted(context.Background(), fetch.New(fetch.WithDelay(0)), srv.URL+"/svc/op", map[string]string{"numOfRows": "10"}, "abc+def==")
 	if err != nil {
 		t.Fatalf("call: %v", err)
 	}
@@ -41,7 +43,7 @@ func TestCallDoesNotLeakKeyOnTransportError(t *testing.T) {
 	key := "SECRET+KEY=="
 	escaped := strings.ReplaceAll(key, "+", "%2B")
 
-	_, err := Call(context.Background(), fetch.New(fetch.WithDelay(0)), "http://127.0.0.1:1/x", nil, key)
+	_, err := callTrusted(context.Background(), fetch.New(fetch.WithDelay(0)), "http://127.0.0.1:1/x", nil, key)
 	if err == nil {
 		t.Fatal("expected transport error, got nil")
 	}
@@ -63,11 +65,57 @@ func TestCallServiceKeyHint(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	res, err := Call(context.Background(), fetch.New(fetch.WithDelay(0)), srv.URL, nil, "wrongkey")
+	res, err := callTrusted(context.Background(), fetch.New(fetch.WithDelay(0)), srv.URL, nil, "wrongkey")
 	if res == nil {
 		t.Fatal("CallResult must still be returned (surface the body)")
 	}
 	if err == nil || !strings.Contains(err.Error(), "Encoding") {
 		t.Fatalf("expected Encoding/Decoding key hint in error, got %v", err)
+	}
+}
+
+func TestSecureEndpointAllowsOnlyOfficialHTTPSGateway(t *testing.T) {
+	got, err := SecureEndpoint("http://apis.data.go.kr/123/service/op?numOfRows=10")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != "https://apis.data.go.kr/123/service/op?numOfRows=10" {
+		t.Fatalf("secure endpoint = %q", got)
+	}
+
+	for _, endpoint := range []string{
+		"https://evil.example/steal",
+		"http://apis.data.go.kr.evil.example/steal",
+		"https://user@apis.data.go.kr/steal",
+		"https://apis.data.go.kr:8443/steal",
+		"https://apis.data.go.kr/steal?serviceKey=already-there",
+	} {
+		if _, err := SecureEndpoint(endpoint); err == nil {
+			t.Errorf("SecureEndpoint(%q) unexpectedly allowed", endpoint)
+		}
+	}
+}
+
+func TestCallRejectsExternalEndpointBeforeSendingKey(t *testing.T) {
+	_, err := Call(context.Background(), fetch.New(fetch.WithDelay(0)), "https://evil.example/steal", nil, "SECRET")
+	if err == nil || !strings.Contains(err.Error(), "공식 게이트웨이") {
+		t.Fatalf("Call external endpoint error = %v", err)
+	}
+}
+
+func TestCallSurfacesNonSuccessHTTPStatusWithBody(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		_, _ = w.Write([]byte(`{"error":"publisher unavailable"}`))
+	}))
+	defer srv.Close()
+
+	res, err := callTrusted(context.Background(), fetch.New(fetch.WithDelay(0)), srv.URL+"/op", nil, "key")
+	if !errors.Is(err, ErrHTTPStatus) {
+		t.Fatalf("error = %v, want ErrHTTPStatus", err)
+	}
+	if res == nil || res.Status != http.StatusInternalServerError {
+		t.Fatalf("result = %+v, want surfaced 500 body", res)
 	}
 }

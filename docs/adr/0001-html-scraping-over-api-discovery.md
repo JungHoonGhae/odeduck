@@ -9,9 +9,11 @@ gongctl reads data.go.kr by scraping HTML, which looks fragile enough that
 (Scrapling), a crawler framework (goscrapy), an AI browser agent (Browser Use
 et al), or discovering the JSON APIs beneath the pages (Unbrowse's approach). We
 investigated the last one against the live portal and it settled the rest:
-data.go.kr's read paths are **pure server-render**, so there are no underlying
-data APIs to prefer. We therefore keep HTML scraping, and manage its fragility
-with a *loud* drift signal (`gongctl doctor`) rather than a clever parser.
+data.go.kr's read paths return **server-rendered HTML**, not a stable JSON data
+API. We therefore keep deterministic HTML parsing, prefer narrow first-party
+HTTP fragment endpoints when the portal exposes them, and manage markup
+fragility with a *loud* drift signal (`gongctl doctor`) rather than a clever
+parser.
 
 ## Evidence (2026-07-25, live authenticated session)
 
@@ -24,10 +26,37 @@ XHR/fetch captured via CDP while loading each page:
 | `selectAcountList.do` (applications) | none — only `selectCommonCodeSelectboxList.json` (select-box codes) |
 | apply submit | **`POST /iim/api/saveDevAcountRequest.do`** — a real endpoint |
 
+## Revalidation (2026-08-31, KRDS redesign)
+
+The portal replaced its search and account-list markup with KRDS components, so
+we repeated API discovery before changing selectors. CDP captured request
+metadata for public search, the authenticated application list, the API-key
+page, and the apply form without recording cookies, payloads, or key values.
+
+| Page | Data-bearing XHR/fetch after redesign |
+|---|---|
+| public search | none — rows are in the document HTML |
+| OpenAPI detail | metadata and the initial operation are in the document HTML; remaining legacy operations come from **`POST /tcs/dss/selectApiDetailFunction.do`**, an HTML fragment endpoint |
+| application list | none — `selectCommonCodeSelectboxList.json` only supplies common select-box codes |
+| API-key page | none — the key field is in the authenticated document HTML |
+| apply form | none — only a web-filter `.hbs` template |
+
+The detail fragment endpoint is now used directly. It is a better boundary than
+driving the operation selector UI even though its response still requires HTML
+parsing. The apply submit endpoint still exists, but its form validation and
+payload assembly remain browser-owned. The redesign therefore refines the
+decision: use stable read endpoints when found, parse their factual HTML, and
+keep submit form-driven.
+
+This also establishes an operating rule: after a major portal redesign, rerun
+network discovery first. HTML parsing is the fallback only after confirming that
+the redesigned page did not introduce a stable data API.
+
 ## Considered options
 
-- **API discovery for reads** — rejected: nothing to discover; the data is only
-  ever in the server-rendered HTML.
+- **JSON API discovery for reads** — rejected: search, account, and key data is
+  only in server-rendered HTML. A targeted HTML fragment endpoint is used for
+  multi-operation OpenAPI details because it is narrower than the page UI.
 - **`POST /iim/api/saveDevAcountRequest.do` directly for apply** — rejected even
   though the endpoint exists. Driving the form's own `fn_save()` makes the portal
   build and validate the payload; hand-rolling the POST means reproducing every
@@ -53,5 +82,9 @@ XHR/fetch captured via CDP while loading each page:
 - Markup drift is inevitable, so it must be *detected*, not absorbed: parsers
   degrade to empty results, and `gongctl doctor` drives each seam live and exits
   non-zero on drift (CI-friendly).
+- A zero-row authenticated application parse is ambiguous, not healthy. Doctor
+  reports it as skipped, while non-empty lists report the parsed count. The
+  API-key selector has a value-free probe so layout drift can be detected without
+  exposing the credential.
 - CDP stays. The one-time human SSO login plus a long-lived re-attachable session
   is the requirement that rules out managed/remote browser services anyway.

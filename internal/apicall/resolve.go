@@ -122,8 +122,10 @@ func MissingRequired(op *Operation, params map[string]string) []string {
 		return nil
 	}
 	have := make(map[string]bool, len(params))
-	for k := range params {
-		have[strings.ToLower(k)] = true
+	for k, value := range params {
+		if strings.TrimSpace(value) != "" {
+			have[strings.ToLower(k)] = true
+		}
 	}
 	var missing []string
 	for _, p := range op.Params {

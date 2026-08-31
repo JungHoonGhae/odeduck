@@ -54,7 +54,7 @@ homebrew_casks:
       branch: main
       token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
     homepage: "https://github.com/JungHoonGhae/gongctl"
-    description: "data.go.kr 활용신청·인증키 발급·API 호출을 AI 에이전트가 대신 — 포털 UI를 사람이 건드릴 필요 없이"
+    description: "data.go.kr 자연어 탐색부터 활용신청·승인 확인·실제 API 호출까지 잇는 AI 에이전트 워크플로"
     # 미서명 바이너리의 macOS Gatekeeper 격리 제거 (없으면 첫 실행이 차단됨).
     hooks:
       post:

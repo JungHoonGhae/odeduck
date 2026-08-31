@@ -3,10 +3,12 @@ package main
 import (
 	"errors"
 	"fmt"
+	"os"
 	"sort"
 	"strings"
 	"time"
 
+	"github.com/JungHoonGhae/gongctl/internal/agentplan"
 	"github.com/JungHoonGhae/gongctl/internal/catalog"
 	"github.com/JungHoonGhae/gongctl/internal/output"
 	"github.com/spf13/cobra"
@@ -21,14 +23,16 @@ func catalogCmd() *cobra.Command {
 있나?"를 확인하려면 검색어를 하나씩 추측해 볼 수밖에 없습니다.
 
   gongctl catalog sync            전체 목록 수집 (수십 초)
+  gongctl catalog discover <목표> Codex·Claude·Gemini·Cursor로 검색축 생성 후 탐색
   gongctl catalog sync --if-stale 오래됐을 때만 수집 — cron/CI 로 주기 갱신할 때
-  gongctl catalog search 폭염     로컬 검색 — 활용신청 많은 순
+  gongctl catalog semantic-build  Ollama 의미 벡터 인덱스 생성(선택)
+  gongctl catalog search 폭염     하이브리드 검색(인덱스 없으면 키워드 검색)
   gongctl catalog search 폭염 --rest-only   호출 가능한(REST) 것만
   gongctl catalog orgs 폭염       그 주제를 개방한 기관 순위
   gongctl catalog info            언제 수집했는지 / 몇 건인지`,
 		RunE: func(cmd *cobra.Command, _ []string) error { return cmd.Help() },
 	}
-	c.AddCommand(catalogSyncCmd(), catalogSearchCmd(), catalogOrgsCmd(), catalogInfoCmd())
+	c.AddCommand(catalogSyncCmd(), catalogSemanticBuildCmd(), catalogSearchCmd(), catalogDiscoverCmd(), catalogOrgsCmd(), catalogInfoCmd())
 	return c
 }
 
@@ -79,13 +83,37 @@ func catalogSyncCmd() *cobra.Command {
 }
 
 func catalogSearchCmd() *cobra.Command {
+	return catalogQueryCmd(false)
+}
+
+func catalogDiscoverCmd() *cobra.Command {
+	return catalogQueryCmd(true)
+}
+
+func catalogQueryCmd(discover bool) *cobra.Command {
 	var limit int
 	var restOnly bool
+	var semantic bool
+	var concepts []string
+	var ranking string
+	var previews bool
+	var agent string
+	use := "search <검색어…>"
+	short := "로컬 카탈로그 하이브리드 검색 (키워드 + 선택적 의미 벡터)"
+	defaultAgent := "none"
+	if discover {
+		use = "discover <목표…>"
+		short = "Codex·Claude·Gemini·Cursor로 검색축을 만들고 기회 탐색"
+		defaultAgent = agentplan.ProviderAuto
+	}
 	c := &cobra.Command{
-		Use:   "search <검색어…>",
-		Short: "로컬 카탈로그 검색 (모든 단어가 포함된 것, 활용신청 많은 순)",
+		Use:   use,
+		Short: short,
 		Args:  cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if limit < 1 || limit > catalog.MaxSearchLimit {
+				return fmt.Errorf("--limit은 1~%d 사이여야 합니다", catalog.MaxSearchLimit)
+			}
 			format, err := resolveFormat()
 			if err != nil {
 				return err
@@ -101,31 +129,80 @@ func catalogSearchCmd() *cobra.Command {
 				}
 				q += a
 			}
-			res := cat.Search(q, limit, restOnly)
+			var planner *agentplan.Plan
+			if len(concepts) == 0 && agent != "none" {
+				generated, planErr := agentplan.Generate(cmd.Context(), q, agent)
+				if planErr != nil {
+					if agent != agentplan.ProviderAuto {
+						return planErr
+					}
+					planner = &agentplan.Plan{Status: agentplan.StatusUnavailable, Detail: planErr.Error()}
+					fmt.Fprintf(cmd.ErrOrStderr(), "⚠ AI 검색 계획을 만들지 못해 원문 검색으로 폴백합니다: %v\n", planErr)
+				} else {
+					planner = &generated
+					concepts = generated.Concepts
+					fmt.Fprintf(cmd.ErrOrStderr(), "검색 계획 · %s: %s\n", generated.Provider, strings.Join(generated.Concepts, " · "))
+				}
+			}
+			queryPlan := catalog.QueryPlan{
+				Intent: q, Concepts: concepts, Limit: limit, RESTOnly: restOnly,
+				IncludePreviews: previews, Ranking: ranking,
+			}
+			var res catalog.Result
+			if semantic {
+				idx, indexErr := catalog.LoadSemanticIndex(cat)
+				switch {
+				case indexErr == nil:
+					embedder := catalog.NewOllamaEmbedder(os.Getenv("GONGCTL_OLLAMA_URL"), idx.Model)
+					res = cat.SearchHybrid(cmd.Context(), queryPlan, idx, embedder)
+				case errors.Is(indexErr, catalog.ErrSemanticIndexStale):
+					res = cat.SearchPlan(queryPlan)
+					res.Semantic = &catalog.SemanticInfo{Status: catalog.SemanticUnavailable, Detail: "카탈로그 갱신 후 semantic-build 필요"}
+					fmt.Fprintln(cmd.ErrOrStderr(), "⚠ 의미 인덱스가 현재 카탈로그와 다릅니다 — `gongctl catalog semantic-build` 로 갱신하세요.")
+				case errors.Is(indexErr, catalog.ErrSemanticIndexNotBuilt):
+					res = cat.SearchHybrid(cmd.Context(), queryPlan, nil, nil)
+				default:
+					res = cat.SearchPlan(queryPlan)
+					res.Semantic = &catalog.SemanticInfo{Status: catalog.SemanticUnavailable, Detail: "의미 인덱스 로드 실패"}
+					fmt.Fprintf(cmd.ErrOrStderr(), "⚠ 의미 인덱스를 읽지 못해 키워드 검색으로 폴백합니다: %v\n", indexErr)
+				}
+			} else {
+				res = cat.SearchPlan(queryPlan)
+			}
 			hits, total := res.Hits, res.Total
 			if format != output.Table {
-				return output.WriteJSON(cmd.OutOrStdout(), map[string]any{
+				result := map[string]any{
+					"mode": res.Mode, "intent": res.Intent, "queries": res.Queries, "semantic": res.Semantic,
 					"terms": res.Terms, "relaxed": res.Relaxed,
 					"total": total, "shown": len(hits), "hits": hits,
-				})
+				}
+				if planner != nil {
+					result["planner"] = planner
+				}
+				return output.WriteJSON(cmd.OutOrStdout(), result)
 			}
 			if total == 0 {
 				fmt.Fprintln(cmd.ErrOrStderr(), "일치하는 데이터가 없습니다.")
 				return nil
 			}
 			if res.Relaxed {
-				fmt.Fprintf(cmd.ErrOrStderr(),
-					"모든 단어를 포함하는 결과가 없어 일부만 일치하는 것까지 보여줍니다 (검색어: %s)\n\n",
-					strings.Join(res.Terms, " "))
+				if len(res.Queries) > 0 {
+					fmt.Fprintln(cmd.ErrOrStderr(), "일부 검색축은 모든 단어가 일치하지 않아 절반 이상 일치한 후보까지 포함합니다.")
+					fmt.Fprintln(cmd.ErrOrStderr())
+				} else {
+					fmt.Fprintf(cmd.ErrOrStderr(),
+						"모든 단어를 포함하는 결과가 없어 일부만 일치하는 것까지 보여줍니다 (검색어: %s)\n\n",
+						strings.Join(res.Terms, " "))
+				}
 			}
-			headers := []string{"pk", "유형", "활용신청", "수정일", "제공기관", "데이터명"}
+			headers := []string{"pk", "유형", "활용신청", "수정일", "발견축", "제공기관", "데이터명"}
 			rows := make([][]string, 0, len(hits))
 			for _, h := range hits {
 				svc := h.SvcType
 				if svc == "" {
 					svc = "?"
 				}
-				rows = append(rows, []string{h.PK, svc, fmt.Sprintf("%d", h.ApplyCount), h.ModifiedAt, h.Org, h.Title})
+				rows = append(rows, []string{h.PK, svc, fmt.Sprintf("%d", h.ApplyCount), h.ModifiedAt, h.MatchedQuery, h.Org, h.Title})
 			}
 			if err := output.WriteTable(cmd.OutOrStdout(), headers, rows); err != nil {
 				return err
@@ -137,7 +214,56 @@ func catalogSearchCmd() *cobra.Command {
 		},
 	}
 	c.Flags().IntVar(&limit, "limit", 20, "표시할 최대 건수")
-	c.Flags().BoolVar(&restOnly, "rest-only", false, "포털에 명세가 있는 REST 만 (LINK 는 describe/call 불가)")
+	c.Flags().BoolVar(&restOnly, "rest-only", true, "호출 가능한 REST만 검색 (전체 탐색은 --rest-only=false)")
+	c.Flags().BoolVar(&semantic, "semantic", true, "준비된 Ollama 의미 인덱스를 자동 사용 (--semantic=false 로 비활성화)")
+	c.Flags().StringArrayVar(&concepts, "concept", nil, "자연어 목표에서 추론한 구체적 검색축 (반복 가능, MCP 의미 분해 재현용)")
+	c.Flags().StringVar(&agent, "agent", defaultAgent, "검색 계획기: none | auto | codex | claude | gemini | cursor (CLI의 기존 로그인 사용)")
+	c.Flags().StringVar(&ranking, "ranking", catalog.RankBalanced, "검색축 내 순위: balanced | demand | recent")
+	c.Flags().BoolVar(&previews, "previews", true, "JSON 결과에 공식 설명의 짧은 미리보기 포함")
+	return c
+}
+
+func catalogSemanticBuildCmd() *cobra.Command {
+	var model, ollamaURL string
+	var batchSize int
+	var pull bool
+	c := &cobra.Command{
+		Use:   "semantic-build",
+		Short: "Ollama로 전체 카탈로그 의미 벡터 인덱스 생성",
+		Long: `선택 기능입니다. Ollama 하나만 설치되어 있으면 모델 다운로드부터 전체 카탈로그
+임베딩·로컬 캐시까지 한 번에 처리합니다. 별도 벡터 DB는 필요하지 않습니다. 카탈로그를
+sync 한 뒤 다시 실행하면 새 스냅샷에 맞춰 인덱스를 교체합니다.`,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			cat, err := loadCatalog(cmd)
+			if err != nil {
+				return err
+			}
+			embedder := catalog.NewOllamaEmbedder(ollamaURL, model)
+			if pull {
+				fmt.Fprintf(cmd.ErrOrStderr(), "Ollama 모델 확인·다운로드: %s\n", embedder.Model())
+				if err := embedder.Pull(cmd.Context()); err != nil {
+					return err
+				}
+			}
+			start := time.Now()
+			idx, err := catalog.BuildSemanticIndex(cmd.Context(), cat, embedder, batchSize, func(done, total int) {
+				fmt.Fprintf(cmd.ErrOrStderr(), "\r  의미 인덱싱… %d/%d (%.0f%%)", done, total, float64(done)*100/float64(total))
+			})
+			if err != nil {
+				return err
+			}
+			if err := idx.Save(); err != nil {
+				return err
+			}
+			fmt.Fprintf(cmd.ErrOrStderr(), "\r의미 인덱스 %d건 저장 · 모델 %s · %.1f초\n",
+				len(idx.PKs), idx.Model, time.Since(start).Seconds())
+			return nil
+		},
+	}
+	c.Flags().StringVar(&model, "model", catalog.DefaultEmbeddingModel, "Ollama 임베딩 모델")
+	c.Flags().StringVar(&ollamaURL, "ollama-url", os.Getenv("GONGCTL_OLLAMA_URL"), "Ollama base URL (기본 http://127.0.0.1:11434)")
+	c.Flags().IntVar(&batchSize, "batch-size", 32, "한 번에 임베딩할 카탈로그 항목 수")
+	c.Flags().BoolVar(&pull, "pull", true, "빌드 전에 Ollama 모델 확인·다운로드")
 	return c
 }
 
