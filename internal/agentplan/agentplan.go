@@ -31,6 +31,11 @@ const (
 
 var providerOrder = []string{ProviderCodex, ProviderClaude, ProviderGemini, ProviderCursor}
 
+// providerBinariesFor is a test seam for exercising provider fallback without
+// creating platform-specific fake executables. Production always uses
+// providerBinaries.
+var providerBinariesFor = providerBinaries
+
 // Plan is intentionally small and provider-neutral. Summary is explanatory,
 // not an instruction to the retrieval layer.
 type Plan struct {
@@ -60,7 +65,7 @@ type resolvedProvider struct {
 
 // Generate invokes one installed CLI in a non-interactive, read-only mode.
 // Authentication and billing remain entirely under that CLI's configuration;
-// gongctl never reads or stores its credentials.
+// opendatactl never reads or stores its credentials.
 func Generate(ctx context.Context, goal, requested string) (Plan, error) {
 	goal = strings.TrimSpace(goal)
 	if goal == "" {
@@ -90,7 +95,7 @@ func Generate(ctx context.Context, goal, requested string) (Plan, error) {
 
 func generateWithProvider(ctx context.Context, goal string, candidate resolvedProvider) (Plan, error) {
 	prompt := planningPrompt(goal)
-	workDir, err := os.MkdirTemp("", "gongctl-agent-")
+	workDir, err := os.MkdirTemp("", "opendatactl-agent-")
 	if err != nil {
 		return Plan{}, fmt.Errorf("agent 임시 작업공간 생성 실패: %w", err)
 	}
@@ -149,7 +154,7 @@ func resolveProviders(requested string) ([]resolvedProvider, bool, error) {
 	}
 	var resolved []resolvedProvider
 	for _, candidate := range candidates {
-		for _, binary := range providerBinaries(candidate) {
+		for _, binary := range providerBinariesFor(candidate) {
 			path, lookErr := exec.LookPath(binary.name)
 			if lookErr == nil {
 				resolved = append(resolved, resolvedProvider{provider: candidate, executable: path, prefix: binary.prefix})

@@ -9,6 +9,9 @@ import (
 )
 
 var (
+	// CommandName is the invocation identity. The compatibility build overrides
+	// it to gongctl so help, completions, and version parsers keep their contract.
+	CommandName = "opendatactl"
 	// Version is the semantic version, set at build time.
 	Version = "dev"
 	// Commit is the short git SHA, set at build time.
@@ -43,5 +46,5 @@ func init() {
 
 // String renders a human-readable version line.
 func String() string {
-	return fmt.Sprintf("gongctl %s (commit %s, built %s)", Version, Commit, Date)
+	return fmt.Sprintf("%s %s (commit %s, built %s)", CommandName, Version, Commit, Date)
 }

@@ -148,7 +148,7 @@ func parseAPIKey(html string) (string, error) {
 	}
 	key, _ := doc.Find("#pblisrCrtfcKeyPlain").First().Attr("value")
 	if doc.Find("#pblisrCrtfcKeyPlain").Length() == 0 {
-		return "", fmt.Errorf("%w — 페이지 구조 변경 가능성, `gongctl doctor` 로 확인", ErrAPIKeyFieldMissing)
+		return "", fmt.Errorf("%w — 페이지 구조 변경 가능성, `opendatactl doctor` 로 확인", ErrAPIKeyFieldMissing)
 	}
 	key = strings.TrimSpace(key)
 	if key == "" {
@@ -161,7 +161,7 @@ func parseAPIKey(html string) (string, error) {
 // field changed from an expired session that landed on the generic portal home.
 // Both are HTTP 200 responses without #pblisrCrtfcKeyPlain, but only the former
 // is parser drift. Keeping that distinction prevents doctor from reporting a
-// portal redesign when the actual action is simply `gongctl login`.
+// portal redesign when the actual action is simply `opendatactl login`.
 func apiKeyFromAccountPage(html string) (string, error) {
 	key, err := parseAPIKey(html)
 	if !errors.Is(err, ErrAPIKeyFieldMissing) {

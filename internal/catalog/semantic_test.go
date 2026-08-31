@@ -52,8 +52,34 @@ func TestOllamaEmbedderUsesBatchAPI(t *testing.T) {
 	}
 }
 
+func TestOllamaURLFromEnvPrefersOpenDataCTLAndFallsBackToLegacy(t *testing.T) {
+	t.Setenv("OPENDATACTL_OLLAMA_URL", "")
+	t.Setenv("GONGCTL_OLLAMA_URL", "http://legacy.example")
+	if got := OllamaURLFromEnv(); got != "http://legacy.example" {
+		t.Fatalf("legacy Ollama URL = %q", got)
+	}
+
+	t.Setenv("OPENDATACTL_OLLAMA_URL", "http://current.example")
+	if got := OllamaURLFromEnv(); got != "http://current.example" {
+		t.Fatalf("current Ollama URL = %q", got)
+	}
+}
+
+func TestOllamaURLFromEnvUsesDefaultWhenNeitherVariableIsSet(t *testing.T) {
+	t.Setenv("OPENDATACTL_OLLAMA_URL", "")
+	t.Setenv("GONGCTL_OLLAMA_URL", "")
+
+	embedder := NewOllamaEmbedder(OllamaURLFromEnv(), "")
+	if embedder.baseURL != DefaultOllamaURL {
+		t.Fatalf("Ollama base URL = %q, want %q", embedder.baseURL, DefaultOllamaURL)
+	}
+	if embedder.model != DefaultEmbeddingModel {
+		t.Fatalf("Ollama model = %q, want %q", embedder.model, DefaultEmbeddingModel)
+	}
+}
+
 func TestSemanticIndexRoundTripAndSearch(t *testing.T) {
-	t.Setenv("HOME", t.TempDir())
+	isolateConfigHome(t)
 	c := &Catalog{SyncedAt: time.Now(), Entries: []Entry{
 		{PK: "auction", Title: "온비드 부동산", Org: "한국자산관리공사", SvcType: SvcREST, Desc: "공공자산 공매 물건"},
 		{PK: "weather", Title: "동네 날씨", Org: "기상청", SvcType: SvcREST, Desc: "기온 강수량"},
@@ -86,7 +112,7 @@ func TestSemanticIndexRoundTripAndSearch(t *testing.T) {
 }
 
 func TestSemanticIndexRejectsChangedCatalog(t *testing.T) {
-	t.Setenv("HOME", t.TempDir())
+	isolateConfigHome(t)
 	c := &Catalog{SyncedAt: time.Now(), Entries: []Entry{{PK: "1", Title: "원본"}}}
 	e := fakeEmbedder{model: "fake", fn: func(string) []float32 { return []float32{1} }}
 	idx, err := BuildSemanticIndex(context.Background(), c, e, 1, nil)

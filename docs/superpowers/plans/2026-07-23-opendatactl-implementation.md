@@ -1,31 +1,35 @@
-# gongctl Implementation Plan
+# opendatactl Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+> **Historical plan:** This records the original implementation sequence and is no longer the
+> current runbook. The shipped session lifecycle, catalog search, MCP surface, and release layout
+> have since changed. Use `README.md`, `docs/adr/`, current CLI help, and the code as the source of truth.
+
 **Goal:** Ship a Go CLI + MCP server that lets an AI agent search data.go.kr datasets, submit 활용신청 (application) through a live browser session, and call arbitrary approved OpenAPIs — with zero human portal-UI operation beyond a one-time browser login.
 
-**Architecture:** One binary, two faces (CLI for humans via cobra, MCP for agents via stdio), same backend. Deterministic steps (login, apply, key injection, HTTP, XML→JSON) are automated by tools; heterogeneous API specs are *surfaced* (scraped and handed to the agent), never parsed into claims. The 활용신청 automation is a CDP-attach daemon: gongctl launches a real Chrome, the human logs in once, gongctl keeps it alive and re-attaches over the DevTools Protocol for later commands.
+**Architecture:** One binary, two faces (CLI for humans via cobra, MCP for agents via stdio), same backend. Deterministic steps (login, apply, key injection, HTTP, XML→JSON) are automated by tools; heterogeneous API specs are *surfaced* (scraped and handed to the agent), never parsed into claims. The 활용신청 automation is a CDP-attach daemon: opendatactl launches a real Chrome, the human logs in once, opendatactl keeps it alive and re-attaches over the DevTools Protocol for later commands.
 
 **Tech Stack:** Go 1.26, cobra (CLI), chromedp + cdproto (browser automation), PuerkitoBio/goquery (HTML scraping), modelcontextprotocol/go-sdk (MCP), encoding/xml (call responses). No cgo.
 
 ## Global Constraints
 
-- **Module path:** `github.com/JungHoonGhae/gongctl` (fresh repo, no remote yet).
+- **Module path:** `github.com/JungHoonGhae/opendatactl` (fresh repo, no remote yet).
 - **Go version floor:** `go 1.26.1`.
 - **kvote source repo (port origin):** `/Users/junghoon/workspace/projects/oss-k-vote-cli` — referenced as `$KVOTE` below. Ported files are copied from here, then renamed.
 - **Dependency pins (match kvote's go.mod exactly):** `github.com/PuerkitoBio/goquery v1.12.0`, `github.com/chromedp/chromedp v0.15.1`, `github.com/chromedp/cdproto v0.0.0-20260321001828-e3e3800016bc`, `github.com/modelcontextprotocol/go-sdk v1.6.1`, `github.com/spf13/cobra v1.10.2`. **Do NOT add new dependencies** — XML→JSON uses stdlib `encoding/xml`.
-- **Naming rule:** every kvote-specific identifier/string ("kvote", "nec", NEC org defaults, `KVOTE_*`) is renamed to gongctl-neutral. No election-domain vocabulary survives into gongctl.
+- **Naming rule:** every kvote-specific identifier/string ("kvote", "nec", NEC org defaults, `KVOTE_*`) is renamed to opendatactl-neutral. No election-domain vocabulary survives into opendatactl.
 - **License:** MIT. Platforms: macOS/Linux/Windows.
 - **Never log or persist a serviceKey.** The key is passed in per call and surfaced back only inside CallResult/error to the caller.
 - **surface-only contract:** describe never invents a parameter that isn't in the page; call never auto-retries or rewrites a key silently — it surfaces the error with a hint.
-- **Config dir:** `os.UserConfigDir()/gongctl/` holds `datagokr-cdp.json` (session state), `chrome-profile/` (persistent Chrome profile), `config.json` (preferences).
+- **Config dir:** `os.UserConfigDir()/opendatactl/` holds `datagokr-cdp.json` (session state), `chrome-profile/` (persistent Chrome profile), `config.json` (preferences).
 
 ---
 
 ## File Structure
 
 ```
-cmd/gongctl/
+cmd/opendatactl/
   main.go            entrypoint
   root.go            cobra root, global flags, client builders
   auth.go            login / logout / status
@@ -58,21 +62,21 @@ internal/output/     json/jsonl/table renderer (ported verbatim)
 internal/version/    ldflags-injected build metadata (ported, renamed)
   version.go
 internal/mcpserver/  MCP (stdio)
-  server.go          assemble + 5 tools + gongctl://guide resource
+  server.go          assemble + 5 tools + opendatactl://guide resource
   server_test.go     in-memory transport round-trip
-  guide.go           gongctl://guide markdown text
+  guide.go           opendatactl://guide markdown text
 ```
 
 ---
 
-### Task 1: Scaffold — module, version, buildable `gongctl version`
+### Task 1: Scaffold — module, version, buildable `opendatactl version`
 
 **Files:**
 - Create: `go.mod`
 - Create: `internal/version/version.go`
-- Create: `cmd/gongctl/main.go`
-- Create: `cmd/gongctl/root.go`
-- Create: `cmd/gongctl/version.go`
+- Create: `cmd/opendatactl/main.go`
+- Create: `cmd/opendatactl/root.go`
+- Create: `cmd/opendatactl/version.go`
 
 **Interfaces:**
 - Produces: `version.String() string`; `version.Version`, `version.Commit`, `version.Date` (ldflags targets). `rootCmd` cobra command with persistent flags `--format/-f` (default `json`), `--delay` (default `700ms`), `--base-url` (default `""`). Builder stubs `resolveFormat()`, and command registration in `root.go init()`.
@@ -81,26 +85,26 @@ internal/mcpserver/  MCP (stdio)
 
 Run:
 ```bash
-cd /Users/junghoon/workspace/projects/oss-gongctl
-go mod init github.com/JungHoonGhae/gongctl
+cd /Users/junghoon/workspace/projects/oss-opendatactl
+go mod init github.com/JungHoonGhae/opendatactl
 go mod edit -go=1.26.1
 ```
 
 - [ ] **Step 2: Port the version package**
 
-Copy `$KVOTE/internal/version/version.go` to `internal/version/version.go`, then change **only** the `String()` function's format string from `"kvote %s ..."` to `"gongctl %s ..."`:
+Copy `$KVOTE/internal/version/version.go` to `internal/version/version.go`, then change **only** the `String()` function's format string from `"kvote %s ..."` to `"opendatactl %s ..."`:
 
 ```go
 // String renders a human-readable version line.
 func String() string {
-	return fmt.Sprintf("gongctl %s (commit %s, built %s)", Version, Commit, Date)
+	return fmt.Sprintf("opendatactl %s (commit %s, built %s)", Version, Commit, Date)
 }
 ```
 
 - [ ] **Step 3: Write main.go**
 
 ```go
-// Command gongctl automates data.go.kr (공공데이터포털): dataset search, OpenAPI
+// Command opendatactl automates data.go.kr (공공데이터포털): dataset search, OpenAPI
 // 활용신청, and authenticated API calls — driven from a CLI or, for AI agents,
 // an MCP server. It exists so agents never have to touch the portal UI.
 package main
@@ -126,8 +130,8 @@ package main
 import (
 	"time"
 
-	"github.com/JungHoonGhae/gongctl/internal/output"
-	"github.com/JungHoonGhae/gongctl/internal/portal"
+	"github.com/JungHoonGhae/opendatactl/internal/output"
+	"github.com/JungHoonGhae/opendatactl/internal/portal"
 	"github.com/spf13/cobra"
 )
 
@@ -138,11 +142,11 @@ var (
 )
 
 var rootCmd = &cobra.Command{
-	Use:   "gongctl",
+	Use:   "opendatactl",
 	Short: "data.go.kr(공공데이터포털) 자동화 — 검색·활용신청·API 호출 (CLI + MCP)",
-	Long: `gongctl — 공공데이터포털(data.go.kr)의 OpenAPI 활용신청·인증키·호출을 자동화합니다.
+	Long: `opendatactl — 공공데이터포털(data.go.kr)의 OpenAPI 활용신청·인증키·호출을 자동화합니다.
 
-사람은 브라우저에서 한 번만 로그인(gongctl login)하면, 이후 검색·활용신청·호출을
+사람은 브라우저에서 한 번만 로그인(opendatactl login)하면, 이후 검색·활용신청·호출을
 CLI 또는 MCP(에이전트)로 처리합니다. 포털 UI를 다시 건드릴 필요가 없습니다.`,
 	SilenceUsage:  true,
 	SilenceErrors: true,
@@ -173,7 +177,7 @@ package main
 import (
 	"fmt"
 
-	"github.com/JungHoonGhae/gongctl/internal/version"
+	"github.com/JungHoonGhae/opendatactl/internal/version"
 	"github.com/spf13/cobra"
 )
 
@@ -192,8 +196,8 @@ func versionCmd() *cobra.Command {
 - [ ] **Step 6: Commit**
 
 ```bash
-git add go.mod internal/version cmd/gongctl/main.go cmd/gongctl/version.go
-git commit -m "feat: scaffold gongctl module, version package, CLI root"
+git add go.mod internal/version cmd/opendatactl/main.go cmd/opendatactl/version.go
+git commit -m "feat: scaffold opendatactl module, version package, CLI root"
 ```
 
 ---
@@ -281,18 +285,18 @@ git commit -m "feat: port output renderer (json/jsonl/table) from kvote"
 - [ ] **Step 1: Port daemon.go with renames**
 
 Copy `$KVOTE/internal/datagokr/daemon.go` to `internal/portal/daemon.go`, change `package datagokr` → `package portal`, and apply these exact renames:
-- `configDir()`: `filepath.Join(dir, "kvote")` → `filepath.Join(dir, "gongctl")`.
-- `ErrNotLoggedIn` message: `"data.go.kr 세션이 없습니다 — 먼저 \`kvote api login\` 을 실행하세요"` → `"data.go.kr 세션이 없습니다 — 먼저 \`gongctl login\` 을 실행하세요"`.
+- `configDir()`: `filepath.Join(dir, "kvote")` → `filepath.Join(dir, "opendatactl")`.
+- `ErrNotLoggedIn` message: `"data.go.kr 세션이 없습니다 — 먼저 \`kvote api login\` 을 실행하세요"` → `"data.go.kr 세션이 없습니다 — 먼저 \`opendatactl login\` 을 실행하세요"`.
 
 Everything else (debugPort, daemonState, statePath, profileDir, saveState, loadState, findChrome, launchBrowser, discoverWS, wsAlive) is copied unchanged.
 
 - [ ] **Step 2: Port the platform files**
 
-Copy `$KVOTE/internal/datagokr/daemon_unix.go` and `daemon_windows.go` to `internal/portal/`, changing only `package datagokr` → `package portal`. Update the comment "kvote's exit" → "gongctl's exit" in both.
+Copy `$KVOTE/internal/datagokr/daemon_unix.go` and `daemon_windows.go` to `internal/portal/`, changing only `package datagokr` → `package portal`. Update the comment "kvote's exit" → "opendatactl's exit" in both.
 
 - [ ] **Step 3: Port config.go**
 
-Copy `$KVOTE/internal/datagokr/config.go` to `internal/portal/config.go`, change `package datagokr` → `package portal`. Update comment `` `api apply` `` → `` `gongctl apply` `` on the `AutoApply` field.
+Copy `$KVOTE/internal/datagokr/config.go` to `internal/portal/config.go`, change `package datagokr` → `package portal`. Update comment `` `api apply` `` → `` `opendatactl apply` `` on the `AutoApply` field.
 
 - [ ] **Step 4: Add DefaultDelay constant (root.go depends on it)**
 
@@ -340,7 +344,7 @@ Expected: FAIL (parseApplications undefined).
 
 - [ ] **Step 3: Port accounts.go**
 
-Copy `$KVOTE/internal/datagokr/accounts.go` → `internal/portal/accounts.go`, change `package datagokr` → `package portal`. The struct doc mentions "kvote surfaces it" — change to "gongctl surfaces it". No other change (parser is domain-neutral: it reads data.go.kr's 활용신청 현황 markup). This adds the `goquery` dependency.
+Copy `$KVOTE/internal/datagokr/accounts.go` → `internal/portal/accounts.go`, change `package datagokr` → `package portal`. The struct doc mentions "kvote surfaces it" — change to "opendatactl surfaces it". No other change (parser is domain-neutral: it reads data.go.kr's 활용신청 현황 markup). This adds the `goquery` dependency.
 
 - [ ] **Step 4: Run test to verify it passes**
 
@@ -372,7 +376,7 @@ Copy `$KVOTE/internal/datagokr/browser.go` → `internal/portal/browser.go`, cha
 
 - [ ] **Step 2: Port apply.go**
 
-Copy `$KVOTE/internal/datagokr/apply.go` → `internal/portal/apply.go`, change `package datagokr` → `package portal`. The comments reference "kvote drives the portal's real logic" and "kvote never bulk-applies" — change "kvote" → "gongctl" in comments. The `--purpose` error message stays. All chromedp logic (SSO warm-up, `currentMyMenuId` cookie, `fn_save()`, dialog listener, list-reflection success check) is copied **verbatim** — this is the hand-verified fragile automation; do not "improve" it.
+Copy `$KVOTE/internal/datagokr/apply.go` → `internal/portal/apply.go`, change `package datagokr` → `package portal`. The comments reference "kvote drives the portal's real logic" and "kvote never bulk-applies" — change "kvote" → "opendatactl" in comments. The `--purpose` error message stays. All chromedp logic (SSO warm-up, `currentMyMenuId` cookie, `fn_save()`, dialog listener, list-reflection success check) is copied **verbatim** — this is the hand-verified fragile automation; do not "improve" it.
 
 - [ ] **Step 3: Verify it compiles**
 
@@ -404,7 +408,7 @@ git commit -m "feat: port CDP browser session + 활용신청 auto-submit from kv
 **Interfaces:**
 - Produces: `portal.Client` (throttled HTTP), `portal.New(opts ...Option) *Client`, options `WithBaseURL`/`WithDelay`/`WithHTTPClient`/`WithUserAgent`, `(*Client).SearchDatasets(ctx, SearchOptions) ([]Dataset, error)`, types `Dataset{PublicDataPk, Title, Description, Formats, HasOpenAPI}` and `SearchOptions{Keyword, Org, Type, Page}`.
 
-Note on generalization vs kvote: kvote's `nec.Datasets` hardcodes `dType=FILE` and defaults `org=중앙선거관리위원회`. gongctl drops the NEC org default (blank = all publishers) and lets `Type` select FILE / API / (blank = all). The `<dl>` scraping and `parseDt` format-splitting are reused as-is.
+Note on generalization vs kvote: kvote's `nec.Datasets` hardcodes `dType=FILE` and defaults `org=중앙선거관리위원회`. opendatactl drops the NEC org default (blank = all publishers) and lets `Type` select FILE / API / (blank = all). The `<dl>` scraping and `parseDt` format-splitting are reused as-is.
 
 - [ ] **Step 1: Capture a real search fixture**
 
@@ -490,7 +494,7 @@ import (
 const DefaultBaseURL = "https://www.data.go.kr"
 
 // DefaultUserAgent identifies the client honestly to the server operator.
-const DefaultUserAgent = "gongctl (+https://github.com/JungHoonGhae/gongctl)"
+const DefaultUserAgent = "opendatactl (+https://github.com/JungHoonGhae/opendatactl)"
 
 // Client is a rate-limited HTTP client for scraping data.go.kr public pages
 // (dataset search, OpenAPI detail). Authenticated actions use the CDP browser
@@ -698,7 +702,7 @@ Expected: PASS. If the fixture's `<dl>` structure differs from kvote's assumptio
 
 - [ ] **Step 7: Wire root.go client builder + verify full build**
 
-Add to `cmd/gongctl/root.go`:
+Add to `cmd/opendatactl/root.go`:
 ```go
 // newPortalClient builds a portal HTTP client from the global flags.
 func newPortalClient() *portal.Client {
@@ -715,7 +719,7 @@ Expected: whole module builds; output + portal tests pass.
 - [ ] **Step 8: Commit**
 
 ```bash
-git add internal/portal/client.go internal/portal/search.go internal/portal/search_test.go internal/portal/testdata/search-list.html cmd/gongctl/root.go
+git add internal/portal/client.go internal/portal/search.go internal/portal/search_test.go internal/portal/testdata/search-list.html cmd/opendatactl/root.go
 git commit -m "feat: generalized data.go.kr dataset search (FILE+OpenAPI, any org)"
 ```
 
@@ -737,7 +741,7 @@ Grounding (verified against the real page `https://www.data.go.kr/data/15000908/
 
 ```bash
 mkdir -p internal/apicall/testdata
-cp "/private/tmp/claude-501/-Users-junghoon-workspace-projects-oss-gongctl/3c826fea-54ac-4996-8e8a-32250a8ee82f/scratchpad/op-15000908.html" internal/apicall/testdata/op-15000908.html
+cp "/private/tmp/claude-501/-Users-junghoon-workspace-projects-oss-opendatactl/3c826fea-54ac-4996-8e8a-32250a8ee82f/scratchpad/op-15000908.html" internal/apicall/testdata/op-15000908.html
 ```
 If that scratchpad file is gone, re-capture:
 ```bash
@@ -879,7 +883,7 @@ func Describe(ctx context.Context, baseURL, pk string) (*APISpec, error) {
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("User-Agent", "gongctl (+https://github.com/JungHoonGhae/gongctl)")
+	req.Header.Set("User-Agent", "opendatactl (+https://github.com/JungHoonGhae/opendatactl)")
 	req.Header.Set("Accept", "text/html,*/*")
 	client := &http.Client{Timeout: 30 * time.Second}
 	resp, err := client.Do(req)
@@ -1129,7 +1133,7 @@ func Call(ctx context.Context, endpoint string, params map[string]string, key st
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("User-Agent", "gongctl (+https://github.com/JungHoonGhae/gongctl)")
+	req.Header.Set("User-Agent", "opendatactl (+https://github.com/JungHoonGhae/opendatactl)")
 	client := &http.Client{Timeout: 60 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {
@@ -1258,10 +1262,10 @@ git commit -m "feat: call — serviceKey injection, XML→JSON, error-code surfa
 ### Task 9: CLI commands — auth, data (search/describe/call), apply/applications
 
 **Files:**
-- Create: `cmd/gongctl/auth.go`
-- Create: `cmd/gongctl/data.go`
-- Create: `cmd/gongctl/apply.go`
-- Modify: `cmd/gongctl/root.go` (register the new commands in `init()`)
+- Create: `cmd/opendatactl/auth.go`
+- Create: `cmd/opendatactl/data.go`
+- Create: `cmd/opendatactl/apply.go`
+- Modify: `cmd/opendatactl/root.go` (register the new commands in `init()`)
 
 **Interfaces:**
 - Consumes: `portal.Login/Logout/Applications/Apply`, `portal.Client.SearchDatasets`, `apicall.Describe/Call`, `output.*`.
@@ -1275,7 +1279,7 @@ package main
 import (
 	"fmt"
 
-	"github.com/JungHoonGhae/gongctl/internal/portal"
+	"github.com/JungHoonGhae/opendatactl/internal/portal"
 	"github.com/spf13/cobra"
 )
 
@@ -1283,14 +1287,14 @@ func loginCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "login",
 		Short: "브라우저로 data.go.kr 로그인 (세션 유지)",
-		Long: `브라우저 창을 띄워 data.go.kr 에 로그인합니다. 로그인이 끝나면 gongctl 이
+		Long: `브라우저 창을 띄워 data.go.kr 에 로그인합니다. 로그인이 끝나면 opendatactl 이
 그 브라우저를 백그라운드로 유지하고, 이후 apply/applications 등이 그 세션에
 다시 붙어 동작합니다. 키체인 비밀번호는 묻지 않습니다.`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			if err := portal.Login(cmd.Context(), cmd.ErrOrStderr()); err != nil {
 				return err
 			}
-			fmt.Fprintln(cmd.ErrOrStderr(), "   이제 `gongctl applications` 로 활용신청 현황을 볼 수 있습니다.")
+			fmt.Fprintln(cmd.ErrOrStderr(), "   이제 `opendatactl applications` 로 활용신청 현황을 볼 수 있습니다.")
 			return nil
 		},
 	}
@@ -1317,7 +1321,7 @@ func statusCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			_, err := portal.Applications(cmd.Context())
 			if err != nil {
-				fmt.Fprintln(cmd.ErrOrStderr(), "세션 없음 — `gongctl login` 을 실행하세요.")
+				fmt.Fprintln(cmd.ErrOrStderr(), "세션 없음 — `opendatactl login` 을 실행하세요.")
 				return nil
 			}
 			fmt.Fprintln(cmd.ErrOrStderr(), "✅ 세션이 살아있습니다.")
@@ -1339,8 +1343,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/JungHoonGhae/gongctl/internal/output"
-	"github.com/JungHoonGhae/gongctl/internal/portal"
+	"github.com/JungHoonGhae/opendatactl/internal/output"
+	"github.com/JungHoonGhae/opendatactl/internal/portal"
 	"github.com/spf13/cobra"
 )
 
@@ -1354,7 +1358,7 @@ func applyCmd() *cobra.Command {
 계정에 실제 신청을 생성하므로 **한 번에 한 건만** 처리하고 **활용목적(--purpose)을
 반드시 요구**하며 제출 전 확인합니다 (투기적 대량신청 금지).
 
-예) gongctl apply 15000908 --purpose "선거 데이터 분석" --category research`,
+예) opendatactl apply 15000908 --purpose "선거 데이터 분석" --category research`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			format, err := resolveFormat()
@@ -1388,7 +1392,7 @@ func applyCmd() *cobra.Command {
 				return output.WriteJSON(cmd.OutOrStdout(), res)
 			}
 			if res.Submitted {
-				fmt.Fprintf(cmd.ErrOrStderr(), "✅ %s — `gongctl applications` 로 확인하세요.\n", res.Message)
+				fmt.Fprintf(cmd.ErrOrStderr(), "✅ %s — `opendatactl applications` 로 확인하세요.\n", res.Message)
 			} else {
 				fmt.Fprintf(cmd.ErrOrStderr(), "⏹  %s\n", res.Message)
 			}
@@ -1473,9 +1477,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/JungHoonGhae/gongctl/internal/apicall"
-	"github.com/JungHoonGhae/gongctl/internal/output"
-	"github.com/JungHoonGhae/gongctl/internal/portal"
+	"github.com/JungHoonGhae/opendatactl/internal/apicall"
+	"github.com/JungHoonGhae/opendatactl/internal/output"
+	"github.com/JungHoonGhae/opendatactl/internal/portal"
 	"github.com/spf13/cobra"
 )
 
@@ -1546,7 +1550,7 @@ func callCmd() *cobra.Command {
 		Long: `승인된 OpenAPI 엔드포인트를 호출합니다. --key 로 계정 인증키를,
 --param k=v 로 요청변수를 전달합니다. 응답은 XML이면 JSON으로 변환해 출력합니다.
 
-예) gongctl call http://apis.data.go.kr/9760000/.../getX --key <KEY> --param numOfRows=10`,
+예) opendatactl call http://apis.data.go.kr/9760000/.../getX --key <KEY> --param numOfRows=10`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			pm := map[string]string{}
@@ -1576,7 +1580,7 @@ func callCmd() *cobra.Command {
 
 - [ ] **Step 4: Register commands in root.go**
 
-In `cmd/gongctl/root.go` `init()`, add after `rootCmd.AddCommand(versionCmd())`:
+In `cmd/opendatactl/root.go` `init()`, add after `rootCmd.AddCommand(versionCmd())`:
 ```go
 	rootCmd.AddCommand(loginCmd(), logoutCmd(), statusCmd())
 	rootCmd.AddCommand(searchCmd(), describeCmd(), callCmd())
@@ -1587,46 +1591,46 @@ In `cmd/gongctl/root.go` `init()`, add after `rootCmd.AddCommand(versionCmd())`:
 
 Run:
 ```bash
-go build ./... && go run ./cmd/gongctl --help && go run ./cmd/gongctl search --help
+go build ./... && go run ./cmd/opendatactl --help && go run ./cmd/opendatactl search --help
 ```
 Expected: help lists login/logout/status/search/describe/call/apply/applications/version. No live network needed.
 
 - [ ] **Step 6: Commit**
 
 ```bash
-git add cmd/gongctl/auth.go cmd/gongctl/data.go cmd/gongctl/apply.go cmd/gongctl/root.go
+git add cmd/opendatactl/auth.go cmd/opendatactl/data.go cmd/opendatactl/apply.go cmd/opendatactl/root.go
 git commit -m "feat: CLI commands — auth, search/describe/call, apply/applications"
 ```
 
 ---
 
-### Task 10: MCP server — 5 tools + gongctl://guide resource
+### Task 10: MCP server — 5 tools + opendatactl://guide resource
 
 **Files:**
 - Create: `internal/mcpserver/guide.go`
 - Create: `internal/mcpserver/server.go`
 - Create: `internal/mcpserver/server_test.go`
-- Create: `cmd/gongctl/mcp.go`
-- Modify: `cmd/gongctl/root.go` (register `mcpCmd()`)
+- Create: `cmd/opendatactl/mcp.go`
+- Modify: `cmd/opendatactl/root.go` (register `mcpCmd()`)
 
 **Interfaces:**
 - Consumes: `portal.Client.SearchDatasets`, `portal.Applications`, `portal.Apply`, `apicall.Describe`, `apicall.Call`.
-- Produces: `mcpserver.New(Deps) *mcp.Server`, `mcpserver.Serve(ctx, Deps) error`, `mcpserver.Deps{Portal *portal.Client, BaseURL string}`, tools `search_datasets`/`list_applications`/`apply`/`describe_api`/`call_api`, resource `gongctl://guide`.
+- Produces: `mcpserver.New(Deps) *mcp.Server`, `mcpserver.Serve(ctx, Deps) error`, `mcpserver.Deps{Portal *portal.Client, BaseURL string}`, tools `search_datasets`/`list_applications`/`apply`/`describe_api`/`call_api`, resource `opendatactl://guide`.
 
 - [ ] **Step 1: Write guide.go**
 
 ```go
 package mcpserver
 
-// GuideDoc is the gongctl://guide resource — the agent's entry point. It states
+// GuideDoc is the opendatactl://guide resource — the agent's entry point. It states
 // tool order and the Encoding/Decoding serviceKey trap.
-const GuideDoc = `# gongctl — data.go.kr 사용 가이드
+const GuideDoc = `# opendatactl — data.go.kr 사용 가이드
 
 ## 도구 사용 순서
 1. **search_datasets(keyword)** — 데이터셋을 찾는다. hasOpenApi=true 인 것이 API 호출 대상.
 2. **list_applications()** — 이미 활용신청한 API와 그 상태·인증키 만료일을 확인.
 3. **apply(pk, purpose)** — 아직 신청 안 했다면 활용신청(자동승인 개발계정 → 즉시 사용 가능).
-   - 로그인 세션이 필요하다. 세션이 없으면 사람에게 \`gongctl login\` 을 안내하는 에러가 온다.
+   - 로그인 세션이 필요하다. 세션이 없으면 사람에게 \`opendatactl login\` 을 안내하는 에러가 온다.
 4. **describe_api(pk)** — 상세기능·엔드포인트·요청변수를 surface. 파라미터는 여기서 확인해 구성한다.
    - params 가 비어 있고 rawHtml 만 있으면, 표 구조가 불확실하다는 뜻 — rawHtml 을 직접 읽어라.
    - guideDoc(참고문서)는 링크만 준다. 필요하면 사람에게 열어보게 한다.
@@ -1655,7 +1659,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/JungHoonGhae/gongctl/internal/portal"
+	"github.com/JungHoonGhae/opendatactl/internal/portal"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -1705,7 +1709,7 @@ Expected: FAIL (New undefined).
 - [ ] **Step 4: Write server.go**
 
 ```go
-// Package mcpserver exposes gongctl over the Model Context Protocol (stdio):
+// Package mcpserver exposes opendatactl over the Model Context Protocol (stdio):
 // dataset search, 활용신청, spec surfacing, and authenticated calls as tools.
 // It only assembles — the deterministic work lives in portal/apicall.
 package mcpserver
@@ -1713,8 +1717,8 @@ package mcpserver
 import (
 	"context"
 
-	"github.com/JungHoonGhae/gongctl/internal/apicall"
-	"github.com/JungHoonGhae/gongctl/internal/portal"
+	"github.com/JungHoonGhae/opendatactl/internal/apicall"
+	"github.com/JungHoonGhae/opendatactl/internal/portal"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -1753,8 +1757,8 @@ func New(deps Deps) *mcp.Server {
 		base = portal.BaseURL
 	}
 	s := mcp.NewServer(&mcp.Implementation{
-		Name:    "gongctl",
-		Title:   "gongctl — 공공데이터포털(data.go.kr) 자동화",
+		Name:    "opendatactl",
+		Title:   "opendatactl — 공공데이터포털(data.go.kr) 자동화",
 		Version: "0.1.0",
 	}, nil)
 
@@ -1816,12 +1820,12 @@ func New(deps Deps) *mcp.Server {
 
 	s.AddResource(&mcp.Resource{
 		Name:        "guide",
-		URI:         "gongctl://guide",
+		URI:         "opendatactl://guide",
 		MIMEType:    "text/markdown",
-		Description: "gongctl 도구 사용 순서와 인증키 Encoding/Decoding 주의. 먼저 읽으세요.",
+		Description: "opendatactl 도구 사용 순서와 인증키 Encoding/Decoding 주의. 먼저 읽으세요.",
 	}, func(ctx context.Context, req *mcp.ReadResourceRequest) (*mcp.ReadResourceResult, error) {
 		return &mcp.ReadResourceResult{Contents: []*mcp.ResourceContents{{
-			URI:      "gongctl://guide",
+			URI:      "opendatactl://guide",
 			MIMEType: "text/markdown",
 			Text:     GuideDoc,
 		}}}, nil
@@ -1842,7 +1846,7 @@ func Serve(ctx context.Context, deps Deps) error {
 
 Note: the empty-input tool (`list_applications`) uses `struct{}` — confirm the SDK accepts a no-field input struct (kvote's tools all take a field). If it rejects `struct{}`, give it a dummy `type emptyIn struct{}` with no jsonschema fields, matching whatever the pinned SDK requires (check by compiling).
 
-- [ ] **Step 5: Write cmd/gongctl/mcp.go + register**
+- [ ] **Step 5: Write cmd/opendatactl/mcp.go + register**
 
 ```go
 package main
@@ -1850,7 +1854,7 @@ package main
 import (
 	"context"
 
-	"github.com/JungHoonGhae/gongctl/internal/mcpserver"
+	"github.com/JungHoonGhae/opendatactl/internal/mcpserver"
 	"github.com/spf13/cobra"
 )
 
@@ -1858,9 +1862,9 @@ func mcpCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "mcp",
 		Short: "MCP 서버 실행 (stdio) — 에이전트가 검색·활용신청·호출",
-		Long: `gongctl 을 Model Context Protocol 서버로 노출합니다(stdio).
+		Long: `opendatactl 을 Model Context Protocol 서버로 노출합니다(stdio).
 search_datasets / list_applications / apply / describe_api / call_api tool 과
-gongctl://guide 리소스로 에이전트가 data.go.kr 을 다룹니다. 로그인 세션 전제.`,
+opendatactl://guide 리소스로 에이전트가 data.go.kr 을 다룹니다. 로그인 세션 전제.`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return mcpserver.Serve(context.Background(), mcpserver.Deps{
 				Portal: newPortalClient(),
@@ -1879,8 +1883,8 @@ Expected: PASS + full build.
 - [ ] **Step 7: Commit**
 
 ```bash
-git add internal/mcpserver cmd/gongctl/mcp.go cmd/gongctl/root.go
-git commit -m "feat: MCP server — 5 tools + gongctl://guide resource"
+git add internal/mcpserver cmd/opendatactl/mcp.go cmd/opendatactl/root.go
+git commit -m "feat: MCP server — 5 tools + opendatactl://guide resource"
 ```
 
 ---
@@ -1895,11 +1899,11 @@ git commit -m "feat: MCP server — 5 tools + gongctl://guide resource"
 - Create: `LICENSE` (MIT)
 - Create: `README.md`
 
-**Interfaces:** none (build/release config). Port structure from `$KVOTE`'s equivalents, renaming kvote→gongctl, module path, and binary name.
+**Interfaces:** none (build/release config). Port structure from `$KVOTE`'s equivalents, renaming kvote→opendatactl, module path, and binary name.
 
 - [ ] **Step 1: Port goreleaser + scripts**
 
-Copy `$KVOTE/.goreleaser.yaml`, `install.sh`, `install.ps1` (if present) and rewrite: binary name `kvote`→`gongctl`, module path, repo `k-vote-cli`→`gongctl`, ldflags targets `internal/version.{Version,Commit,Date}`. Set `builds.env: [CGO_ENABLED=0]`, GOOS `darwin/linux/windows`, GOARCH `amd64/arm64`.
+Copy `$KVOTE/.goreleaser.yaml`, `install.sh`, `install.ps1` (if present) and rewrite: binary name `kvote`→`opendatactl`, module path, repo `k-vote-cli`→`opendatactl`, ldflags targets `internal/version.{Version,Commit,Date}`. Set `builds.env: [CGO_ENABLED=0]`, GOOS `darwin/linux/windows`, GOARCH `amd64/arm64`.
 
 - [ ] **Step 2: Verify goreleaser config + snapshot build**
 
@@ -1909,12 +1913,12 @@ go install github.com/goreleaser/goreleaser/v2@latest 2>/dev/null || true
 goreleaser check
 goreleaser build --snapshot --clean --single-target
 ```
-Expected: `goreleaser check` passes; a `gongctl` binary is produced under `dist/`.
-Run: `./dist/**/gongctl version` → prints `gongctl <version> (...)`.
+Expected: `goreleaser check` passes; a `opendatactl` binary is produced under `dist/`.
+Run: `./dist/**/opendatactl version` → prints `opendatactl <version> (...)`.
 
 - [ ] **Step 3: Write LICENSE + README**
 
-MIT `LICENSE` (2026, Junghoon). `README.md`: one-paragraph pitch ("data-go-mcp인데 포털을 안 건드림"), install one-liner, `gongctl login` → `search` → `apply` → `describe` → `call` walkthrough, and the MCP config snippet (`gongctl mcp` as an MCP stdio server).
+MIT `LICENSE` (2026, Junghoon). `README.md`: one-paragraph pitch ("data-go-mcp인데 포털을 안 건드림"), install one-liner, `opendatactl login` → `search` → `apply` → `describe` → `call` walkthrough, and the MCP config snippet (`opendatactl mcp` as an MCP stdio server).
 
 - [ ] **Step 4: Commit (workflow needs token workflow scope)**
 
@@ -1930,12 +1934,12 @@ Note: pushing `.github/workflows/` requires a git token with **workflow** scope 
 
 After Task 11, run the real end-to-end path once against the actual portal with a real data.go.kr account:
 ```bash
-go run ./cmd/gongctl login                 # browser opens; log in once
-go run ./cmd/gongctl search 대기오염 --type api -f table
-go run ./cmd/gongctl apply <pk> --purpose "테스트 검증" --category research
-go run ./cmd/gongctl applications -f table  # confirm approved + note the key
-go run ./cmd/gongctl describe <pk>
-go run ./cmd/gongctl call <endpoint> --key <KEY> --param numOfRows=5
+go run ./cmd/opendatactl login                 # browser opens; log in once
+go run ./cmd/opendatactl search 대기오염 --type api -f table
+go run ./cmd/opendatactl apply <pk> --purpose "테스트 검증" --category research
+go run ./cmd/opendatactl applications -f table  # confirm approved + note the key
+go run ./cmd/opendatactl describe <pk>
+go run ./cmd/opendatactl call <endpoint> --key <KEY> --param numOfRows=5
 ```
 Expected: apply reflects in the list (auto-approved), describe surfaces operations, call returns a JSON-converted body with resultCode 00. This is the only test that exercises the CDP automation (login/apply/list) — unit tests can't.
 

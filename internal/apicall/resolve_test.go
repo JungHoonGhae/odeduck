@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/JungHoonGhae/gongctl/internal/fetch"
+	"github.com/JungHoonGhae/opendatactl/internal/fetch"
 )
 
 // describeFromHTML runs Describe against a page body, for assertions about a single
@@ -43,7 +43,7 @@ func TestIsRequiredAcceptsBothVocabularies(t *testing.T) {
 
 func TestMissingRequired(t *testing.T) {
 	op := &Operation{Params: []Param{
-		{Name: "ServiceKey", Required: "필"}, // gongctl injects this one
+		{Name: "ServiceKey", Required: "필"}, // opendatactl injects this one
 		{Name: "pageNo", Required: "필"},
 		{Name: "numOfRows", Required: "필수"},
 		{Name: "bas_yy", Required: "옵"},
@@ -106,7 +106,7 @@ func TestDedupeOperationsCollapsesIdenticalDuplicates(t *testing.T) {
 	}
 }
 
-// gongctl applies for a development account, and the portal grades the two stages
+// opendatactl applies for a development account, and the portal grades the two stages
 // separately: every sampled dataset auto-approves at 개발단계 while a third of them
 // require review at 운영단계. Conflating the two would either promise a key that
 // needs a human or warn about review that never applies here.

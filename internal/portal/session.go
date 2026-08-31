@@ -13,7 +13,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/JungHoonGhae/gongctl/internal/fetch"
+	"github.com/JungHoonGhae/opendatactl/internal/fetch"
 	"github.com/chromedp/cdproto/network"
 	"github.com/chromedp/chromedp"
 )
@@ -23,7 +23,7 @@ import (
 //
 // The portal's auth cookies are session-scoped — Chrome discards them when it
 // exits — but the values stay valid server-side until the session expires. So
-// gongctl copies them out after login and closes the browser, instead of keeping
+// opendatactl copies them out after login and closes the browser, instead of keeping
 // a window open for the rest of the day. Authenticated HTTP reads capture and
 // persist rotated cookies, extending a sliding session while the portal permits
 // it. The one flow that still needs a browser (활용신청 submit, which drives the
@@ -121,44 +121,41 @@ func loadSessionUnlocked() (*Session, error) {
 //
 // The profiles matter as much as the files. The login profile accumulates the
 // cookies of whatever the human logged in WITH — an SSO provider's session, for
-// instance — and the headless profile holds the cookies gongctl injected into it.
-// Removing only gongctl's own two files would leave those on disk after the user
+// instance — and the headless profile holds the cookies opendatactl injected into it.
+// Removing only opendatactl's own two files would leave those on disk after the user
 // asked to be logged out.
 func clearSession() error {
-	path, err := sessionPath()
+	dirs, err := configDirsForCleanup()
 	if err != nil {
 		return err
 	}
-	if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
-		return err
-	}
-	dir, derr := configDir()
-	if derr != nil {
-		return derr
-	}
-	if err := os.Remove(filepath.Join(dir, keyCacheFile)); err != nil && !os.IsNotExist(err) {
-		return err
-	}
-	for _, profile := range []string{"chrome-profile", "chrome-headless"} {
-		if err := os.RemoveAll(filepath.Join(dir, profile)); err != nil {
-			return fmt.Errorf("브라우저 프로파일 삭제 실패 (%s): %w", profile, err)
-		}
-	}
-	headlessProfiles, err := filepath.Glob(filepath.Join(dir, "chrome-headless-*"))
-	if err != nil {
-		return err
-	}
-	for _, profile := range headlessProfiles {
-		if data, readErr := os.ReadFile(filepath.Join(profile, headlessStateFile)); readErr == nil {
-			var state daemonState
-			if json.Unmarshal(data, &state) == nil {
-				cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), 12*time.Second)
-				closeBrowser(cleanupCtx, &state)
-				cleanupCancel()
+	for _, dir := range dirs {
+		for _, file := range []string{"datagokr-session.json", keyCacheFile, daemonStateFile} {
+			if err := os.Remove(filepath.Join(dir, file)); err != nil && !os.IsNotExist(err) {
+				return err
 			}
 		}
-		if err := os.RemoveAll(profile); err != nil {
-			return fmt.Errorf("브라우저 프로파일 삭제 실패 (%s): %w", filepath.Base(profile), err)
+		for _, profile := range []string{"chrome-profile", "chrome-headless"} {
+			if err := os.RemoveAll(filepath.Join(dir, profile)); err != nil {
+				return fmt.Errorf("브라우저 프로파일 삭제 실패 (%s): %w", profile, err)
+			}
+		}
+		headlessProfiles, err := filepath.Glob(filepath.Join(dir, "chrome-headless-*"))
+		if err != nil {
+			return err
+		}
+		for _, profile := range headlessProfiles {
+			if data, readErr := os.ReadFile(filepath.Join(profile, headlessStateFile)); readErr == nil {
+				var state daemonState
+				if json.Unmarshal(data, &state) == nil {
+					cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), 12*time.Second)
+					closeBrowser(cleanupCtx, &state)
+					cleanupCancel()
+				}
+			}
+			if err := os.RemoveAll(profile); err != nil {
+				return fmt.Errorf("브라우저 프로파일 삭제 실패 (%s): %w", filepath.Base(profile), err)
+			}
 		}
 	}
 	return nil

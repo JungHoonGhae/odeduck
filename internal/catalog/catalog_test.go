@@ -4,11 +4,12 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/JungHoonGhae/gongctl/internal/portal"
+	"github.com/JungHoonGhae/opendatactl/internal/portal"
 )
 
 func sample() *Catalog {
@@ -26,10 +27,16 @@ func sample() *Catalog {
 	}
 }
 
-func TestCatalogSaveAtomicallyReplacesSnapshot(t *testing.T) {
+func isolateConfigHome(t *testing.T) {
+	t.Helper()
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, ".config"))
+	t.Setenv("APPDATA", filepath.Join(home, "AppData", "Roaming"))
+}
+
+func TestCatalogSaveAtomicallyReplacesSnapshot(t *testing.T) {
+	isolateConfigHome(t)
 	first := &Catalog{SyncedAt: time.Now(), Type: "API", Entries: []Entry{{PK: "1", Title: "first"}}}
 	if err := first.Save(); err != nil {
 		t.Fatal(err)
@@ -53,8 +60,10 @@ func TestCatalogSaveAtomicallyReplacesSnapshot(t *testing.T) {
 	if err != nil || len(temps) != 0 {
 		t.Fatalf("temporary files after save = %v, err=%v", temps, err)
 	}
-	if info, err := os.Stat(filepath.Join(dir, "catalog.json")); err != nil || info.Mode().Perm() != 0o644 {
-		t.Fatalf("catalog mode = %v, err=%v", info, err)
+	if info, err := os.Stat(filepath.Join(dir, "catalog.json")); err != nil {
+		t.Fatalf("catalog stat: %v", err)
+	} else if runtime.GOOS != "windows" && info.Mode().Perm() != 0o644 {
+		t.Fatalf("catalog mode = %v, want 0644", info.Mode().Perm())
 	}
 }
 

@@ -2,7 +2,7 @@ package portal
 
 import (
 	"context"
-	"github.com/JungHoonGhae/gongctl/internal/fetch"
+	"github.com/JungHoonGhae/opendatactl/internal/fetch"
 	"net/http"
 	"net/http/httptest"
 	"os"

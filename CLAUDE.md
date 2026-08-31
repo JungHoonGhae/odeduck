@@ -1,15 +1,19 @@
-# CLAUDE.md — gongctl
+# CLAUDE.md — OpenDataCTL
 
 data.go.kr(공공데이터포털)의 OpenAPI **활용신청·인증키 발급·호출을 AI 에이전트가 대신**하게 하는
 Go CLI + MCP. 사람은 정부 SSO 로그인 한 번만 하고 이후 포털 작업을 에이전트가 잇는 것이 핵심.
 
 ## 현재 상태 (2026-08-31)
 
-- v0.8은 목표 기반 카탈로그 검색, 선택형 Ollama 의미 검색, 검색→상세→활용신청→호출 MCP 흐름을 제공한다.
+- v0.9는 제품·명령 이름을 OpenDataCTL/`opendatactl`로 바꾸고, v0.8 자동화를 위한 `gongctl`
+  호환 바이너리·설정 경로·환경변수·MCP 가이드 URI를 유지한다.
+- 목표 기반 카탈로그 검색, 선택형 Ollama 의미 검색, 검색→상세→활용신청→호출 MCP 흐름을 제공한다.
 - data.go.kr KRDS 개편 파서와 세션 쿠키 회전 갱신을 적용했다.
 - 온비드·나라장터·도매시장·중소기업 지원사업 API를 실계정으로 신청·승인·호출했다.
-- 설계 근거는 `docs/adr/`, 검색 평가는 `docs/research/semantic-search-evaluation.md`, 경쟁 조사는
-  `docs/research/competitive-workflow-audit.md`가 단일 소스다.
+- 현재 설계 근거는 `docs/adr/`, 검색 평가는 `docs/research/semantic-search-evaluation.md`, 경쟁 조사는
+  `docs/research/competitive-workflow-audit.md`, 포털 경계는 `docs/reverse-engineering/portal-catalog.md`가
+  단일 소스다. `docs/superpowers/specs/`와 `docs/superpowers/plans/`는 최초 구현의 역사적 기록이고,
+  홍보 영상 제작 기록은 `docs/promo/opendatactl-agent-explainer.md`에 있다.
 
 ## 확정된 핵심 결정 (스펙 요약)
 
@@ -22,11 +26,11 @@ Go CLI + MCP. 사람은 정부 SSO 로그인 한 번만 하고 이후 포털 작
   (로그인 1회 제외). 인증키는 `/iim/api/selectApiKeyList.do`의 `#pblisrCrtfcKeyPlain`에서 파싱.
 - **인증키**: data.go.kr은 **계정당 일반 인증키 하나**(첫 신청 시 발급). 엔드포인트별 매칭 불필요.
   Encoding/Decoding 키 함정 있음 — 잘못 쓰면 조용히 실패, 에러 힌트로 surface.
-- **로그인**: 정부 SSO는 자동화 안 함. 사람이 브라우저 1회(`gongctl login`) → **쿠키 추출 후 브라우저 종료**.
+- **로그인**: 정부 SSO는 자동화 안 함. 사람이 브라우저 1회(`opendatactl login`) → **쿠키 추출 후 브라우저 종료**.
   읽기는 순수 HTTP(`internal/portal/session.go`), `apply`만 headless Chrome에 쿠키 주입해 폼 구동.
   tossinvest-cli의 storage-state 패턴을 이식(단, Python helper 없이 chromedp in-process).
 
-## kvote에서 복사 이식할 것 (검증된 코드)
+## kvote에서 이식한 기반 (검증된 코드)
 
 `~/workspace/projects/oss-k-vote-cli` 의 다음을 복사 이식(공유 라이브러리 추출 안 함 — §5):
 - `internal/datagokr/*` (browser·apply·accounts·daemon·config) — 활용신청 CDP-attach 자동화의
@@ -36,21 +40,21 @@ Go CLI + MCP. 사람은 정부 SSO 로그인 한 번만 하고 이후 포털 작
 - `internal/output`, `internal/version`, CLI/MCP 패턴, goreleaser·install.sh/ps1 파이프라인.
 - NEC 전용 하드코딩 API(turnout/winners/elections)는 **가져오지 않음** — 범용 call_api로 대체.
 
-## 신규로 짤 것 (스펙 §4)
+## 신규로 구현한 것 (스펙 §4)
 
 - `internal/apicall/describe.go` — OpenAPI 상세페이지 → 엔드포인트·요청변수·가이드문서 surface.
 - `internal/apicall/call.go` — 계정 인증키 주입 + HTTP GET + XML→JSON + 에러코드 surface.
 
 ## 경쟁 지형
 
-검색→상세→호출 MCP는 이미 존재한다. gongctl의 검증된 차이는 목표 기반 전체 카탈로그 탐색과
+검색→상세→호출 MCP는 이미 존재한다. OpenDataCTL의 검증된 차이는 목표 기반 전체 카탈로그 탐색과
 data.go.kr 활용신청·승인·키 재사용·실호출을 하나로 연결하는 것이다. 비교 주장과 커밋 고정 근거는
 `docs/research/competitive-workflow-audit.md`만 갱신한다.
 
 ## 주의
 
 - `.github/workflows/` 커밋은 git 토큰 **workflow 스코프** 필요(kvote에서 겪음, 해결됨).
-- 이건 fragile scraping — data.go.kr HTML 바뀌면 파서가 조용히 빈 결과. `gongctl doctor`가
+- 이건 fragile scraping — data.go.kr HTML 바뀌면 파서가 조용히 빈 결과. `opendatactl doctor`가
   각 seam(search·describe·applications)을 라이브 호출해 drift를 시끄럽게 감지(CI용 exit 1).
 - **보안(HIGH, 해결됨)**: `daemon.go`에서 `--remote-allow-origins=*` 제거(스파이크
   `proto/cdp-origin`로 검증 — chromedp는 flag 없이 재부착, 외부 Origin은 Chrome이 403 거부).

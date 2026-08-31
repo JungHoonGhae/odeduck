@@ -6,9 +6,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/JungHoonGhae/gongctl/internal/apicall"
-	"github.com/JungHoonGhae/gongctl/internal/output"
-	"github.com/JungHoonGhae/gongctl/internal/portal"
+	"github.com/JungHoonGhae/opendatactl/internal/apicall"
+	"github.com/JungHoonGhae/opendatactl/internal/output"
+	"github.com/JungHoonGhae/opendatactl/internal/portal"
 	"github.com/spf13/cobra"
 )
 
@@ -94,9 +94,9 @@ func callCmd() *cobra.Command {
 신청 직후에는 게이트웨이 반영에 보통 7~10분 걸려 403 이 옵니다. --wait 10m 을 주면 그때까지
 1분 간격으로 재시도합니다(승인 자체는 즉시 끝나므로 다시 신청할 필요 없습니다).
 
-예) gongctl call --pk 15077974 --param numOfRows=10
-    gongctl call --pk 15077974 --wait 15m --param numOfRows=10   # 방금 신청한 API
-    gongctl call https://apis.data.go.kr/9760000/.../getX --param numOfRows=10`,
+예) opendatactl call --pk 15077974 --param numOfRows=10
+    opendatactl call --pk 15077974 --wait 15m --param numOfRows=10   # 방금 신청한 API
+    opendatactl call https://apis.data.go.kr/9760000/.../getX --param numOfRows=10`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) == 0 && pk == "" {
@@ -130,7 +130,7 @@ func callCmd() *cobra.Command {
 				// Missing required variables usually come back as an empty result
 				// rather than an error, so refuse before spending the request.
 				if missing := apicall.MissingRequired(resolved, pm); len(missing) > 0 {
-					return fmt.Errorf("필수 요청변수가 빠졌습니다: %s — `gongctl describe %s` 로 확인하세요",
+					return fmt.Errorf("필수 요청변수가 빠졌습니다: %s — `opendatactl describe %s` 로 확인하세요",
 						strings.Join(missing, ", "), pk)
 				}
 			}
@@ -142,7 +142,7 @@ func callCmd() *cobra.Command {
 			if key == "" {
 				k, keyErr := portal.APIKey(cmd.Context())
 				if keyErr != nil {
-					return fmt.Errorf("인증키를 얻지 못했습니다 (--key 로 직접 지정하거나 `gongctl login` 후 재시도): %w", keyErr)
+					return fmt.Errorf("인증키를 얻지 못했습니다 (--key 로 직접 지정하거나 `opendatactl login` 후 재시도): %w", keyErr)
 				}
 				key = k
 			}

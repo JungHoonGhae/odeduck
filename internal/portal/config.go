@@ -8,7 +8,7 @@ import (
 
 // Config holds user preferences for the data.go.kr integration.
 type Config struct {
-	// AutoApply, when true, lets `gongctl apply` submit without the y/n prompt.
+	// AutoApply, when true, lets `opendatactl apply` submit without the y/n prompt.
 	// Default false — applications are account-mutating, so confirmation is the
 	// safe default; the user opts into automation explicitly.
 	AutoApply bool `json:"autoApply"`
