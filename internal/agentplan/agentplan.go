@@ -31,6 +31,11 @@ const (
 
 var providerOrder = []string{ProviderCodex, ProviderClaude, ProviderGemini, ProviderCursor}
 
+// providerBinariesFor is a test seam for exercising provider fallback without
+// creating platform-specific fake executables. Production always uses
+// providerBinaries.
+var providerBinariesFor = providerBinaries
+
 // Plan is intentionally small and provider-neutral. Summary is explanatory,
 // not an instruction to the retrieval layer.
 type Plan struct {
@@ -149,7 +154,7 @@ func resolveProviders(requested string) ([]resolvedProvider, bool, error) {
 	}
 	var resolved []resolvedProvider
 	for _, candidate := range candidates {
-		for _, binary := range providerBinaries(candidate) {
+		for _, binary := range providerBinariesFor(candidate) {
 			path, lookErr := exec.LookPath(binary.name)
 			if lookErr == nil {
 				resolved = append(resolved, resolvedProvider{provider: candidate, executable: path, prefix: binary.prefix})

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -59,8 +60,10 @@ func TestCatalogSaveAtomicallyReplacesSnapshot(t *testing.T) {
 	if err != nil || len(temps) != 0 {
 		t.Fatalf("temporary files after save = %v, err=%v", temps, err)
 	}
-	if info, err := os.Stat(filepath.Join(dir, "catalog.json")); err != nil || info.Mode().Perm() != 0o644 {
-		t.Fatalf("catalog mode = %v, err=%v", info, err)
+	if info, err := os.Stat(filepath.Join(dir, "catalog.json")); err != nil {
+		t.Fatalf("catalog stat: %v", err)
+	} else if runtime.GOOS != "windows" && info.Mode().Perm() != 0o644 {
+		t.Fatalf("catalog mode = %v, want 0644", info.Mode().Perm())
 	}
 }
 

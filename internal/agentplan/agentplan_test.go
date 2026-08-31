@@ -2,8 +2,8 @@ package agentplan
 
 import (
 	"context"
+	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -104,17 +104,20 @@ func TestPlanningPromptDoesNotAskAgentToClaimExistence(t *testing.T) {
 }
 
 func TestGenerateAutoFallsBackAfterInstalledAgentFails(t *testing.T) {
-	dir := t.TempDir()
-	writeAgent := func(name, body string) {
-		t.Helper()
-		path := filepath.Join(dir, name)
-		if err := os.WriteFile(path, []byte("#!/bin/sh\n"+body+"\n"), 0o755); err != nil {
-			t.Fatal(err)
+	original := providerBinariesFor
+	t.Cleanup(func() { providerBinariesFor = original })
+	providerBinariesFor = func(provider string) []binaryCandidate {
+		switch provider {
+		case ProviderCodex, ProviderClaude:
+			return []binaryCandidate{{
+				name:   os.Args[0],
+				prefix: []string{"-test.run=TestAgentCLIHelper", "--", provider},
+			}}
+		default:
+			return nil
 		}
 	}
-	writeAgent("codex", `echo '{"error":"not authenticated"}' >&2; exit 1`)
-	writeAgent("claude", `echo '{"concepts":["공매 물건","낙찰 가격","입찰 결과"]}'`)
-	t.Setenv("PATH", dir)
+	t.Setenv("GO_WANT_AGENT_HELPER", "1")
 
 	plan, err := Generate(context.Background(), "수익 기회", ProviderAuto)
 	if err != nil {
@@ -123,4 +126,24 @@ func TestGenerateAutoFallsBackAfterInstalledAgentFails(t *testing.T) {
 	if plan.Provider != ProviderClaude {
 		t.Fatalf("provider = %q, want claude fallback", plan.Provider)
 	}
+}
+
+func TestAgentCLIHelper(t *testing.T) {
+	if os.Getenv("GO_WANT_AGENT_HELPER") != "1" {
+		return
+	}
+	for i, arg := range os.Args {
+		if arg != "--" || i+1 >= len(os.Args) {
+			continue
+		}
+		switch os.Args[i+1] {
+		case ProviderCodex:
+			fmt.Fprintln(os.Stderr, `{"error":"not authenticated"}`)
+			os.Exit(1)
+		case ProviderClaude:
+			fmt.Println(`{"concepts":["공매 물건","낙찰 가격","입찰 결과"]}`)
+			os.Exit(0)
+		}
+	}
+	os.Exit(2)
 }
