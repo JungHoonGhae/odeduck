@@ -66,6 +66,11 @@ v0.9에는 새 `opendatactl`과 기존 스크립트·자동화를 위한 `gongct
 기존 Homebrew cask는 tap의 rename 매핑을 따라 `brew update && brew upgrade --cask gongctl`로
 새 cask로 전환됩니다.
 
+단, 파일로 저장해 둔 **v0.8 Windows 설치 스크립트**를 버전 지정 없이 다시 실행하면 GitHub의
+저장소 이름 변경 리다이렉트를 따라가지 못합니다. 위의 최신 PowerShell 설치 명령을 한 번 실행하면
+기존 설치 폴더를 그대로 감지해 `opendatactl.exe`와 `gongctl.exe`를 함께 갱신합니다. 이미 설치된
+`gongctl` 실행 파일과 설정·로그인 상태에는 영향이 없습니다.
+
 ## 사용법
 
 ```sh

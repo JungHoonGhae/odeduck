@@ -48,9 +48,10 @@ archives:
     format_overrides:
       - goos: windows
         formats: ["zip"]
-  # Keep the old asset name for users running a saved v0.8 installer. The new
-  # installer prefers the OpenDataCTL archive, while this one contains only the
-  # compatibility command.
+  # Keep the old asset name for saved v0.8 macOS/Linux installers and explicitly
+  # version-pinned Windows installers. Unpinned v0.8 Windows installers cannot
+  # follow GitHub's intermediate repository-rename redirect; README documents
+  # rerunning the current installer for that one migration case.
   - id: gongctl
     ids: [gongctl-compat]
     name_template: "gongctl_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
