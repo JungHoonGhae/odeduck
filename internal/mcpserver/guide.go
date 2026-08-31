@@ -36,6 +36,34 @@ const GuideDoc = `# OpenDataCTL — data.go.kr 사용 가이드
 후보를 하나 고른 뒤 그 hit의 pk를 describe_api에 넘긴다. 검색 결과만 보고 엔드포인트나
 파라미터를 추측하지 않는다.
 
+### 서로 다른 데이터 연결: 같은 catalog_search를 세 번 사용
+
+도구 종류를 늘리지 않는다. 첫 catalog_search는 Anchor Node를 찾고, 두 번째 catalog_search는
+실제 결과를 본 뒤 Bridge Node를 찾는다.
+
+1. 첫 호출의 axes에 role=anchor와 서로 다른 역할을 넣는다. concepts와 axes를 함께 보낼 필요는 없다.
+2. 첫 결과에서 실제 Anchor PK 1개를 고른다. 제목·기관·preview를 본 뒤 처음 계획이 놓친 역할만
+   다시 만든다.
+3. 두 번째 호출에 anchorPks=[선택한 PK], 첫 호출의 원래 anchor axis, Bridge axes를 보낸다. 서버는
+   선택 PK가 이 호출에서도 anchor axis로 회수될 때만 Anchor로 인정한다. 각 Bridge axis는 다음을 모두 가진다.
+   - contribution: 둘을 결합해야만 새로 가능한 의사결정·비교·연구 측정
+   - edge.kinds: entity, spatial, temporal, proxy 중 하나 이상
+   - edge.expectedKeys: 실제 명세와 표본에서 확인할 결합키
+   - proxy라면 edge.transform: 변환식과 정보 손실
+4. 두 번째 hits에서 title과 official preview가 역할을 실제로 뒷받침하는 PK만 최대 3개 고른다.
+   검색 1위라는 이유로 자동 선택하지 않는다. 지역·유형 coverage 제한도 기록한다.
+5. 같은 catalog_search를 한 번 더 호출해 anchorPks, axes와 bridgeSelections를 보낸다.
+   bridgeSelections에는 실제 pk와 whyCandidate를 넣는다. role, incrementalValue, edge는 서버가 두 번째
+   hits의 검색 계약에서 가져오므로 선택기가 후보를 다른 역할이나 결합키로 바꿀 수 없다.
+6. connections의 status는 항상 candidate다. 카탈로그 metadata와 의미 유사도는 Data Node를 찾을 뿐
+   실제 Connection Edge를 증명하지 않는다. 역할·expectedKeys·incrementalValue·whyCandidate가
+   없거나 proxy 변환이 없으면 연결 카드를 만들지 않는다. 유효한 카드가 없을 때 abstention은 정상 결과다.
+
+각 candidate의 evidenceRequired를 따라 관련 PK들을 각각 describe_api하고, 공통 지역·기간으로
+call_api 표본을 가져와 실제 key namespace, grain, match rate, uniqueness, null rate, join cardinality와
+duplicate expansion을 확인한다. 모든 필수 edge가 표본 검증되기 전에는 Verified Connection이라고
+부르지 않는다. 접근·승인 때문에 확인하지 못하면 blocked, 실제 불일치면 rejected다.
+
 ### 2. describe_api(pk)
 선택한 데이터셋 하나의 상세기능, 실제 엔드포인트, 요청변수, 심의유형을 반환한다.
 
@@ -57,7 +85,7 @@ AI가 선택한 OpenAPI의 활용신청을 실제 제출한다. purpose에는 �
 - 로그인 세션이 없으면 사람에게 ` + "`opendatactl login`" + `을 안내한다. 로그인 이후에는 브라우저 조작,
   인증키 복사, 신청 폼 입력을 AI가 대신한다.
 
-### 3. call_api(pk, op, params)
+### 3. call_api(pk, op, params, profileFields?)
 describe_api에서 확인한 pk·op·params로 승인된 API를 호출한다. MCP 입력에는 raw endpoint와
 serviceKey가 없다. opendatactl이 pk로 명세를 다시 읽고 엔드포인트를 결정하며 필수 파라미터 누락을
 검사한 뒤 로그인 세션의 인증키를 주입한다. XML 응답은 JSON으로 변환한다.
@@ -67,6 +95,11 @@ serviceKey가 없다. opendatactl이 pk로 명세를 다시 읽고 엔드포인�
 - 미승인 오류면 아래의 계정 보조 도구를 사용한 뒤 같은 pk로 다시 호출한다.
 - 방금 승인된 API라면 waitSeconds=300을 줄 수 있다. 403은 승인 실패나 키 오류가 아니라
   게이트웨이 전파 대기일 수 있으므로 다시 신청하거나 키를 바꾸지 않는다.
+- Connection candidate를 검증할 때는 관련 API들을 같은 지역·기간으로 각각 호출하고,
+  profileFields에 expectedKeys의 실제 응답 field 이름을 최대 8개 넣는다. profile은 raw 값 표본,
+  count, distinctCount, nullCount, duplicateCount를 반환하며 leading zero를 보존한다.
+- 양쪽 profile의 값 교집합, 양방향 match rate, uniqueness와 예상 join expansion을 계산한다.
+  profile field가 없거나 grain·code namespace가 다르면 candidate를 승격하지 않는다.
 
 ## 보조 도구
 

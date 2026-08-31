@@ -76,19 +76,84 @@ type Hit struct {
 	Preview       string  `json:"preview,omitempty"`
 	SemanticScore float32 `json:"semanticScore,omitempty"`
 	Exact         bool    `json:"exact,omitempty"` // all lexical terms for MatchedQuery matched
+	// Discovery fields are present only for a structured role axis. They let a
+	// caller keep "why this node exists in the plan" separate from lexical or
+	// semantic similarity, without expanding the catalogue entry itself.
+	Role           string          `json:"role,omitempty"`
+	Contribution   string          `json:"contribution,omitempty"`
+	EdgeHypothesis *EdgeHypothesis `json:"edgeHypothesis,omitempty"`
+}
+
+// EdgeHypothesis is a metadata-only claim about how an Anchor Node and Bridge
+// Node might join. Search never upgrades it beyond candidate: official fields
+// and sampled values must be inspected through describe_api and call_api.
+type EdgeHypothesis struct {
+	Kinds        []string `json:"kinds"`               // entity | spatial | temporal | proxy
+	ExpectedKeys []string `json:"expectedKeys"`        // e.g. 법정동코드, 기준연월
+	Transform    string   `json:"transform,omitempty"` // required when Kinds contains proxy
+}
+
+// DiscoveryAxis is one distinct role in a goal-driven search. Query retrieves
+// nodes; the remaining fields explain why a result could complement an anchor.
+// The anchor role deliberately has no edge or contribution requirement.
+type DiscoveryAxis struct {
+	Role         string         `json:"role"`
+	Query        string         `json:"query"`
+	Contribution string         `json:"contribution,omitempty"`
+	Edge         EdgeHypothesis `json:"edge,omitempty"`
+}
+
+// ConnectionCandidate is a bounded, explicitly unverified pair. It is safe to
+// produce from catalogue metadata because Status can only be "candidate" here.
+// EvidenceRequired tells the host what must be learned before it may use the
+// stronger Verified Connection term.
+type ConnectionCandidate struct {
+	Anchor            Hit            `json:"anchor"`
+	Bridge            Hit            `json:"bridge"`
+	BridgeRole        string         `json:"bridgeRole"`
+	Edge              EdgeHypothesis `json:"edge"`
+	IncrementalValue  string         `json:"incrementalValue"`
+	Status            string         `json:"status"`
+	EvidenceRequired  []string       `json:"evidenceRequired"`
+	CandidateEvidence string         `json:"candidateEvidence,omitempty"`
+	ClaimBoundary     string         `json:"claimBoundary"`
+}
+
+// BridgeSelection is a host/model choice made after it has inspected real
+// catalogue hits. PK and WhyCandidate are the only trusted choices: Role,
+// IncrementalValue and Edge are echoed for compatibility but the catalogue
+// derives the connection contract from the selected hit so it cannot be
+// relabelled. Search never turns the top-ranked row into a connection
+// automatically; an explicit PK selection is the precision gate.
+type BridgeSelection struct {
+	PK               string         `json:"pk"`
+	Role             string         `json:"role,omitempty"`
+	IncrementalValue string         `json:"incrementalValue,omitempty"`
+	Edge             EdgeHypothesis `json:"edge,omitempty"`
+	WhyCandidate     string         `json:"whyCandidate"`
+}
+
+// Abstention is a normal discovery result when structured axes do not produce
+// a connection candidate that satisfies the metadata contract.
+type Abstention struct {
+	Reason string `json:"reason"`
 }
 
 // Result is what a search returns. Terms and Relaxed exist so a caller can tell
 // what was actually searched for: a query is not always used as written.
 type Result struct {
-	Mode     string        `json:"mode,omitempty"`    // lexical | planned
-	Intent   string        `json:"intent,omitempty"`  // original natural-language goal for a planned search
-	Queries  []string      `json:"queries,omitempty"` // concrete semantic axes inferred by the caller model
-	Terms    []string      `json:"terms,omitempty"`   // what a single lexical query was reduced to
-	Total    int           `json:"total"`             // entries matched
-	Relaxed  bool          `json:"relaxed,omitempty"` // true = at least one query had to OR its terms
-	Hits     []Hit         `json:"hits"`
-	Semantic *SemanticInfo `json:"semantic,omitempty"`
+	Mode        string                `json:"mode,omitempty"`    // lexical | planned
+	Intent      string                `json:"intent,omitempty"`  // original natural-language goal for a planned search
+	Queries     []string              `json:"queries,omitempty"` // concrete semantic axes inferred by the caller model
+	Terms       []string              `json:"terms,omitempty"`   // what a single lexical query was reduced to
+	Total       int                   `json:"total"`             // entries matched
+	Relaxed     bool                  `json:"relaxed,omitempty"` // true = at least one query had to OR its terms
+	Hits        []Hit                 `json:"hits"`
+	Semantic    *SemanticInfo         `json:"semantic,omitempty"`
+	Anchors     []Hit                 `json:"anchors,omitempty"`
+	Connections []ConnectionCandidate `json:"connections,omitempty"`
+	Warnings    []string              `json:"warnings,omitempty"`
+	Abstention  *Abstention           `json:"abstention,omitempty"`
 }
 
 const (
@@ -121,7 +186,27 @@ type QueryPlan struct {
 	RESTOnly        bool
 	IncludePreviews bool
 	Ranking         string // balanced (default) | demand | recent
+	// Axes is the structured form used for cross-domain connection discovery.
+	// Concepts remains supported for existing callers and ordinary broad search.
+	Axes             []DiscoveryAxis
+	AnchorPKs        []string
+	BridgeSelections []BridgeSelection
+	MaxConnections   int
 }
+
+type discoveryBucket struct {
+	axis DiscoveryAxis
+	hits []Hit
+}
+
+const (
+	ConnectionStatusCandidate = "candidate"
+	// MaxConnectionCandidates keeps exploratory discovery reviewable. A larger
+	// list encourages the host model to pass weak, merely novel pairs instead of
+	// abstaining when the join contract is not supported by metadata.
+	MaxConnectionCandidates = 3
+	maxAnchorNodes          = 3
+)
 
 // StaleAfter is when a synced catalogue should be refreshed. The portal adds and
 // retires datasets continuously, so a month-old snapshot is still useful for
@@ -432,7 +517,14 @@ func (c *Catalog) searchPlan(plan QueryPlan) Result {
 	if limit <= 0 {
 		limit = 20
 	}
+	axes, axisWarnings := normalizeDiscoveryAxes(plan.Axes, 8)
 	concepts := uniqueQueries(plan.Concepts, 8)
+	if len(axes) > 0 {
+		concepts = make([]string, 0, len(axes))
+		for _, axis := range axes {
+			concepts = append(concepts, axis.Query)
+		}
+	}
 	if len(concepts) == 0 {
 		return c.search(plan.Intent, limit, plan.RESTOnly)
 	}
@@ -446,13 +538,10 @@ func (c *Catalog) searchPlan(plan QueryPlan) Result {
 		entries[c.Entries[i].PK] = &c.Entries[i]
 	}
 
-	type bucket struct {
-		hits []Hit
-	}
-	buckets := make([]bucket, 0, len(concepts))
+	buckets := make([]discoveryBucket, 0, len(concepts))
 	all := make(map[string]bool)
 	anyRelaxed := false
-	for _, query := range concepts {
+	for queryIndex, query := range concepts {
 		found := c.search(query, len(c.Entries), plan.RESTOnly)
 		anyRelaxed = anyRelaxed || found.Relaxed
 		hits := append([]Hit(nil), found.Hits...)
@@ -480,17 +569,29 @@ func (c *Catalog) searchPlan(plan QueryPlan) Result {
 		}
 		for i := range hits {
 			hits[i].MatchedQuery = query
+			if queryIndex < len(axes) {
+				hits[i].Role = axes[queryIndex].Role
+				hits[i].Contribution = axes[queryIndex].Contribution
+				if len(axes[queryIndex].Edge.Kinds) > 0 || len(axes[queryIndex].Edge.ExpectedKeys) > 0 {
+					edge := axes[queryIndex].Edge
+					hits[i].EdgeHypothesis = &edge
+				}
+			}
 			if plan.IncludePreviews {
 				hits[i].Preview = descriptionPreview(entries[hits[i].PK], 180)
 			}
 			all[hits[i].PK] = true
 		}
-		buckets = append(buckets, bucket{hits: hits})
+		var axis DiscoveryAxis
+		if queryIndex < len(axes) {
+			axis = axes[queryIndex]
+		}
+		buckets = append(buckets, discoveryBucket{axis: axis, hits: hits})
 	}
 
 	res := Result{
 		Mode: SearchModePlanned, Intent: strings.TrimSpace(plan.Intent),
-		Queries: concepts, Total: len(all), Relaxed: anyRelaxed,
+		Queries: concepts, Total: len(all), Relaxed: anyRelaxed, Warnings: axisWarnings,
 	}
 	selected := make(map[string]bool)
 	for row := 0; len(res.Hits) < limit; row++ {
@@ -514,7 +615,236 @@ func (c *Catalog) searchPlan(plan QueryPlan) Result {
 			break
 		}
 	}
+	finalizeConnectionCandidates(plan, &res, entries)
 	return res
+}
+
+func normalizeDiscoveryAxes(raw []DiscoveryAxis, max int) ([]DiscoveryAxis, []string) {
+	if max <= 0 {
+		max = 8
+	}
+	seen := map[string]bool{}
+	seenRoles := map[string]bool{}
+	var axes []DiscoveryAxis
+	var warnings []string
+	for _, item := range raw {
+		axis := DiscoveryAxis{
+			Role:         compactText(item.Role, 40),
+			Query:        compactText(item.Query, 80),
+			Contribution: compactText(item.Contribution, 240),
+			Edge: EdgeHypothesis{
+				Kinds:        normalizeEdgeKinds(item.Edge.Kinds),
+				ExpectedKeys: uniqueCompact(item.Edge.ExpectedKeys, 4, 80),
+				Transform:    compactText(item.Edge.Transform, 240),
+			},
+		}
+		if axis.Query == "" || axis.Role == "" {
+			warnings = append(warnings, "role 또는 query가 비어 있는 discovery axis를 제외했습니다")
+			continue
+		}
+		key := strings.ToLower(axis.Role + "\x00" + axis.Query)
+		roleKey := strings.ToLower(axis.Role)
+		if seen[key] || seenRoles[roleKey] {
+			warnings = append(warnings, fmt.Sprintf("중복 discovery role을 제외했습니다: %s", axis.Role))
+			continue
+		}
+		seen[key] = true
+		seenRoles[roleKey] = true
+		axes = append(axes, axis)
+		if len(axes) == max {
+			break
+		}
+	}
+	return axes, warnings
+}
+
+func normalizeEdgeKinds(raw []string) []string {
+	allowed := map[string]bool{"entity": true, "spatial": true, "temporal": true, "proxy": true}
+	var out []string
+	seen := map[string]bool{}
+	for _, kind := range raw {
+		kind = strings.ToLower(strings.TrimSpace(kind))
+		if !allowed[kind] || seen[kind] {
+			continue
+		}
+		seen[kind] = true
+		out = append(out, kind)
+	}
+	return out
+}
+
+func uniqueCompact(raw []string, maxItems, maxRunes int) []string {
+	var out []string
+	seen := map[string]bool{}
+	for _, value := range raw {
+		value = compactText(value, maxRunes)
+		key := strings.ToLower(value)
+		if value == "" || seen[key] {
+			continue
+		}
+		seen[key] = true
+		out = append(out, value)
+		if len(out) == maxItems {
+			break
+		}
+	}
+	return out
+}
+
+func compactText(value string, maxRunes int) string {
+	value = strings.Join(strings.Fields(value), " ")
+	runes := []rune(value)
+	if len(runes) > maxRunes {
+		return string(runes[:maxRunes])
+	}
+	return value
+}
+
+func anchorHits(current []Hit, rawPKs []string) []Hit {
+	eligible := make(map[string]Hit, len(current))
+	for _, hit := range current {
+		if strings.EqualFold(strings.TrimSpace(hit.Role), "anchor") {
+			eligible[hit.PK] = hit
+		}
+	}
+	seen := map[string]bool{}
+	anchors := make([]Hit, 0, maxAnchorNodes)
+	for _, raw := range rawPKs {
+		pk := strings.TrimSpace(raw)
+		hit, exists := eligible[pk]
+		if !exists || seen[pk] {
+			continue
+		}
+		seen[pk] = true
+		hit.Role = "anchor"
+		anchors = append(anchors, hit)
+		if len(anchors) == maxAnchorNodes {
+			break
+		}
+	}
+	return anchors
+}
+
+func finalizeConnectionCandidates(plan QueryPlan, res *Result, entries map[string]*Entry) {
+	res.Anchors = nil
+	res.Connections = nil
+	res.Abstention = nil
+	if len(plan.AnchorPKs) == 0 {
+		return
+	}
+	res.Anchors = anchorHits(res.Hits, plan.AnchorPKs)
+	if len(res.Anchors) == 0 {
+		res.Abstention = &Abstention{Reason: "요청한 Anchor PK가 현재 hits에서 anchor 역할로 회수되지 않았습니다"}
+		return
+	}
+	if len(plan.BridgeSelections) == 0 {
+		return
+	}
+	allowed := make(map[string]Hit, len(res.Hits))
+	for _, hit := range res.Hits {
+		if _, exists := allowed[hit.PK]; !exists {
+			allowed[hit.PK] = hit
+		}
+	}
+	maxConnections := plan.MaxConnections
+	if maxConnections <= 0 || maxConnections > MaxConnectionCandidates {
+		maxConnections = MaxConnectionCandidates
+	}
+	res.Connections = buildSelectedConnections(res.Anchors, entries, allowed, plan.BridgeSelections, maxConnections)
+	if len(res.Connections) == 0 {
+		res.Abstention = &Abstention{Reason: "선택된 Bridge가 현재 hits에 없거나 검색 hit의 역할·후보 근거·예상 결합키·Incremental Value 계약을 만족하지 않습니다"}
+	}
+}
+
+func buildSelectedConnections(anchors []Hit, entries map[string]*Entry, allowed map[string]Hit, selections []BridgeSelection, limit int) []ConnectionCandidate {
+	if len(anchors) == 0 || limit <= 0 {
+		return nil
+	}
+	seenPKs, seenRoles := map[string]bool{}, map[string]bool{}
+	var out []ConnectionCandidate
+	for _, raw := range selections {
+		pk := strings.TrimSpace(raw.PK)
+		hit, visible := allowed[pk]
+		entry := entries[pk]
+		whyCandidate := compactText(raw.WhyCandidate, 240)
+		if entry == nil || !visible || seenPKs[pk] || whyCandidate == "" || hit.EdgeHypothesis == nil {
+			continue
+		}
+		edge := EdgeHypothesis{
+			Kinds:        normalizeEdgeKinds(hit.EdgeHypothesis.Kinds),
+			ExpectedKeys: uniqueCompact(hit.EdgeHypothesis.ExpectedKeys, 4, 80),
+			Transform:    compactText(hit.EdgeHypothesis.Transform, 240),
+		}
+		role := compactText(hit.Role, 40)
+		incrementalValue := compactText(hit.Contribution, 240)
+		axis := DiscoveryAxis{Role: role, Query: entryTitle(entry), Contribution: incrementalValue, Edge: edge}
+		roleKey := strings.ToLower(role)
+		if roleKey == "anchor" || seenRoles[roleKey] || !validCandidateAxis(axis) {
+			continue
+		}
+		seenPKs[pk], seenRoles[roleKey] = true, true
+		bridge := Hit{
+			PK: entry.PK, Title: entry.Title, Org: entry.Org, ApplyCount: entry.ApplyCount,
+			ModifiedAt: entry.ModifiedAt, SvcType: entry.SvcType, Role: role,
+			Contribution: incrementalValue, EdgeHypothesis: &edge,
+		}
+		for _, anchor := range anchors {
+			if anchor.PK == bridge.PK {
+				continue
+			}
+			out = append(out, ConnectionCandidate{
+				Anchor: anchor, Bridge: bridge, BridgeRole: role, Edge: edge,
+				IncrementalValue: incrementalValue, Status: ConnectionStatusCandidate,
+				EvidenceRequired: evidenceFor(edge), CandidateEvidence: whyCandidate,
+				ClaimBoundary: "실제 검색 결과에서 선택했지만 명세·값 교집합·사업 또는 연구 성과는 아직 검증하지 않았습니다",
+			})
+			break
+		}
+		if len(out) == limit {
+			break
+		}
+	}
+	return out
+}
+
+func entryTitle(entry *Entry) string {
+	if entry == nil {
+		return ""
+	}
+	return entry.Title
+}
+
+func validCandidateAxis(axis DiscoveryAxis) bool {
+	if axis.Role == "" || axis.Query == "" || axis.Contribution == "" || len(axis.Edge.Kinds) == 0 || len(axis.Edge.ExpectedKeys) == 0 {
+		return false
+	}
+	for _, kind := range axis.Edge.Kinds {
+		if kind == "proxy" && axis.Edge.Transform == "" {
+			return false
+		}
+	}
+	return true
+}
+
+func evidenceFor(edge EdgeHypothesis) []string {
+	evidence := []string{
+		"describe_api에서 실제 출력 field 이름·type·code namespace 확인",
+		"공통 지역·기간 slice의 call_api 표본에서 matched keys와 양방향 match rate 확인",
+		"uniqueness·null rate·join cardinality·duplicate expansion 확인",
+	}
+	for _, kind := range edge.Kinds {
+		switch kind {
+		case "spatial":
+			evidence = append(evidence, "공간 coverage·좌표계 또는 행정구역 code version·grain 확인")
+		case "temporal":
+			evidence = append(evidence, "시간 coverage·timestamp 의미·timezone·resolution 확인")
+		case "entity":
+			evidence = append(evidence, "식별자 namespace·version·정규화 규칙 확인")
+		case "proxy":
+			evidence = append(evidence, "proxy 변환식의 손실률과 오매칭률 확인")
+		}
+	}
+	return evidence
 }
 
 func uniqueQueries(queries []string, max int) []string {
