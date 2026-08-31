@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -214,9 +215,19 @@ func TestProviderCommandsDisableToolsForUntrustedCatalogPrompts(t *testing.T) {
 		t.Fatalf("Claude tools not disabled: %s", joined)
 	}
 	gemini := providerCommand(ProviderGemini, "gemini", nil, "/tmp/opendatactl-test", "goal")
-	if joined := strings.Join(gemini.args, " "); !strings.Contains(joined, "--policy /tmp/opendatactl-test/deny-tools.toml") {
-		t.Fatalf("Gemini deny policy missing: %s", joined)
+	wantPolicy := filepath.Join("/tmp/opendatactl-test", "deny-tools.toml")
+	if !containsArgPair(gemini.args, "--policy", wantPolicy) {
+		t.Fatalf("Gemini deny policy missing: %q", gemini.args)
 	}
+}
+
+func containsArgPair(args []string, flag, value string) bool {
+	for i := 0; i+1 < len(args); i++ {
+		if args[i] == flag && args[i+1] == value {
+			return true
+		}
+	}
+	return false
 }
 
 func TestProviderEnvironmentDoesNotForwardUnrelatedSecrets(t *testing.T) {
