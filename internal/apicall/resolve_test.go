@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	"github.com/JungHoonGhae/opendatactl/internal/fetch"
@@ -162,13 +163,384 @@ func TestLinkURLSurfacedAndNamedInNote(t *testing.T) {
 	if spec.LinkURL != "https://www.safetydata.go.kr/disaster-data/view?dataSn=1326" {
 		t.Fatalf("linkUrl = %q, want the publisher's href", spec.LinkURL)
 	}
+	if spec.Handoff == nil || spec.Handoff.Host != "www.safetydata.go.kr" ||
+		spec.Handoff.State != HandoffInspectionRequired || spec.Handoff.NextAction != HandoffInspectContract {
+		t.Fatalf("handoff = %+v, want an explicitly uninspected external handoff", spec.Handoff)
+	}
 	if !strings.Contains(spec.Note, spec.LinkURL) {
 		t.Errorf("note should hand over the address, got: %s", spec.Note)
 	}
-	// The publishers are a long tail with their own credentials; promising the
-	// account key works there would send a caller down a dead end.
-	if !strings.Contains(spec.Note, "인증키") {
-		t.Errorf("note should warn the account key does not work there, got: %s", spec.Note)
+	// The publishers are a long tail with different contracts; treating every
+	// handoff as an endpoint would send a caller down a dead end.
+	if !strings.Contains(spec.Note, "단정할 수 없") || !strings.Contains(spec.Note, "call_api") {
+		t.Errorf("note should forbid treating a heterogeneous link as an API endpoint, got: %s", spec.Note)
+	}
+}
+
+// KRDS no longer renders the publisher URL in a labeled row. LINK pages show a
+// button whose JavaScript asks selectApiLinkUrl.do for the target only when the
+// user clicks it. Describe must follow that portal-owned lookup so callers still
+// receive the one actionable address without having to drive a browser.
+func TestLinkURLResolvedFromKRDSLookup(t *testing.T) {
+	const pk = "15116894"
+	lookupCount := 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html; charset=UTF-8")
+		switch r.URL.Path {
+		case "/data/" + pk + "/openapi.do":
+			_, _ = w.Write([]byte(`<html><body>
+				<ul><li><strong class="key">API 유형</strong><div class="value">LINK</div></li></ul>
+				<button onclick="fn_goUrlLink('15116894')">바로가기</button>
+			</body></html>`))
+		case "/tcs/dss/selectApiLinkUrl.do":
+			lookupCount++
+			if got := r.URL.Query().Get("publicDataPk"); got != pk {
+				t.Errorf("publicDataPk = %q, want %q", got, pk)
+			}
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"publicDataDetailPk":"detail-1","linkUrl":"https://www.safetykorea.kr/release/openapi","status":true}`))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer srv.Close()
+
+	spec, err := Describe(context.Background(), fetch.New(fetch.WithDelay(0)), srv.URL, pk)
+	if err != nil {
+		t.Fatalf("describe: %v", err)
+	}
+	if lookupCount != 1 {
+		t.Fatalf("link lookups = %d, want 1", lookupCount)
+	}
+	if spec.LinkURL != "https://www.safetykorea.kr/release/openapi" {
+		t.Fatalf("linkUrl = %q", spec.LinkURL)
+	}
+	if spec.Handoff == nil || spec.Handoff.URL != spec.LinkURL || spec.Handoff.Host != "www.safetykorea.kr" {
+		t.Fatalf("handoff = %+v, want resolved SafetyKorea handoff", spec.Handoff)
+	}
+	if spec.Handoff.State != HandoffContractKnown || spec.Handoff.NextAction != HandoffRequestAccess {
+		t.Fatalf("handoff state = %+v, want known contract awaiting provider access", spec.Handoff)
+	}
+	if spec.Handoff.Trust != HandoffPublisherUntrusted {
+		t.Fatalf("handoff trust = %q", spec.Handoff.Trust)
+	}
+	contract := spec.Handoff.Contract
+	if contract == nil || contract.Provider != "SafetyKorea" || contract.AccessMode != "manual_approval" ||
+		contract.Auth == nil || contract.Auth.Placement != "header" || contract.Auth.Name != "AuthKey" ||
+		contract.InvocationState != "not_implemented" {
+		t.Fatalf("contract = %+v, want documented but not-yet-callable SafetyKorea contract", contract)
+	}
+	if !strings.Contains(spec.Note, spec.LinkURL) {
+		t.Errorf("note should hand over the resolved address, got: %s", spec.Note)
+	}
+}
+
+func TestLinkSkipsBrokenRESTOperationFragments(t *testing.T) {
+	const pk = "15116894"
+	fragmentCalls := 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/data/" + pk + "/openapi.do":
+			_, _ = w.Write([]byte(`<html><body>
+				<ul><li><strong class="key">API 유형</strong><div class="value">LINK</div></li></ul>
+				<input id="publicDataDetailPk" value="detail-1">
+				<select id="open_api_detail_select"><option value="1">stale operation</option></select>
+				<div id="apiDetailFunctionDiv"><div class="data-report-group"></div></div>
+			</body></html>`))
+		case "/tcs/dss/selectApiDetailFunction.do":
+			fragmentCalls++
+			w.WriteHeader(http.StatusInternalServerError)
+		case "/tcs/dss/selectApiLinkUrl.do":
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"linkUrl":"https://www.safetykorea.kr/release/openapi","status":true}`))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer srv.Close()
+
+	spec, err := Describe(context.Background(), fetch.New(fetch.WithDelay(0)), srv.URL, pk)
+	if err != nil {
+		t.Fatalf("Describe LINK: %v", err)
+	}
+	if fragmentCalls != 0 || len(spec.Operations) != 0 || spec.Handoff == nil {
+		t.Fatalf("LINK branch touched REST fragments or lost handoff: calls=%d spec=%+v", fragmentCalls, spec)
+	}
+}
+
+func TestUnknownLinkHostStaysInspectionRequired(t *testing.T) {
+	spec := describeFromHTML(t, `<table>
+		<tr><th>API 유형</th><td>LINK</td></tr>
+		<tr><th>URL</th><td><a href="https://provider.example/dataset/1">provider</a></td></tr>
+		<tr><th>참고문서</th><td></td></tr>
+	</table>`)
+	if spec.Handoff == nil || spec.Handoff.State != HandoffInspectionRequired ||
+		spec.Handoff.NextAction != HandoffInspectContract || spec.Handoff.Contract != nil {
+		t.Fatalf("unknown provider must not receive an invented contract: %+v", spec.Handoff)
+	}
+}
+
+func TestLegacyPlainTextLinkURLIsSurfaced(t *testing.T) {
+	spec := describeFromHTML(t, `<table>
+		<tr><th>API 유형</th><td>LINK</td></tr>
+		<tr><th>URL</th><td>https://provider.example/open-api</td></tr>
+	</table>`)
+	if spec.LinkURL != "https://provider.example/open-api" || spec.Handoff == nil {
+		t.Fatalf("plain-text handoff = %+v", spec)
+	}
+}
+
+func TestSafetyKoreaContractNormalizesHostAndSurfacesFullMetadata(t *testing.T) {
+	spec := describeFromHTML(t, `<table>
+		<tr><th>API 유형</th><td>LINK</td></tr>
+		<tr><th>URL</th><td><a href="https://SafetyKorea.KR./release/openapi">provider</a></td></tr>
+	</table>`)
+	if spec.Handoff == nil {
+		t.Fatal("normalized SafetyKorea URL did not produce a handoff")
+	}
+	if spec.Handoff.Host != "safetykorea.kr" {
+		t.Fatalf("normalized handoff host = %q", spec.Handoff.Host)
+	}
+	contract := spec.Handoff.Contract
+	if spec.Handoff.State != HandoffContractKnown || contract == nil {
+		t.Fatalf("normalized SafetyKorea handoff = %+v", spec.Handoff)
+	}
+	if contract.DocumentationURL == "" || contract.DocumentationVersion != "2.0 (2025-06-30)" ||
+		contract.ApplicationURL != "https://www.safetykorea.kr/release/openapi2" ||
+		contract.VerifiedAt != "2026-09-01" || contract.Auth.Type != "api_key" ||
+		contract.Auth.CredentialScope != "safetykorea.kr" {
+		t.Fatalf("contract metadata = %+v", contract)
+	}
+}
+
+func TestSafetyKoreaUnverifiedPathStaysInspectionRequired(t *testing.T) {
+	spec := describeFromHTML(t, `<table>
+		<tr><th>API 유형</th><td>LINK</td></tr>
+		<tr><th>URL</th><td><a href="https://www.safetykorea.kr/another-service">provider</a></td></tr>
+	</table>`)
+	if spec.Handoff == nil || spec.Handoff.State != HandoffInspectionRequired || spec.Handoff.Contract != nil {
+		t.Fatalf("unverified provider path received an over-broad contract: %+v", spec.Handoff)
+	}
+}
+
+func TestSafetyKoreaInsecureOriginStaysInspectionRequired(t *testing.T) {
+	for _, raw := range []string{
+		"http://www.safetykorea.kr/release/openapi",
+		"https://www.safetykorea.kr:8443/release/openapi",
+		"https://www.safetykorea.kr/release%2Fopenapi",
+		"https://www.safetykorea.kr/release/openapi?mode=other",
+		"https://www.safetykorea.kr/release/openapi#other",
+	} {
+		spec := describeFromHTML(t, `<table>
+			<tr><th>API 유형</th><td>LINK</td></tr>
+			<tr><th>URL</th><td><a href="`+raw+`">provider</a></td></tr>
+		</table>`)
+		if spec.Handoff == nil || spec.Handoff.State != HandoffInspectionRequired || spec.Handoff.Contract != nil {
+			t.Errorf("insecure origin %q received a contract: %+v", raw, spec.Handoff)
+		}
+	}
+}
+
+func TestResolveRejectsEndpointLookingMarkupOnLinkDataset(t *testing.T) {
+	const pk = "15116894"
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/data/"+pk+"/openapi.do" {
+			_, _ = w.Write([]byte(`<html><body>
+				<ul><li><strong class="key">API 유형</strong><div class="value">LINK</div></li></ul>
+				<p>참고 예시: https://apis.data.go.kr/example/getItems</p>
+				<table><tr><th>URL</th><td><a href="https://provider.example/dataset">provider</a></td></tr></table>
+			</body></html>`))
+			return
+		}
+		http.NotFound(w, r)
+	}))
+	defer srv.Close()
+
+	fc := fetch.New(fetch.WithDelay(0))
+	spec, err := Describe(context.Background(), fc, srv.URL, pk)
+	if err != nil {
+		t.Fatalf("Describe: %v", err)
+	}
+	if len(spec.Operations) != 0 || spec.EndpointOnly {
+		t.Fatalf("LINK describe exposed call-shaped operations: %+v", spec)
+	}
+
+	_, err = Resolve(context.Background(), fc, srv.URL, pk, "")
+	if err == nil || !strings.Contains(err.Error(), "LINK 유형") || !strings.Contains(err.Error(), "call_api") {
+		t.Fatalf("Resolve error = %v, want enforced LINK invocation boundary", err)
+	}
+}
+
+func TestUnknownAPITypeFailsClosed(t *testing.T) {
+	const pk = "15116894"
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(`<html><body>
+			<p>markup drift hid the API type: https://apis.data.go.kr/example/getItems</p>
+		</body></html>`))
+	}))
+	defer srv.Close()
+
+	fc := fetch.New(fetch.WithDelay(0))
+	spec, err := Describe(context.Background(), fc, srv.URL, pk)
+	if err != nil {
+		t.Fatalf("Describe: %v", err)
+	}
+	if len(spec.Operations) != 0 || spec.EndpointOnly || !strings.Contains(spec.Note, "API 유형") {
+		t.Fatalf("unknown API type did not fail closed: %+v", spec)
+	}
+	if _, err := Resolve(context.Background(), fc, srv.URL, pk, ""); err == nil || !strings.Contains(err.Error(), "REST로 확인") {
+		t.Fatalf("Resolve error = %v, want unknown-type rejection", err)
+	}
+}
+
+func TestLinkURLLookupRejectsUnsafeTarget(t *testing.T) {
+	const pk = "15116894"
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/data/"+pk+"/openapi.do" {
+			_, _ = w.Write([]byte(`<ul><li><strong class="key">API 유형</strong><div class="value">LINK</div></li></ul>`))
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"linkUrl":"javascript:alert(1)","status":true}`))
+	}))
+	defer srv.Close()
+
+	spec, err := Describe(context.Background(), fetch.New(fetch.WithDelay(0)), srv.URL, pk)
+	if err != nil {
+		t.Fatalf("describe: %v", err)
+	}
+	if spec.LinkURL != "" || spec.Handoff == nil || spec.Handoff.URL != "" ||
+		spec.Handoff.State != HandoffResolutionFailed || spec.Handoff.NextAction != HandoffChooseAnother ||
+		spec.Handoff.FetchPolicy != "" || spec.Handoff.Failure == nil ||
+		spec.Handoff.Failure.Code != "link_unsafe_target" || spec.Handoff.Failure.Retryable {
+		t.Fatalf("unsafe target must surface only as a structured failure: %+v", spec)
+	}
+	if !strings.Contains(spec.Note, "유효한 HTTP(S)") {
+		t.Fatalf("note should explain rejected handoff, got: %s", spec.Note)
+	}
+}
+
+func TestLinkURLLookupSurfacesRetryableFailure(t *testing.T) {
+	const pk = "15116894"
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/data/"+pk+"/openapi.do" {
+			_, _ = w.Write([]byte(`<ul><li><strong class="key">API 유형</strong><div class="value">LINK</div></li></ul>`))
+			return
+		}
+		w.WriteHeader(http.StatusBadGateway)
+	}))
+	defer srv.Close()
+
+	spec, err := Describe(context.Background(), fetch.New(fetch.WithDelay(0)), srv.URL, pk)
+	if err != nil {
+		t.Fatalf("describe: %v", err)
+	}
+	if spec.Handoff == nil || spec.Handoff.State != HandoffResolutionFailed ||
+		spec.Handoff.NextAction != HandoffRetryResolution || spec.Handoff.Failure == nil ||
+		spec.Handoff.FetchPolicy != "" || spec.Handoff.Failure.Code != "link_http_error" || !spec.Handoff.Failure.Retryable {
+		t.Fatalf("retryable handoff failure = %+v", spec.Handoff)
+	}
+}
+
+func TestResolvePortalLinkURLFailureModes(t *testing.T) {
+	tests := []struct {
+		name       string
+		statusCode int
+		body       string
+		want       string
+	}{
+		{name: "http status", statusCode: http.StatusBadGateway, body: `upstream failed`, want: "HTTP 502"},
+		{name: "malformed json", statusCode: http.StatusOK, body: `{`, want: "응답 해석 실패"},
+		{name: "portal error", statusCode: http.StatusOK, body: `{"status":false,"errorDc":"서비스 종료"}`, want: "서비스 종료"},
+		{name: "empty portal error", statusCode: http.StatusOK, body: `{"status":false}`, want: "실패 상태"},
+		{name: "empty target", statusCode: http.StatusOK, body: `{"status":true}`, want: "유효한 HTTP(S)"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.URL.Path != "/tcs/dss/selectApiLinkUrl.do" {
+					t.Fatalf("path = %q", r.URL.Path)
+				}
+				if got := r.URL.Query().Get("publicDataPk"); got != "15116894" {
+					t.Fatalf("publicDataPk = %q", got)
+				}
+				w.WriteHeader(tt.statusCode)
+				_, _ = w.Write([]byte(tt.body))
+			}))
+			defer srv.Close()
+
+			_, err := resolvePortalLinkURL(context.Background(), fetch.New(fetch.WithDelay(0)), srv.URL, "15116894")
+			if err == nil || !strings.Contains(err.Error(), tt.want) {
+				t.Fatalf("error = %v, want text %q", err, tt.want)
+			}
+		})
+	}
+}
+
+func TestValidatePublisherLinkURLRejectsUntrustedShapes(t *testing.T) {
+	for _, raw := range []string{
+		"javascript:alert(1)",
+		"/relative/provider/page",
+		"ftp://provider.example/spec",
+		"https://user:secret@provider.example/spec",
+		"http://localhost/admin",
+		"http://service.local/admin",
+		"http://127.0.0.1/admin",
+		"http://10.0.0.1/admin",
+		"http://169.254.169.254/latest/meta-data",
+		"http://[::1]/admin",
+		"http://127.1/admin",
+		"http://2130706433/admin",
+		"http://0x7f000001/admin",
+		"http://[fe80::1%25en0]/admin",
+		"http://１２７。０。０。１/admin",
+		"http://１２７．０．０．１/admin",
+		"http://0x７f000001/admin",
+	} {
+		if _, err := validatePublisherLinkURL(raw); err == nil {
+			t.Errorf("validatePublisherLinkURL(%q) succeeded, want rejection", raw)
+		}
+	}
+}
+
+func TestValidatePublisherLinkURLAllowsHexLookingDNSNames(t *testing.T) {
+	for _, raw := range []string{
+		"https://abc123.de/openapi",
+		"https://b2b.de/openapi",
+		"https://face1.de/openapi",
+		"https://예시.한국/openapi",
+	} {
+		got, err := validatePublisherLinkURL(raw)
+		if err != nil {
+			t.Errorf("validatePublisherLinkURL(%q) = %v, want legitimate DNS name", raw, err)
+		}
+		if strings.Contains(raw, "예시") && !strings.Contains(got, "xn--") {
+			t.Errorf("international hostname was not normalized: %q", got)
+		}
+	}
+}
+
+func TestResolvePortalLinkURLDoesNotFollowRedirect(t *testing.T) {
+	var targetRequests atomic.Int32
+	target := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		targetRequests.Add(1)
+		_, _ = w.Write([]byte(`must not be fetched`))
+	}))
+	defer target.Close()
+
+	portal := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Location", target.URL)
+		w.WriteHeader(http.StatusFound)
+	}))
+	defer portal.Close()
+
+	_, err := resolvePortalLinkURL(context.Background(), fetch.New(fetch.WithDelay(0)), portal.URL, "15116894")
+	if err == nil || !strings.Contains(err.Error(), "HTTP 302") {
+		t.Fatalf("redirect error = %v", err)
+	}
+	if got := targetRequests.Load(); got != 0 {
+		t.Fatalf("redirect target received %d requests, want 0", got)
 	}
 }
 

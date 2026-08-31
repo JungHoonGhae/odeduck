@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/JungHoonGhae/opendatactl/internal/apicall"
 	"github.com/JungHoonGhae/opendatactl/internal/catalog"
 	"github.com/JungHoonGhae/opendatactl/internal/fetch"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -82,6 +83,52 @@ func TestSearchToolRoundTrip(t *testing.T) {
 	}
 }
 
+func TestDescribeLinkHandoffRoundTrip(t *testing.T) {
+	const pk = "15116894"
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/data/" + pk + "/openapi.do":
+			_, _ = w.Write([]byte(`<html><body>
+				<h1 class="h-tit">제품 안전인증 및 리콜 정보</h1>
+				<ul><li><strong class="key">API 유형</strong><div class="value">LINK</div></li></ul>
+			</body></html>`))
+		case "/tcs/dss/selectApiLinkUrl.do":
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"linkUrl":"https://www.safetykorea.kr/release/openapi","status":true}`))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer srv.Close()
+
+	sess := connectTestClient(t, New(Deps{Fetch: fetch.New(fetch.WithDelay(0)), BaseURL: srv.URL}))
+	res, err := sess.CallTool(context.Background(), &mcp.CallToolParams{
+		Name: "describe_api", Arguments: map[string]any{"pk": pk},
+	})
+	if err != nil {
+		t.Fatalf("call describe_api: %v", err)
+	}
+	if res.IsError {
+		t.Fatalf("describe_api returned error: %+v", res.Content)
+	}
+	raw, err := json.Marshal(res.StructuredContent)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got apicall.APISpec
+	if err := json.Unmarshal(raw, &got); err != nil {
+		t.Fatal(err)
+	}
+	if got.APIType != "LINK" || got.Handoff == nil || got.Handoff.State != apicall.HandoffContractKnown ||
+		got.Handoff.Trust != apicall.HandoffPublisherUntrusted ||
+		got.Handoff.FetchPolicy != apicall.HandoffSafeFetcherRequired ||
+		got.Handoff.NextAction != apicall.HandoffRequestAccess || got.Handoff.Contract == nil ||
+		got.Handoff.Contract.InvocationState != "not_implemented" || got.Handoff.Contract.Auth == nil ||
+		got.Handoff.Contract.Auth.Name != "AuthKey" {
+		t.Fatalf("LINK structured content = %+v", got)
+	}
+}
+
 func TestToolCatalogPresentsProgressiveDiscoveryWorkflow(t *testing.T) {
 	sess := connectTestClient(t, New(Deps{Fetch: fetch.New(fetch.WithDelay(0))}))
 	res, err := sess.ListTools(context.Background(), nil)
@@ -115,6 +162,10 @@ func TestToolCatalogPresentsProgressiveDiscoveryWorkflow(t *testing.T) {
 		if !strings.Contains(tool.Title+tool.Annotations.Title+tool.Description, want.stage) {
 			t.Errorf("primary tool %q does not identify itself as %s", name, want.stage)
 		}
+	}
+	if !strings.Contains(byName["describe_api"].Description, "invocationState=not_implemented") ||
+		!strings.Contains(byName["describe_api"].Description, "call_api") {
+		t.Fatal("describe_api must preserve the LINK non-invocation instruction")
 	}
 
 	callSchema, ok := byName["call_api"].InputSchema.(map[string]any)
