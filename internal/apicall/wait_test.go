@@ -34,8 +34,8 @@ func TestCallWaitingRetriesUntilPropagated(t *testing.T) {
 	old := pollFor(t, 10*time.Millisecond)
 	defer old()
 
-	res, err := CallWaiting(context.Background(), fetch.New(fetch.WithDelay(0)),
-		srv.URL, nil, "k", time.Second, nil)
+	res, err := callWaiting(context.Background(), fetch.New(fetch.WithDelay(0)),
+		srv.URL, nil, "k", time.Second, nil, callTrusted)
 	if err != nil {
 		t.Fatalf("should have succeeded once the gateway caught up: %v", err)
 	}
@@ -54,8 +54,8 @@ func TestCallWaitingGivesUpWithPropagationError(t *testing.T) {
 	old := pollFor(t, 10*time.Millisecond)
 	defer old()
 
-	_, err := CallWaiting(context.Background(), fetch.New(fetch.WithDelay(0)),
-		srv.URL, nil, "k", 35*time.Millisecond, nil)
+	_, err := callWaiting(context.Background(), fetch.New(fetch.WithDelay(0)),
+		srv.URL, nil, "k", 35*time.Millisecond, nil, callTrusted)
 	if !errors.Is(err, ErrPropagating) {
 		t.Fatalf("err = %v, want ErrPropagating", err)
 	}
@@ -74,8 +74,8 @@ func TestCallWaitingDoesNotRetryOtherErrors(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	_, err := CallWaiting(context.Background(), fetch.New(fetch.WithDelay(0)),
-		srv.URL, nil, "k", time.Minute, nil)
+	_, err := callWaiting(context.Background(), fetch.New(fetch.WithDelay(0)),
+		srv.URL, nil, "k", time.Minute, nil, callTrusted)
 	if !errors.Is(err, ErrKeyRejected) {
 		t.Fatalf("err = %v, want ErrKeyRejected", err)
 	}

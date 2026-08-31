@@ -96,7 +96,7 @@ func callCmd() *cobra.Command {
 
 예) gongctl call --pk 15077974 --param numOfRows=10
     gongctl call --pk 15077974 --wait 15m --param numOfRows=10   # 방금 신청한 API
-    gongctl call http://apis.data.go.kr/9760000/.../getX --param numOfRows=10`,
+    gongctl call https://apis.data.go.kr/9760000/.../getX --param numOfRows=10`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) == 0 && pk == "" {
@@ -104,13 +104,6 @@ func callCmd() *cobra.Command {
 			}
 			if len(args) > 0 && pk != "" {
 				return fmt.Errorf("엔드포인트 URL 과 --pk 는 함께 쓸 수 없습니다 — 어느 것을 호출할지 하나만 정하세요")
-			}
-			if key == "" {
-				k, err := portal.APIKey(cmd.Context())
-				if err != nil {
-					return fmt.Errorf("인증키를 얻지 못했습니다 (--key 로 직접 지정하거나 `gongctl login` 후 재시도): %w", err)
-				}
-				key = k
 			}
 			pm := map[string]string{}
 			for _, p := range params {
@@ -141,6 +134,18 @@ func callCmd() *cobra.Command {
 						strings.Join(missing, ", "), pk)
 				}
 			}
+			secureEndpoint, secureErr := apicall.SecureEndpoint(endpoint)
+			if secureErr != nil {
+				return secureErr
+			}
+			endpoint = secureEndpoint
+			if key == "" {
+				k, keyErr := portal.APIKey(cmd.Context())
+				if keyErr != nil {
+					return fmt.Errorf("인증키를 얻지 못했습니다 (--key 로 직접 지정하거나 `gongctl login` 후 재시도): %w", keyErr)
+				}
+				key = k
+			}
 			doCall := func(k string) (*apicall.CallResult, error) {
 				if wait <= 0 {
 					return apicall.Call(cmd.Context(), newFetchClient(), endpoint, pm, k)
@@ -165,7 +170,7 @@ func callCmd() *cobra.Command {
 				output.WriteJSON(cmd.OutOrStdout(), res)
 			}
 			if err != nil {
-				fmt.Fprintln(cmd.ErrOrStderr(), err) // surface hint, don't fail hard
+				return err
 			}
 			return nil
 		},

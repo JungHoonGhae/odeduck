@@ -30,7 +30,7 @@ Verified against the live portal on **2026-07-25** with an authenticated session
 | `public` | GET | `/sso/login.do` | login entry page | `login` opens this for the human |
 | `auth` | GET | `/sso/profile.do` | **SSO trampoline** — auto-submitting form, needs JS | probe loops settle past it |
 | `auth` | GET | `/iim/api/selectAcountList.do` | 활용신청 현황 list | `applications`; also the auth probe |
-| `auth` | GET | `/iim/api/selectApiKeyList.do` | 인증키 발급현황 (the serviceKey) | `key` / MCP `get_api_key`; `call` auto-injects it. Parse `#pblisrCrtfcKeyPlain` (hidden input = the ACTIVE key; the table also lists superseded ones). **Note the markup has a duplicate `value` attribute — take the first.** |
+| `auth` | GET | `/iim/api/selectApiKeyList.do` | 인증키 발급현황 (the serviceKey) | CLI `key`; `call`/MCP `call_api`가 내부에서 자동 주입하며 MCP 도구로 키 자체를 노출하지 않는다. Parse `#pblisrCrtfcKeyPlain` (hidden input = the ACTIVE key; the table also lists superseded ones). **Note the markup has a duplicate `value` attribute — take the first.** |
 | `precondition` | GET | `/tcs/dss/redirectDevAcountRequestForm.do?publicDataPk={pk}&isBusinessApply=N` | 활용신청 form | `apply`; needs cookie `currentMyMenuId=M020105`, else bounces to `index.do` |
 | `driven` | POST | `/iim/api/saveDevAcountRequest.do` | 활용신청 submit (AJAX) | **not called directly** — `apply` invokes the form's `fn_save()` so the page builds/validates the payload (ADR 0001) |
 | `public` | GET | `/tcs/dss/selectDataSetList.do?dType=&org=&keyword=&currentPage=&perPage=` | dataset search | `search` (plain HTTP, no browser) |

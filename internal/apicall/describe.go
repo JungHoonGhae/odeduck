@@ -8,11 +8,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"regexp"
 	"sort"
 	"strings"
 
 	"github.com/JungHoonGhae/gongctl/internal/fetch"
+	"github.com/JungHoonGhae/gongctl/internal/portal"
 	"github.com/PuerkitoBio/goquery"
 )
 
@@ -65,8 +67,10 @@ func (a *Approval) AutoApproved() bool {
 	return a != nil && strings.Contains(a.Dev, "자동승인")
 }
 
-// reApproval reads "개발단계 : 자동승인 / 운영단계 : 심의승인".
-var reApproval = regexp.MustCompile(`개발단계\s*[::]\s*(\S+)\s*/\s*운영단계\s*[::]\s*(\S+)`)
+// reApproval reads "개발단계 : 자동승인 / 운영단계 : 심의승인". The
+// redesigned page uses ASCII colons today, while older publisher fragments can
+// contain the full-width form.
+var reApproval = regexp.MustCompile(`개발단계\s*[:：]\s*(\S+)\s*/\s*운영단계\s*[:：]\s*(\S+)`)
 
 // Operation is one 상세기능. When the request-variable table parses cleanly,
 // Params is filled; otherwise RawHTML carries the section verbatim.
@@ -95,6 +99,9 @@ var reFileDownload = regexp.MustCompile(`fn_fileDownload\('([^']+)'\s*,\s*'([^']
 // Describe scrapes {baseURL}/data/{pk}/openapi.do through the shared transport.
 // baseURL is overridable for tests; production passes portal.BaseURL.
 func Describe(ctx context.Context, f *fetch.Client, baseURL, pk string) (*APISpec, error) {
+	if err := portal.ValidatePublicDataPK(pk); err != nil {
+		return nil, err
+	}
 	url := strings.TrimRight(baseURL, "/") + "/data/" + pk + "/openapi.do"
 	doc, err := f.GetDoc(ctx, url)
 	if err != nil {
@@ -102,8 +109,13 @@ func Describe(ctx context.Context, f *fetch.Client, baseURL, pk string) (*APISpe
 	}
 
 	spec := &APISpec{PublicDataPk: pk}
-	spec.DataName = strings.TrimSpace(doc.Find(".open-api-title, .data-set-title").First().Text())
+	spec.DataName = strings.TrimSpace(doc.Find(".h-tit, .open-api-title, .data-set-title").First().Text())
 	spec.DataName = cleanText(spec.DataName)
+	if spec.DataName == "" {
+		if value, ok := labeledValue(doc.Selection, "OpenAPI 명"); ok {
+			spec.DataName = cleanText(value.Text())
+		}
+	}
 
 	// Operation containers: real per-operation content lives in
 	// .open-api-detail-result (endpoint + 요청변수/출력결과 tables). The sibling
@@ -117,6 +129,13 @@ func Describe(ctx context.Context, f *fetch.Client, baseURL, pk string) (*APISpe
 	// The portal embeds an authoritative Swagger 2.0 spec on modern pages; prefer
 	// it over scraping the rendered tables, which carry less and break more.
 	if ops := operationsFromSwagger(doc); len(ops) > 0 {
+		spec.Operations = ops
+	}
+	if len(spec.Operations) == 0 {
+		ops, err := operationsFromKRDS(ctx, f, baseURL, doc, pk)
+		if err != nil {
+			return nil, err
+		}
 		spec.Operations = ops
 	}
 
@@ -161,61 +180,43 @@ func Describe(ctx context.Context, f *fetch.Client, baseURL, pk string) (*APISpe
 		}
 	}
 
+	// Summary metadata used to be a th/td table. KRDS renders the same label/value
+	// pairs as <strong class=key> + <div class=value>. Keep that markup choice in
+	// one helper so every field gets the same compatibility boundary.
+	if value, ok := labeledValue(doc.Selection, "API 유형"); ok {
+		spec.APIType = cleanText(value.Text())
+	}
+	if value, ok := labeledValue(doc.Selection, "심의유형"); ok {
+		raw := cleanText(value.Text())
+		a := &Approval{Raw: raw}
+		if m := reApproval.FindStringSubmatch(raw); m != nil {
+			a.Dev, a.Ops = m[1], m[2]
+		}
+		spec.Approval = a
+	}
+
+	// The URL row appears on LINK pages (where 심의유형 does not).
+	if value, ok := labeledValue(doc.Selection, "URL"); ok {
+		if href, found := value.Find("a[href]").First().Attr("href"); found {
+			spec.LinkURL = strings.TrimSpace(href)
+		} else {
+			spec.LinkURL = cleanText(value.Text())
+		}
+	}
+
 	// GuideDoc: the 참고문서 row. The file itself is never fetched or parsed here —
 	// but its download URL is surfaced, because the file name alone gives an agent
 	// nothing it can act on.
-	// API 유형 (REST / LINK / …) — the th/td pair in the summary table.
-	doc.Find("th").EachWithBreak(func(_ int, th *goquery.Selection) bool {
-		if strings.Contains(cleanText(th.Text()), "API 유형") {
-			spec.APIType = cleanText(th.NextFiltered("td").Text())
-			return false
-		}
-		return true
-	})
-
-	doc.Find("th").EachWithBreak(func(_ int, th *goquery.Selection) bool {
-		if strings.Contains(cleanText(th.Text()), "심의유형") {
-			raw := cleanText(th.NextFiltered("td").Text())
-			a := &Approval{Raw: raw}
-			if m := reApproval.FindStringSubmatch(raw); m != nil {
-				a.Dev, a.Ops = m[1], m[2]
+	guideValue, guideRowFound := labeledValue(doc.Selection, "참고문서")
+	if guideRowFound {
+		spec.GuideDoc = cleanText(guideValue.Text())
+		if onclick, ok := guideValue.Find("a[onclick]").First().Attr("onclick"); ok {
+			if m := reFileDownload.FindStringSubmatch(onclick); m != nil {
+				spec.GuideDocURL = fmt.Sprintf("%s/cmm/cmm/fileDownload.do?atchFileId=%s&fileDetailSn=%s",
+					strings.TrimRight(baseURL, "/"), m[1], m[2])
 			}
-			spec.Approval = a
-			return false
 		}
-		return true
-	})
-
-	// The URL row appears on LINK pages (where 심의유형 does not).
-	doc.Find("th").EachWithBreak(func(_ int, th *goquery.Selection) bool {
-		if cleanText(th.Text()) == "URL" {
-			td := th.NextFiltered("td")
-			if href, ok := td.Find("a[href]").First().Attr("href"); ok {
-				spec.LinkURL = strings.TrimSpace(href)
-			} else {
-				spec.LinkURL = cleanText(td.Text())
-			}
-			return false
-		}
-		return true
-	})
-
-	guideRowFound := false
-	doc.Find("th").EachWithBreak(func(_ int, th *goquery.Selection) bool {
-		if strings.Contains(th.Text(), "참고문서") {
-			guideRowFound = true
-			td := th.NextFiltered("td")
-			spec.GuideDoc = cleanText(td.Text())
-			if onclick, ok := td.Find("a[onclick]").First().Attr("onclick"); ok {
-				if m := reFileDownload.FindStringSubmatch(onclick); m != nil {
-					spec.GuideDocURL = fmt.Sprintf("%s/cmm/cmm/fileDownload.do?atchFileId=%s&fileDetailSn=%s",
-						strings.TrimRight(baseURL, "/"), m[1], m[2])
-				}
-			}
-			return false
-		}
-		return true
-	})
+	}
 
 	// Some datasets document the whole spec in the attached guide document and
 	// leave the page itself empty. Say so, rather than handing back an empty list
@@ -251,6 +252,140 @@ func Describe(ctx context.Context, f *fetch.Client, baseURL, pk string) (*APISpe
 	}
 
 	return spec, nil
+}
+
+// operationsFromKRDS reads the operation fragment rendered in the detail page,
+// then asks the portal's own fragment endpoint for every remaining select
+// option. The endpoint returns HTML rather than JSON, but it is still the
+// narrowest stable boundary: no browser, clicks, or timing assumptions.
+func operationsFromKRDS(ctx context.Context, f *fetch.Client, baseURL string, doc *goquery.Document, pk string) ([]Operation, error) {
+	type option struct {
+		seq  string
+		name string
+	}
+	var options []option
+	doc.Find("#open_api_detail_select option[value]").Each(func(_ int, sel *goquery.Selection) {
+		seq, _ := sel.Attr("value")
+		if seq = strings.TrimSpace(seq); seq != "" {
+			options = append(options, option{seq: seq, name: cleanText(sel.Text())})
+		}
+	})
+
+	root := doc.Find("#apiDetailFunctionDiv").First()
+	// The legacy page reused this wrapper around .open-api-detail-result. Its
+	// operation parser below already handles that shape; only the KRDS fragment
+	// carries .data-report-group and uses the on-demand endpoint described here.
+	if root.Length() == 0 || root.Find(".data-report-group").Length() == 0 {
+		return nil, nil
+	}
+
+	var ops []Operation
+	next := 0
+	if root.Length() > 0 {
+		name := ""
+		if len(options) > 0 {
+			name = options[0].name // the select's first option is rendered initially
+			next = 1
+		}
+		if op := operationFromKRDS(root, name); operationHasContent(op) {
+			ops = append(ops, op)
+		} else {
+			next = 0 // initial fragment was empty; fetch every named option explicitly
+		}
+	}
+	if next >= len(options) {
+		return ops, nil
+	}
+
+	detailPK, _ := doc.Find("#publicDataDetailPk").First().Attr("value")
+	pagePK, _ := doc.Find("#publicDataPk").First().Attr("value")
+	if pagePK == "" {
+		pagePK = pk
+	}
+	if detailPK == "" {
+		return nil, fmt.Errorf("pk=%s 의 상세기능 선택지는 있지만 publicDataDetailPk 가 없습니다 — 페이지 구조가 바뀌었을 수 있습니다", pk)
+	}
+
+	fragmentURL := strings.TrimRight(baseURL, "/") + "/tcs/dss/selectApiDetailFunction.do"
+	for _, item := range options[next:] {
+		fragment, err := f.PostFormDoc(ctx, fragmentURL, url.Values{
+			"oprtinSeqNo":        {item.seq},
+			"publicDataDetailPk": {detailPK},
+			"publicDataPk":       {pagePK},
+		})
+		if err != nil {
+			return nil, fmt.Errorf("pk=%s 상세기능 %q 조회 실패: %w", pk, item.name, err)
+		}
+		op := operationFromKRDS(fragment.Selection, item.name)
+		if !operationHasContent(op) {
+			return nil, fmt.Errorf("pk=%s 상세기능 %q 응답에서 엔드포인트·요청변수를 찾지 못했습니다 — 페이지 구조가 바뀌었을 수 있습니다", pk, item.name)
+		}
+		ops = append(ops, op)
+	}
+	return ops, nil
+}
+
+func operationFromKRDS(root *goquery.Selection, name string) Operation {
+	op := Operation{Name: cleanText(name)}
+	if value, ok := labeledValue(root, "요청주소"); ok {
+		op.Endpoint = reEndpoint.FindString(value.Text())
+	}
+	op.Params = parseParams(root)
+	if len(op.Params) == 0 {
+		if html, err := root.Html(); err == nil {
+			op.RawHTML = strings.TrimSpace(html)
+		}
+	}
+	return op
+}
+
+func operationHasContent(op Operation) bool {
+	return op.Endpoint != "" || len(op.Params) > 0 || op.RawHTML != ""
+}
+
+// labeledValue returns the value beside a portal summary label across both
+// layouts observed in production: the legacy th/td table and the KRDS
+// key/value list. A caller asks in domain terms ("API 유형"), not markup terms.
+func labeledValue(root *goquery.Selection, label string) (*goquery.Selection, bool) {
+	matches := func(text string) bool {
+		text = cleanText(text)
+		if label == "URL" { // avoid matching labels that merely contain "URL"
+			return text == label
+		}
+		return strings.Contains(text, label)
+	}
+
+	var value *goquery.Selection
+	root.Find("th").EachWithBreak(func(_ int, th *goquery.Selection) bool {
+		if !matches(th.Text()) {
+			return true
+		}
+		candidate := th.NextFiltered("td").First()
+		if candidate.Length() > 0 {
+			value = candidate
+			return false
+		}
+		return true
+	})
+	if value != nil {
+		return value, true
+	}
+
+	root.Find(".key").EachWithBreak(func(_ int, key *goquery.Selection) bool {
+		if !matches(key.Text()) {
+			return true
+		}
+		candidate := key.Parent().ChildrenFiltered(".value").First()
+		if candidate.Length() == 0 {
+			candidate = key.NextFiltered(".value").First()
+		}
+		if candidate.Length() > 0 {
+			value = candidate
+			return false
+		}
+		return true
+	})
+	return value, value != nil
 }
 
 // parseParams reads the 요청변수 (request parameter) table inside an operation

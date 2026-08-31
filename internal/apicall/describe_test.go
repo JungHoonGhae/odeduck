@@ -2,13 +2,105 @@ package apicall
 
 import (
 	"context"
-	"github.com/JungHoonGhae/gongctl/internal/fetch"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"strings"
 	"testing"
+
+	"github.com/JungHoonGhae/gongctl/internal/fetch"
 )
+
+func TestDescribeReadsKRDSMetadata(t *testing.T) {
+	body := `<html><body>
+		<h1 class="h-tit">중소기업 지원사업 공고 조회 서비스</h1>
+		<ul class="info-ul row">
+			<li><strong class="key">API 유형</strong><div class="value">REST</div></li>
+			<li><strong class="key">심의유형</strong><div class="value">
+				개발단계 : 자동승인 / 운영단계 : 심의승인
+			</div></li>
+		</ul>
+	</body></html>`
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html; charset=UTF-8")
+		_, _ = w.Write([]byte(body))
+	}))
+	defer srv.Close()
+
+	spec, err := Describe(context.Background(), fetch.New(fetch.WithDelay(0)), srv.URL, "15157820")
+	if err != nil {
+		t.Fatalf("describe: %v", err)
+	}
+	if spec.DataName != "중소기업 지원사업 공고 조회 서비스" {
+		t.Errorf("dataName = %q", spec.DataName)
+	}
+	if spec.APIType != "REST" {
+		t.Errorf("apiType = %q", spec.APIType)
+	}
+	if spec.Approval == nil || spec.Approval.Dev != "자동승인" || spec.Approval.Ops != "심의승인" {
+		t.Errorf("approval = %+v", spec.Approval)
+	}
+}
+
+func TestDescribeLoadsEveryKRDSOperationFragment(t *testing.T) {
+	operation := func(endpoint, param string) string {
+		return `<div class="data-info-tit"><h2>기능 설명</h2></div>
+			<div class="data-report-group">
+				<div class="data-report"><h4>API 기본 정보</h4><ul class="info-ul"><li>
+					<strong class="key">요청주소</strong><div class="value">` + endpoint + `</div>
+				</li></ul></div>
+				<div class="data-report"><h4>요청변수(Request Parameter)</h4><table>
+					<thead><tr><th>항목명(영문)</th><th>항목구분</th><th>샘플데이터</th><th>항목설명</th></tr></thead>
+					<tbody><tr><td>` + param + `</td><td>필</td><td>10</td><td>테스트 변수</td></tr></tbody>
+				</table></div>
+			</div>`
+	}
+	page := `<html><body>
+		<input id="publicDataDetailPk" value="detail-1"><input id="publicDataPk" value="15076352">
+		<select id="open_api_detail_select">
+			<option value="29456">충전소 상태</option><option value="29457">충전소 정보</option>
+		</select>
+		<div id="apiDetailFunctionDiv">` + operation("https://apis.data.go.kr/test/getStatus", "pageNo") + `</div>
+	</body></html>`
+
+	postCount := 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html; charset=UTF-8")
+		if r.Method == http.MethodGet {
+			_, _ = w.Write([]byte(page))
+			return
+		}
+		postCount++
+		if err := r.ParseForm(); err != nil {
+			t.Fatalf("parse form: %v", err)
+		}
+		if r.URL.Path != "/tcs/dss/selectApiDetailFunction.do" ||
+			r.Form.Get("oprtinSeqNo") != "29457" ||
+			r.Form.Get("publicDataDetailPk") != "detail-1" ||
+			r.Form.Get("publicDataPk") != "15076352" {
+			t.Errorf("unexpected operation request: path=%s form=%v", r.URL.Path, r.Form)
+		}
+		_, _ = w.Write([]byte(operation("https://apis.data.go.kr/test/getInfo", "numOfRows")))
+	}))
+	defer srv.Close()
+
+	spec, err := Describe(context.Background(), fetch.New(fetch.WithDelay(0)), srv.URL, "15076352")
+	if err != nil {
+		t.Fatalf("describe: %v", err)
+	}
+	if postCount != 1 {
+		t.Fatalf("operation fragment posts = %d, want 1 for the non-initial option", postCount)
+	}
+	if len(spec.Operations) != 2 {
+		t.Fatalf("operations = %+v", spec.Operations)
+	}
+	if spec.Operations[0].Name != "충전소 상태" || spec.Operations[0].Params[0].Name != "pageNo" {
+		t.Errorf("first operation = %+v", spec.Operations[0])
+	}
+	if spec.Operations[1].Name != "충전소 정보" || spec.Operations[1].Params[0].Name != "numOfRows" {
+		t.Errorf("second operation = %+v", spec.Operations[1])
+	}
+}
 
 func TestDescribe(t *testing.T) {
 	body, err := os.ReadFile("testdata/op-15000908.html")

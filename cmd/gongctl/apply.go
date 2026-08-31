@@ -2,7 +2,6 @@ package main
 
 import (
 	"bufio"
-	"errors"
 	"fmt"
 	"strings"
 
@@ -16,7 +15,7 @@ func applyCmd() *cobra.Command {
 	var yes bool
 	c := &cobra.Command{
 		Use:   "apply <publicDataPk>",
-		Short: "OpenAPI 활용신청 (자동승인) — 목적 필수, 제출 전 확인",
+		Short: "OpenAPI 활용신청 자동화 — 에이전트는 확인 없이 제출 가능",
 		Long: `data.go.kr OpenAPI 1건의 활용신청을 자동 제출합니다(자동승인). 신청은
 계정에 실제 신청을 생성하므로 **한 번에 한 건만** 처리하고 **활용목적(--purpose)을
 반드시 요구**하며 제출 전 확인합니다 (투기적 대량신청 금지).
@@ -28,7 +27,10 @@ func applyCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			cat := mapCategory(category)
+			cat, err := portal.NormalizePurposeCategory(category)
+			if err != nil {
+				return err
+			}
 			cfg, _ := portal.LoadConfig()
 			confirm := func(s portal.ApplySummary) bool {
 				if yes || (cfg != nil && cfg.AutoApply) {
@@ -45,10 +47,6 @@ func applyCmd() *cobra.Command {
 			}
 			res, err := portal.Apply(cmd.Context(), args[0], purpose, cat, confirm)
 			if err != nil {
-				if errors.Is(err, portal.ErrNotLoggedIn) {
-					fmt.Fprintln(cmd.ErrOrStderr(), err)
-					return nil
-				}
 				return err
 			}
 			if format == output.JSON || format == output.JSONL {
@@ -56,32 +54,20 @@ func applyCmd() *cobra.Command {
 			}
 			if res.Submitted {
 				fmt.Fprintf(cmd.ErrOrStderr(), "✅ %s — `gongctl applications` 로 확인하세요.\n", res.Message)
-			} else {
+			} else if res.Canceled {
 				fmt.Fprintf(cmd.ErrOrStderr(), "⏹  %s\n", res.Message)
+			} else {
+				return fmt.Errorf("활용신청 실패: %s", res.Message)
 			}
 			return nil
 		},
 	}
 	c.Flags().StringVar(&purpose, "purpose", "", "활용목적 내용 (필수)")
-	c.Flags().StringVar(&category, "category", "research", "목적분류: research|web|app|ref|etc")
+	c.Flags().StringVar(&category, "category", "", "목적분류: research|web|app|ref|etc (필수)")
 	c.Flags().BoolVar(&yes, "yes", false, "확인 프롬프트 생략")
 	c.MarkFlagRequired("purpose")
+	c.MarkFlagRequired("category")
 	return c
-}
-
-func mapCategory(c string) string {
-	switch strings.ToLower(c) {
-	case "web":
-		return portal.PurposeWeb
-	case "app":
-		return portal.PurposeApp
-	case "ref":
-		return portal.PurposeRef
-	case "etc":
-		return portal.PurposeEtc
-	default:
-		return portal.PurposeResearch
-	}
 }
 
 func applicationsCmd() *cobra.Command {
@@ -95,10 +81,6 @@ func applicationsCmd() *cobra.Command {
 			}
 			apps, err := portal.Applications(cmd.Context())
 			if err != nil {
-				if errors.Is(err, portal.ErrNotLoggedIn) {
-					fmt.Fprintln(cmd.ErrOrStderr(), err)
-					return nil
-				}
 				return err
 			}
 			if len(apps) == 0 {

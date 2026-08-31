@@ -18,11 +18,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/JungHoonGhae/gongctl/internal/portal"
 )
@@ -67,15 +69,58 @@ type Hit struct {
 	ModifiedAt string `json:"modifiedAt,omitempty"`
 	SvcType    string `json:"svcType,omitempty"` // LINK = no spec on the portal, describe/call will not work
 	Matched    int    `json:"matched,omitempty"` // terms hit — only meaningful when Result.Relaxed
+	// Planned searches explain which model-inferred data axis surfaced the row.
+	// Preview is deliberately short and opt-in: useful for ideation without
+	// returning every full catalogue description to the model context.
+	MatchedQuery  string  `json:"matchedQuery,omitempty"`
+	Preview       string  `json:"preview,omitempty"`
+	SemanticScore float32 `json:"semanticScore,omitempty"`
+	Exact         bool    `json:"exact,omitempty"` // all lexical terms for MatchedQuery matched
 }
 
 // Result is what a search returns. Terms and Relaxed exist so a caller can tell
 // what was actually searched for: a query is not always used as written.
 type Result struct {
-	Terms   []string `json:"terms"`             // what the query was reduced to
-	Total   int      `json:"total"`             // entries matched
-	Relaxed bool     `json:"relaxed,omitempty"` // true = every term matching found nothing, so terms were ORed
-	Hits    []Hit    `json:"hits"`
+	Mode     string        `json:"mode,omitempty"`    // lexical | planned
+	Intent   string        `json:"intent,omitempty"`  // original natural-language goal for a planned search
+	Queries  []string      `json:"queries,omitempty"` // concrete semantic axes inferred by the caller model
+	Terms    []string      `json:"terms,omitempty"`   // what a single lexical query was reduced to
+	Total    int           `json:"total"`             // entries matched
+	Relaxed  bool          `json:"relaxed,omitempty"` // true = at least one query had to OR its terms
+	Hits     []Hit         `json:"hits"`
+	Semantic *SemanticInfo `json:"semantic,omitempty"`
+}
+
+const (
+	SearchModeLexical = "lexical"
+	SearchModePlanned = "planned"
+	SearchModeHybrid  = "hybrid"
+
+	RankDemand   = "demand"
+	RankRecent   = "recent"
+	RankBalanced = "balanced"
+
+	// MaxSearchLimit preserves progressive disclosure: search returns a compact
+	// candidate set and describe_api expands one selection. It also bounds model
+	// context when tools are invoked directly with untrusted arguments.
+	MaxSearchLimit = 100
+)
+
+// QueryPlan is the boundary between semantic interpretation and deterministic
+// retrieval. The MCP host model turns an open-ended user goal into a few
+// concrete Concepts; the catalogue executes, merges, explains and diversifies
+// them without embedding-provider credentials or a hard-coded synonym tree.
+//
+// Ranking controls candidates within each concept. Balanced alternates proven
+// demand with recently modified data so exploratory searches can surface both
+// usable incumbents and underused new possibilities.
+type QueryPlan struct {
+	Intent          string
+	Concepts        []string
+	Limit           int
+	RESTOnly        bool
+	IncludePreviews bool
+	Ranking         string // balanced (default) | demand | recent
 }
 
 // StaleAfter is when a synced catalogue should be refreshed. The portal adds and
@@ -124,7 +169,10 @@ func (c *Catalog) Save() error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(p, data, 0o644)
+	return atomicWrite(p, "catalog-*.tmp", 0o644, func(w io.Writer) error {
+		_, err := w.Write(data)
+		return err
+	})
 }
 
 // Stale reports whether the snapshot is old enough to warrant a re-sync.
@@ -219,7 +267,7 @@ var particles = []string{"에서는", "에서", "에게", "으로", "부터", "�
 // would rank titles by whether they happen to contain the word "데이터". Matching
 // is on the whole token, so 대한 here never touches 대한민국.
 var fillers = map[string]bool{
-	"데이터": true, "자료": true, "정보를": true, "좋은": true, "관련": true, "관한": true,
+	"데이터": true, "자료": true, "정보": true, "정보를": true, "좋은": true, "관련": true, "관한": true,
 	"있는": true, "찾아줘": true, "알려줘": true, "무엇": true, "어떤": true, "필요한": true,
 	"목록": true, "리스트": true, "api": true, "그리고": true, "또는": true,
 	// connectives — "폭염으로 인한", "청소년을 위한", "고령화에 따른"
@@ -233,8 +281,13 @@ var fillers = map[string]bool{
 // cleverer would need a dictionary this tool has no reason to carry.
 func queryTerms(query string) []string {
 	var out []string
-	for _, w := range strings.Fields(strings.ToLower(query)) {
-		w = strings.Trim(w, ".,?!\"'()[]")
+	words := strings.FieldsFunc(strings.ToLower(query), func(r rune) bool {
+		// Agent plans commonly join related government terms with ·, / or -.
+		// Treat punctuation as a separator so "공매·압류재산" is not one
+		// impossible literal token. Symbols are separators for the same reason.
+		return unicode.IsSpace(r) || unicode.IsPunct(r) || unicode.IsSymbol(r)
+	})
+	for _, w := range words {
 		if w == "" || fillers[w] {
 			continue
 		}
@@ -244,6 +297,9 @@ func queryTerms(query string) []string {
 				w = trimmed
 				break
 			}
+		}
+		if fillers[w] {
+			continue
 		}
 		out = append(out, w)
 	}
@@ -266,11 +322,25 @@ func queryTerms(query string) []string {
 // intends to describe and call, that is the honest default: a LINK dataset has no
 // spec here, so applying for one spends a real application on a dead end.
 func (c *Catalog) Search(query string, limit int, restOnly bool) Result {
+	return c.search(query, normalizeSearchLimit(limit), restOnly)
+}
+
+func normalizeSearchLimit(limit int) int {
 	if limit <= 0 {
-		limit = 20
+		return 20
 	}
+	if limit > MaxSearchLimit {
+		return MaxSearchLimit
+	}
+	return limit
+}
+
+// search is the unbounded internal candidate retriever. Public entry points cap
+// their final output, while planned recent/balanced ranking must inspect beyond
+// the top 100 demand-ranked matches to surface new low-demand datasets.
+func (c *Catalog) search(query string, limit int, restOnly bool) Result {
 	terms := queryTerms(query)
-	res := Result{Terms: terms}
+	res := Result{Mode: SearchModeLexical, Terms: terms}
 
 	type scored struct {
 		e       *Entry
@@ -337,13 +407,168 @@ func (c *Catalog) Search(query string, limit int, restOnly bool) Result {
 	}
 	for _, s := range kept {
 		h := Hit{PK: s.e.PK, Title: s.e.Title, Org: s.e.Org,
-			ApplyCount: s.e.ApplyCount, ModifiedAt: s.e.ModifiedAt, SvcType: s.e.SvcType}
+			ApplyCount: s.e.ApplyCount, ModifiedAt: s.e.ModifiedAt, SvcType: s.e.SvcType,
+			Exact: !res.Relaxed && len(terms) > 0}
 		if res.Relaxed {
 			h.Matched = s.matched
 		}
 		res.Hits = append(res.Hits, h)
 	}
 	return res
+}
+
+// SearchPlan executes up to eight model-inferred concept queries and returns a
+// round-robin merge. This is intentionally different from silently expanding a
+// phrase with a synonym map: the language model can reason about new industries,
+// causal indicators and adjacent opportunities we did not anticipate, while the
+// local catalogue remains cheap, complete and reproducible.
+func (c *Catalog) SearchPlan(plan QueryPlan) Result {
+	plan.Limit = normalizeSearchLimit(plan.Limit)
+	return c.searchPlan(plan)
+}
+
+func (c *Catalog) searchPlan(plan QueryPlan) Result {
+	limit := plan.Limit
+	if limit <= 0 {
+		limit = 20
+	}
+	concepts := uniqueQueries(plan.Concepts, 8)
+	if len(concepts) == 0 {
+		return c.search(plan.Intent, limit, plan.RESTOnly)
+	}
+	ranking := plan.Ranking
+	if ranking != RankDemand && ranking != RankRecent {
+		ranking = RankBalanced
+	}
+
+	entries := make(map[string]*Entry, len(c.Entries))
+	for i := range c.Entries {
+		entries[c.Entries[i].PK] = &c.Entries[i]
+	}
+
+	type bucket struct {
+		hits []Hit
+	}
+	buckets := make([]bucket, 0, len(concepts))
+	all := make(map[string]bool)
+	anyRelaxed := false
+	for _, query := range concepts {
+		found := c.search(query, len(c.Entries), plan.RESTOnly)
+		anyRelaxed = anyRelaxed || found.Relaxed
+		hits := append([]Hit(nil), found.Hits...)
+		if found.Relaxed && len(found.Terms) >= 3 {
+			// A planned axis is a compact noun phrase. When no entry contains
+			// every word, accepting a single generic word such as "현황" makes
+			// a popular but unrelated API win. Preserve recall, but require at
+			// least half of a three-plus-term axis to agree.
+			minimum := (len(found.Terms) + 1) / 2
+			filtered := hits[:0]
+			for _, hit := range hits {
+				if hit.Matched >= minimum {
+					filtered = append(filtered, hit)
+				}
+			}
+			hits = filtered
+		}
+		switch ranking {
+		case RankRecent:
+			sortHitsByRecent(hits)
+		case RankBalanced:
+			recent := append([]Hit(nil), hits...)
+			sortHitsByRecent(recent)
+			hits = interleaveHits(hits, recent)
+		}
+		for i := range hits {
+			hits[i].MatchedQuery = query
+			if plan.IncludePreviews {
+				hits[i].Preview = descriptionPreview(entries[hits[i].PK], 180)
+			}
+			all[hits[i].PK] = true
+		}
+		buckets = append(buckets, bucket{hits: hits})
+	}
+
+	res := Result{
+		Mode: SearchModePlanned, Intent: strings.TrimSpace(plan.Intent),
+		Queries: concepts, Total: len(all), Relaxed: anyRelaxed,
+	}
+	selected := make(map[string]bool)
+	for row := 0; len(res.Hits) < limit; row++ {
+		progress := false
+		for _, b := range buckets {
+			if row >= len(b.hits) {
+				continue
+			}
+			progress = true
+			h := b.hits[row]
+			if selected[h.PK] {
+				continue
+			}
+			selected[h.PK] = true
+			res.Hits = append(res.Hits, h)
+			if len(res.Hits) == limit {
+				break
+			}
+		}
+		if !progress {
+			break
+		}
+	}
+	return res
+}
+
+func uniqueQueries(queries []string, max int) []string {
+	seen := map[string]bool{}
+	out := make([]string, 0, len(queries))
+	for _, query := range queries {
+		query = strings.TrimSpace(query)
+		key := strings.ToLower(query)
+		if query == "" || seen[key] {
+			continue
+		}
+		seen[key] = true
+		out = append(out, query)
+		if len(out) == max {
+			break
+		}
+	}
+	return out
+}
+
+func sortHitsByRecent(hits []Hit) {
+	sort.SliceStable(hits, func(i, j int) bool {
+		if hits[i].ModifiedAt != hits[j].ModifiedAt {
+			return hits[i].ModifiedAt > hits[j].ModifiedAt
+		}
+		return hits[i].ApplyCount > hits[j].ApplyCount
+	})
+}
+
+func interleaveHits(primary, secondary []Hit) []Hit {
+	out := make([]Hit, 0, len(primary))
+	seen := make(map[string]bool, len(primary))
+	for i := 0; i < len(primary) || i < len(secondary); i++ {
+		for _, hits := range [][]Hit{primary, secondary} {
+			if i >= len(hits) || seen[hits[i].PK] {
+				continue
+			}
+			seen[hits[i].PK] = true
+			out = append(out, hits[i])
+		}
+	}
+	return out
+}
+
+func descriptionPreview(entry *Entry, maxRunes int) string {
+	if entry == nil {
+		return ""
+	}
+	preview := strings.Join(strings.Fields(entry.Desc), " ")
+	runes := []rune(preview)
+	if len(runes) <= maxRunes {
+		return preview
+	}
+	return string(runes[:maxRunes]) + "…"
 }
 
 // SvcTypes counts datasets per service type, so `info` can say how much of the

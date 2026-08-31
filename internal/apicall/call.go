@@ -25,6 +25,42 @@ var ErrKeyRejected = errors.New("data.go.kr 이 인증키를 거부했습니다"
 // why it is a distinct sentinel from ErrKeyRejected.
 var ErrPropagating = errors.New("게이트웨이에 아직 반영되지 않았습니다 (403)")
 
+// ErrHTTPStatus reports a non-success gateway response not covered by a more
+// specific sentinel. CallResult is still returned so callers can inspect body.
+var ErrHTTPStatus = errors.New("OpenAPI가 실패 HTTP 상태를 반환했습니다")
+
+// SecureEndpoint constrains automatic serviceKey injection to the government
+// gateway. Portal pages are publisher-controlled input; treating a Swagger host
+// as trusted would let a bad spec send the account-wide key elsewhere. The
+// gateway historically publishes http URLs, so exact gateway URLs are upgraded
+// to HTTPS rather than rejected.
+func SecureEndpoint(endpoint string) (string, error) {
+	u, err := url.Parse(strings.TrimSpace(endpoint))
+	if err != nil {
+		return "", fmt.Errorf("엔드포인트 URL 해석 실패: %w", err)
+	}
+	if u.User != nil || !strings.EqualFold(u.Hostname(), "apis.data.go.kr") {
+		return "", fmt.Errorf("인증키는 apis.data.go.kr 공식 게이트웨이에만 전송할 수 있습니다")
+	}
+	if port := u.Port(); port != "" && port != "443" {
+		return "", fmt.Errorf("인증키는 apis.data.go.kr HTTPS 기본 포트에만 전송할 수 있습니다")
+	}
+	if u.Scheme != "http" && u.Scheme != "https" {
+		return "", fmt.Errorf("OpenAPI 엔드포인트는 HTTP(S) URL이어야 합니다")
+	}
+	if u.Path == "" || u.Path == "/" {
+		return "", fmt.Errorf("OpenAPI 엔드포인트 경로가 비어 있습니다")
+	}
+	for name := range u.Query() {
+		if strings.EqualFold(name, "serviceKey") {
+			return "", fmt.Errorf("엔드포인트 URL에 serviceKey를 직접 넣지 마세요")
+		}
+	}
+	u.Scheme = "https"
+	u.Host = "apis.data.go.kr"
+	return u.String(), nil
+}
+
 // CallResult is a surfaced API response. Body is a map (XML→JSON or JSON),
 // or a string when the content isn't structured.
 type CallResult struct {
@@ -38,8 +74,19 @@ type CallResult struct {
 // re-encoding it would break it). It never retries: on a well-known key error
 // it returns the body AND an error carrying the Encoding/Decoding hint.
 func Call(ctx context.Context, f *fetch.Client, endpoint string, params map[string]string, key string) (*CallResult, error) {
+	secure, err := SecureEndpoint(endpoint)
+	if err != nil {
+		return nil, err
+	}
+	return callTrusted(ctx, f, secure, params, key)
+}
+
+func callTrusted(ctx context.Context, f *fetch.Client, endpoint string, params map[string]string, key string) (*CallResult, error) {
 	q := url.Values{}
 	for k, v := range params {
+		if strings.EqualFold(k, "serviceKey") {
+			return nil, fmt.Errorf("serviceKey는 gongctl이 주입하므로 params에 넣지 마세요")
+		}
 		q.Set(k, v)
 	}
 	full := endpoint
@@ -86,6 +133,9 @@ func Call(ctx context.Context, f *fetch.Client, endpoint string, params map[stri
 		return res, fmt.Errorf("%w: SERVICE_KEY_IS_NOT_REGISTERED_ERROR — "+
 			"키 형태(Encoding/Decoding)가 잘못됐거나, 포털에서 키를 재발급해 "+
 			"이 키가 무효해졌을 수 있습니다", ErrKeyRejected)
+	}
+	if resp.Status < http.StatusOK || resp.Status >= http.StatusMultipleChoices {
+		return res, fmt.Errorf("%w: status %d", ErrHTTPStatus, resp.Status)
 	}
 	return res, nil
 }

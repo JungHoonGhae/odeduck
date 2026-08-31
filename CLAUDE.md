@@ -1,22 +1,15 @@
 # CLAUDE.md — gongctl
 
 data.go.kr(공공데이터포털)의 OpenAPI **활용신청·인증키 발급·호출을 AI 에이전트가 대신**하게 하는
-Go CLI + MCP. 사람이 포털 UI를 한 번도 안 건드리게 하는 것이 핵심.
+Go CLI + MCP. 사람은 정부 SSO 로그인 한 번만 하고 이후 포털 작업을 에이전트가 잇는 것이 핵심.
 
-## 현재 상태 (2026-07-24)
+## 현재 상태 (2026-08-31)
 
-- **v0 구현 완료, main 머지됨.** subagent-driven 11태스크 + 태스크별/whole-branch 리뷰 완주.
-- 설계 스펙: `docs/superpowers/specs/2026-07-08-gongctl-design.md`, 실행계획:
-  `docs/superpowers/plans/2026-07-23-gongctl-implementation.md`.
-- 구현: `internal/portal`(활용신청 CDP 자동화 이식 + 검색), `internal/apicall`(신규 describe/call),
-  `internal/mcpserver`(6 tool + guide), `cmd/gongctl`(12명령: +doctor,key), goreleaser/CI/install. 테스트 그린.
-- **배포**: GitHub repo 생성·push 완료(github.com/JungHoonGhae/gongctl, public, CI green), tap repo
-  `homebrew-gongctl` 생성, CHANGELOG 0.1.0 추가, goreleaser check·snapshot 통과.
-- **남은 것 (사용자 액션)**: ① `DOPPLER_TOKEN` 시크릿 + Doppler에 `HOMEBREW_TAP_TOKEN`(tap 쓰기 PAT)
-  → 그다음 `git tag v0.1.0 && git push origin v0.1.0`로 첫 릴리즈. ② 쓰기 경로 라이브 E2E(실계정 apply→call).
-- **보안(HIGH, 해결됨)**: `daemon.go`에서 `--remote-allow-origins=*` 제거 — 스파이크
-  (`proto/cdp-origin`)로 chromedp가 flag 없이도 재부착됨을 검증(외부 Origin은 Chrome이 403 거부).
-  세션탈취 표면 제거. 라이브 E2E에서 재부착 최종 확인만 남음.
+- v0.8은 목표 기반 카탈로그 검색, 선택형 Ollama 의미 검색, 검색→상세→활용신청→호출 MCP 흐름을 제공한다.
+- data.go.kr KRDS 개편 파서와 세션 쿠키 회전 갱신을 적용했다.
+- 온비드·나라장터·도매시장·중소기업 지원사업 API를 실계정으로 신청·승인·호출했다.
+- 설계 근거는 `docs/adr/`, 검색 평가는 `docs/research/semantic-search-evaluation.md`, 경쟁 조사는
+  `docs/research/competitive-workflow-audit.md`가 단일 소스다.
 
 ## 확정된 핵심 결정 (스펙 요약)
 
@@ -24,7 +17,7 @@ Go CLI + MCP. 사람이 포털 UI를 한 번도 안 건드리게 하는 것이 �
 - **호출 설계**: surface-only + 에이전트 주도. 도구는 결정적인 것만(로그인·활용신청·키 주입·HTTP·
   XML→JSON), 이질적 API 명세는 파싱하지 않고 에이전트에게 surface. (kvote 국정수행 PDF 교훈.)
 - **인터페이스**: CLI(사람) + MCP(에이전트), 같은 백엔드. kvote 패턴.
-- **MCP tool 6**: search_datasets · list_applications · apply · describe_api · call_api · get_api_key.
+- **MCP tools**: catalog_search → describe_api → apply(필요시) → call_api. search_datasets와 list_applications는 보조 도구다. 인증키는 call_api 내부에서만 사용하며 모델 컨텍스트로 반환하지 않는다.
   `call_api`는 key 생략 시 세션에서 자동 조회 → **검색→신청→승인확인→키→호출이 사람 개입 0**
   (로그인 1회 제외). 인증키는 `/iim/api/selectApiKeyList.do`의 `#pblisrCrtfcKeyPlain`에서 파싱.
 - **인증키**: data.go.kr은 **계정당 일반 인증키 하나**(첫 신청 시 발급). 엔드포인트별 매칭 불필요.
@@ -36,8 +29,8 @@ Go CLI + MCP. 사람이 포털 UI를 한 번도 안 건드리게 하는 것이 �
 ## kvote에서 복사 이식할 것 (검증된 코드)
 
 `~/workspace/projects/oss-k-vote-cli` 의 다음을 복사 이식(공유 라이브러리 추출 안 함 — §5):
-- `internal/datagokr/*` (browser·apply·accounts·daemon·config) — **활용신청 CDP-attach 자동화의
-  유일한 구현.** 세상에서 이거 가진 코드가 kvote뿐. 손 검증된 로직(SSO 트램펄린·JS 다이얼로그·
+- `internal/datagokr/*` (browser·apply·accounts·daemon·config) — 활용신청 CDP-attach 자동화의
+  원형. 손 검증된 로직(SSO 트램펄린·JS 다이얼로그·
   `currentMyMenuId` 쿠키 전제) 그대로 가져올 것.
 - `internal/nec` 의 datasets·openportal 검색 부분 → `internal/portal/search.go`.
 - `internal/output`, `internal/version`, CLI/MCP 패턴, goreleaser·install.sh/ps1 파이프라인.
@@ -48,11 +41,11 @@ Go CLI + MCP. 사람이 포털 UI를 한 번도 안 건드리게 하는 것이 �
 - `internal/apicall/describe.go` — OpenAPI 상세페이지 → 엔드포인트·요청변수·가이드문서 surface.
 - `internal/apicall/call.go` — 계정 인증키 주입 + HTTP GET + XML→JSON + 에러코드 surface.
 
-## 경쟁 지형 (왜 만드나)
+## 경쟁 지형
 
-- `JeHwanYoo/data-go-kr`(CLI): 이미 받은 키로 호출만. ⭐1, 방치.
-- `Koomook/data-go-mcp-servers`(MCP ⭐288): 수동 신청+키 붙여넣기, 6개 하드코딩, 신청 자동화 없음.
-- **아무도 활용신청을 자동화 안 함** = gongctl 존재 이유. 차별화: "data-go-mcp인데 포털을 안 건드림."
+검색→상세→호출 MCP는 이미 존재한다. gongctl의 검증된 차이는 목표 기반 전체 카탈로그 탐색과
+data.go.kr 활용신청·승인·키 재사용·실호출을 하나로 연결하는 것이다. 비교 주장과 커밋 고정 근거는
+`docs/research/competitive-workflow-audit.md`만 갱신한다.
 
 ## 주의
 

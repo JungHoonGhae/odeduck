@@ -29,6 +29,11 @@ func fixtureServer(t *testing.T) *httptest.Server {
 			w.Write(search)
 		case "/data/" + CanaryPK + "/openapi.do":
 			w.Write(openapi)
+		case "/tcs/dss/selectApiDetailFunction.do":
+			// The captured legacy page has an operation selector. Production returns
+			// the selected HTML fragment here; the full fixture contains the same
+			// operation section and is sufficient for the parser boundary.
+			w.Write(openapi)
 		default:
 			http.NotFound(w, r)
 		}
@@ -54,7 +59,7 @@ func TestRunHealthy(t *testing.T) {
 		t.Errorf("search check = %q, want ok", got)
 	}
 	if got := statusOf(checks, "describe"); got != StatusOK {
-		t.Errorf("describe check = %q, want ok", got)
+		t.Errorf("describe check = %q, want ok; checks=%+v", got, checks)
 	}
 }
 
@@ -73,5 +78,24 @@ func TestRunDetectsDrift(t *testing.T) {
 	}
 	if got := statusOf(checks, "describe"); got != StatusDrift {
 		t.Errorf("describe check = %q, want drift", got)
+	}
+}
+
+func TestRunDetectsPartialDescribeDrift(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html")
+		if r.URL.Path == "/tcs/dss/selectDataSetList.do" {
+			w.Write([]byte(`<div class="apply-result-item"><a href="/data/1/openapi.do"><strong>테스트</strong></a></div>`))
+			return
+		}
+		// Endpoint alone used to make doctor green even when the title, API type,
+		// approval, and request-variable parsers had all drifted.
+		w.Write([]byte(`<html><body>https://apis.data.go.kr/test/getRows</body></html>`))
+	}))
+	defer srv.Close()
+
+	checks := Run(context.Background(), fetch.New(fetch.WithDelay(0)), srv.URL)
+	if got := statusOf(checks, "describe"); got != StatusDrift {
+		t.Errorf("partial describe check = %q, want drift", got)
 	}
 }
