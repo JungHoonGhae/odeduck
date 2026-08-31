@@ -158,9 +158,25 @@ func (c *Client) Get(ctx context.Context, rawURL string) (*Response, error) {
 	return c.do(ctx, http.MethodGet, rawURL, nil, "")
 }
 
+// GetNoRedirect performs the same bounded, throttled GET but returns the first
+// redirect response instead of following it. Use this for first-party lookup
+// endpoints whose response is data: following a redirect there could cross the
+// trust boundary before the caller has validated the returned destination.
+func (c *Client) GetNoRedirect(ctx context.Context, rawURL string) (*Response, error) {
+	httpClient := *c.http
+	httpClient.CheckRedirect = func(_ *http.Request, _ []*http.Request) error {
+		return http.ErrUseLastResponse
+	}
+	return c.doWithClient(ctx, &httpClient, http.MethodGet, rawURL, nil, "")
+}
+
 // do is the one HTTP boundary so GET pages and the portal's form-backed detail
 // fragments share the same throttle, headers, TLS policy, and response shape.
 func (c *Client) do(ctx context.Context, method, rawURL string, requestBody io.Reader, contentType string) (*Response, error) {
+	return c.doWithClient(ctx, c.http, method, rawURL, requestBody, contentType)
+}
+
+func (c *Client) doWithClient(ctx context.Context, httpClient *http.Client, method, rawURL string, requestBody io.Reader, contentType string) (*Response, error) {
 	c.throttle()
 	req, err := http.NewRequestWithContext(ctx, method, rawURL, requestBody)
 	if err != nil {
@@ -174,7 +190,7 @@ func (c *Client) do(ctx context.Context, method, rawURL string, requestBody io.R
 	if ref := refererOf(rawURL); ref != "" {
 		req.Header.Set("Referer", ref)
 	}
-	resp, err := c.http.Do(req)
+	resp, err := httpClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("%s %s: %w", method, rawURL, err)
 	}

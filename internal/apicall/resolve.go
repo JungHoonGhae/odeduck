@@ -51,6 +51,20 @@ func Resolve(ctx context.Context, f *fetch.Client, baseURL, pk, name string) (*O
 	if err != nil {
 		return nil, err
 	}
+	// LINK is an external-provider handoff, even if its page happens to contain
+	// an endpoint-looking apis.data.go.kr URL in prose or copied markup. Refuse
+	// before endpoint selection so the invocation boundary is enforced by code,
+	// not only by MCP instructions.
+	if isLinkAPIType(spec.APIType) {
+		note := spec.Note
+		if note == "" {
+			note = "제공기관의 문서·신청·인증 계약을 먼저 확인하세요"
+		}
+		return nil, fmt.Errorf("pk=%s 는 LINK 유형이라 call_api 로 호출할 수 없습니다 — %s", pk, note)
+	}
+	if !isRESTAPIType(spec.APIType) {
+		return nil, fmt.Errorf("pk=%s 의 API 유형을 REST로 확인할 수 없어 call_api 로 호출하지 않습니다 — %s", pk, spec.Note)
+	}
 	var callable []Operation
 	for _, op := range spec.Operations {
 		if op.Endpoint != "" {
