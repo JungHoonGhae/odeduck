@@ -71,6 +71,11 @@ v0.9에는 새 `opendatactl`과 기존 스크립트·자동화를 위한 `gongct
 기존 설치 폴더를 그대로 감지해 `opendatactl.exe`와 `gongctl.exe`를 함께 갱신합니다. 이미 설치된
 `gongctl` 실행 파일과 설정·로그인 상태에는 영향이 없습니다.
 
+환경변수도 새 이름을 우선하고 기존 이름을 호환합니다. Ollama 주소는
+`OPENDATACTL_OLLAMA_URL`(`GONGCTL_OLLAMA_URL` 폴백), 설치할 릴리스 버전은
+`OPENDATACTL_VERSION`(`GONGCTL_VERSION` 폴백)으로 지정할 수 있습니다. MCP 가이드의 기본 URI는
+`opendatactl://guide`이며, 기존 클라이언트를 위해 `gongctl://guide`도 같은 내용을 반환합니다.
+
 ## 사용법
 
 ```sh
@@ -126,7 +131,8 @@ MCP에서 쓸 때는 상위 Codex·Claude·Gemini·Cursor가 이미 검색 계�
 Ollama 의미 벡터는 에이전트가 만든 검색축 밖의 표현까지 추가로 회수하거나, 네트워크 없이 반복
 검색할 때 쓰는 선택 기능입니다. [Ollama](https://docs.ollama.com/)만 설치한 뒤 아래 명령 한 번이면
 추천 다국어 모델 다운로드, 11,902개 카탈로그 임베딩, 로컬 인덱스 저장까지 처리합니다. 별도 벡터 DB와
-API 키는 필요하지 않습니다.
+API 키는 필요하지 않습니다. Ollama가 기본 주소가 아닌 곳에서 실행되면
+`OPENDATACTL_OLLAMA_URL`을 설정하세요. v0.8의 `GONGCTL_OLLAMA_URL`도 호환됩니다.
 
 ```bash
 opendatactl catalog semantic-build
@@ -211,6 +217,9 @@ MCP의 `call_api`는 raw endpoint와 인증키를 입력받지 않습니다. 항
 `apply`는 보조 기능이 아니라 **발견한 데이터를 실제로 쓸 수 있게 만드는 핵심 연결 단계**입니다.
 로그인 한 번 뒤에는 에이전트가 명세 확인, 신청 폼 제출, 승인 상태 확인, 인증키 주입과 호출까지
 스스로 이어갑니다.
+
+에이전트가 먼저 읽을 MCP 리소스는 `opendatactl://guide`입니다. 기존 `gongctl://guide` URI도
+v0.9 호환 기간에는 같은 가이드를 반환합니다.
 
 Codex·Claude Code·Gemini CLI에서는 각자 한 줄로 등록할 수 있습니다. 이 경로에서는 해당 호스트
 모델이 자연어 목표를 검색축으로 만들므로 `catalog discover`가 하위 에이전트를 다시 실행하지 않습니다.

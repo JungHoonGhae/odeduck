@@ -15,7 +15,9 @@ section matching a `vX.Y.Z` tag as the GitHub release notes.
   approval status, credential injection, and the first live API call.
 - Release archives contain both `opendatactl` and a `gongctl` compatibility
   binary. Legacy `gongctl_*` archive names also remain available for saved v0.8
-  installer copies. The old `GONGCTL_VERSION` and `GONGCTL_OLLAMA_URL`
+  macOS/Linux installers and explicitly version-pinned Windows installers. An
+  unpinned saved v0.8 Windows script must be replaced by the current installer.
+  The old `GONGCTL_VERSION` and `GONGCTL_OLLAMA_URL`
   environment variables and `gongctl://guide` MCP resource remain supported
   during the transition.
 
