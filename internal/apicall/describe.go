@@ -7,7 +7,9 @@ package apicall
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"net"
 	"net/url"
 	"regexp"
 	"sort"
@@ -16,6 +18,7 @@ import (
 	"github.com/JungHoonGhae/opendatactl/internal/fetch"
 	"github.com/JungHoonGhae/opendatactl/internal/portal"
 	"github.com/PuerkitoBio/goquery"
+	"golang.org/x/net/idna"
 )
 
 // APISpec is the surfaced view of one dataset's OpenAPI detail page.
@@ -34,19 +37,90 @@ type APISpec struct {
 	// whose request parameters the portal never documents.
 	EndpointOnly bool `json:"endpointOnly,omitempty"`
 	// LinkURL is the publisher's own page for a LINK dataset, taken from the
-	// portal's URL row. The portal has it on every LINK page sampled, so telling a
+	// legacy URL row or the KRDS link lookup. The portal has it on every LINK page
+	// sampled, so telling a
 	// caller to "check the publisher's documentation" without handing over the
 	// address it already holds is withholding the one actionable thing on the page.
 	// opendatactl does not follow it: the publishers are a long tail (39 distinct hosts
 	// in 70 sampled datasets, the largest 13%), each with its own registration and
 	// spec format, so reading it is the agent's job — surfacing it is ours.
-	LinkURL string `json:"linkUrl,omitempty"`
+	LinkURL string           `json:"linkUrl,omitempty"`
+	Handoff *ExternalHandoff `json:"handoff,omitempty"`
 	// Approval is the portal's 심의유형 row: whether an application is granted
 	// automatically or waits for a human at the publishing agency.
 	Approval *Approval `json:"approval,omitempty"`
 	// Note is set only when the spec is incomplete, to say where the rest of it
 	// lives. Without it an empty Operations list is a dead end.
 	Note string `json:"note,omitempty"`
+}
+
+// ExternalHandoff is the only contract shared by heterogeneous LINK datasets.
+// URL is an official starting point resolved through data.go.kr, not necessarily
+// an API endpoint or even a specification page. State and NextAction keep an
+// agent from sending call_api parameters to an uninspected provider page. A
+// failed portal lookup uses resolution_failed plus a structured Failure instead
+// of looking like a successful LINK response with an unexplained empty URL.
+type ExternalHandoff struct {
+	URL         string            `json:"url,omitempty"`
+	Host        string            `json:"host,omitempty"`
+	Trust       string            `json:"trust,omitempty"`
+	FetchPolicy string            `json:"fetchPolicy,omitempty"`
+	State       string            `json:"state"`      // inspection_required | contract_known | resolution_failed
+	NextAction  string            `json:"nextAction"` // inspect_provider_contract | request_provider_access | retry_link_resolution | choose_another_dataset
+	Contract    *ExternalContract `json:"contract,omitempty"`
+	Failure     *HandoffFailure   `json:"failure,omitempty"`
+}
+
+// HandoffFailure keeps LINK resolution failures machine-actionable without
+// pretending a missing URL is the same thing as an unsupported provider.
+type HandoffFailure struct {
+	Code      string `json:"code"`
+	Message   string `json:"message"`
+	Retryable bool   `json:"retryable"`
+}
+
+const (
+	HandoffInspectionRequired  = "inspection_required"
+	HandoffInspectContract     = "inspect_provider_contract"
+	HandoffContractKnown       = "contract_known"
+	HandoffRequestAccess       = "request_provider_access"
+	HandoffPublisherUntrusted  = "publisher_supplied_untrusted"
+	HandoffSafeFetcherRequired = "safe_fetcher_required"
+	HandoffResolutionFailed    = "resolution_failed"
+	HandoffRetryResolution     = "retry_link_resolution"
+	HandoffChooseAnother       = "choose_another_dataset"
+)
+
+type linkResolutionError struct {
+	code      string
+	retryable bool
+	err       error
+}
+
+func (e *linkResolutionError) Error() string { return e.err.Error() }
+func (e *linkResolutionError) Unwrap() error { return e.err }
+
+// ExternalContract records facts from a versioned provider document. It does
+// not imply that opendatactl can invoke the provider: InvocationState says
+// whether a provider-specific credential and caller have actually been wired.
+type ExternalContract struct {
+	Provider             string                `json:"provider"`
+	DocumentationURL     string                `json:"documentationUrl"`
+	DocumentationVersion string                `json:"documentationVersion,omitempty"`
+	ApplicationURL       string                `json:"applicationUrl,omitempty"`
+	AccessMode           string                `json:"accessMode"`
+	Auth                 *ExternalAuthContract `json:"auth,omitempty"`
+	InvocationState      string                `json:"invocationState"`
+	VerifiedAt           string                `json:"verifiedAt"`
+}
+
+// ExternalAuthContract describes where the external provider expects its own
+// credential. It is metadata only; no credential value enters APISpec.
+type ExternalAuthContract struct {
+	Type            string `json:"type"`
+	Placement       string `json:"placement"`
+	Name            string `json:"name"`
+	CredentialScope string `json:"credentialScope"`
 }
 
 // Approval reports the two stages the portal grades separately. opendatactl applies
@@ -116,66 +190,74 @@ func Describe(ctx context.Context, f *fetch.Client, baseURL, pk string) (*APISpe
 			spec.DataName = cleanText(value.Text())
 		}
 	}
-
-	// Operation containers: real per-operation content lives in
-	// .open-api-detail-result (endpoint + 요청변수/출력결과 tables). The sibling
-	// .open-api-detail div is only the operation-switcher (<select>+button, no
-	// data) and, on pages with broken/comment-only-closed div nesting, can end
-	// up as the *only* match for .open-api-detail while swallowing unrelated
-	// content via the HTML5 parser's error recovery — so prefer the result
-	// containers whenever the page has any, and only fall back to
-	// .open-api-detail for older/simpler single-operation pages that lack a
-	// separate result div.
-	// The portal embeds an authoritative Swagger 2.0 spec on modern pages; prefer
-	// it over scraping the rendered tables, which carry less and break more.
-	if ops := operationsFromSwagger(doc); len(ops) > 0 {
-		spec.Operations = ops
+	// Decide the protocol branch before parsing any REST operation fragments.
+	// A LINK page may contain REST-looking examples or stale selectors, but those
+	// must neither trigger extra fragment requests nor become callable output.
+	if value, ok := labeledValue(doc.Selection, "API 유형"); ok {
+		spec.APIType = cleanText(value.Text())
 	}
-	if len(spec.Operations) == 0 {
-		ops, err := operationsFromKRDS(ctx, f, baseURL, doc, pk)
-		if err != nil {
-			return nil, err
+
+	if isRESTAPIType(spec.APIType) {
+		// Operation containers: real per-operation content lives in
+		// .open-api-detail-result (endpoint + 요청변수/출력결과 tables). The sibling
+		// .open-api-detail div is only the operation-switcher (<select>+button, no
+		// data) and, on pages with broken/comment-only-closed div nesting, can end
+		// up as the *only* match for .open-api-detail while swallowing unrelated
+		// content via the HTML5 parser's error recovery — so prefer the result
+		// containers whenever the page has any, and only fall back to
+		// .open-api-detail for older/simpler single-operation pages that lack a
+		// separate result div.
+		// The portal embeds an authoritative Swagger 2.0 spec on modern pages; prefer
+		// it over scraping the rendered tables, which carry less and break more.
+		if ops := operationsFromSwagger(doc); len(ops) > 0 {
+			spec.Operations = ops
 		}
-		spec.Operations = ops
-	}
-
-	sections := doc.Find(".open-api-detail-result")
-	if sections.Length() == 0 {
-		sections = doc.Find(".open-api-detail")
-	}
-	if len(spec.Operations) > 0 {
-		sections = doc.Find("__none__") // swagger already answered; skip the tables
-	}
-	sections.Each(func(_ int, sel *goquery.Selection) {
-		op := Operation{Name: cleanText(sel.Find("h4, .tit").First().Text())}
-		if html, err := sel.Html(); err == nil {
-			if m := reEndpoint.FindString(html); m != "" {
-				op.Endpoint = m
+		if len(spec.Operations) == 0 {
+			ops, err := operationsFromKRDS(ctx, f, baseURL, doc, pk)
+			if err != nil {
+				return nil, err
 			}
+			spec.Operations = ops
 		}
-		op.Params = parseParams(sel)
-		if len(op.Params) == 0 {
-			// surface-only: no clean request-variable table → hand back raw HTML.
+
+		sections := doc.Find(".open-api-detail-result")
+		if sections.Length() == 0 {
+			sections = doc.Find(".open-api-detail")
+		}
+		if len(spec.Operations) > 0 {
+			sections = doc.Find("__none__") // swagger already answered; skip the tables
+		}
+		sections.Each(func(_ int, sel *goquery.Selection) {
+			op := Operation{Name: cleanText(sel.Find("h4, .tit").First().Text())}
 			if html, err := sel.Html(); err == nil {
-				op.RawHTML = strings.TrimSpace(html)
+				if m := reEndpoint.FindString(html); m != "" {
+					op.Endpoint = m
+				}
 			}
-		}
-		if op.Name != "" || op.Endpoint != "" || op.RawHTML != "" {
-			spec.Operations = append(spec.Operations, op)
-		}
-	})
+			op.Params = parseParams(sel)
+			if len(op.Params) == 0 {
+				// surface-only: no clean request-variable table → hand back raw HTML.
+				if html, err := sel.Html(); err == nil {
+					op.RawHTML = strings.TrimSpace(html)
+				}
+			}
+			if op.Name != "" || op.Endpoint != "" || op.RawHTML != "" {
+				spec.Operations = append(spec.Operations, op)
+			}
+		})
 
-	spec.Operations = dedupeOperations(spec.Operations)
+		spec.Operations = dedupeOperations(spec.Operations)
 
-	// Page-level endpoint fallback: many REST datasets carry the endpoint URL
-	// somewhere on the page while documenting no 요청변수 table at all. Surfacing
-	// the endpoint alone is still factual and gets a caller moving; the note below
-	// makes clear the parameters are NOT documented here.
-	if len(spec.Operations) == 0 {
-		if html, err := doc.Html(); err == nil {
-			if m := reEndpoint.FindString(html); m != "" {
-				spec.Operations = append(spec.Operations, Operation{Endpoint: m})
-				spec.EndpointOnly = true
+		// Page-level endpoint fallback: many REST datasets carry the endpoint URL
+		// somewhere on the page while documenting no 요청변수 table at all. Surfacing
+		// the endpoint alone is still factual and gets a caller moving; the note below
+		// makes clear the parameters are NOT documented here.
+		if len(spec.Operations) == 0 {
+			if html, err := doc.Html(); err == nil {
+				if m := reEndpoint.FindString(html); m != "" {
+					spec.Operations = append(spec.Operations, Operation{Endpoint: m})
+					spec.EndpointOnly = true
+				}
 			}
 		}
 	}
@@ -183,9 +265,6 @@ func Describe(ctx context.Context, f *fetch.Client, baseURL, pk string) (*APISpe
 	// Summary metadata used to be a th/td table. KRDS renders the same label/value
 	// pairs as <strong class=key> + <div class=value>. Keep that markup choice in
 	// one helper so every field gets the same compatibility boundary.
-	if value, ok := labeledValue(doc.Selection, "API 유형"); ok {
-		spec.APIType = cleanText(value.Text())
-	}
 	if value, ok := labeledValue(doc.Selection, "심의유형"); ok {
 		raw := cleanText(value.Text())
 		a := &Approval{Raw: raw}
@@ -195,12 +274,34 @@ func Describe(ctx context.Context, f *fetch.Client, baseURL, pk string) (*APISpe
 		spec.Approval = a
 	}
 
-	// The URL row appears on LINK pages (where 심의유형 does not).
-	if value, ok := labeledValue(doc.Selection, "URL"); ok {
+	// Legacy LINK pages render the publisher address in a URL row.
+	var linkLookupErr error
+	if value, ok := labeledValue(doc.Selection, "URL"); ok && isLinkAPIType(spec.APIType) {
+		var raw string
 		if href, found := value.Find("a[href]").First().Attr("href"); found {
-			spec.LinkURL = strings.TrimSpace(href)
+			raw = href
 		} else {
-			spec.LinkURL = cleanText(value.Text())
+			raw = cleanText(value.Text())
+		}
+		if raw != "" {
+			if err := spec.setExternalHandoff(raw); err != nil {
+				linkLookupErr = err
+			}
+		}
+	}
+	// KRDS LINK pages render only a 바로가기 button. Its own JavaScript resolves
+	// the publisher address through this JSON lookup when clicked. Keep that
+	// portal detail hidden inside Describe: callers should not need a browser or
+	// a second command merely because the portal changed how it renders the same
+	// field.
+	if isLinkAPIType(spec.APIType) && spec.LinkURL == "" {
+		var resolved string
+		resolved, linkLookupErr = resolvePortalLinkURL(ctx, f, baseURL, pk)
+		if linkLookupErr == nil {
+			linkLookupErr = spec.setExternalHandoff(resolved)
+		}
+		if linkLookupErr != nil && spec.Handoff == nil {
+			spec.Handoff = failedExternalHandoff(linkLookupErr)
 		}
 	}
 
@@ -226,21 +327,29 @@ func Describe(ctx context.Context, f *fetch.Client, baseURL, pk string) (*APISpe
 			"파라미터는 포털에 문서화돼 있지 않습니다. guideDocUrl 이 있으면 그 문서를, 없으면 " +
 			"제공기관 문서를 확인하세요. 파라미터를 추측해서 호출하지 마세요."
 	} else if len(spec.Operations) == 0 {
-		spec.Note = "이 페이지에는 상세기능·요청변수 표가 없습니다 — 명세가 참고문서(guideDocUrl)에만 있는 API입니다. " +
-			"guideDocUrl 을 내려받아 읽고 엔드포인트·파라미터를 확인하세요. 파라미터를 추측해 호출하지 마세요."
-		if spec.GuideDocURL == "" {
+		if isLinkAPIType(spec.APIType) {
+			spec.Note = "이 API 는 유형이 LINK 입니다 — 포털은 명세를 싣지 않고 제공기관 사이트로 " +
+				"연결만 합니다. 엔드포인트·파라미터는 포털에서 알 수 없으니 추측해서 호출하지 마세요."
+			if spec.LinkURL != "" {
+				spec.Note += " handoff.url(" + spec.LinkURL + ") 은 포털이 확인한 외부 시작점입니다. " +
+					"API 엔드포인트나 명세라고 단정할 수 없습니다. 직접 가져오지 말고 DNS·리다이렉트마다 비공개 주소를 차단하는 " +
+					"safe fetcher로 문서·신청·인증 계약을 검사하세요. " +
+					"검사 전에는 call_api 로 호출할 수 없습니다."
+			} else if linkLookupErr != nil {
+				spec.Note += " 포털의 제공기관 URL 조회도 실패했습니다: " + linkLookupErr.Error()
+			}
+		} else if isRESTAPIType(spec.APIType) {
+			spec.Note = "이 페이지에는 상세기능·요청변수 표가 없습니다 — 명세가 참고문서(guideDocUrl)에만 있는 API입니다. " +
+				"guideDocUrl 을 내려받아 읽고 엔드포인트·파라미터를 확인하세요. 파라미터를 추측해 호출하지 마세요."
+		} else {
+			spec.Note = "API 유형을 REST 또는 LINK로 확인하지 못했습니다 — 페이지 구조나 유형 표기가 바뀐 것일 수 있습니다. " +
+				"opendatactl doctor로 점검하고, 유형을 확인하기 전에는 엔드포인트를 추측하거나 call_api로 호출하지 마세요."
+		}
+		if isRESTAPIType(spec.APIType) && spec.GuideDocURL == "" {
 			// A 참고문서 row that carries no file (fn_fileDownload('','')) is the
 			// portal saying "no document" — distinct from the row being absent,
 			// which would suggest the page layout changed.
-			if strings.Contains(spec.APIType, "LINK") {
-				spec.Note = "이 API 는 유형이 LINK 입니다 — 포털은 명세를 싣지 않고 제공기관 사이트로 " +
-					"연결만 합니다. 엔드포인트·파라미터는 포털에서 알 수 없으니 추측해서 호출하지 마세요."
-				if spec.LinkURL != "" {
-					spec.Note += " linkUrl(" + spec.LinkURL + ") 을 직접 열어 읽으면 명세가 거기 있습니다. " +
-						"단, 대개 제공기관의 별도 회원가입·별도 인증키가 필요하며 opendatactl 의 계정 인증키는 " +
-						"그곳에서 쓸 수 없습니다."
-				}
-			} else if guideRowFound {
+			if guideRowFound {
 				spec.Note = "이 API 는 포털에 명세가 없습니다 — 상세기능·요청변수 표도, 참고문서 파일도 " +
 					"제공되지 않습니다(참고문서 항목이 비어 있음). 엔드포인트와 파라미터를 알 방법이 " +
 					"포털에 없으니 제공기관에 문의하거나 다른 API 를 쓰세요. 추측해서 호출하지 마세요."
@@ -252,6 +361,176 @@ func Describe(ctx context.Context, f *fetch.Client, baseURL, pk string) (*APISpe
 	}
 
 	return spec, nil
+}
+
+func isLinkAPIType(apiType string) bool {
+	return strings.Contains(strings.ToUpper(apiType), "LINK")
+}
+
+func isRESTAPIType(apiType string) bool {
+	return strings.Contains(strings.ToUpper(apiType), "REST")
+}
+
+func (s *APISpec) setExternalHandoff(raw string) error {
+	validated, err := validatePublisherLinkURL(raw)
+	if err != nil {
+		return err
+	}
+	u, _ := url.Parse(validated) // validatePublisherLinkURL already proved it parses.
+	s.LinkURL = validated
+	s.Handoff = &ExternalHandoff{
+		URL:         validated,
+		Host:        strings.TrimSuffix(strings.ToLower(u.Hostname()), "."),
+		Trust:       HandoffPublisherUntrusted,
+		FetchPolicy: HandoffSafeFetcherRequired,
+		State:       HandoffInspectionRequired,
+		NextAction:  HandoffInspectContract,
+	}
+	if contract := knownExternalContract(u); contract != nil {
+		s.Handoff.State = HandoffContractKnown
+		s.Handoff.NextAction = HandoffRequestAccess
+		s.Handoff.Contract = contract
+	}
+	return nil
+}
+
+func failedExternalHandoff(err error) *ExternalHandoff {
+	failure := &HandoffFailure{Code: "link_resolution_failed", Message: err.Error()}
+	nextAction := HandoffChooseAnother
+	var resolutionErr *linkResolutionError
+	if errors.As(err, &resolutionErr) {
+		failure.Code = resolutionErr.code
+		failure.Retryable = resolutionErr.retryable
+		if resolutionErr.retryable {
+			nextAction = HandoffRetryResolution
+		}
+	}
+	return &ExternalHandoff{
+		State:      HandoffResolutionFailed,
+		NextAction: nextAction,
+		Failure:    failure,
+	}
+}
+
+// resolvePortalLinkURL mirrors the portal's fn_goUrlLink click without driving
+// a browser. The endpoint belongs to data.go.kr and returns the publisher URL;
+// it is not the publisher API itself and needs no external credentials.
+func resolvePortalLinkURL(ctx context.Context, f *fetch.Client, baseURL, pk string) (string, error) {
+	u, err := url.Parse(strings.TrimRight(baseURL, "/") + "/tcs/dss/selectApiLinkUrl.do")
+	if err != nil {
+		return "", err
+	}
+	q := u.Query()
+	q.Set("publicDataPk", pk)
+	u.RawQuery = q.Encode()
+
+	res, err := f.GetNoRedirect(ctx, u.String())
+	if err != nil {
+		return "", &linkResolutionError{code: "link_transport_error", retryable: true, err: err}
+	}
+	if res.Status != 200 {
+		return "", &linkResolutionError{
+			code: "link_http_error", retryable: res.Status == 429 || res.Status >= 500,
+			err: fmt.Errorf("LINK 주소 조회 HTTP %d", res.Status),
+		}
+	}
+	var payload struct {
+		Status  bool   `json:"status"`
+		LinkURL string `json:"linkUrl"`
+		Error   string `json:"errorDc"`
+	}
+	if err := json.Unmarshal(res.Body, &payload); err != nil {
+		return "", &linkResolutionError{code: "link_invalid_response", err: fmt.Errorf("LINK 주소 응답 해석 실패: %w", err)}
+	}
+	if !payload.Status {
+		if payload.Error == "" {
+			payload.Error = "포털이 실패 상태를 반환했습니다"
+		}
+		return "", &linkResolutionError{code: "link_portal_rejected", err: fmt.Errorf("LINK 주소 조회 실패: %s", cleanText(payload.Error))}
+	}
+	validated, err := validatePublisherLinkURL(payload.LinkURL)
+	if err != nil {
+		return "", &linkResolutionError{code: "link_unsafe_target", err: err}
+	}
+	return validated, nil
+}
+
+func validatePublisherLinkURL(raw string) (string, error) {
+	raw = strings.TrimSpace(raw)
+	u, err := url.Parse(raw)
+	if err != nil || u.Host == "" || u.User != nil ||
+		(!strings.EqualFold(u.Scheme, "https") && !strings.EqualFold(u.Scheme, "http")) {
+		return "", fmt.Errorf("포털이 유효한 HTTP(S) 제공기관 URL을 반환하지 않았습니다")
+	}
+	host, err := normalizePublisherURLHost(u)
+	if err != nil {
+		return "", fmt.Errorf("포털이 유효한 제공기관 호스트를 반환하지 않았습니다")
+	}
+	if host == "localhost" || strings.HasSuffix(host, ".localhost") || host == "local" || strings.HasSuffix(host, ".local") {
+		return "", fmt.Errorf("포털이 외부에서 안전하게 검사할 수 없는 제공기관 주소를 반환했습니다")
+	}
+	if strings.Contains(host, "%") || looksLikeObscureNumericHost(host) {
+		return "", fmt.Errorf("포털이 외부에서 안전하게 검사할 수 없는 제공기관 주소를 반환했습니다")
+	}
+	if ip := net.ParseIP(host); ip != nil &&
+		(ip.IsPrivate() || ip.IsLoopback() || ip.IsLinkLocalUnicast() || ip.IsUnspecified() || ip.IsMulticast()) {
+		return "", fmt.Errorf("포털이 외부에서 안전하게 검사할 수 없는 제공기관 주소를 반환했습니다")
+	}
+	return u.String(), nil
+}
+
+func normalizePublisherURLHost(u *url.URL) (string, error) {
+	host := strings.TrimSuffix(u.Hostname(), ".")
+	for _, r := range host {
+		if r > 127 {
+			var err error
+			host, err = idna.Lookup.ToASCII(host)
+			if err != nil {
+				return "", err
+			}
+			break
+		}
+	}
+	host = strings.TrimSuffix(strings.ToLower(host), ".")
+	if host == "" {
+		return "", fmt.Errorf("empty host")
+	}
+	if port := u.Port(); port != "" {
+		u.Host = net.JoinHostPort(host, port)
+	} else if strings.Contains(host, ":") {
+		u.Host = "[" + host + "]"
+	} else {
+		u.Host = host
+	}
+	return host, nil
+}
+
+func looksLikeObscureNumericHost(host string) bool {
+	if host == "" {
+		return false
+	}
+	for _, label := range strings.Split(host, ".") {
+		if label == "" {
+			return false
+		}
+		if strings.HasPrefix(label, "0x") {
+			if len(label) == 2 {
+				return false
+			}
+			for _, r := range label[2:] {
+				if (r < '0' || r > '9') && (r < 'a' || r > 'f') {
+					return false
+				}
+			}
+			continue
+		}
+		for _, r := range label {
+			if r < '0' || r > '9' {
+				return false
+			}
+		}
+	}
+	return true
 }
 
 // operationsFromKRDS reads the operation fragment rendered in the detail page,

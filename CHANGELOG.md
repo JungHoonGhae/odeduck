@@ -5,6 +5,45 @@ All notable changes to OpenDataCTL are documented here. Format follows
 [SemVer](https://semver.org/). The release workflow uses the `## [X.Y.Z]`
 section matching a `vX.Y.Z` tag as the GitHub release notes.
 
+## [0.11.0] - 2026-09-01
+
+### Added
+
+- **LINK datasets now lead somewhere actionable.** `describe` and
+  `describe_api` resolve the publisher starting point hidden behind the current
+  data.go.kr button and return a structured handoff instead of an unexplained
+  empty specification.
+- Handoffs expose their provider host, trust and safe-fetch policy, current
+  state, next action, and a structured failure when the portal lookup cannot be
+  completed. The first evidence-backed provider contract covers SafetyKorea's
+  product-safety OpenAPI documentation, separate application, and scoped
+  `AuthKey` requirement without claiming that invocation is implemented.
+- `doctor` now has an independent LINK canary that detects portal resolver
+  drift, provider-contract downgrade, and contracts that have not been
+  re-verified within 180 days.
+
+### Changed
+
+- LINK remains inside the compact `catalog_search → describe_api → call_api`
+  workflow, but it is now an explicit external-provider branch. LINK responses
+  never expose call-shaped operations, and both CLI and MCP invocation reject
+  them until a provider adapter is deliberately implemented.
+- Known provider contracts match an exact HTTPS origin and verified wire path.
+  Unknown hosts and unverified paths stay discoverable with
+  `inspection_required` rather than receiving an inferred contract.
+- Publisher pages are marked untrusted and require a fetcher that validates DNS
+  destinations and every redirect hop. Agents are instructed to stop when no
+  such fetcher is available and to treat external page content as data, not
+  instructions.
+
+### Fixed
+
+- Restored LINK URL resolution after the KRDS redesign moved the target from a
+  labelled HTML row to the portal's `selectApiLinkUrl.do` lookup.
+- The portal lookup no longer follows redirects, and handoffs reject obvious
+  local, private, link-local, credential-bearing, non-HTTP, and ambiguous
+  numeric-literal targets before surfacing a URL.
+
 ## [0.10.0] - 2026-08-31
 
 ### Added

@@ -56,6 +56,7 @@ func TestDescribeLoadsEveryKRDSOperationFragment(t *testing.T) {
 			</div>`
 	}
 	page := `<html><body>
+		<ul><li><strong class="key">API 유형</strong><div class="value">REST</div></li></ul>
 		<input id="publicDataDetailPk" value="detail-1"><input id="publicDataPk" value="15076352">
 		<select id="open_api_detail_select">
 			<option value="29456">충전소 상태</option><option value="29457">충전소 정보</option>
@@ -155,7 +156,9 @@ func TestDescribe(t *testing.T) {
 // A malformed page must not invent params — surface RawHTML instead of fabricating.
 func TestDescribeSurfaceFallback(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte(`<html><body><div class="open-api-detail">
+		w.Write([]byte(`<html><body>
+			<ul><li><strong class="key">API 유형</strong><div class="value">REST</div></li></ul>
+			<div class="open-api-detail">
 			<h4>테스트기능</h4><p>표 구조가 없는 안내문</p></div></body></html>`))
 	}))
 	defer srv.Close()

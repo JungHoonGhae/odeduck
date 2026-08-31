@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/JungHoonGhae/opendatactl/internal/apicall"
 	"github.com/JungHoonGhae/opendatactl/internal/catalog"
@@ -21,6 +22,18 @@ import (
 // PofelcddInfoInqireService) used to probe the describe scraper. If data.go.kr
 // ever retires it, the describe check will report drift — update this pk then.
 const CanaryPK = "15000908"
+
+// LinkCanaryPK is a LINK dataset whose KRDS detail page resolves the publisher
+// address through selectApiLinkUrl.do. A REST canary cannot exercise that seam:
+// the rest of describe may stay green while all 4,000+ LINK handoffs silently
+// lose their only actionable URL.
+const LinkCanaryPK = "15116894"
+
+const (
+	linkCanaryURL      = "https://www.safetykorea.kr/release/openapi"
+	linkContractMaxAge = 180 * 24 * time.Hour
+	linkClockSkew      = 24 * time.Hour
+)
 
 // Status is the outcome of one check.
 type Status string
@@ -42,9 +55,14 @@ type Check struct {
 // against baseURL and reports whether each still yields data. It needs no login;
 // the session-scoped seams (활용신청 현황) are checked separately by the caller.
 func Run(ctx context.Context, fc *fetch.Client, baseURL string) []Check {
+	return runAt(ctx, fc, baseURL, time.Now())
+}
+
+func runAt(ctx context.Context, fc *fetch.Client, baseURL string, now time.Time) []Check {
 	return []Check{
 		searchCheck(ctx, fc, baseURL),
 		describeCheck(ctx, fc, baseURL),
+		linkCheckAt(ctx, fc, baseURL, now),
 		catalogCheck(),
 		semanticCheck(),
 	}
@@ -132,6 +150,37 @@ func describeCheck(ctx context.Context, fc *fetch.Client, baseURL string) Check 
 	}
 	return Check{"describe", StatusOK, fmt.Sprintf(
 		"%d개 상세기능·요청변수와 심의유형 파싱 (pk=%s)", len(spec.Operations), CanaryPK)}
+}
+
+func linkCheck(ctx context.Context, fc *fetch.Client, baseURL string) Check {
+	return linkCheckAt(ctx, fc, baseURL, time.Now())
+}
+
+func linkCheckAt(ctx context.Context, fc *fetch.Client, baseURL string, now time.Time) Check {
+	spec, err := apicall.Describe(ctx, fc, baseURL, LinkCanaryPK)
+	switch {
+	case err != nil:
+		return Check{"link", StatusDrift, "요청 실패: " + err.Error()}
+	case !strings.Contains(spec.APIType, "LINK"):
+		return Check{"link", StatusDrift, "LINK 유형을 파싱하지 못함 — 외부 제공기관 인계 여부를 판단할 수 없음 (pk=" + LinkCanaryPK + ")"}
+	}
+	if spec.LinkURL != linkCanaryURL || spec.Handoff == nil || spec.Handoff.URL != linkCanaryURL ||
+		spec.Handoff.Host != "www.safetykorea.kr" || spec.Handoff.Trust != apicall.HandoffPublisherUntrusted ||
+		spec.Handoff.FetchPolicy != apicall.HandoffSafeFetcherRequired || spec.Handoff.State != apicall.HandoffContractKnown {
+		return Check{"link", StatusDrift, "예상한 SafetyKorea LINK 인계 계약을 복구하지 못함 — URL·host·trust·state를 확인하세요 (pk=" + LinkCanaryPK + ")"}
+	}
+	contract := spec.Handoff.Contract
+	if contract == nil || contract.Provider != "SafetyKorea" || contract.DocumentationURL == "" ||
+		contract.ApplicationURL == "" || contract.InvocationState != "not_implemented" || contract.Auth == nil ||
+		contract.Auth.Name != "AuthKey" || contract.Auth.CredentialScope != "safetykorea.kr" {
+		return Check{"link", StatusDrift, "SafetyKorea 문서·신청·인증 계약 metadata가 바뀌었거나 누락됨 (pk=" + LinkCanaryPK + ")"}
+	}
+	verifiedAt, err := time.Parse("2006-01-02", contract.VerifiedAt)
+	age := now.Sub(verifiedAt)
+	if err != nil || age < -linkClockSkew || age > linkContractMaxAge {
+		return Check{"link", StatusDrift, "SafetyKorea 외부 계약 검증이 180일 이상 경과했거나 날짜를 해석할 수 없음 — 공식 문서를 다시 확인하세요"}
+	}
+	return Check{"link", StatusOK, fmt.Sprintf("제공기관 인계·계약 해석 (%s, pk=%s)", spec.LinkURL, LinkCanaryPK)}
 }
 
 // ApplyCanaryPKs are datasets to try opening the 활용신청 form for. There is more
