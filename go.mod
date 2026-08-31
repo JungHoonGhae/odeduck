@@ -1,4 +1,4 @@
-module github.com/JungHoonGhae/gongctl
+module github.com/JungHoonGhae/opendatactl
 
 go 1.26.1
 

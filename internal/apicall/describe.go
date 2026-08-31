@@ -13,8 +13,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/JungHoonGhae/gongctl/internal/fetch"
-	"github.com/JungHoonGhae/gongctl/internal/portal"
+	"github.com/JungHoonGhae/opendatactl/internal/fetch"
+	"github.com/JungHoonGhae/opendatactl/internal/portal"
 	"github.com/PuerkitoBio/goquery"
 )
 
@@ -37,7 +37,7 @@ type APISpec struct {
 	// portal's URL row. The portal has it on every LINK page sampled, so telling a
 	// caller to "check the publisher's documentation" without handing over the
 	// address it already holds is withholding the one actionable thing on the page.
-	// gongctl does not follow it: the publishers are a long tail (39 distinct hosts
+	// opendatactl does not follow it: the publishers are a long tail (39 distinct hosts
 	// in 70 sampled datasets, the largest 13%), each with its own registration and
 	// spec format, so reading it is the agent's job — surfacing it is ours.
 	LinkURL string `json:"linkUrl,omitempty"`
@@ -49,7 +49,7 @@ type APISpec struct {
 	Note string `json:"note,omitempty"`
 }
 
-// Approval reports the two stages the portal grades separately. gongctl applies
+// Approval reports the two stages the portal grades separately. opendatactl applies
 // for a development account, so Dev is the one that decides whether a key arrives
 // immediately; Ops describes what a later move to production would face and is
 // surfaced because that is a decision a caller may need to make now.
@@ -237,7 +237,7 @@ func Describe(ctx context.Context, f *fetch.Client, baseURL, pk string) (*APISpe
 					"연결만 합니다. 엔드포인트·파라미터는 포털에서 알 수 없으니 추측해서 호출하지 마세요."
 				if spec.LinkURL != "" {
 					spec.Note += " linkUrl(" + spec.LinkURL + ") 을 직접 열어 읽으면 명세가 거기 있습니다. " +
-						"단, 대개 제공기관의 별도 회원가입·별도 인증키가 필요하며 gongctl 의 계정 인증키는 " +
+						"단, 대개 제공기관의 별도 회원가입·별도 인증키가 필요하며 opendatactl 의 계정 인증키는 " +
 						"그곳에서 쓸 수 없습니다."
 				}
 			} else if guideRowFound {
@@ -246,7 +246,7 @@ func Describe(ctx context.Context, f *fetch.Client, baseURL, pk string) (*APISpe
 					"포털에 없으니 제공기관에 문의하거나 다른 API 를 쓰세요. 추측해서 호출하지 마세요."
 			} else {
 				spec.Note = "이 페이지에서 상세기능·요청변수와 참고문서 항목 자체를 찾지 못했습니다 — " +
-					"페이지 구조가 바뀐 것일 수 있습니다 (gongctl doctor 로 확인). 파라미터를 추측하지 마세요."
+					"페이지 구조가 바뀐 것일 수 있습니다 (opendatactl doctor 로 확인). 파라미터를 추측하지 마세요."
 			}
 		}
 	}
@@ -474,7 +474,7 @@ func cleanText(s string) string { return strings.Join(strings.Fields(s), " ") }
 // `var swaggerJson = \`{…}\`;` template literal.
 var reSwaggerJSON = regexp.MustCompile("(?s)swaggerJson\\s*=\\s*`(.*?)`")
 
-// swaggerDoc is the slice of Swagger 2.0 gongctl reads. Parameters sit at the
+// swaggerDoc is the slice of Swagger 2.0 opendatactl reads. Parameters sit at the
 // PATH level on data.go.kr's specs, not under the operation, so both are read.
 type swaggerDoc struct {
 	Host     string   `json:"host"`

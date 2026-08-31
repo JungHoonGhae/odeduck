@@ -3,9 +3,10 @@ package main
 import (
 	"time"
 
-	"github.com/JungHoonGhae/gongctl/internal/fetch"
-	"github.com/JungHoonGhae/gongctl/internal/output"
-	"github.com/JungHoonGhae/gongctl/internal/portal"
+	"github.com/JungHoonGhae/opendatactl/internal/fetch"
+	"github.com/JungHoonGhae/opendatactl/internal/output"
+	"github.com/JungHoonGhae/opendatactl/internal/portal"
+	"github.com/JungHoonGhae/opendatactl/internal/version"
 	"github.com/spf13/cobra"
 )
 
@@ -16,11 +17,11 @@ var (
 )
 
 var rootCmd = &cobra.Command{
-	Use:   "gongctl",
+	Use:   version.CommandName,
 	Short: "data.go.kr(공공데이터포털) 자동화 — 검색·활용신청·API 호출 (CLI + MCP)",
-	Long: `gongctl — 공공데이터포털(data.go.kr)의 OpenAPI 활용신청·인증키·호출을 자동화합니다.
+	Long: `OpenDataCTL — 공공데이터를 찾고, 신청하고, 호출하는 AI 컨트롤 플레인입니다.
 
-사람은 브라우저에서 한 번만 로그인(gongctl login)하면, 이후 검색·활용신청·호출을
+사람은 브라우저에서 한 번만 로그인(opendatactl login)하면, 이후 검색·활용신청·호출을
 CLI 또는 MCP(에이전트)로 처리합니다. 포털 UI를 다시 건드릴 필요가 없습니다.`,
 	SilenceUsage:  true,
 	SilenceErrors: true,

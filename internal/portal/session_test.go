@@ -11,9 +11,7 @@ import (
 )
 
 func TestSessionFileLockSerializesIndependentHandles(t *testing.T) {
-	home := t.TempDir()
-	t.Setenv("HOME", home)
-	t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, ".config"))
+	isolatedUserConfigDir(t)
 
 	release, err := acquireSessionFileLock(context.Background())
 	if err != nil {
@@ -39,6 +37,34 @@ func TestSessionFileLockSerializesIndependentHandles(t *testing.T) {
 		t.Fatalf("file lock after release: %v", err)
 	}
 	releaseAgain()
+}
+
+func TestAllSessionLocksWaitForLegacyProcess(t *testing.T) {
+	configHome := isolatedUserConfigDir(t)
+	current := filepath.Join(configHome, configDirName)
+	legacy := filepath.Join(configHome, legacyConfigDirName)
+	for _, dir := range []string{current, legacy} {
+		if err := os.MkdirAll(dir, 0o700); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	releaseLegacy, err := acquireSessionFileLockIn(context.Background(), legacy)
+	if err != nil {
+		t.Fatal(err)
+	}
+	waitCtx, cancel := context.WithTimeout(context.Background(), 120*time.Millisecond)
+	defer cancel()
+	if _, err := acquireAllSessionOperations(waitCtx); !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("all-directory lock error = %v, want deadline exceeded", err)
+	}
+	releaseLegacy()
+
+	releaseAll, err := acquireAllSessionOperations(context.Background())
+	if err != nil {
+		t.Fatalf("all-directory lock after legacy release: %v", err)
+	}
+	releaseAll()
 }
 
 func TestSessionWithCookiesCapturesRotationWithoutMutatingOriginal(t *testing.T) {
@@ -73,9 +99,7 @@ func TestSessionWithCookiesCapturesRotationWithoutMutatingOriginal(t *testing.T)
 }
 
 func TestClearSessionRemovesCrashLeftHeadlessProfiles(t *testing.T) {
-	home := t.TempDir()
-	t.Setenv("HOME", home)
-	t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, ".config"))
+	isolatedUserConfigDir(t)
 	dir, err := configDir()
 	if err != nil {
 		t.Fatal(err)
@@ -92,6 +116,48 @@ func TestClearSessionRemovesCrashLeftHeadlessProfiles(t *testing.T) {
 	}
 	if _, err := os.Stat(profile); !os.IsNotExist(err) {
 		t.Fatalf("crash-left headless profile still exists: %v", err)
+	}
+}
+
+func TestClearSessionRemovesCredentialsFromCurrentAndLegacyDirectories(t *testing.T) {
+	configHome := isolatedUserConfigDir(t)
+	for _, name := range []string{configDirName, legacyConfigDirName} {
+		dir := filepath.Join(configHome, name)
+		for _, profile := range []string{"chrome-profile", "chrome-headless", "chrome-headless-crash"} {
+			if err := os.MkdirAll(filepath.Join(dir, profile), 0o700); err != nil {
+				t.Fatal(err)
+			}
+		}
+		for _, file := range []string{"datagokr-session.json", keyCacheFile, daemonStateFile} {
+			if err := os.WriteFile(filepath.Join(dir, file), []byte("credential"), 0o600); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if err := os.WriteFile(filepath.Join(dir, "catalog.json"), []byte("public"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if err := clearSession(); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{configDirName, legacyConfigDirName} {
+		dir := filepath.Join(configHome, name)
+		for _, path := range []string{
+			filepath.Join(dir, "datagokr-session.json"),
+			filepath.Join(dir, keyCacheFile),
+			filepath.Join(dir, daemonStateFile),
+			filepath.Join(dir, "chrome-profile"),
+			filepath.Join(dir, "chrome-headless"),
+			filepath.Join(dir, "chrome-headless-crash"),
+		} {
+			if _, err := os.Stat(path); !os.IsNotExist(err) {
+				t.Fatalf("sensitive path still exists after logout cleanup: %s (%v)", path, err)
+			}
+		}
+		if _, err := os.Stat(filepath.Join(dir, "catalog.json")); err != nil {
+			t.Fatalf("public catalog should remain in %s: %v", dir, err)
+		}
 	}
 }
 

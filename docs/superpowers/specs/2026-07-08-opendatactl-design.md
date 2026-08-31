@@ -1,14 +1,18 @@
-# gongctl 설계 — data.go.kr을 AI 에이전트가 신청·호출하게 하는 오픈소스
+# opendatactl 설계 — data.go.kr을 AI 에이전트가 신청·호출하게 하는 오픈소스
 
 작성일: 2026-07-08
-상태: 승인됨 (브레인스토밍 완료, 구현 계획 대기)
+상태: 역사적 승인 설계 (이후 구현 완료)
+
+> 이 문서는 최초 구현 당시의 설계 기록입니다. 현재 사용자 계약은 `README.md`, 현재 설계 결정은
+> `docs/adr/`, 실제 동작은 현행 CLI 도움말과 코드를 기준으로 합니다. 아래 구조도와 세부 API는
+> 이후 세션 저장 방식·카탈로그 검색·MCP 도구가 확장되기 전 모습을 보존합니다.
 
 ## 1. 목표와 차별화
 
 한국 공공데이터포털(data.go.kr)의 OpenAPI는 데이터마다 **활용신청 → 승인 → 인증키 발급**을
 사람이 UI로 일일이 해야 한다. AI 에이전트는 이 UI 벽 때문에 공공 데이터에 스스로 닿지 못한다.
 
-`gongctl`은 그 벽을 없앤다. 에이전트가 "이런 데이터 필요해" 하면 검색 → (필요 시) 활용신청·
+`opendatactl`은 그 벽을 없앤다. 에이전트가 "이런 데이터 필요해" 하면 검색 → (필요 시) 활용신청·
 자동승인·키 발급 → 임의 OpenAPI 호출 → 구조화 데이터까지, **사람의 포털 UI 조작 0**으로 잇는다.
 
 ### 1.1 경쟁 지형 (2026-07 조사)
@@ -18,8 +22,8 @@
 | `JeHwanYoo/data-go-kr` (CLI) | 이미 받은 키로 호출만 | 신청 자동화·MCP 없음, ⭐1, 2023 방치 |
 | `Koomook/data-go-mcp-servers` (MCP, ⭐288) | data.go.kr API를 에이전트에 연결 | ① 사용자가 직접 신청·키 발급해 env에 붙여넣어야 함 ② 6개 API만 하드코딩 ③ 신청 자동화 전혀 없음 |
 
-**아무도 안 하는 것 = gongctl의 존재 이유**: 활용신청·키 발급 자동화 + 임의 API 호출.
-⭐288 MCP의 존재는 수요를 증명하며, 정확히 gongctl이 부수는 벽에서 멈춰 있다. 차별화 한 줄:
+**아무도 안 하는 것 = opendatactl의 존재 이유**: 활용신청·키 발급 자동화 + 임의 API 호출.
+⭐288 MCP의 존재는 수요를 증명하며, 정확히 opendatactl이 부수는 벽에서 멈춰 있다. 차별화 한 줄:
 *"data-go-mcp인데, 포털을 한 번도 안 건드리는 버전."*
 
 ### 1.2 설계 원칙 (kvote에서 검증된 것)
@@ -37,7 +41,7 @@
 kvote에서 검증된 **CLI(사람) + MCP(에이전트), 같은 백엔드** 패턴.
 
 ```
-cmd/gongctl/         CLI (cobra)
+cmd/opendatactl/         CLI (cobra)
   root.go            전역 플래그, 클라이언트 빌더
   auth.go            login / logout / status
   data.go            search / describe / call
@@ -71,9 +75,9 @@ kvote처럼 discrete tools — 에이전트가 조합. 단일 mega-tool 지양(�
 | `describe_api` | pk | OpenAPI 상세: 상세기능별 엔드포인트·요청변수 표·가이드문서를 surface (파싱 아님) |
 | `call_api` | endpoint, params(map) | 계정 인증키 자동 주입 → GET → XML→JSON → {status, body} 반환 |
 
-- 리소스 `gongctl://guide` — tool 사용 순서와 인증키 Encoding/Decoding 주의를 담은 안내(에이전트가
+- 리소스 `opendatactl://guide` — tool 사용 순서와 인증키 Encoding/Decoding 주의를 담은 안내(에이전트가
   먼저 읽는 진입점). kvote의 `kvote://schema` 패턴.
-- 로그인은 MCP tool로 노출하지 않는다 — 사람이 브라우저에서 1회(`gongctl login`). MCP는 이미
+- 로그인은 MCP tool로 노출하지 않는다 — 사람이 브라우저에서 1회(`opendatactl login`). MCP는 이미
   로그인된 세션을 전제. (미로그인 시 apply/list가 명확한 안내 에러 반환.)
 
 ## 4. 신규 컴포넌트 상세
@@ -108,12 +112,12 @@ kvote처럼 discrete tools — 에이전트가 조합. 단일 mega-tool 지양(�
 - kvote `internal/datagokr/*`(browser·apply·accounts·daemon·config)와 검색(`internal/nec`의
   datasets·openportal 부분), `internal/output`을 **복사 이식**한다. 공유 라이브러리 추출은 두 repo
   릴리즈 결합 비용이 커 지금은 과함. 성숙한 스냅샷 복사 → drift가 문제되면 그때 추출.
-- 이식 시 kvote-특화 명명(nec/kvote)을 gongctl 중립 명명으로 정리. NEC 전용 하드코딩 API 래퍼
-  (turnout/winners/elections)는 가져오지 않는다 — gongctl은 범용 call_api로 대체.
+- 이식 시 kvote-특화 명명(nec/kvote)을 opendatactl 중립 명명으로 정리. NEC 전용 하드코딩 API 래퍼
+  (turnout/winners/elections)는 가져오지 않는다 — opendatactl은 범용 call_api로 대체.
 
 ## 6. 에러 처리
 
-- 미로그인: apply/list/describe가 `ErrNotLoggedIn` → "gongctl login 먼저" 안내.
+- 미로그인: apply/list/describe가 `ErrNotLoggedIn` → "opendatactl login 먼저" 안내.
 - 활용신청 폼 접근 실패(이미 신청/신청 불가): 명확한 메시지 + pk.
 - API 호출 에러코드: 삼키지 않고 CallResult로 surface(§4.2).
 - MCP tool은 모든 실패를 tool-level 에러 결과(errResult)로 — 세션을 죽이지 않는다.

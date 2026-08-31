@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 
-	"github.com/JungHoonGhae/gongctl/internal/version"
+	"github.com/JungHoonGhae/opendatactl/internal/version"
 	"github.com/spf13/cobra"
 )
 

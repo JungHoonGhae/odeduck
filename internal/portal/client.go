@@ -5,7 +5,7 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/JungHoonGhae/gongctl/internal/fetch"
+	"github.com/JungHoonGhae/opendatactl/internal/fetch"
 	"github.com/PuerkitoBio/goquery"
 )
 

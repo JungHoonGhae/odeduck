@@ -26,7 +26,7 @@ import (
 	"time"
 	"unicode"
 
-	"github.com/JungHoonGhae/gongctl/internal/portal"
+	"github.com/JungHoonGhae/opendatactl/internal/portal"
 )
 
 // Entry is one catalogued dataset. Desc is used for matching and is not part of
@@ -157,7 +157,7 @@ func Load() (*Catalog, error) {
 }
 
 // ErrNotSynced means no catalogue has been synced yet.
-var ErrNotSynced = fmt.Errorf("카탈로그가 아직 없습니다 — `gongctl catalog sync` 를 먼저 실행하세요")
+var ErrNotSynced = fmt.Errorf("카탈로그가 아직 없습니다 — `opendatactl catalog sync` 를 먼저 실행하세요")
 
 // Save writes the catalogue.
 func (c *Catalog) Save() error {

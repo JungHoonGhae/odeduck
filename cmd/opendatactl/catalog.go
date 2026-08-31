@@ -3,14 +3,13 @@ package main
 import (
 	"errors"
 	"fmt"
-	"os"
 	"sort"
 	"strings"
 	"time"
 
-	"github.com/JungHoonGhae/gongctl/internal/agentplan"
-	"github.com/JungHoonGhae/gongctl/internal/catalog"
-	"github.com/JungHoonGhae/gongctl/internal/output"
+	"github.com/JungHoonGhae/opendatactl/internal/agentplan"
+	"github.com/JungHoonGhae/opendatactl/internal/catalog"
+	"github.com/JungHoonGhae/opendatactl/internal/output"
 	"github.com/spf13/cobra"
 )
 
@@ -22,14 +21,14 @@ func catalogCmd() *cobra.Command {
 즉시 처리합니다. 포털은 키워드 검색만 제공하므로, 카탈로그가 없으면 "이런 데이터가
 있나?"를 확인하려면 검색어를 하나씩 추측해 볼 수밖에 없습니다.
 
-  gongctl catalog sync            전체 목록 수집 (수십 초)
-  gongctl catalog discover <목표> Codex·Claude·Gemini·Cursor로 검색축 생성 후 탐색
-  gongctl catalog sync --if-stale 오래됐을 때만 수집 — cron/CI 로 주기 갱신할 때
-  gongctl catalog semantic-build  Ollama 의미 벡터 인덱스 생성(선택)
-  gongctl catalog search 폭염     하이브리드 검색(인덱스 없으면 키워드 검색)
-  gongctl catalog search 폭염 --rest-only   호출 가능한(REST) 것만
-  gongctl catalog orgs 폭염       그 주제를 개방한 기관 순위
-  gongctl catalog info            언제 수집했는지 / 몇 건인지`,
+  opendatactl catalog sync            전체 목록 수집 (수십 초)
+  opendatactl catalog discover <목표> Codex·Claude·Gemini·Cursor로 검색축 생성 후 탐색
+  opendatactl catalog sync --if-stale 오래됐을 때만 수집 — cron/CI 로 주기 갱신할 때
+  opendatactl catalog semantic-build  Ollama 의미 벡터 인덱스 생성(선택)
+  opendatactl catalog search 폭염     하이브리드 검색(인덱스 없으면 키워드 검색)
+  opendatactl catalog search 폭염 --rest-only   호출 가능한(REST) 것만
+  opendatactl catalog orgs 폭염       그 주제를 개방한 기관 순위
+  opendatactl catalog info            언제 수집했는지 / 몇 건인지`,
 		RunE: func(cmd *cobra.Command, _ []string) error { return cmd.Help() },
 	}
 	c.AddCommand(catalogSyncCmd(), catalogSemanticBuildCmd(), catalogSearchCmd(), catalogDiscoverCmd(), catalogOrgsCmd(), catalogInfoCmd())
@@ -48,7 +47,7 @@ func catalogSyncCmd() *cobra.Command {
 --if-stale 은 카탈로그가 아직 신선하면 아무것도 하지 않고 성공합니다. 갱신 주기를
 판단하는 일을 사람이 기억하지 않아도 되도록, cron 이나 CI 가 조건 없이 걸어두는 용도입니다:
 
-  0 4 * * *  gongctl catalog sync --if-stale`,
+  0 4 * * *  opendatactl catalog sync --if-stale`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			if ifStale {
 				// Only an existing, still-fresh catalogue is a reason to skip. A
@@ -153,12 +152,12 @@ func catalogQueryCmd(discover bool) *cobra.Command {
 				idx, indexErr := catalog.LoadSemanticIndex(cat)
 				switch {
 				case indexErr == nil:
-					embedder := catalog.NewOllamaEmbedder(os.Getenv("GONGCTL_OLLAMA_URL"), idx.Model)
+					embedder := catalog.NewOllamaEmbedder(catalog.OllamaURLFromEnv(), idx.Model)
 					res = cat.SearchHybrid(cmd.Context(), queryPlan, idx, embedder)
 				case errors.Is(indexErr, catalog.ErrSemanticIndexStale):
 					res = cat.SearchPlan(queryPlan)
 					res.Semantic = &catalog.SemanticInfo{Status: catalog.SemanticUnavailable, Detail: "카탈로그 갱신 후 semantic-build 필요"}
-					fmt.Fprintln(cmd.ErrOrStderr(), "⚠ 의미 인덱스가 현재 카탈로그와 다릅니다 — `gongctl catalog semantic-build` 로 갱신하세요.")
+					fmt.Fprintln(cmd.ErrOrStderr(), "⚠ 의미 인덱스가 현재 카탈로그와 다릅니다 — `opendatactl catalog semantic-build` 로 갱신하세요.")
 				case errors.Is(indexErr, catalog.ErrSemanticIndexNotBuilt):
 					res = cat.SearchHybrid(cmd.Context(), queryPlan, nil, nil)
 				default:
@@ -261,7 +260,7 @@ sync 한 뒤 다시 실행하면 새 스냅샷에 맞춰 인덱스를 교체합�
 		},
 	}
 	c.Flags().StringVar(&model, "model", catalog.DefaultEmbeddingModel, "Ollama 임베딩 모델")
-	c.Flags().StringVar(&ollamaURL, "ollama-url", os.Getenv("GONGCTL_OLLAMA_URL"), "Ollama base URL (기본 http://127.0.0.1:11434)")
+	c.Flags().StringVar(&ollamaURL, "ollama-url", catalog.OllamaURLFromEnv(), "Ollama base URL (기본 http://127.0.0.1:11434)")
 	c.Flags().IntVar(&batchSize, "batch-size", 32, "한 번에 임베딩할 카탈로그 항목 수")
 	c.Flags().BoolVar(&pull, "pull", true, "빌드 전에 Ollama 모델 확인·다운로드")
 	return c
@@ -363,7 +362,7 @@ func loadCatalog(cmd *cobra.Command) (*catalog.Catalog, error) {
 	}
 	if cat.Stale() {
 		fmt.Fprintf(cmd.ErrOrStderr(),
-			"⚠ 카탈로그가 %.0f일 전 것입니다 — `gongctl catalog sync` 로 갱신하세요.\n", cat.Age().Hours()/24)
+			"⚠ 카탈로그가 %.0f일 전 것입니다 — `opendatactl catalog sync` 로 갱신하세요.\n", cat.Age().Hours()/24)
 	}
 	return cat, nil
 }

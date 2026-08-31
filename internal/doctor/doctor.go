@@ -1,4 +1,4 @@
-// Package doctor is a liveness check for gongctl's fragile scraping. data.go.kr
+// Package doctor is a liveness check for opendatactl's fragile scraping. data.go.kr
 // can redesign its HTML at any time, and the parsers degrade to *empty* results
 // rather than crashing — so drift is otherwise silent. doctor drives each
 // scraping seam against the live portal and reports whether it still yields data,
@@ -11,10 +11,10 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/JungHoonGhae/gongctl/internal/apicall"
-	"github.com/JungHoonGhae/gongctl/internal/catalog"
-	"github.com/JungHoonGhae/gongctl/internal/fetch"
-	"github.com/JungHoonGhae/gongctl/internal/portal"
+	"github.com/JungHoonGhae/opendatactl/internal/apicall"
+	"github.com/JungHoonGhae/opendatactl/internal/catalog"
+	"github.com/JungHoonGhae/opendatactl/internal/fetch"
+	"github.com/JungHoonGhae/opendatactl/internal/portal"
 )
 
 // CanaryPK is a stable, long-lived OpenAPI dataset (중앙선거관리위원회
@@ -57,7 +57,7 @@ func Run(ctx context.Context, fc *fetch.Client, baseURL string) []Check {
 func catalogCheck() Check {
 	cat, err := catalog.Load()
 	if errors.Is(err, catalog.ErrNotSynced) {
-		return Check{"catalog", StatusSkipped, "카탈로그 없음 — `gongctl catalog sync` 로 만들면 검색이 즉시 처리됩니다"}
+		return Check{"catalog", StatusSkipped, "카탈로그 없음 — `opendatactl catalog sync` 로 만들면 검색이 즉시 처리됩니다"}
 	}
 	if err != nil {
 		return Check{"catalog", StatusDrift, "카탈로그를 읽지 못했습니다: " + err.Error()}
@@ -65,7 +65,7 @@ func catalogCheck() Check {
 	days := cat.Age().Hours() / 24
 	if cat.Stale() {
 		return Check{"catalog", StatusDrift, fmt.Sprintf(
-			"%.0f일 전 스냅샷 (%d건) — 그 이후 신설된 API 가 검색에서 누락됩니다. `gongctl catalog sync`",
+			"%.0f일 전 스냅샷 (%d건) — 그 이후 신설된 API 가 검색에서 누락됩니다. `opendatactl catalog sync`",
 			days, len(cat.Entries))}
 	}
 	return Check{"catalog", StatusOK, fmt.Sprintf("%.1f일 전 수집 (%d건)", days, len(cat.Entries))}
@@ -88,7 +88,7 @@ func semanticCheck() Check {
 		}
 		return Check{"semantic", StatusOK, fmt.Sprintf("%d건 × %d차원 · %s", len(idx.PKs), dim, idx.Model)}
 	case errors.Is(err, catalog.ErrSemanticIndexNotBuilt):
-		return Check{"semantic", StatusSkipped, "선택 기능 미설치 — `gongctl catalog semantic-build` 로 활성화"}
+		return Check{"semantic", StatusSkipped, "선택 기능 미설치 — `opendatactl catalog semantic-build` 로 활성화"}
 	case errors.Is(err, catalog.ErrSemanticIndexStale):
 		return Check{"semantic", StatusSkipped, "카탈로그 갱신 후 의미 인덱스 재생성 필요"}
 	default:
@@ -173,7 +173,7 @@ func ApplyCheck(ctx context.Context, pk string) Check {
 		probe, err := portal.ProbeApplyForm(ctx, c)
 		switch {
 		case errors.Is(err, portal.ErrNotLoggedIn):
-			return Check{"apply", StatusSkipped, "세션 없음 — `gongctl login` 후 재점검"}
+			return Check{"apply", StatusSkipped, "세션 없음 — `opendatactl login` 후 재점검"}
 		case errors.Is(err, portal.ErrFormUnreachable):
 			// Ambiguous on its own: either this account already applied, or the
 			// form moved. Try the next candidate rather than guess.
@@ -214,7 +214,7 @@ func APIKeyCheck(ctx context.Context) Check {
 	case err == nil:
 		return Check{"api-key", StatusOK, "활성 인증키 필드 확인 (값은 출력하지 않음)"}
 	case errors.Is(err, portal.ErrNotLoggedIn):
-		return Check{"api-key", StatusSkipped, "세션 없음 — `gongctl login` 후 재점검"}
+		return Check{"api-key", StatusSkipped, "세션 없음 — `opendatactl login` 후 재점검"}
 	case errors.Is(err, portal.ErrAPIKeyNotIssued):
 		return Check{"api-key", StatusSkipped, "활성 인증키 필드는 있으나 아직 발급된 키 없음"}
 	default:
