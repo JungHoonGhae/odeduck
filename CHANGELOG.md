@@ -5,6 +5,56 @@ All notable changes to OpenDataCTL are documented here. Format follows
 [SemVer](https://semver.org/). The release workflow uses the `## [X.Y.Z]`
 section matching a `vX.Y.Z` tag as the GitHub release notes.
 
+## [0.10.0] - 2026-08-31
+
+### Added
+
+- **Bounded cross-domain connection discovery.** `catalog discover` and MCP
+  `catalog_search` can now separate a natural-language goal into unique data
+  roles, inspect actual first-pass results, retrieve complementary Bridge nodes,
+  and return at most three explicitly selected Anchor→Bridge candidates.
+- Connection cards explain the proposed edge kind and keys, incremental value,
+  metadata evidence, claim boundary, and evidence still required. Search never
+  labels a connection verified and returns an explicit abstention when no
+  selection passes the contract.
+- `call --profile-field` and MCP `call_api.profileFields` return bounded raw-value,
+  path, null, distinct, and duplicate evidence for up to eight response fields.
+  This helps a host compare common slices without storing API responses or
+  pretending that a field-name match proves a join.
+
+### Changed
+
+- Connection discovery uses a post-retrieval precision gate: a model must choose
+  a real PK from the current result page and explain why its metadata supports
+  the candidacy. The server binds role, incremental value, edge kind, expected
+  keys, and proxy transform to the retrieved hit instead of trusting the selector
+  to rewrite them. Search rank alone can no longer create a card.
+- The MCP surface keeps the existing search → describe → call tool types. New
+  structured `axes`, `anchorPks`, `bridgeSelections`, and `maxConnections` fields
+  are additive, while existing `concepts` callers keep their previous behavior.
+- Discovery roles and cards are capped and deduplicated; `maxConnections` is now
+  honestly bounded to three. Optional Ollama remains a recall aid rather than a
+  connection-verification authority.
+
+### Safety
+
+- Bridge selections outside the current hits, selections without metadata
+  evidence, duplicate roles, and incomplete join hypotheses are rejected.
+- Anchor selections must also be present in the current result under the
+  original anchor role; an arbitrary catalog PK cannot be relabelled as one.
+- JSON response profiling preserves integers larger than JavaScript's safe
+  integer range, avoiding silent corruption of numeric identifiers.
+- Profiling no longer merges identically named leaves from different response
+  paths, and scalar arrays are counted under their owning field.
+- Post-retrieval agent prompts mark publisher metadata as untrusted, disable
+  provider tools, use an empty workspace, and receive a minimal environment
+  instead of inheriting unrelated process secrets. Cursor remains available for
+  initial planning but abstains before untrusted metadata because its current
+  ask-mode sandbox still allows reads outside the workspace.
+- Candidate cards state coverage limitations and keep business success,
+  causality, schema compatibility, and sampled value overlap outside the search
+  layer's claims.
+
 ## [0.9.0]
 
 ### Added
