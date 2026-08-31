@@ -3,11 +3,12 @@
 data.go.kr(공공데이터포털)의 OpenAPI **활용신청·인증키 발급·호출을 AI 에이전트가 대신**하게 하는
 Go CLI + MCP. 사람은 정부 SSO 로그인 한 번만 하고 이후 포털 작업을 에이전트가 잇는 것이 핵심.
 
-## 현재 상태 (2026-08-31)
+## 현재 상태 (2026-09-01)
 
-- v0.10은 여러 공공데이터 사이의 연결 후보를 제한된 탐색 예산 안에서 찾는 connection discovery와
-  응답 필드 프로파일링을 추가한다. v0.9에서 도입한 OpenDataCTL/`opendatactl` 이름과 v0.8 자동화를
-  위한 `gongctl` 호환 바이너리·설정 경로·환경변수·MCP 가이드 URI는 유지한다.
+- v0.11은 LINK 데이터셋의 제공기관 시작점을 구조화된 handoff로 반환하고, 확인된 SafetyKorea 계약과
+  호출 차단·실패 상태·전용 doctor canary를 추가한다. v0.10의 connection discovery와 응답 필드
+  프로파일링, v0.9에서 도입한 OpenDataCTL/`opendatactl` 이름, v0.8 자동화를 위한 `gongctl` 호환
+  바이너리·설정 경로·환경변수·MCP 가이드 URI는 유지한다.
 - 목표 기반 카탈로그 검색, 선택형 Ollama 의미 검색, 검색→상세→활용신청→호출 MCP 흐름을 제공한다.
   discovery는 Generate→Search→Expand→Search→Compose→Search의 세 단계 검색으로 동작하며,
   Codex·Claude·Gemini는 전체 계획을, Cursor는 안전한 초기 검색 계획을 지원한다.
@@ -46,7 +47,8 @@ Go CLI + MCP. 사람은 정부 SSO 로그인 한 번만 하고 이후 포털 작
 
 ## 신규로 구현한 것 (스펙 §4)
 
-- `internal/apicall/describe.go` — OpenAPI 상세페이지 → 엔드포인트·요청변수·가이드문서 surface.
+- `internal/apicall/describe.go` — OpenAPI 상세페이지 → REST 명세 또는 LINK 외부 제공기관 handoff surface.
+- `internal/apicall/external_contract.go` — 공식 문서로 검증한 제공기관별 LINK 신청·인증 계약 registry.
 - `internal/apicall/call.go` — 계정 인증키 주입 + HTTP GET + XML→JSON + 에러코드 surface.
 - `internal/agentplan/` — provider별 계획 생성과 검색 결과 기반 확장·조합, 안전한 abstention.
 - `internal/catalog/` — 키워드·의미 검색, connection discovery의 제한·중복 제거·증거 경계.
@@ -62,7 +64,7 @@ data.go.kr 활용신청·승인·키 재사용·실호출을 하나로 연결하
 
 - `.github/workflows/` 커밋은 git 토큰 **workflow 스코프** 필요(kvote에서 겪음, 해결됨).
 - 이건 fragile scraping — data.go.kr HTML 바뀌면 파서가 조용히 빈 결과. `opendatactl doctor`가
-  각 seam(search·describe·applications)을 라이브 호출해 drift를 시끄럽게 감지(CI용 exit 1).
+  각 seam(search·REST describe·LINK handoff·applications)을 라이브 호출해 drift를 시끄럽게 감지(CI용 exit 1).
 - **보안(HIGH, 해결됨)**: `daemon.go`에서 `--remote-allow-origins=*` 제거(스파이크
   `proto/cdp-origin`로 검증 — chromedp는 flag 없이 재부착, 외부 Origin은 Chrome이 403 거부).
   이전 kvote verbatim 이식이 세션탈취 표면을 열어뒀던 것을 닫음.

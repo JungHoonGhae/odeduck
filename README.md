@@ -189,6 +189,9 @@ opendatactl catalog discover "시세보다 싸게 살 수 있는 물건" --rest-
 > 공식 계약을 확인한 제공기관은 `state=contract_known`과 문서·신청·인증 metadata를 함께 반환합니다.
 > 현재 SafetyKorea의 확인된 OpenAPI 시작점 계약을 지원하지만 별도 수동 승인이 필요하고 호출 어댑터는 아직 구현되지 않았으므로
 > `nextAction=request_provider_access`, `contract.invocationState=not_implemented`로 정직하게 멈춥니다.
+> 포털 조회가 실패하거나 안전하지 않은 주소를 반환하면 `state=resolution_failed`와 구조화된 `failure`가
+> 원인을 설명하고, 재시도 가능한 실패는 `nextAction=retry_link_resolution`, 그 밖의 실패는
+> `nextAction=choose_another_dataset`으로 다음 행동을 구분합니다.
 > 카탈로그는 각 항목의 유형을 표시하고, `--rest-only`로 걸러낼 수 있습니다 — 그냥 인기순으로
 > 고르면 데드엔드에 활용신청을 쓰게 됩니다(`폭염` 검색 2위가 LINK입니다).
 >
@@ -241,7 +244,7 @@ opendatactl doctor -f table
 1. `catalog_search` — 자연어 목표를 모델이 여러 검색축으로 의미 분해하고, 로컬 키워드·선택적 Ollama
    벡터 검색을 결합해 작은 후보 목록을 반환. 교차 데이터 발견은 같은 도구를 세 번 점진적으로
    호출해 Anchor 회수 → 실제 결과 기반 Bridge 회수 → 명시적 PK 선택을 수행
-2. `describe_api` — 선택한 `pk` 하나의 상세기능·엔드포인트·요청변수를 반환
+2. `describe_api` — 선택한 `pk` 하나의 상세기능·엔드포인트·요청변수 또는 LINK의 구조화된 외부 제공기관 인계를 반환
    - `apply`(2.5단계) — 미승인 API라면 AI가 활용목적을 작성해 신청하고 자동승인 결과를 확인
 3. `call_api` — 같은 `pk`와 확인한 파라미터로 명세 검증 후 실제 호출. 연결 검증에서는
    `profileFields`로 응답 field의 raw 값·null·distinct·duplicate 표본을 함께 반환. 같은 leaf가 여러
