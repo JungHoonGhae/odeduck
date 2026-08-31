@@ -41,9 +41,10 @@ type describeIn struct {
 	PK string `json:"pk" jsonschema:"publicDataPk of an OpenAPI dataset"`
 }
 type callIn struct {
-	PK     string            `json:"pk" jsonschema:"publicDataPk returned by catalog_search and inspected with describe_api; raw endpoint URLs are intentionally not accepted by MCP"`
-	Op     string            `json:"op,omitempty" jsonschema:"which operation, named by the last path segment of its endpoint (e.g. getHeatWaveCasualtiesRegionList). Omit when the dataset has only one"`
-	Params map[string]string `json:"params,omitempty" jsonschema:"request variables as key/value"`
+	PK            string            `json:"pk" jsonschema:"publicDataPk returned by catalog_search and inspected with describe_api; raw endpoint URLs are intentionally not accepted by MCP"`
+	Op            string            `json:"op,omitempty" jsonschema:"which operation, named by the last path segment of its endpoint (e.g. getHeatWaveCasualtiesRegionList). Omit when the dataset has only one"`
+	Params        map[string]string `json:"params,omitempty" jsonschema:"request variables as key/value"`
+	ProfileFields []string          `json:"profileFields,omitempty" jsonschema:"for connection verification: up to 8 response field names or dotted path suffixes to profile. Returns raw values plus count/distinct/null/duplicate evidence. If a leaf occurs at multiple paths, ambiguous=true and merged counts are withheld; repeat with one surfaced dotted path"`
 	// Bounded well below apicall.MaxPropagationWait: a tool call that blocks for an
 	// hour looks like a hung agent, and the caller can simply ask again.
 	WaitSeconds int `json:"waitSeconds,omitempty" jsonschema:"wait up to this many seconds for a just-approved API to propagate, retrying the 403 (max 300). Use it right after apply; omit it otherwise"`
@@ -54,9 +55,13 @@ type catalogIn struct {
 	// understands the conversation. opendatactl then executes the plan against all
 	// 11k+ rows locally; this avoids both a brittle synonym dictionary and a
 	// second embedding/LLM credential inside the CLI.
-	Concepts []string `json:"concepts,omitempty" jsonschema:"for broad, exploratory or implicit intent: 2-8 concrete Korean catalogue queries inferred from the user's goal. Cover distinct direct, adjacent, leading-indicator or constraint axes rather than mere synonyms; omit only for a concrete dataset lookup"`
-	Limit    int      `json:"limit,omitempty" jsonschema:"max rows to return (default 20) — keep it small, the total match count comes back separately"`
-	Ranking  string   `json:"ranking,omitempty" jsonschema:"planned-search ranking: balanced (default, interleaves proven demand and recently modified data), demand, or recent"`
+	Concepts         []string                  `json:"concepts,omitempty" jsonschema:"for broad, exploratory or implicit intent: 2-8 concrete Korean catalogue queries inferred from the user's goal. Cover distinct direct, adjacent, leading-indicator or constraint axes rather than mere synonyms; omit only for a concrete dataset lookup"`
+	Axes             []catalog.DiscoveryAxis   `json:"axes,omitempty" jsonschema:"structured alternative to concepts for connection discovery. First call: include role=anchor plus distinct roles. Later calls must retain the original anchor axis and add complementary Bridge roles with contribution and edge{kinds,expectedKeys,transform when proxy}"`
+	AnchorPKs        []string                  `json:"anchorPks,omitempty" jsonschema:"later passes only: 1-3 real PKs chosen from the first catalog_search response. A PK is accepted only when the current call also retrieves it under role=anchor"`
+	BridgeSelections []catalog.BridgeSelection `json:"bridgeSelections,omitempty" jsonschema:"precision gate after inspecting second-pass hits: explicitly select up to 3 real Bridge PKs with whyCandidate. The server derives role, incrementalValue, and edge from the current hit so a selector cannot relabel it. Connections are never auto-created from the top search result"`
+	Limit            int                       `json:"limit,omitempty" jsonschema:"max rows to return (default 20) — keep it small, the total match count comes back separately"`
+	MaxConnections   int                       `json:"maxConnections,omitempty" jsonschema:"candidate cards to return, default 3 and max 3"`
+	Ranking          string                    `json:"ranking,omitempty" jsonschema:"planned-search ranking: balanced (default, interleaves proven demand and recently modified data), demand, or recent"`
 	// Pointer distinguishes omission from an explicit false. Exploratory planned
 	// search defaults previews on; a concrete lookup stays compact by default.
 	IncludePreviews *bool `json:"includePreviews,omitempty" jsonschema:"include a short official-description preview. Defaults true when concepts are provided and false for a concrete lexical lookup"`
@@ -74,23 +79,27 @@ func (in catalogIn) includePreviews() bool {
 	if in.IncludePreviews != nil {
 		return *in.IncludePreviews
 	}
-	return len(in.Concepts) > 0
+	return len(in.Concepts) > 0 || len(in.Axes) > 0
 }
 
 func (in catalogIn) semanticEnabled() bool { return in.Semantic == nil || *in.Semantic }
 
 type catalogOut struct {
-	Mode     string                `json:"mode"`              // lexical | planned
-	Intent   string                `json:"intent,omitempty"`  // the user's original goal
-	Queries  []string              `json:"queries,omitempty"` // model-inferred concrete data axes
-	Terms    []string              `json:"terms,omitempty"`   // what a single query was reduced to
-	Relaxed  bool                  `json:"relaxed,omitempty"` // true = no entry had every term, so any-term matches are shown
-	Total    int                   `json:"total"`             // matches found
-	Shown    int                   `json:"shown"`             // rows returned
-	SyncedAt string                `json:"syncedAt"`          // when the catalogue was built
-	Stale    bool                  `json:"stale"`             // true = re-sync, results may be incomplete
-	Hits     []catalog.Hit         `json:"hits"`
-	Semantic *catalog.SemanticInfo `json:"semantic,omitempty"`
+	Mode        string                        `json:"mode"`              // lexical | planned
+	Intent      string                        `json:"intent,omitempty"`  // the user's original goal
+	Queries     []string                      `json:"queries,omitempty"` // model-inferred concrete data axes
+	Terms       []string                      `json:"terms,omitempty"`   // what a single query was reduced to
+	Relaxed     bool                          `json:"relaxed,omitempty"` // true = no entry had every term, so any-term matches are shown
+	Total       int                           `json:"total"`             // matches found
+	Shown       int                           `json:"shown"`             // rows returned
+	SyncedAt    string                        `json:"syncedAt"`          // when the catalogue was built
+	Stale       bool                          `json:"stale"`             // true = re-sync, results may be incomplete
+	Hits        []catalog.Hit                 `json:"hits"`
+	Semantic    *catalog.SemanticInfo         `json:"semantic,omitempty"`
+	Anchors     []catalog.Hit                 `json:"anchors,omitempty"`
+	Connections []catalog.ConnectionCandidate `json:"connections,omitempty"`
+	Warnings    []string                      `json:"warnings,omitempty"`
+	Abstention  *catalog.Abstention           `json:"abstention,omitempty"`
 }
 type appsOut struct {
 	Applications []portal.Application `json:"applications"`
@@ -147,6 +156,14 @@ func New(deps Deps) *mcp.Server {
 			"planned 결과는 matchedQuery 로 왜 발견됐는지 설명하며, 짧은 공식 preview 를 기본 포함한다. ranking=balanced 는 " +
 			"활용 수요가 검증된 데이터와 최근 수정된 저활용 데이터를 함께 보여준다. 데이터 탐색은 반드시 이 도구로 시작하고, " +
 			"고른 pk 하나를 describe_api 로 넘겨라. " +
+			"서로 무관해 보이는 데이터의 연결을 찾을 때도 새 도구를 쓰지 않는다. 첫 호출은 axes 에 role=anchor 와 서로 다른 역할을 넣는다. " +
+			"실제 hits 를 본 뒤 두 번째 catalog_search 를 호출해 anchorPks, 원래 anchor axis, 아직 다루지 않은 Bridge axes 를 넣어라. Bridge 축은 " +
+			"contribution(둘을 결합해야만 생기는 새 판단)과 edge.kinds/entity|spatial|temporal|proxy, expectedKeys 를 모두 가져야 한다. " +
+			"proxy 는 transform 도 필수다. 두 번째 hits 를 읽은 뒤 적합한 실제 PK만 bridgeSelections 로 명시해 같은 catalog_search 를 한 번 더 호출하라. " +
+			"검색 1위는 자동으로 카드가 되지 않는다. title/preview가 역할을 뒷받침하고 coverage 제한을 whyCandidate에 쓸 수 있는 후보만 고른다. " +
+			"서버는 명시적으로 선택되고 역할·edge·Incremental Value 계약을 통과한 소수 pair만 connections 로 반환하지만 " +
+			"상태는 항상 candidate다. 의미 유사도나 metadata만으로 실제 join·사업성·인과를 검증했다고 말하지 마라. 유효한 pair가 없으면 " +
+			"abstention이 정상 결과다. 각 connection의 evidenceRequired를 따라 여러 describe_api와 call_api로 검증하라. " +
 			"svcType 이 LINK 면 포털에 명세가 없어 describe_api/call_api 로 갈 수 없다(전체의 약 40%가 LINK다) — " +
 			"그래서 restOnly 는 생략해도 기본 true 다. 호출 목적이 아닌 전체 탐색일 때만 false 로 둬라. " +
 			"svcType 이 비어 있으면 유형이 확인되지 않은 것이다. " +
@@ -158,6 +175,18 @@ func New(deps Deps) *mcp.Server {
 		if in.Limit < 0 || in.Limit > catalog.MaxSearchLimit {
 			return errResult(fmt.Sprintf("limit은 생략하거나 1~%d 사이여야 합니다", catalog.MaxSearchLimit)), nil, nil
 		}
+		if len(in.Axes) > 8 {
+			return errResult("axes는 최대 8개입니다"), nil, nil
+		}
+		if len(in.AnchorPKs) > 3 {
+			return errResult("anchorPks는 최대 3개입니다"), nil, nil
+		}
+		if len(in.BridgeSelections) > 3 {
+			return errResult("bridgeSelections는 최대 3개입니다"), nil, nil
+		}
+		if in.MaxConnections < 0 || in.MaxConnections > catalog.MaxConnectionCandidates {
+			return errResult("maxConnections는 생략하거나 1~3 사이여야 합니다"), nil, nil
+		}
 		cat, err := catalog.Load()
 		if err != nil {
 			return errResult(err.Error()), nil, nil
@@ -165,6 +194,8 @@ func New(deps Deps) *mcp.Server {
 		plan := catalog.QueryPlan{
 			Intent: in.Query, Concepts: in.Concepts, Limit: in.Limit,
 			RESTOnly: in.restOnly(), IncludePreviews: in.includePreviews(), Ranking: in.Ranking,
+			Axes: in.Axes, AnchorPKs: in.AnchorPKs, BridgeSelections: in.BridgeSelections,
+			MaxConnections: in.MaxConnections,
 		}
 		var res catalog.Result
 		if !in.semanticEnabled() {
@@ -199,7 +230,8 @@ func New(deps Deps) *mcp.Server {
 			Terms: res.Terms, Relaxed: res.Relaxed,
 			Total: res.Total, Shown: len(hits),
 			SyncedAt: cat.SyncedAt.Format("2006-01-02"), Stale: cat.Stale(),
-			Hits: hits, Semantic: res.Semantic,
+			Hits: hits, Semantic: res.Semantic, Anchors: res.Anchors,
+			Connections: res.Connections, Warnings: res.Warnings, Abstention: res.Abstention,
 		}, nil
 	})
 
@@ -226,10 +258,17 @@ func New(deps Deps) *mcp.Server {
 			"**방금 apply 한 API 라면 waitSeconds=300 을 줘라** — 승인은 즉시지만 게이트웨이 반영에 " +
 			"보통 7~10분 걸려 403 이 오고, opendatactl 이 그 동안 1분 간격으로 재시도한다. " +
 			"그래도 403 이면 실패가 아니라 아직 반영 전이니 잠시 후 다시 호출하라(키를 바꾸거나 " +
-			"다시 신청하지 마라). 응답 XML 은 JSON 으로 변환한다. body 의 resultCode 로 성공(00) 여부를 확인하라.",
+			"다시 신청하지 마라). 응답 XML 은 JSON 으로 변환한다. body 의 resultCode 로 성공(00) 여부를 확인하라. " +
+			"Connection candidate를 검증할 때는 양쪽 API를 공통 지역·기간으로 각각 호출하고 profileFields에 예상 key를 넣어라. " +
+			"profile은 raw 값과 count/distinct/null/duplicate를 반환하며 leading zero를 보존한다. 같은 leaf가 여러 경로에 있으면 " +
+			"ambiguous=true이므로 값을 합치지 말고 surfaced dotted path를 지정하라. 두 profile의 실제 교집합·match rate와 " +
+			"join expansion을 비교하기 전에는 sample_verified라고 말하지 마라.",
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in callIn) (*mcp.CallToolResult, *apicall.CallResult, error) {
 		if strings.TrimSpace(in.PK) == "" {
 			return errResult("pk 가 필요합니다 — catalog_search → describe_api 순서로 먼저 확인하세요"), nil, nil
+		}
+		if _, profileErr := apicall.ProfileBody(nil, in.ProfileFields); profileErr != nil {
+			return errResult(profileErr.Error()), nil, nil
 		}
 		resolved, rerr := apicall.Resolve(ctx, deps.Fetch, base, in.PK, in.Op)
 		if rerr != nil {
@@ -264,8 +303,14 @@ func New(deps Deps) *mcp.Server {
 			}
 		}
 		if err != nil {
+			if res != nil && len(in.ProfileFields) > 0 {
+				res.Profile, _ = apicall.ProfileBody(res.Body, in.ProfileFields)
+			}
 			// surface the hint but still return the body
 			return &mcp.CallToolResult{IsError: true, Content: []mcp.Content{&mcp.TextContent{Text: err.Error()}}}, res, nil
+		}
+		if len(in.ProfileFields) > 0 {
+			res.Profile, _ = apicall.ProfileBody(res.Body, in.ProfileFields)
 		}
 		return nil, res, nil
 	})

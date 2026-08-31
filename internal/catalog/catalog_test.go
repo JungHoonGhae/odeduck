@@ -302,6 +302,228 @@ func TestSearchPlanFallsBackToOrdinarySearch(t *testing.T) {
 	}
 }
 
+func TestSearchPlanBuildsConnectionsOnlyFromExplicitBridgeSelections(t *testing.T) {
+	c := &Catalog{SyncedAt: time.Now(), Entries: []Entry{
+		{PK: "anchor", Title: "온비드 공매 물건", Org: "한국자산관리공사", SvcType: SvcREST},
+		{PK: "demand", Title: "상권 점포 개폐업 이력", Org: "부산광역시", SvcType: SvcREST},
+		{PK: "rent", Title: "오피스텔 전월세 실거래", Org: "국토교통부", SvcType: SvcREST},
+	}}
+	res := c.SearchPlan(QueryPlan{
+		Intent: "공매 부동산의 실제 수요를 판단",
+		Axes: []DiscoveryAxis{
+			{Role: "anchor", Query: "공매 물건"},
+			{Role: "상권 수요", Query: "상권 점포 개폐업", Contribution: "쇠퇴 상권인지 가격 기회인지 구분", Edge: EdgeHypothesis{
+				Kinds: []string{"spatial", "temporal"}, ExpectedKeys: []string{"법정동코드", "기준연월"},
+			}},
+			{Role: "임대 수익", Query: "오피스텔 전월세", Contribution: "예상 임대 현금흐름 계산", Edge: EdgeHypothesis{
+				Kinds: []string{"spatial", "temporal"}, ExpectedKeys: []string{"법정동코드", "계약연월"},
+			}},
+		},
+		AnchorPKs: []string{"anchor"},
+		BridgeSelections: []BridgeSelection{
+			{PK: "demand", Role: "상권 수요", IncrementalValue: "쇠퇴 상권인지 가격 기회인지 구분",
+				WhyCandidate: "점포 개폐업 이력이라는 제목이 상권의 실제 수요 변화를 뒷받침함",
+				Edge:         EdgeHypothesis{Kinds: []string{"spatial", "temporal"}, ExpectedKeys: []string{"법정동코드", "기준연월"}}},
+			{PK: "rent", Role: "임대 수익", IncrementalValue: "예상 임대 현금흐름 계산",
+				WhyCandidate: "전월세 실거래라는 제목이 임대 현금흐름의 관측값을 제공함",
+				Edge:         EdgeHypothesis{Kinds: []string{"spatial", "temporal"}, ExpectedKeys: []string{"법정동코드", "계약연월"}}},
+		},
+		Limit: 10, RESTOnly: true, MaxConnections: 2,
+	})
+	if len(res.Anchors) != 1 || res.Anchors[0].PK != "anchor" {
+		t.Fatalf("anchors = %+v", res.Anchors)
+	}
+	if len(res.Connections) != 2 {
+		t.Fatalf("connections = %+v, want one per role", res.Connections)
+	}
+	for _, connection := range res.Connections {
+		if connection.Status != ConnectionStatusCandidate {
+			t.Errorf("status = %q, search must never claim verification", connection.Status)
+		}
+		if connection.Anchor.PK != "anchor" || connection.Bridge.PK == "anchor" {
+			t.Errorf("bad pair = %+v", connection)
+		}
+		if len(connection.EvidenceRequired) < 3 || connection.ClaimBoundary == "" {
+			t.Errorf("candidate lacks verification boundary: %+v", connection)
+		}
+	}
+}
+
+func TestSearchPlanRejectsSelectionWithoutCandidateEvidence(t *testing.T) {
+	c := &Catalog{SyncedAt: time.Now(), Entries: []Entry{
+		{PK: "anchor", Title: "공매 물건", SvcType: SvcREST},
+		{PK: "bridge", Title: "상권 점포 개폐업", SvcType: SvcREST},
+	}}
+	res := c.SearchPlan(QueryPlan{
+		Axes: []DiscoveryAxis{
+			{Role: "anchor", Query: "공매 물건"},
+			{Role: "상권 수요", Query: "상권 점포", Contribution: "쇠퇴 상권을 구분",
+				Edge: EdgeHypothesis{Kinds: []string{"spatial"}, ExpectedKeys: []string{"법정동코드"}}},
+		},
+		AnchorPKs: []string{"anchor"}, BridgeSelections: []BridgeSelection{{
+			PK: "bridge", Role: "상권 수요", IncrementalValue: "쇠퇴 상권을 구분",
+			Edge: EdgeHypothesis{Kinds: []string{"spatial"}, ExpectedKeys: []string{"법정동코드"}},
+		}},
+		Limit: 10, RESTOnly: true,
+	})
+	if len(res.Connections) != 0 || res.Abstention == nil {
+		t.Fatalf("selection without whyCandidate must abstain: %+v", res)
+	}
+}
+
+func TestSearchPlanRejectsSelectionOutsideCurrentHits(t *testing.T) {
+	c := &Catalog{SyncedAt: time.Now(), Entries: []Entry{
+		{PK: "anchor", Title: "공매 물건", SvcType: SvcREST},
+		{PK: "visible", Title: "상권 점포 개폐업", SvcType: SvcREST},
+		{PK: "unseen", Title: "하천 수질 측정", SvcType: SvcREST},
+	}}
+	res := c.SearchPlan(QueryPlan{
+		Axes: []DiscoveryAxis{
+			{Role: "anchor", Query: "공매 물건"},
+			{Role: "상권 수요", Query: "상권 점포", Contribution: "쇠퇴 상권을 구분",
+				Edge: EdgeHypothesis{Kinds: []string{"spatial"}, ExpectedKeys: []string{"법정동코드"}}},
+		},
+		AnchorPKs: []string{"anchor"}, BridgeSelections: []BridgeSelection{{
+			PK: "unseen", Role: "상권 수요", IncrementalValue: "쇠퇴 상권을 구분", WhyCandidate: "검색 밖 후보",
+			Edge: EdgeHypothesis{Kinds: []string{"spatial"}, ExpectedKeys: []string{"법정동코드"}},
+		}},
+		Limit: 10, RESTOnly: true,
+	})
+	if len(res.Connections) != 0 || res.Abstention == nil {
+		t.Fatalf("selection outside current hits must abstain: %+v", res)
+	}
+}
+
+func TestSearchPlanRejectsAnchorNotRetrievedUnderAnchorRole(t *testing.T) {
+	c := &Catalog{SyncedAt: time.Now(), Entries: []Entry{
+		{PK: "arbitrary", Title: "임의 데이터", SvcType: SvcREST},
+		{PK: "bridge", Title: "상권 점포 개폐업", SvcType: SvcREST},
+	}}
+	res := c.SearchPlan(QueryPlan{
+		Axes: []DiscoveryAxis{{
+			Role: "상권 수요", Query: "상권 점포", Contribution: "쇠퇴 상권을 구분",
+			Edge: EdgeHypothesis{Kinds: []string{"spatial"}, ExpectedKeys: []string{"법정동코드"}},
+		}},
+		AnchorPKs: []string{"arbitrary"}, BridgeSelections: []BridgeSelection{{
+			PK: "bridge", WhyCandidate: "점포 개폐업 제목 근거",
+		}},
+		Limit: 10, RESTOnly: true,
+	})
+	if len(res.Anchors) != 0 || len(res.Connections) != 0 || res.Abstention == nil {
+		t.Fatalf("arbitrary catalog PK must not be relabelled as anchor: %+v", res)
+	}
+}
+
+func TestSearchPlanDerivesCandidateContractFromRetrievedHit(t *testing.T) {
+	c := &Catalog{SyncedAt: time.Now(), Entries: []Entry{
+		{PK: "anchor", Title: "공매 물건", SvcType: SvcREST},
+		{PK: "bridge", Title: "상권 점포 개폐업", SvcType: SvcREST},
+	}}
+	res := c.SearchPlan(QueryPlan{
+		Axes: []DiscoveryAxis{
+			{Role: "anchor", Query: "공매 물건"},
+			{Role: "상권 수요", Query: "상권 점포", Contribution: "쇠퇴 상권을 구분",
+				Edge: EdgeHypothesis{Kinds: []string{"spatial"}, ExpectedKeys: []string{"법정동코드"}}},
+		},
+		AnchorPKs: []string{"anchor"}, BridgeSelections: []BridgeSelection{{
+			PK: "bridge", Role: "환경 위험", IncrementalValue: "모델이 지어낸 가치", WhyCandidate: "점포 개폐업 제목 근거",
+			Edge: EdgeHypothesis{Kinds: []string{"entity"}, ExpectedKeys: []string{"inventedId"}},
+		}},
+		Limit: 10, RESTOnly: true,
+	})
+	if len(res.Connections) != 1 {
+		t.Fatalf("connections = %+v", res.Connections)
+	}
+	got := res.Connections[0]
+	if got.BridgeRole != "상권 수요" || got.IncrementalValue != "쇠퇴 상권을 구분" ||
+		len(got.Edge.ExpectedKeys) != 1 || got.Edge.ExpectedKeys[0] != "법정동코드" {
+		t.Fatalf("candidate contract was relabelled by selection: %+v", got)
+	}
+}
+
+func TestSearchPlanEmitsAtMostOneConnectionPerRetrievedRole(t *testing.T) {
+	c := &Catalog{SyncedAt: time.Now(), Entries: []Entry{
+		{PK: "anchor", Title: "공매 물건", SvcType: SvcREST},
+		{PK: "bridge-a", Title: "상권 점포 개폐업 A", SvcType: SvcREST},
+		{PK: "bridge-b", Title: "상권 점포 개폐업 B", SvcType: SvcREST},
+	}}
+	res := c.SearchPlan(QueryPlan{
+		Axes: []DiscoveryAxis{
+			{Role: "anchor", Query: "공매 물건"},
+			{Role: "상권 수요", Query: "상권 점포 개폐업", Contribution: "쇠퇴 상권을 구분",
+				Edge: EdgeHypothesis{Kinds: []string{"spatial"}, ExpectedKeys: []string{"법정동코드"}}},
+		},
+		AnchorPKs: []string{"anchor"}, BridgeSelections: []BridgeSelection{
+			{PK: "bridge-a", WhyCandidate: "A 제목 근거"},
+			{PK: "bridge-b", WhyCandidate: "B 제목 근거"},
+		},
+		Limit: 10, RESTOnly: true,
+	})
+	if len(res.Connections) != 1 || res.Connections[0].Bridge.PK != "bridge-a" {
+		t.Fatalf("duplicate roles must be suppressed deterministically: %+v", res.Connections)
+	}
+}
+
+func TestSearchPlanAbstainsWhenBridgeAxisHasNoJoinContract(t *testing.T) {
+	c := &Catalog{SyncedAt: time.Now(), Entries: []Entry{
+		{PK: "anchor", Title: "공매 물건", SvcType: SvcREST},
+		{PK: "noise", Title: "관광 인기 순위", SvcType: SvcREST},
+	}}
+	res := c.SearchPlan(QueryPlan{
+		Axes: []DiscoveryAxis{
+			{Role: "anchor", Query: "공매 물건"},
+			{Role: "새로움", Query: "관광 인기", Contribution: "흥미로운 조합"},
+		},
+		AnchorPKs:        []string{"anchor"},
+		BridgeSelections: []BridgeSelection{{PK: "noise", Role: "새로움", IncrementalValue: "흥미로운 조합"}},
+		Limit:            10, RESTOnly: true,
+	})
+	if len(res.Connections) != 0 || res.Abstention == nil {
+		t.Fatalf("invalid bridge should abstain, got connections=%+v abstention=%+v", res.Connections, res.Abstention)
+	}
+}
+
+func TestSearchPlanRejectsProxyAxisWithoutTransform(t *testing.T) {
+	c := &Catalog{SyncedAt: time.Now(), Entries: []Entry{
+		{PK: "anchor", Title: "공매 물건", SvcType: SvcREST},
+		{PK: "bridge", Title: "상권 정보", SvcType: SvcREST},
+	}}
+	res := c.SearchPlan(QueryPlan{
+		Axes: []DiscoveryAxis{
+			{Role: "anchor", Query: "공매 물건"},
+			{Role: "수요", Query: "상권", Contribution: "수요 판정",
+				Edge: EdgeHypothesis{Kinds: []string{"proxy"}, ExpectedKeys: []string{"주소"}}},
+		},
+		AnchorPKs: []string{"anchor"},
+		BridgeSelections: []BridgeSelection{{
+			PK: "bridge", Role: "수요", IncrementalValue: "수요 판정",
+			Edge: EdgeHypothesis{Kinds: []string{"proxy"}, ExpectedKeys: []string{"주소"}},
+		}},
+		Limit: 10, RESTOnly: true,
+	})
+	if len(res.Connections) != 0 || res.Abstention == nil {
+		t.Fatalf("proxy without transform must abstain: %+v", res)
+	}
+}
+
+func TestSearchPlanDoesNotAutoSelectTopRankedBridge(t *testing.T) {
+	c := &Catalog{SyncedAt: time.Now(), Entries: []Entry{
+		{PK: "anchor", Title: "공매 물건", SvcType: SvcREST},
+		{PK: "wrong", Title: "임대료 기준 정보", SvcType: SvcREST},
+	}}
+	res := c.SearchPlan(QueryPlan{
+		Axes: []DiscoveryAxis{
+			{Role: "anchor", Query: "공매 물건"},
+			{Role: "권리부담", Query: "임대료", Contribution: "위험조정 가격",
+				Edge: EdgeHypothesis{Kinds: []string{"entity"}, ExpectedKeys: []string{"건물관리번호"}}},
+		},
+		AnchorPKs: []string{"anchor"}, Limit: 10, RESTOnly: true,
+	})
+	if len(res.Hits) != 2 || len(res.Connections) != 0 || res.Abstention != nil {
+		t.Fatalf("retrieval without explicit selection must not create a card: %+v", res)
+	}
+}
+
 func TestSearchPlanRelaxationRejectsSingleGenericWord(t *testing.T) {
 	c := &Catalog{SyncedAt: time.Now(), Entries: []Entry{
 		{PK: "relevant", Title: "국유재산 매각 공고", SvcType: SvcREST, ApplyCount: 10},

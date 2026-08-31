@@ -119,3 +119,15 @@ func TestCallSurfacesNonSuccessHTTPStatusWithBody(t *testing.T) {
 		t.Fatalf("result = %+v, want surfaced 500 body", res)
 	}
 }
+
+func TestDecodeBodyPreservesLargeJSONInteger(t *testing.T) {
+	body := decodeBody("application/json", []byte(`{"items":[{"parcelId":9007199254740993}]}`))
+	profile, err := ProfileBody(body, []string{"parcelId"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := profile.Fields[0]
+	if len(got.Values) != 1 || got.Values[0] != "9007199254740993" {
+		t.Fatalf("large identifier lost precision: %+v", got)
+	}
+}

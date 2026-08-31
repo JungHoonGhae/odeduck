@@ -78,6 +78,7 @@ func describeCmd() *cobra.Command {
 func callCmd() *cobra.Command {
 	var key string
 	var params []string
+	var profileFields []string
 	var pk, op string
 	var wait time.Duration
 	c := &cobra.Command{
@@ -94,11 +95,20 @@ func callCmd() *cobra.Command {
 신청 직후에는 게이트웨이 반영에 보통 7~10분 걸려 403 이 옵니다. --wait 10m 을 주면 그때까지
 1분 간격으로 재시도합니다(승인 자체는 즉시 끝나므로 다시 신청할 필요 없습니다).
 
+연결 후보를 검증할 때 --profile-field 를 반복하면 응답 안의 해당 field를 재귀적으로 찾아 raw 값 표본,
+count, distinct, null, duplicate 수를 함께 반환합니다. 두 API를 같은 지역·기간으로 호출한 뒤 profile을
+비교하세요. 식별자의 leading zero는 보존하며, 실제 join 성공은 양쪽 값 교집합과 cardinality를 별도로
+확인해야 합니다. 같은 leaf 이름이 여러 경로에 있으면 값을 합치지 않고 ambiguous=true와 실제 paths를
+반환하므로 dotted path로 다시 지정하세요.
+
 예) opendatactl call --pk 15077974 --param numOfRows=10
     opendatactl call --pk 15077974 --wait 15m --param numOfRows=10   # 방금 신청한 API
     opendatactl call https://apis.data.go.kr/9760000/.../getX --param numOfRows=10`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if _, err := apicall.ProfileBody(nil, profileFields); err != nil {
+				return err
+			}
 			if len(args) == 0 && pk == "" {
 				return fmt.Errorf("엔드포인트 URL 또는 --pk 가 필요합니다")
 			}
@@ -167,6 +177,9 @@ func callCmd() *cobra.Command {
 				}
 			}
 			if res != nil {
+				if len(profileFields) > 0 {
+					res.Profile, _ = apicall.ProfileBody(res.Body, profileFields)
+				}
 				output.WriteJSON(cmd.OutOrStdout(), res)
 			}
 			if err != nil {
@@ -177,6 +190,7 @@ func callCmd() *cobra.Command {
 	}
 	c.Flags().StringVar(&key, "key", "", "계정 인증키 (생략 시 로그인 세션에서 자동 조회)")
 	c.Flags().StringArrayVar(&params, "param", nil, "요청변수 k=v (반복 가능)")
+	c.Flags().StringArrayVar(&profileFields, "profile-field", nil, "연결 검증용 응답 field 프로파일 (반복 가능, 최대 8개)")
 	c.Flags().StringVar(&pk, "pk", "", "publicDataPk — 엔드포인트를 포털에서 조회 (URL 대신)")
 	c.Flags().StringVar(&op, "op", "", "상세기능 이름 (엔드포인트 마지막 경로 조각). 하나뿐이면 생략 가능")
 	c.Flags().DurationVar(&wait, "wait", 0, "게이트웨이 반영(403)을 이 시간까지 기다리며 재시도 (예: 10m, 최대 1h)")

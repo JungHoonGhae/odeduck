@@ -317,14 +317,21 @@ func (s *SemanticIndex) Search(c *Catalog, query []float32, limit int, restOnly,
 // drown the intent signal; agreement between both retrievers ranks highest.
 func (c *Catalog) SearchHybrid(ctx context.Context, plan QueryPlan, index *SemanticIndex, embedder Embedder) Result {
 	want := normalizeSearchLimit(plan.Limit)
+	normalizedPlan := plan
+	normalizedPlan.Axes, _ = normalizeDiscoveryAxes(plan.Axes, 8)
 	expanded := plan
 	expanded.Limit = want * 4
 	if expanded.Limit < 40 {
 		expanded.Limit = 40
 	}
 	base := c.searchPlan(expanded)
+	entries := make(map[string]*Entry, len(c.Entries))
+	for i := range c.Entries {
+		entries[c.Entries[i].PK] = &c.Entries[i]
+	}
 	if index == nil || embedder == nil {
 		base.Hits = trimHits(base.Hits, want)
+		finalizeConnectionCandidates(normalizedPlan, &base, entries)
 		base.Semantic = &SemanticInfo{Status: SemanticNotIndexed}
 		return base
 	}
@@ -332,9 +339,17 @@ func (c *Catalog) SearchHybrid(ctx context.Context, plan QueryPlan, index *Seman
 	// Concrete model-inferred axes come first. The original broad intent remains
 	// a final semantic safety net, but must not crowd out the diverse retrieval
 	// plan the host model deliberately supplied.
-	queries := uniqueQueries(append(append([]string{}, plan.Concepts...), plan.Intent), 8)
+	semanticConcepts := append([]string{}, plan.Concepts...)
+	if len(normalizedPlan.Axes) > 0 {
+		semanticConcepts = semanticConcepts[:0]
+		for _, axis := range normalizedPlan.Axes {
+			semanticConcepts = append(semanticConcepts, axis.Query)
+		}
+	}
+	queries := uniqueQueries(append(semanticConcepts, plan.Intent), 8)
 	if len(queries) == 0 {
 		base.Hits = trimHits(base.Hits, want)
+		finalizeConnectionCandidates(normalizedPlan, &base, entries)
 		base.Semantic = &SemanticInfo{Status: SemanticUnavailable, Model: index.Model, Detail: "검색할 문장이 비어 있음"}
 		return base
 	}
@@ -345,27 +360,41 @@ func (c *Catalog) SearchHybrid(ctx context.Context, plan QueryPlan, index *Seman
 	vectors, err := embedder.Embed(ctx, inputs)
 	if err != nil {
 		base.Hits = trimHits(base.Hits, want)
+		finalizeConnectionCandidates(normalizedPlan, &base, entries)
 		base.Semantic = &SemanticInfo{Status: SemanticUnavailable, Model: index.Model, Detail: err.Error()}
 		return base
 	}
 
 	perQuery := expanded.Limit
 	buckets := make([][]Hit, len(vectors))
+	axisByQuery := map[string]DiscoveryAxis{}
+	for _, axis := range normalizedPlan.Axes {
+		axisByQuery[axis.Query] = axis
+	}
 	for i, vector := range vectors {
 		buckets[i] = index.Search(c, vector, perQuery, plan.RESTOnly, plan.IncludePreviews)
 		for j := range buckets[i] {
 			buckets[i][j].MatchedQuery = queries[i]
+			if axis, ok := axisByQuery[queries[i]]; ok {
+				buckets[i][j].Role = axis.Role
+				buckets[i][j].Contribution = axis.Contribution
+				if len(axis.Edge.Kinds) > 0 || len(axis.Edge.ExpectedKeys) > 0 {
+					edge := axis.Edge
+					buckets[i][j].EdgeHypothesis = &edge
+				}
+			}
 		}
 	}
 	semantic := roundRobinHits(buckets, expanded.Limit)
 	diversityOrder := queries
-	if concepts := uniqueQueries(plan.Concepts, 8); len(concepts) > 0 {
+	if concepts := uniqueQueries(semanticConcepts, 8); len(concepts) > 0 {
 		// The original intent is a semantic safety net, not a seventh product
 		// axis. Fill concept coverage first; intent-only surprises can enter as
 		// remainder when the requested page has room.
 		diversityOrder = concepts
 	}
 	base.Hits = fuseHits(base.Hits, semantic, want, diversityOrder)
+	finalizeConnectionCandidates(normalizedPlan, &base, entries)
 	base.Mode = SearchModeHybrid
 	base.Semantic = &SemanticInfo{Status: SemanticUsed, Model: index.Model}
 	if len(base.Queries) == 0 {
