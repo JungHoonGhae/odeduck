@@ -483,7 +483,7 @@ func TestValidatePublisherLinkURLRejectsUntrustedShapes(t *testing.T) {
 		"javascript:alert(1)",
 		"/relative/provider/page",
 		"ftp://provider.example/spec",
-		"https://user:secret@provider.example/spec",
+		"https://user@provider.example/spec",
 		"http://localhost/admin",
 		"http://service.local/admin",
 		"http://127.0.0.1/admin",
