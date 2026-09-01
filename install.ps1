@@ -75,6 +75,23 @@ try {
         }
     }
 
+    $CatalogAsset = "opendatactl-catalog.json.gz"
+    $CatalogFile = Join-Path $Tmp $CatalogAsset
+    $CatalogAvailable = $false
+    try {
+        if (Get-Command gh -ErrorAction SilentlyContinue) {
+            & gh release download $Version --repo $Repo --pattern $CatalogAsset --dir $Tmp --clobber
+            if ($LASTEXITCODE -ne 0) { throw "gh catalogue download failed" }
+        }
+        else {
+            Invoke-WebRequest -Uri "https://github.com/$Repo/releases/download/$Version/$CatalogAsset" -OutFile $CatalogFile
+        }
+        $CatalogAvailable = $true
+    }
+    catch {
+        Write-Host "Prebuilt catalogue is not available for $Version; install will continue without it."
+    }
+
     # Verify against checksums.txt from the same release.
     $ChecksumFile = Join-Path $Tmp "checksums.txt"
     if (Get-Command gh -ErrorAction SilentlyContinue) {
@@ -87,6 +104,11 @@ try {
     $Expected = (Select-String -Path $ChecksumFile -Pattern ([regex]::Escape($Asset))).Line.Split(" ")[0]
     $Actual = (Get-FileHash -Algorithm SHA256 -Path $Zip).Hash.ToLower()
     if ($Expected -ne $Actual) { throw "Checksum mismatch for $Asset" }
+    if ($CatalogAvailable) {
+        $ExpectedCatalog = (Select-String -Path $ChecksumFile -Pattern ([regex]::Escape($CatalogAsset))).Line.Split(" ")[0]
+        $ActualCatalog = (Get-FileHash -Algorithm SHA256 -Path $CatalogFile).Hash.ToLower()
+        if ($ExpectedCatalog -ne $ActualCatalog) { throw "Checksum mismatch for $CatalogAsset" }
+    }
 
     Expand-Archive -Path $Zip -DestinationPath $Tmp -Force
     $PrimaryBinary = Join-Path $Tmp "opendatactl.exe"
@@ -94,10 +116,18 @@ try {
     if (-not (Test-Path $PrimaryBinary) -and (Test-Path $LegacyBinary)) {
         Copy-Item -Path $LegacyBinary -Destination $PrimaryBinary
     }
+    if ($CatalogAvailable) {
+        & $PrimaryBinary catalog install-snapshot $CatalogFile --check-only -f table
+        if ($LASTEXITCODE -ne 0) { throw "Prebuilt catalogue validation failed" }
+    }
     New-Item -ItemType Directory -Path $InstallDir -Force | Out-Null
     Move-Item -Path $PrimaryBinary -Destination (Join-Path $InstallDir "opendatactl.exe") -Force
     if (Test-Path $LegacyBinary) {
         Move-Item -Path $LegacyBinary -Destination (Join-Path $InstallDir "gongctl.exe") -Force
+    }
+    if ($CatalogAvailable) {
+        & (Join-Path $InstallDir "opendatactl.exe") catalog install-snapshot $CatalogFile -f table
+        if ($LASTEXITCODE -ne 0) { throw "Prebuilt catalogue install failed" }
     }
 }
 finally {

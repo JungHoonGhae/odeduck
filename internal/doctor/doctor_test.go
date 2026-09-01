@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"strings"
 	"testing"
@@ -33,6 +34,40 @@ func fixtureServer(t *testing.T) *httptest.Server {
 			w.Write(search)
 		case "/data/" + CanaryPK + "/openapi.do":
 			w.Write(openapi)
+		case "/data/" + CombinedSwaggerCanaryPK + "/openapi.do":
+			http.Error(w, "legacy route removed", http.StatusInternalServerError)
+		case "/data/" + CombinedSwaggerCanaryPK + "/fileData.do":
+			w.Write([]byte(`<h1 class="h-tit">서울교통공사_월별 승하차인원</h1>
+				<script>const options = {url: 'https://infuser.odcloud.kr/oas/docs?namespace=15127058/v1'};</script>`))
+		case "/oas/docs":
+			w.Header().Set("Content-Type", "application/json")
+			w.Write([]byte(`{"swagger":"2.0","host":"api.odcloud.kr","basePath":"/api/15127058/v1","schemes":["https"],"paths":{"/getRows":{"get":{"summary":"월별 승하차 조회","parameters":[{"name":"page","in":"query","required":true}]}}}}`))
+		case "/catalog/" + FileCanaryPK + "/fileData.json":
+			w.Header().Set("Content-Type", "application/json")
+			w.Write([]byte(`{"name":"전국지식산업센터현황","creator":{"name":"한국산업단지공단"},"encodingFormat":"CSV"}`))
+		case "/data/" + FileCanaryPK + "/fileData.do":
+			w.Write([]byte(`<script>fileDetailObj.fn_fileDataDown('15117154','10','FILE_CANARY','1','센터.csv')</script>`))
+		case "/tcs/dss/selectFileDataDownload.do":
+			w.Header().Set("Content-Type", "application/json")
+			w.Write([]byte(`{"status":true,"atchFileId":"FILE_CANARY","fileDetailSn":"1","fileDataRegistVO":{"dataNm":"전국지식산업센터현황","orginlFileNm":"센터.csv","atchFileExtsn":"csv"}}`))
+		case "/catalog/" + SeoulFileCanaryPK + "/fileData.json":
+			w.Header().Set("Content-Type", "application/json")
+			w.Write([]byte(`{"name":"서울시 상권 추정매출","creator":{"name":"서울특별시"},"encodingFormat":"CSV"}`))
+		case "/data/" + SeoulFileCanaryPK + "/fileData.do":
+			w.Write([]byte(`<ul class="info-ul">
+				<li><strong class="key">제공형태</strong><div class="value">기관자체에서 다운로드(제공데이터URL기재)</div></li>
+				<li><strong class="key">URL</strong><div class="value"><a href="http://data.seoul.go.kr/dataList/OA-15572/S/1/datasetView.do">바로가기</a></div></li>
+			</ul>`))
+		case "/sample/json/SearchOpenDataServiceList/1/5/OA-15572/":
+			w.Header().Set("Content-Type", "application/json")
+			w.Write([]byte(`{"SearchOpenDataServiceList":{"list_total_count":2,"RESULT":{"CODE":"INFO-000"},"row":[
+				{"INF_ID":"OA-15572","INF_NM":"서울시 상권분석서비스(추정매출-상권)","MNG_ORGAN_NAME":"서울신용보증재단","SRV_TYPE":"FILE","SHORT_URL":"https://data.seoul.go.kr/dataList/OA-15572/F/1/datasetView.do"},
+				{"INF_ID":"OA-15572","INF_NM":"서울시 상권분석서비스(추정매출-상권)","MNG_ORGAN_NAME":"서울신용보증재단","SRV_TYPE":"OPENAPI","SHORT_URL":"https://data.seoul.go.kr/dataList/OA-15572/A/1/datasetView.do"}
+			]}}`))
+		case "/dataList/OA-15572/F/1/datasetView.do":
+			w.Write([]byte(`<form name="frmFile"><input name="infSeq" value="3"></form><table><tbody><tr>
+				<td><button title="추정매출.zip" onclick="downloadFile('51')">다운로드</button></td><td></td><td></td><td>13.7</td><td>2026.05.18.</td>
+			</tr></tbody></table>`))
 		case "/tcs/dss/selectApiLinkUrl.do":
 			w.Header().Set("Content-Type", "application/json")
 			if canary, ok := adapterCanary(r.URL.Query().Get("publicDataPk")); ok {
@@ -60,6 +95,31 @@ func fixtureServer(t *testing.T) *httptest.Server {
 	}))
 }
 
+type roundTripFunc func(*http.Request) (*http.Response, error)
+
+func (f roundTripFunc) RoundTrip(request *http.Request) (*http.Response, error) { return f(request) }
+
+// fixtureFetch keeps every first-party/official-provider request inside the
+// fixture server while preserving the original path and query. Production uses
+// the real fixed origins; this is only the live-shape test seam.
+func fixtureFetch(t *testing.T, server *httptest.Server) *fetch.Client {
+	t.Helper()
+	target, err := url.Parse(server.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	transport := roundTripFunc(func(request *http.Request) (*http.Response, error) {
+		clone := request.Clone(request.Context())
+		copyURL := *request.URL
+		copyURL.Scheme = target.Scheme
+		copyURL.Host = target.Host
+		clone.URL = &copyURL
+		clone.Host = target.Host
+		return http.DefaultTransport.RoundTrip(clone)
+	})
+	return fetch.New(fetch.WithDelay(0), fetch.WithHTTPClient(&http.Client{Transport: transport}))
+}
+
 func adapterCanary(pk string) (apicall.ExternalProviderAdapterCanary, bool) {
 	for _, adapter := range apicall.ExternalProviderAdapters() {
 		for _, canary := range adapter.Canaries {
@@ -85,13 +145,18 @@ func TestRunHealthy(t *testing.T) {
 	srv := fixtureServer(t)
 	defer srv.Close()
 
-	checks := runAt(context.Background(), fetch.New(fetch.WithDelay(0)), srv.URL,
+	checks := runAt(context.Background(), fixtureFetch(t, srv), srv.URL,
 		time.Date(2026, 9, 2, 0, 0, 0, 0, time.UTC))
 	if got := statusOf(checks, "search"); got != StatusOK {
 		t.Errorf("search check = %q, want ok", got)
 	}
 	if got := statusOf(checks, "describe"); got != StatusOK {
 		t.Errorf("describe check = %q, want ok; checks=%+v", got, checks)
+	}
+	for _, name := range []string{"odcloud-swagger", "file-asset", "seoul-file"} {
+		if got := statusOf(checks, name); got != StatusOK {
+			t.Errorf("%s check = %q, want ok; checks=%+v", name, got, checks)
+		}
 	}
 	if got := statusOf(checks, "link"); got != StatusOK {
 		t.Errorf("link check = %q, want ok; checks=%+v", got, checks)
@@ -211,6 +276,11 @@ func TestRunDetectsDrift(t *testing.T) {
 	}
 	if got := statusOf(checks, "describe"); got != StatusDrift {
 		t.Errorf("describe check = %q, want drift", got)
+	}
+	for _, name := range []string{"odcloud-swagger", "file-asset", "seoul-file"} {
+		if got := statusOf(checks, name); got != StatusDrift {
+			t.Errorf("%s check = %q, want drift", name, got)
+		}
 	}
 }
 

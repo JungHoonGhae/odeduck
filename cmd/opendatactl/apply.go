@@ -33,7 +33,7 @@ describe가 반환한 provider application URL을 안내합니다. 신청은
 			if base == "" {
 				base = portal.BaseURL
 			}
-			spec, err := apicall.Describe(cmd.Context(), newFetchClient(), base, args[0])
+			spec, err := apicall.DescribeCatalogued(cmd.Context(), newFetchClient(), base, args[0])
 			if err != nil {
 				return fmt.Errorf("활용신청 전 명세 확인 실패: %w", err)
 			}

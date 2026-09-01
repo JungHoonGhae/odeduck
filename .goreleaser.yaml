@@ -61,6 +61,8 @@ archives:
 
 checksum:
   name_template: "checksums.txt"
+  extra_files:
+    - glob: ./release-assets/opendatactl-catalog.json.gz
 
 changelog:
   sort: asc
@@ -74,3 +76,5 @@ changelog:
 release:
   draft: false
   prerelease: auto
+  extra_files:
+    - glob: ./release-assets/opendatactl-catalog.json.gz

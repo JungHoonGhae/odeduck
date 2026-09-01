@@ -19,14 +19,27 @@ jobs:
       - name: Verify module files
         run: go mod tidy -diff
 
+      - name: Verify generated brand copy
+        run: go run ./scripts/sync-brand.go --check
+
       - name: go vet
         run: go vet ./...
+
+      - name: Vulnerability scan
+        run: go run golang.org/x/vuln/cmd/govulncheck@v1.7.0 ./...
 
       - name: Test (네트워크 불필요 — testdata/픽스처)
         run: go test ./...
 
       - name: Build
         run: go build ./...
+
+      - name: Create snapshot-only catalogue fixture
+        shell: bash
+        run: |
+          mkdir -p release-assets
+          printf '%s' '{"syncedAt":"2026-09-01T00:00:00Z","type":"ALL","source":"official","entries":[{"pk":"15000001","title":"CI packaging fixture","svcType":"FILE","dataTypes":["FILE"]}]}' \
+            | gzip -n -9 > release-assets/opendatactl-catalog.json.gz
 
       - name: Verify release packaging
         uses: goreleaser/goreleaser-action@v7

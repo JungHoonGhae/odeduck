@@ -39,12 +39,24 @@ func applyFormJS(purpose, category string, fill bool) string {
 		document.querySelectorAll('.col-table input[type=checkbox]').forEach(function(o){
 			if(!o.classList.contains('all-chk')){ if(fill){ o.checked = true; } n++; }
 		});
+		// ODCloud's current multiCloud form represents one selected operation with
+		// a hidden publicDataDetailPk instead of a checkbox table.
+		var detailPk = document.getElementById('publicDataDetailPk');
+		if(n === 0 && f.action.indexOf(` + strconv.Quote(multiCloudApplicationPath) + `) >= 0 && detailPk && String(detailPk.value || '').trim() !== ''){ n = 1; }
 		out.ops = n;
 		var ag = document.getElementById('useScopeAgreAt');
 		out.agreement = !!ag;
 		if(ag && fill){ ag.checked = true; }
 		var tag = document.querySelector('.tagset');
 		if(tag){ var box = tag.closest('div'); var t = box && box.querySelector('.tit'); if(t){ out.name = t.textContent.replace(/\s+/g,' ').trim(); } }
+		if(!out.name){
+			document.querySelectorAll('#reqForm .key').forEach(function(key){
+				if(!out.name && key.textContent.replace(/\s+/g,' ').trim() === '데이터명'){
+					var value = key.parentElement && key.parentElement.querySelector('.value');
+					if(value){ out.name = value.textContent.replace(/\s+/g,' ').trim(); }
+				}
+			});
+		}
 		return JSON.stringify(out);
 	})(` + strconv.Quote(purpose) + `,` + strconv.Quote(category) + `,` + strconv.FormatBool(fill) + `)`
 }

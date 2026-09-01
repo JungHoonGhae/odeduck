@@ -1,6 +1,6 @@
 module github.com/JungHoonGhae/opendatactl
 
-go 1.26.1
+go 1.26.6
 
 require (
 	github.com/PuerkitoBio/goquery v1.12.0
@@ -8,9 +8,10 @@ require (
 	github.com/chromedp/chromedp v0.15.1
 	github.com/modelcontextprotocol/go-sdk v1.6.1
 	github.com/spf13/cobra v1.10.2
-	golang.org/x/net v0.52.0
-	golang.org/x/sys v0.42.0
-	golang.org/x/term v0.41.0
+	golang.org/x/net v0.56.0
+	golang.org/x/sys v0.46.0
+	golang.org/x/term v0.44.0
+	golang.org/x/text v0.39.0
 )
 
 require (
@@ -27,5 +28,4 @@ require (
 	github.com/spf13/pflag v1.0.9 // indirect
 	github.com/yosida95/uritemplate/v3 v3.0.2 // indirect
 	golang.org/x/oauth2 v0.35.0 // indirect
-	golang.org/x/text v0.35.0 // indirect
 )

@@ -14,6 +14,7 @@ import (
 
 	"github.com/JungHoonGhae/opendatactl/internal/apicall"
 	"github.com/JungHoonGhae/opendatactl/internal/catalog"
+	"github.com/JungHoonGhae/opendatactl/internal/dataset"
 	"github.com/JungHoonGhae/opendatactl/internal/fetch"
 	"github.com/JungHoonGhae/opendatactl/internal/portal"
 	"github.com/JungHoonGhae/opendatactl/internal/providerauth"
@@ -23,6 +24,20 @@ import (
 // PofelcddInfoInqireService) used to probe the describe scraper. If data.go.kr
 // ever retires it, the describe check will report drift — update this pk then.
 const CanaryPK = "15000908"
+
+// CombinedSwaggerCanaryPK is an API+FILE node whose legacy openapi.do route is
+// absent and whose callable operation comes from the exact ODCloud Swagger URL
+// referenced by the combined fileData page. It protects that fallback as a
+// separate seam from the legacy describe canary above.
+const CombinedSwaggerCanaryPK = "15127058"
+
+// FileCanaryPK exercises data.go.kr's standard metadata, labelled FILE detail
+// page and download-contract resolver without downloading the asset.
+const FileCanaryPK = "15117154"
+
+// SeoulFileCanaryPK exercises the external Seoul handoff, documented provider
+// catalogue and versioned FILE asset parser without downloading the asset.
+const SeoulFileCanaryPK = "15076355"
 
 // LinkCanaryPK is retained for compatibility with tests and downstream probes.
 // The live check now gets its full provider/variant inventory from apicall.
@@ -60,10 +75,66 @@ func runAt(ctx context.Context, fc *fetch.Client, baseURL string, now time.Time)
 	return []Check{
 		searchCheck(ctx, fc, baseURL),
 		describeCheck(ctx, fc, baseURL),
+		combinedSwaggerCheck(ctx, fc, baseURL),
+		fileAssetCheck(ctx, fc, baseURL, FileCanaryPK, "file-asset", "datagokr-file"),
+		fileAssetCheck(ctx, fc, baseURL, SeoulFileCanaryPK, "seoul-file", "seoul-file"),
 		linkCheckAt(ctx, fc, baseURL, now),
 		catalogCheck(),
 		semanticCheck(),
 	}
+}
+
+func combinedSwaggerCheck(ctx context.Context, fc *fetch.Client, baseURL string) Check {
+	spec, err := apicall.Describe(ctx, fc, baseURL, CombinedSwaggerCanaryPK)
+	if err != nil {
+		return Check{"odcloud-swagger", StatusDrift, "요청 실패: " + err.Error()}
+	}
+	if spec.DataName == "" || !strings.Contains(strings.ToUpper(spec.APIType), "REST") {
+		return Check{"odcloud-swagger", StatusDrift, fmt.Sprintf(
+			"통합 API+FILE 페이지의 이름 또는 REST 유형을 복원하지 못함 (pk=%s)", CombinedSwaggerCanaryPK)}
+	}
+	for _, operation := range spec.Operations {
+		if operation.ContractKind == apicall.ContractKindOfficialSwagger && operation.Endpoint != "" {
+			return Check{"odcloud-swagger", StatusOK, fmt.Sprintf(
+				"공식 Swagger에서 %d개 operation 복원 (pk=%s)", len(spec.Operations), CombinedSwaggerCanaryPK)}
+		}
+	}
+	return Check{"odcloud-swagger", StatusDrift, fmt.Sprintf(
+		"통합 페이지가 참조한 공식 Swagger operation을 복원하지 못함 (pk=%s)", CombinedSwaggerCanaryPK)}
+}
+
+func fileAssetCheck(ctx context.Context, transport dataset.Transport, baseURL, pk, name, wantAdapter string) Check {
+	contract, err := dataset.NewInspector(transport, baseURL).Inspect(ctx, dataset.Ref{PK: pk, Delivery: dataset.DeliveryFile})
+	if err != nil {
+		return Check{name, StatusDrift, "요청 실패: " + err.Error()}
+	}
+	if contract.Name == "" || contract.AdapterID != wantAdapter || contract.Capability != dataset.CapabilityRetrievable || len(contract.Assets) == 0 {
+		return Check{name, StatusDrift, fmt.Sprintf(
+			"FILE 계약의 이름·adapter·다운로드 자산을 복원하지 못함 (pk=%s, adapter=%s, assets=%d)",
+			pk, contract.AdapterID, len(contract.Assets))}
+	}
+	wantEvidence := map[string]bool{
+		dataset.EvidenceStandardMetadata:      false,
+		dataset.EvidenceFirstPartyWebContract: false,
+	}
+	if wantAdapter == "seoul-file" {
+		wantEvidence[dataset.EvidenceOfficialAPI] = false
+		if len(contract.Alternatives) == 0 {
+			return Check{name, StatusDrift, fmt.Sprintf("서울 공식 catalogue가 제공 형태를 반환하지 않음 (pk=%s)", pk)}
+		}
+	}
+	for _, evidence := range contract.Evidence {
+		if _, ok := wantEvidence[evidence.Kind]; ok {
+			wantEvidence[evidence.Kind] = true
+		}
+	}
+	for kind, present := range wantEvidence {
+		if !present {
+			return Check{name, StatusDrift, fmt.Sprintf("%s evidence가 누락됨 (pk=%s)", kind, pk)}
+		}
+	}
+	return Check{name, StatusOK, fmt.Sprintf("%s@r%d · 다운로드 자산 %d개 확인, 내려받지 않음 (pk=%s)",
+		contract.AdapterID, contract.AdapterRevision, len(contract.Assets), pk)}
 }
 
 // catalogCheck reports the local catalogue's freshness. A stale snapshot is the

@@ -6,6 +6,7 @@ func TestApplySuccessDialogIsAcceptedWhenListPropagationLags(t *testing.T) {
 	for _, message := range []string{
 		"활용신청이 완료되었습니다.",
 		"  활용신청이\n완료되었습니다.  ",
+		"신청이 완료되었습니다. 신청된 API는 1~2시간 후 호출 가능합니다. 일부 API에서 24시간 후 인증이 가능합니다.",
 	} {
 		if !isApplySuccessDialog(message) {
 			t.Errorf("isApplySuccessDialog(%q) = false, want true", message)
@@ -20,6 +21,20 @@ func TestApplySuccessDialogIsAcceptedWhenListPropagationLags(t *testing.T) {
 		if isApplySuccessDialog(message) {
 			t.Errorf("isApplySuccessDialog(%q) = true, want false", message)
 		}
+	}
+}
+
+func TestApplyFormLocationAcceptsLegacyAndODCloudForms(t *testing.T) {
+	for _, location := range []string{
+		"https://www.data.go.kr/iim/api/selectDevAcountRequestForm.do?x=1",
+		"https://www.data.go.kr/iim/api/multiCloudApiRequestForm.do?x=1",
+	} {
+		if !isApplyFormLocation(location) {
+			t.Errorf("valid application form rejected: %s", location)
+		}
+	}
+	if isApplyFormLocation("https://www.data.go.kr/index.do") {
+		t.Fatal("index page must not be accepted as an application form")
 	}
 }
 

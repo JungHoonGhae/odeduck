@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/tls"
 	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -85,6 +86,35 @@ func TestGetSetsUserAgent(t *testing.T) {
 	}
 }
 
+func TestGetWithHeadersNoRedirectDoesNotForwardAuthorization(t *testing.T) {
+	var redirected bool
+	destination := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+		redirected = true
+		if got := r.Header.Get("Authorization"); got != "" {
+			t.Errorf("redirected Authorization = %q, want empty", got)
+		}
+	}))
+	defer destination.Close()
+
+	origin := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		http.Redirect(w, &http.Request{}, destination.URL, http.StatusFound)
+	}))
+	defer origin.Close()
+
+	response, err := New(WithDelay(0)).GetWithHeadersNoRedirect(context.Background(), origin.URL, http.Header{
+		"Authorization": {"Infuser secret-key"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if response.Status != http.StatusFound {
+		t.Fatalf("status = %d, want redirect response", response.Status)
+	}
+	if redirected {
+		t.Fatal("credentialed request followed redirect")
+	}
+}
+
 // Two Gets on one client are spaced by at least the throttle delay.
 func TestThrottleSpacesRequests(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
@@ -157,6 +187,27 @@ func TestPostFormDocSendsFormAndParsesHTML(t *testing.T) {
 	}
 }
 
+func TestPostFormReturnsBoundedRawResponse(t *testing.T) {
+	var got string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if err := r.ParseForm(); err != nil {
+			t.Fatal(err)
+		}
+		got = r.Form.Get("seq")
+		w.Header().Set("Content-Type", "application/zip")
+		_, _ = w.Write([]byte("PK fixture"))
+	}))
+	defer srv.Close()
+
+	res, err := New(WithDelay(0)).PostForm(context.Background(), srv.URL, url.Values{"seq": {"51"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != "51" || res.Status != http.StatusOK || res.ContentType != "application/zip" || string(res.Body) != "PK fixture" {
+		t.Fatalf("post form got=%q response=%+v", got, res)
+	}
+}
+
 func TestGetRejectsOversizedResponse(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = w.Write([]byte("123456789"))
@@ -166,5 +217,46 @@ func TestGetRejectsOversizedResponse(t *testing.T) {
 	_, err := New(WithDelay(0), WithMaxResponseBytes(8)).Get(context.Background(), srv.URL)
 	if !errors.Is(err, ErrResponseTooLarge) {
 		t.Fatalf("oversized response error = %v, want ErrResponseTooLarge", err)
+	}
+}
+
+func TestOpenGETUsesSeparateStreamingTimeout(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte("streamed"))
+	}))
+	defer srv.Close()
+
+	client := New(WithDelay(0), WithStreamTimeout(5*time.Second))
+	client.http.Timeout = time.Nanosecond
+	response, err := client.OpenGET(context.Background(), srv.URL)
+	if err != nil {
+		t.Fatalf("OpenGET inherited interactive timeout: %v", err)
+	}
+	defer response.Body.Close()
+	body, err := io.ReadAll(response.Body)
+	if err != nil || string(body) != "streamed" {
+		t.Fatalf("body=%q err=%v", body, err)
+	}
+}
+
+func TestOpenPostFormStreamsBodyAndForm(t *testing.T) {
+	var got string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if err := r.ParseForm(); err != nil {
+			t.Fatal(err)
+		}
+		got = r.Form.Get("seq")
+		_, _ = w.Write([]byte("streamed-post"))
+	}))
+	defer server.Close()
+
+	response, err := New(WithDelay(0)).OpenPostForm(context.Background(), server.URL, url.Values{"seq": {"51"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer response.Body.Close()
+	body, err := io.ReadAll(response.Body)
+	if err != nil || string(body) != "streamed-post" || got != "51" {
+		t.Fatalf("form=%q body=%q err=%v", got, body, err)
 	}
 }

@@ -82,10 +82,18 @@ func TestSecureEndpointAllowsOnlyOfficialHTTPSGateway(t *testing.T) {
 	if got != "https://apis.data.go.kr/123/service/op?numOfRows=10" {
 		t.Fatalf("secure endpoint = %q", got)
 	}
+	odcloud, err := SecureEndpoint("http://api.odcloud.kr/api/15044249/v1/uddi:test?page=1")
+	if err != nil {
+		t.Fatalf("official ODCloud gateway rejected: %v", err)
+	}
+	if odcloud != "https://api.odcloud.kr/api/15044249/v1/uddi:test?page=1" {
+		t.Fatalf("secure ODCloud endpoint = %q", odcloud)
+	}
 
 	for _, endpoint := range []string{
 		"https://evil.example/steal",
 		"http://apis.data.go.kr.evil.example/steal",
+		"https://api.odcloud.kr.evil.example/steal",
 		"https://user@apis.data.go.kr/steal",
 		"https://apis.data.go.kr:8443/steal",
 		"https://apis.data.go.kr/steal?serviceKey=already-there",

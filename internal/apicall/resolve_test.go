@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"path/filepath"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -371,6 +372,7 @@ func TestSafetyKoreaInsecureOriginStaysInspectionRequired(t *testing.T) {
 }
 
 func TestResolveRejectsEndpointLookingMarkupOnLinkDataset(t *testing.T) {
+	isolateResolveCatalog(t)
 	const pk = "15116894"
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/data/"+pk+"/openapi.do" {
@@ -401,6 +403,7 @@ func TestResolveRejectsEndpointLookingMarkupOnLinkDataset(t *testing.T) {
 }
 
 func TestUnknownAPITypeFailsClosed(t *testing.T) {
+	isolateResolveCatalog(t)
 	const pk = "15116894"
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = w.Write([]byte(`<html><body>
@@ -420,6 +423,14 @@ func TestUnknownAPITypeFailsClosed(t *testing.T) {
 	if _, err := Resolve(context.Background(), fc, srv.URL, pk, ""); err == nil || !strings.Contains(err.Error(), "REST로 확인") {
 		t.Fatalf("Resolve error = %v, want unknown-type rejection", err)
 	}
+}
+
+func isolateResolveCatalog(t *testing.T) {
+	t.Helper()
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, ".config"))
+	t.Setenv("APPDATA", filepath.Join(home, "AppData", "Roaming"))
 }
 
 func TestLinkURLLookupRejectsUnsafeTarget(t *testing.T) {

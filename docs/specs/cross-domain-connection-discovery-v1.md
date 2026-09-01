@@ -50,7 +50,7 @@ v1은 데이터만으로 사업 성공, 매출, 지불의사, 인과관계, 법�
 도구 유형은 기존 세 진입점을 유지한다.
 
 1. `catalog_search`: 검색과 연결 후보 생성
-2. `describe_api`: 선택한 각 PK의 operation, endpoint, 요청변수, 승인 조건 확인
+2. `inspect_dataset`: 선택한 각 PK의 API/LINK 계약 또는 FILE 자산·실제 컬럼 확인
 3. `call_api`: 명세 검증, 인증키 주입, bounded 응답 호출과 선택적 field profile
 
 활용승인이 없을 때만 기존 `apply`가 2.5단계로 들어간다. 수천 개 endpoint를 별도 MCP tool로
@@ -109,9 +109,9 @@ field 아래 값으로 펼친다. OpenDataCTL은 이 public sample을 영구 저
 빈 후보 근거, 빈 Incremental Value, edge kind/key 누락, 변환 없는 proxy도 거부한다. 검색 점수 1위는
 자동으로 카드가 되지 않는다.
 
-그 다음 호스트는 카드의 모든 노드에 `describe_api`를 반복하고, 공통 지역·기간이 있는 소수 pair만
-`call_api`로 표본을 가져온다. field profile을 비교해도 자동 join 증명은 아니며, namespace와 grain을
-공식 설명으로 먼저 확인해야 한다.
+그 다음 호스트는 카드의 모든 노드에 `inspect_dataset`을 반복한다. API/LINK는 공통 지역·기간이 있는
+소수 pair만 `call_api`로 표본을 가져오고, FILE은 `observe=true`로 실제 컬럼과 해시를 확인한다. field
+profile을 비교해도 자동 join 증명은 아니며, namespace와 grain을 공식 설명으로 먼저 확인해야 한다.
 
 ### 4.2 독립 CLI
 
@@ -217,9 +217,9 @@ v1의 최종 connection 최대 3개 제한은 유지한다. 대신 data.go.kr의
 최대 3개 노드, 전체 최대 21개를 제공한다. 사용자는 같은 선택지에서 서로 다른 세 개를 골라 여러
 조합을 비교할 수 있지만, 명시적으로 고른 항목만 `connections`의 `candidate`가 된다.
 
-FILE 노드는 `svcType=FILE`, `nextAction=inspect_file_data|inspect_file_api_contract`, 공식 `detailUrl`과 formats를 갖는다.
-후자는 포털의 JSON+XML 자동변환 badge를 보존한 상태이지 현재 call_api 계약은 아니다.
-검색과 조합 후보에는 참여하지만 `describe_api → call_api`가 가능한 것처럼 표시하지 않는다. FILE이
+FILE 노드는 `svcType=FILE`, `nextAction=inspect_dataset`, 공식 `detailUrl`과 formats를 갖는다.
+JSON+XML 자동변환 badge는 formats 증거로 보존하지만 현재 call_api 계약은 아니다.
+검색과 조합 후보에는 참여하지만 `inspect_dataset → call_api`가 가능한 것처럼 표시하지 않는다. FILE이
 포함된 후보의 evidenceRequired는 공식 컬럼·갱신일·coverage·다운로드 조건과 bounded 파일 표본을
 먼저 확인하도록 바뀐다. 상세 결정과 하위 호환성은
 [ADR 0004](../adr/0004-broad-catalog-bounded-composition.md)에 기록한다.

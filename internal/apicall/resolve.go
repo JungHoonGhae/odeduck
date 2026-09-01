@@ -48,7 +48,7 @@ func (e *ErrAmbiguousOperation) Error() string {
 // "the only one there is", which fails loudly rather than picking for you when
 // there is more than one.
 func Resolve(ctx context.Context, f *fetch.Client, baseURL, pk, name string) (*Operation, error) {
-	spec, err := Describe(ctx, f, baseURL, pk)
+	spec, err := DescribeCatalogued(ctx, f, baseURL, pk)
 	if err != nil {
 		return nil, err
 	}

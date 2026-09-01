@@ -19,7 +19,8 @@ func doctorCmd() *cobra.Command {
 		Short: "스크래핑 상태 점검 — data.go.kr 마크업 변경(drift) 감지",
 		Long: `opendatactl 의 fragile scraping 이 아직 동작하는지 라이브로 점검합니다.
 data.go.kr 이 HTML 을 바꾸면 파서가 조용히 빈 결과를 내므로, doctor 가 각 seam
-(검색·REST describe·LINK 인계·활용신청 현황)을 실제로 호출해 데이터가 나오는지 확인합니다.
+(검색·REST describe·ODCloud Swagger·FILE/서울 자산·LINK 인계·활용신청 현황)을
+실제로 호출해 데이터가 나오는지 확인합니다.
 drift 가 하나라도 있으면 종료코드 1 을 반환합니다(CI 용).
 
 apply 점검은 활용신청 폼을 실제로 열어 필요한 입력요소가 남아 있는지 확인하되 **제출하지 않습니다.**

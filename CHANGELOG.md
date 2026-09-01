@@ -5,6 +5,68 @@ All notable changes to OpenDataCTL are documented here. Format follows
 [SemVer](https://semver.org/). The release workflow uses the `## [X.Y.Z]`
 section matching a `vX.Y.Z` tag as the GitHub release notes.
 
+## [Unreleased]
+
+## [0.14.0] - 2026-09-02
+
+### Added
+
+- Added one delivery-neutral `inspect_dataset` workflow for REST, LINK and FILE
+  nodes. FILE inspection can resolve provider assets and observe bounded CSV/DBF
+  schemas; API inspection now exposes fact-level provenance.
+- Release builds now publish a checksummed official catalogue snapshot that the
+  macOS/Linux and Windows installers validate and install atomically.
+- Public monthly catalogue streaming and a release-only official-file+web
+  composite make the prebuilt reproducible without an institutional API key.
+- A reviewed release-search golden set now protects representative direct and
+  natural-language discoveries from catalogue or ranking regressions.
+- Added the `oddsock` public brand and one-sock meerkat mark. Brand name,
+  tagline and asset path are generated from one checked configuration while the
+  `opendatactl` command and compatibility contracts remain unchanged.
+
+### Changed
+
+- Catalogue sync now prefers the documented data.go.kr bulk API and joins its
+  logical dataset, OpenAPI-operation and file-version lists. An explicit web
+  Adapter remains available when the bulk API is not approved.
+- Official snapshots retain REST/LINK operations, request-variable names,
+  approval modes and FILE co-representations. Portal HTML is a labelled fallback
+  only for facts the machine interfaces omit, such as required/sample parameter
+  details and concrete file asset identifiers.
+- Every catalogue hit now points to `inspect_dataset`, preserving the compact
+  search → inspect → call progression across delivery types.
+- API+FILE co-representations now expose both contracts by default, with an
+  explicit `delivery=api|file` selector and a FILE detail handoff even when API
+  remains the primary service type.
+- The redesigned combined API+FILE page, referenced official ODCloud Swagger,
+  and the portal's current individual-account application redirect are now
+  supported.
+- Automatic refreshes preserve a broader existing composite snapshot when an
+  upstream fallback would silently replace it with a narrower catalogue.
+- FILE observation streams GET and POST assets through bounded temporary files,
+  avoiding the ordinary 32 MiB in-memory response limit while retaining archive
+  entry, expanded-size and total-download guards.
+
+### Safety
+
+- Release coverage gates require API, FILE, REST, LINK and official-contract
+  minimums, preserve at least 50,000 API+FILE alternatives, and cap unknown
+  types; a high total row count alone cannot pass.
+- Prebuilt installation rejects malformed/non-official snapshots and upgrades a
+  newer but narrower web/API-only local snapshot while preserving a newer,
+  equally complete official snapshot.
+- Bulk-only catalogue metadata cannot trigger a credentialed API call until a
+  detailed first-party or official Swagger contract proves the invocation;
+  cancellation is propagated and large FILE streams use a bounded ten-minute
+  timeout instead of the short metadata timeout.
+- Account-wide catalogue credentials are pinned to the documented
+  `https://api.odcloud.kr` origin. Test portal overrides cannot receive them and
+  credentialed catalogue requests never follow redirects.
+- Installers checksum and structurally preflight the optional prebuilt catalogue
+  with the staged binary before replacing an installed binary.
+- The release baseline now uses Go 1.26.6 and patched `x/net`/`x/text`
+  dependencies; CI and tag builds run `govulncheck` before packaging.
+
 ## [0.13.0] - 2026-09-01
 
 ### Added

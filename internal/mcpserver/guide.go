@@ -5,7 +5,7 @@ package mcpserver
 // only one compact candidate list and one selected specification enter context.
 const GuideDoc = `# OpenDataCTL — data.go.kr 사용 가이드
 
-## 기본 경로: 넓게 검색 → 상세 확인 → 호출 가능한 데이터만 필요시 신청·호출
+## 기본 경로: 넓게 검색 → 실제 계약 검사 → 호출 가능한 데이터만 필요시 신청·호출
 
 ### 1. catalog_search(query, concepts?)
 모든 탐색은 여기서 시작한다. 구체적인 데이터명·현상을 찾는 요청이면 query만 사용한다. 사용자가
@@ -27,16 +27,25 @@ const GuideDoc = `# OpenDataCTL — data.go.kr 사용 가이드
 
 - restOnly는 생략하면 false다. 기본 결과는 REST, LINK, FILE을 모두 포함하므로 호출 방식이 다르다는
   이유로 유용한 데이터가 자연어 검색에서 사라지지 않는다. REST만 명시적으로 원할 때 restOnly=true를 사용한다.
-- LINK 데이터셋은 포털에 명세가 없으므로 describe_api에서 provider 계약을 검사한다.
+- LINK 데이터셋은 포털에 명세가 없으므로 inspect_dataset에서 provider 계약을 검사한다.
   implemented면 같은 call_api로 호출하고, blocked/not_implemented/inspection_required면 nextAction을 따른다.
-- FILE 데이터셋은 svcType=FILE, 공식 detailUrl과 formats를 반환한다. nextAction=inspect_file_data면
-  파일만, inspect_file_api_contract면 포털이 JSON+XML 자동변환 표현의 존재도 표시한 것이다. 후자도
-  현재 call_api 계약을 뜻하지 않으므로 공식 파일 상세의 컬럼·namespace를 먼저 확인한다.
+- FILE 데이터셋은 svcType=FILE, 공식 detailUrl과 formats를 반환한다. inspect_dataset(pk)는 포털 직접
+  다운로드 또는 검증된 provider Adapter를 통해 실제 파일 자산을 구조화한다. observe=true면 첫 번째 최신
+  자산을 bounded 다운로드하고 ZIP 내부 CSV 또는 SHP의 DBF 컬럼과 원본 SHA-256을 반환한다. 특정 과거
+  파일은 asset에 inspect 결과의 정확한 자산명을 넣는다. metadata 설명을 실제 컬럼으로 간주하지 않는다.
+  evidence는 사실의 출처와 안정성을 나타낸다. official_api/documented와 standard_metadata/documented를
+  우선하고, first_party_web_contract/fallback은 공식 machine interface에 빠진 자산 식별자를 보완한 것이다.
+  alternatives는 같은 provider가 공식적으로 광고한 SHEET·FILE·OPENAPI 표현이며, 존재 자체가 안전한
+  자동 호출을 뜻하지는 않는다.
 - lexical 결과의 relaxed=true면 모든 검색어를 만족하는 결과가 없어 일부 단어만 맞는 후보까지 확장한 것이다.
   terms와 각 hit의 matched를 보고 관련성을 다시 판단한다.
+- source=official은 문서화된 목록조회 API, source=official-file은 공개 월간 CSV,
+  source=official-file+web은 월간 CSV의 정확한 분류에 포털의 복수 제공형을 보강한 릴리즈 snapshot이다.
+  source=web은 나머지 원천 장애 시의 명시적 호환 fallback이다. 검색 결과의 사실 수준은 각 데이터셋을
+  inspect_dataset해 별도로 확인한다.
 - stale=true면 최근 신설 API가 빠졌을 수 있다. ` + "`opendatactl catalog sync`" + `로 갱신한다.
 
-후보를 하나 고른 뒤 그 hit의 pk를 describe_api에 넘긴다. 검색 결과만 보고 엔드포인트나
+후보를 하나 고른 뒤 그 hit의 pk를 inspect_dataset에 넘긴다. 검색 결과만 보고 엔드포인트나
 파라미터를 추측하지 않는다.
 
 ### 서로 다른 데이터 연결: 같은 catalog_search를 세 번 사용
@@ -64,18 +73,24 @@ const GuideDoc = `# OpenDataCTL — data.go.kr 사용 가이드
    실제 Connection Edge를 증명하지 않는다. 역할·expectedKeys·incrementalValue·whyCandidate가
    없거나 proxy 변환이 없으면 연결 카드를 만들지 않는다. 유효한 카드가 없을 때 abstention은 정상 결과다.
 
-각 candidate의 evidenceRequired를 따른다. API 노드는 각각 describe_api하고 공통 지역·기간으로
-call_api 표본을 가져온다. FILE 노드는 detailUrl의 공식 컬럼·갱신일·coverage를 확인한 뒤 작은 표본을
-다운로드한다. 실제 key namespace, grain, match rate, uniqueness, null rate, join cardinality와 duplicate
+각 candidate의 evidenceRequired를 따른다. 모든 노드는 각각 inspect_dataset한다. API는 공통 지역·기간으로
+call_api 표본을 가져오고, FILE은 observe=true로 실제 컬럼·해시를 확인한다. 실제 key namespace, grain,
+match rate, uniqueness, null rate, join cardinality와 duplicate
 expansion을 확인한다. 모든 필수 edge가 표본 검증되기 전에는 Verified Connection이라고
 부르지 않는다. 접근·승인 때문에 확인하지 못하면 blocked, 실제 불일치면 rejected다.
 
-### 2. describe_api(pk)
-선택한 데이터셋 하나의 상세기능, 실제 엔드포인트, 요청변수, 심의유형을 반환한다.
+### 2. inspect_dataset(pk, delivery?, observe?, asset?)
 
-svcType=FILE인 노드는 describe_api로 보내지 않는다. catalog_search가 준 detailUrl에서 파일 상세와
-컬럼을 확인한다. dataTypes에 API도 있고 nextAction=inspect_file_api_contract면 자동변환 표현이 있다는
-뜻이지만, /openapi.do 계약이 확인된 것은 아니다. svcType이 REST/LINK일 때만 describe_api 경로를 사용한다.
+기본 delivery=auto는 API+FILE 복수 제공형의 두 계약을 모두 반환한다. 한 제공형만 필요하면
+delivery=api 또는 delivery=file을 사용한다.
+선택한 Data Node 하나를 delivery-neutral하게 검사한다. REST/LINK는 상세기능, 실제 엔드포인트,
+요청변수와 심의유형을 반환하고 FILE은 provider, 갱신주기, 실제 다운로드 자산과 Adapter revision을 반환한다.
+FILE observe 결과가 지원 포맷을 찾지 못하면 warnings를 확인하고 컬럼을 추측하지 않는다. describe_api는
+기존 클라이언트를 위한 REST/LINK 호환 도구로만 남아 있다.
+
+- FILE metadata는 먼저 data.go.kr의 표준 JSON을 읽고 provider가 공식 catalogue API를 제공하면 그 최신
+  metadata와 제공 형태를 우선한다. HTML 기반 evidence는 다운로드 URL이나 버전 목록처럼 API가 주지 않는
+  사실에만 사용한다. fallback이 있다는 이유로 전체 계약을 공식 API라고 표현하지 않는다.
 
 - operations에서 호출할 상세기능을 고른다. op 값은 해당 endpoint의 마지막 경로 조각이다.
 - params의 Required가 필수인 요청변수를 구성한다. sample은 예시일 뿐 실제 요청 의도에 맞게 바꾼다.
@@ -109,15 +124,15 @@ AI가 선택한 OpenAPI의 활용신청을 실제 제출한다. purpose에는 �
   인증키 복사, 신청 폼 입력을 AI가 대신한다.
 
 ### 3. call_api(pk, op, params, profileFields?)
-describe_api에서 확인한 pk·op·params로 승인된 API를 호출한다. MCP 입력에는 raw endpoint와
+inspect_dataset에서 확인한 REST/LINK pk·op·params로 승인된 API를 호출한다. MCP 입력에는 raw endpoint와
 serviceKey가 없다. opendatactl이 pk로 REST 명세 또는 LINK contract를 다시 읽고 endpoint를 결정하며
 필수 파라미터 누락을 검사한 뒤 data.go.kr 세션 키 또는 provider scope별 저장 키를 주입한다.
 XML 응답은 JSON으로 변환한다.
 
-svcType=FILE은 call_api 대상이 아니다. 파일 표본은 catalog_search의 detailUrl과 공식 다운로드 조건을
-따라 별도로 읽고, API와 결합할 때 evidenceRequired에 나온 동일한 key/grain 검사를 적용한다.
+svcType=FILE은 call_api 대상이 아니다. inspect_dataset(observe=true)의 실제 컬럼·hash를 기준으로
+API와 결합할 때 evidenceRequired에 나온 동일한 key/grain 검사를 적용한다.
 
-- 상세기능이 하나면 op를 생략할 수 있다. 여러 개면 describe_api에서 확인한 op를 지정한다.
+- 상세기능이 하나면 op를 생략할 수 있다. 여러 개면 inspect_dataset에서 확인한 op를 지정한다.
 - body의 resultCode 또는 제공기관별 성공 코드를 확인한다. HTTP 200만으로 성공을 판단하지 않는다.
 - 미승인 오류면 아래의 계정 보조 도구를 사용한 뒤 같은 pk로 다시 호출한다.
 - 방금 승인된 API라면 waitSeconds=300을 줄 수 있다. 403은 승인 실패나 키 오류가 아니라
