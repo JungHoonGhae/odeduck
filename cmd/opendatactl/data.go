@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/JungHoonGhae/opendatactl/internal/apicall"
+	"github.com/JungHoonGhae/opendatactl/internal/dataset"
 	"github.com/JungHoonGhae/opendatactl/internal/output"
 	"github.com/JungHoonGhae/opendatactl/internal/portal"
 	"github.com/JungHoonGhae/opendatactl/internal/providerauth"
@@ -90,13 +91,41 @@ func describeCmd() *cobra.Command {
 			if base == "" {
 				base = portal.BaseURL
 			}
-			spec, err := apicall.Describe(cmd.Context(), newFetchClient(), base, args[0])
+			spec, err := apicall.DescribeCatalogued(cmd.Context(), newFetchClient(), base, args[0])
 			if err != nil {
 				return err
 			}
 			return output.WriteJSON(cmd.OutOrStdout(), spec)
 		},
 	}
+}
+
+func inspectCmd() *cobra.Command {
+	var observe bool
+	var assetName string
+	var delivery string
+	c := &cobra.Command{
+		Use:   "inspect <publicDataPk>",
+		Short: "데이터 상세 — REST/LINK 계약 또는 FILE 실제 스키마 검사",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			base := flagBaseURL
+			if base == "" {
+				base = portal.BaseURL
+			}
+			result, err := dataset.NewUnifiedInspector(newFetchClient(), base).Inspect(cmd.Context(), dataset.InspectionRequest{
+				PK: args[0], Delivery: dataset.DeliverySelection(delivery), Observe: observe, Asset: assetName,
+			})
+			if err != nil {
+				return err
+			}
+			return output.WriteJSON(cmd.OutOrStdout(), result)
+		},
+	}
+	c.Flags().BoolVar(&observe, "observe", false, "FILE 최신 자산을 bounded 다운로드해 실제 CSV/DBF 컬럼과 SHA-256 검사")
+	c.Flags().StringVar(&assetName, "asset", "", "검사할 FILE 자산의 정확한 이름 (기본: 목록 첫 번째 최신 자산)")
+	c.Flags().StringVar(&delivery, "delivery", "auto", "검사할 제공형: auto | api | file (auto는 복수 제공형을 모두 반환)")
+	return c
 }
 
 func callCmd() *cobra.Command {

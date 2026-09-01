@@ -17,11 +17,12 @@ import (
 
 // 목적분류(prcusePrpos) 코드. 자동승인 개발계정 신청의 활용목적 카테고리.
 const (
-	PurposeWeb      = "PROS01" // 웹 사이트 개발
-	PurposeApp      = "PROS02" // 앱개발
-	PurposeEtc      = "PROS03" // 기타
-	PurposeRef      = "PROS04" // 참고자료
-	PurposeResearch = "PROS05" // 연구(논문 등)
+	PurposeWeb                = "PROS01" // 웹 사이트 개발
+	PurposeApp                = "PROS02" // 앱개발
+	PurposeEtc                = "PROS03" // 기타
+	PurposeRef                = "PROS04" // 참고자료
+	PurposeResearch           = "PROS05" // 연구(논문 등)
+	multiCloudApplicationPath = "multiCloudApiRequestForm.do"
 )
 
 // A headless apply browser uses one fixed profile and CDP port. Serializing the
@@ -202,7 +203,10 @@ func onApplyForm(ctx context.Context, pk string, body func(tctx context.Context,
 	}
 
 	// 신청 폼 진입: currentMyMenuId 쿠키가 전제조건(없으면 index.do 로 튕김).
-	formURL := fmt.Sprintf("%s/tcs/dss/redirectDevAcountRequestForm.do?publicDataPk=%s&isBusinessApply=N", BaseURL, pk)
+	// Match the portal's current fn_goOpenAPIRequestForm contract: individual
+	// accounts pass an empty isBusinessApply value. The legacy hard-coded "N"
+	// now redirects a valid request back to index.do on the KRDS portal.
+	formURL := fmt.Sprintf("%s/tcs/dss/redirectDevAcountRequestForm.do?publicDataPk=%s&isBusinessApply=", BaseURL, pk)
 	var loc string
 	if err := chromedp.Run(tctx,
 		network.SetCookie("currentMyMenuId", "M020105").WithDomain("www.data.go.kr").WithPath("/"),
@@ -210,11 +214,11 @@ func onApplyForm(ctx context.Context, pk string, body func(tctx context.Context,
 	); err != nil {
 		return err
 	}
-	// settle: 폼(selectDevAcountRequestForm) 또는 index.do 로 안착할 때까지.
+	// settle: legacy REST form, ODCloud multi form, or index.do.
 	deadline := time.Now().Add(15 * time.Second)
 	for time.Now().Before(deadline) {
 		chromedp.Run(tctx, chromedp.Location(&loc))
-		if strings.Contains(loc, "selectDevAcountRequestForm.do") || strings.Contains(loc, "index.do") {
+		if isApplyFormLocation(loc) || strings.Contains(loc, "index.do") {
 			break
 		}
 		time.Sleep(400 * time.Millisecond)
@@ -222,10 +226,15 @@ func onApplyForm(ctx context.Context, pk string, body func(tctx context.Context,
 	if strings.Contains(loc, "common-login") || strings.Contains(loc, "auth.data.go.kr") {
 		return ErrNotLoggedIn
 	}
-	if strings.Contains(loc, "index.do") || !strings.Contains(loc, "selectDevAcountRequestForm.do") {
+	if strings.Contains(loc, "index.do") || !isApplyFormLocation(loc) {
 		return fmt.Errorf("%w (pk=%s) — 이미 신청했거나 신청 불가한 데이터일 수 있습니다", ErrFormUnreachable, pk)
 	}
 	return body(tctx, dialog)
+}
+
+func isApplyFormLocation(location string) bool {
+	return strings.Contains(location, "selectDevAcountRequestForm.do") ||
+		strings.Contains(location, multiCloudApplicationPath)
 }
 
 // ErrFormUnreachable means the 활용신청 form did not load for this pk. It is a
@@ -310,7 +319,8 @@ func sameApplicationTitle(applicationTitle, dataName string) bool {
 
 func isApplySuccessDialog(message string) bool {
 	message = strings.Join(strings.Fields(message), " ")
-	return message == "활용신청이 완료되었습니다."
+	return message == "활용신청이 완료되었습니다." ||
+		strings.HasPrefix(message, "신청이 완료되었습니다. 신청된 API는 1~2시간 후 호출 가능합니다.")
 }
 
 // probeListLenient navigates the reused tab to the 활용신청 현황 list and returns

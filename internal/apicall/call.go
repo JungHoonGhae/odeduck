@@ -30,8 +30,8 @@ var ErrPropagating = errors.New("게이트웨이에 아직 반영되지 않았�
 // specific sentinel. CallResult is still returned so callers can inspect body.
 var ErrHTTPStatus = errors.New("OpenAPI가 실패 HTTP 상태를 반환했습니다")
 
-// SecureEndpoint constrains automatic serviceKey injection to the government
-// gateway. Portal pages are publisher-controlled input; treating a Swagger host
+// SecureEndpoint constrains automatic serviceKey injection to the two government
+// gateways documented by data.go.kr. Portal pages are publisher-controlled input; treating a Swagger host
 // as trusted would let a bad spec send the account-wide key elsewhere. The
 // gateway historically publishes http URLs, so exact gateway URLs are upgraded
 // to HTTPS rather than rejected.
@@ -40,11 +40,12 @@ func SecureEndpoint(endpoint string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("엔드포인트 URL 해석 실패: %w", err)
 	}
-	if u.User != nil || !strings.EqualFold(u.Hostname(), "apis.data.go.kr") {
-		return "", fmt.Errorf("인증키는 apis.data.go.kr 공식 게이트웨이에만 전송할 수 있습니다")
+	host := strings.ToLower(strings.TrimSuffix(u.Hostname(), "."))
+	if u.User != nil || (host != "apis.data.go.kr" && host != "api.odcloud.kr") {
+		return "", fmt.Errorf("인증키는 data.go.kr 공식 게이트웨이에만 전송할 수 있습니다")
 	}
 	if port := u.Port(); port != "" && port != "443" {
-		return "", fmt.Errorf("인증키는 apis.data.go.kr HTTPS 기본 포트에만 전송할 수 있습니다")
+		return "", fmt.Errorf("인증키는 공식 게이트웨이의 HTTPS 기본 포트에만 전송할 수 있습니다")
 	}
 	if u.Scheme != "http" && u.Scheme != "https" {
 		return "", fmt.Errorf("OpenAPI 엔드포인트는 HTTP(S) URL이어야 합니다")
@@ -58,7 +59,7 @@ func SecureEndpoint(endpoint string) (string, error) {
 		}
 	}
 	u.Scheme = "https"
-	u.Host = "apis.data.go.kr"
+	u.Host = host
 	return u.String(), nil
 }
 

@@ -42,6 +42,13 @@ main() {
         asset="${LEGACY_BINARY}_${ver_no_v}_${os}_${arch}.tar.gz"
         download_asset "$version" "$asset" "${tmpdir}/${asset}"
     fi
+    catalog_asset="opendatactl-catalog.json.gz"
+    catalog_available=0
+    if download_asset "$version" "$catalog_asset" "${tmpdir}/${catalog_asset}"; then
+        catalog_available=1
+    else
+        echo "Prebuilt catalogue is not available for ${version}; install will continue without it."
+    fi
     download_asset "$version" "checksums.txt" "${tmpdir}/checksums.txt"
 
     echo "Verifying checksum..."
@@ -53,11 +60,23 @@ main() {
         else
             sha256sum -c asset.sha256 >/dev/null
         fi
+        if [ "$catalog_available" -eq 1 ]; then
+            grep " ${catalog_asset}\$" checksums.txt > catalog.sha256
+            if command -v shasum >/dev/null 2>&1; then
+                shasum -a 256 -c catalog.sha256 >/dev/null
+            else
+                sha256sum -c catalog.sha256 >/dev/null
+            fi
+        fi
     )
 
     tar -xzf "${tmpdir}/${asset}" -C "$tmpdir"
     if [ ! -f "${tmpdir}/${BINARY}" ] && [ -f "${tmpdir}/${LEGACY_BINARY}" ]; then
         cp "${tmpdir}/${LEGACY_BINARY}" "${tmpdir}/${BINARY}"
+    fi
+
+    if [ "$catalog_available" -eq 1 ]; then
+        "${tmpdir}/${BINARY}" catalog install-snapshot "${tmpdir}/${catalog_asset}" --check-only -f table
     fi
 
     # 쓰기 가능하면 그대로, 아니면 sudo. /usr/local/bin 이 없는 환경도 있으므로
@@ -74,6 +93,10 @@ main() {
     if [ -f "${tmpdir}/${LEGACY_BINARY}" ]; then
         $SUDO mv "${tmpdir}/${LEGACY_BINARY}" "${INSTALL_DIR}/${LEGACY_BINARY}"
         $SUDO chmod +x "${INSTALL_DIR}/${LEGACY_BINARY}"
+    fi
+
+    if [ "$catalog_available" -eq 1 ]; then
+        "${INSTALL_DIR}/${BINARY}" catalog install-snapshot "${tmpdir}/${catalog_asset}" -f table
     fi
 
     echo ""

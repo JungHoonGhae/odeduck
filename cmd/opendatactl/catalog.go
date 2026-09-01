@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"fmt"
+	"os"
 	"sort"
 	"strings"
 	"time"
@@ -10,6 +11,7 @@ import (
 	"github.com/JungHoonGhae/opendatactl/internal/agentplan"
 	"github.com/JungHoonGhae/opendatactl/internal/catalog"
 	"github.com/JungHoonGhae/opendatactl/internal/output"
+	"github.com/JungHoonGhae/opendatactl/internal/portal"
 	"github.com/spf13/cobra"
 )
 
@@ -17,7 +19,24 @@ var (
 	generateDiscoveryPlan = agentplan.Generate
 	expandDiscoveryPlan   = agentplan.Expand
 	composeDiscoveryPlan  = agentplan.Compose
+	newOfficialSource     = func(key string) catalog.SyncSource {
+		return catalog.NewOfficialSource(newFetchClient(), key)
+	}
 )
+
+func catalogPortalBaseURL() string {
+	if flagBaseURL != "" {
+		return flagBaseURL
+	}
+	return portal.BaseURL
+}
+
+func newCombinedCatalogSource() catalog.SyncSource {
+	return catalog.NewCombinedSource(
+		catalog.NewOfficialFileSource(newFetchClient(), catalogPortalBaseURL()),
+		catalog.NewWebSource(newPortalClient()),
+	)
+}
 
 func catalogCmd() *cobra.Command {
 	c := &cobra.Command{
@@ -37,24 +56,80 @@ func catalogCmd() *cobra.Command {
   opendatactl catalog info            언제 수집했는지 / 몇 건인지`,
 		RunE: func(cmd *cobra.Command, _ []string) error { return cmd.Help() },
 	}
-	c.AddCommand(catalogSyncCmd(), catalogSemanticBuildCmd(), catalogSearchCmd(), catalogDiscoverCmd(), catalogOrgsCmd(), catalogInfoCmd())
+	c.AddCommand(catalogSyncCmd(), catalogInstallSnapshotCmd(), catalogSemanticBuildCmd(), catalogSearchCmd(), catalogDiscoverCmd(), catalogOrgsCmd(), catalogInfoCmd(), catalogValidateReleaseCmd())
 	return c
+}
+
+func catalogInstallSnapshotCmd() *cobra.Command {
+	var checkOnly bool
+	command := &cobra.Command{
+		Use:   "install-snapshot <catalog.json.gz>",
+		Short: "검증된 릴리즈 사전 구축 카탈로그를 검사하거나 원자적으로 설치",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			file, err := os.Open(args[0])
+			if err != nil {
+				return err
+			}
+			var result catalog.InstallResult
+			var installErr error
+			if checkOnly {
+				result, installErr = catalog.ValidateSnapshot(file)
+			} else {
+				result, installErr = catalog.InstallSnapshot(file)
+			}
+			closeErr := file.Close()
+			if installErr != nil {
+				return installErr
+			}
+			if closeErr != nil {
+				return closeErr
+			}
+			format, err := resolveFormat()
+			if err != nil {
+				return err
+			}
+			if format != output.Table {
+				return output.WriteJSON(cmd.OutOrStdout(), result)
+			}
+			if checkOnly {
+				fmt.Fprintf(cmd.OutOrStdout(), "사전 구축 카탈로그 검증 완료 (%d건, %s, %s)\n", result.Entries, result.Source, result.SyncedAt)
+				return nil
+			}
+			if result.Installed {
+				fmt.Fprintf(cmd.OutOrStdout(), "사전 구축 카탈로그 %d건 설치 (%s, %s)\n", result.Entries, result.Source, result.SyncedAt)
+			} else {
+				fmt.Fprintf(cmd.OutOrStdout(), "기존 로컬 카탈로그가 더 최신하고 coverage도 동등 이상이라 유지했습니다 (%s)\n", result.SyncedAt)
+			}
+			return nil
+		},
+	}
+	command.Flags().BoolVar(&checkOnly, "check-only", false, "로컬 상태를 바꾸지 않고 압축·구조·출처만 검증")
+	return command
 }
 
 func catalogSyncCmd() *cobra.Command {
 	var dtype string
+	var sourceMode string
 	var perPage int
 	var ifStale bool
 	c := &cobra.Command{
 		Use:   "sync",
 		Short: "포털에서 전체 목록을 받아 로컬 카탈로그 갱신",
-		Long: `포털의 전체 오픈API와 파일데이터 목록을 수집해 로컬 카탈로그를 갱신합니다.
+		Long: `공식 목록조회 API를 우선 사용해 전체 오픈API와 파일데이터 카탈로그를 갱신합니다.
+기본 auto는 계정 인증키로 공식 API를 시도하고, 해당 API가 기관 전용이라 사용할 수 없으면
+공개 월간 목록 CSV를 한 번 스트리밍합니다. 둘 다 실패할 때만 포털 웹 수집으로 fallback합니다.
+릴리즈 snapshot은 --source official-file+web으로 로그인·secret 없이 재현할 수 있습니다.
 
 --if-stale 은 카탈로그가 아직 신선하면 아무것도 하지 않고 성공합니다. 갱신 주기를
 판단하는 일을 사람이 기억하지 않아도 되도록, cron 이나 CI 가 조건 없이 걸어두는 용도입니다:
 
   0 4 * * *  opendatactl catalog sync --if-stale`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
+			sourceMode = strings.ToLower(strings.TrimSpace(sourceMode))
+			if sourceMode != "auto" && sourceMode != catalog.SourceOfficial && sourceMode != catalog.SourceCombined && sourceMode != catalog.SourceOfficialFile && sourceMode != catalog.SourceWeb {
+				return fmt.Errorf("--source는 auto, official, official-file+web, official-file, web 중 하나여야 합니다")
+			}
 			if ifStale {
 				// Only an existing, still-fresh catalogue is a reason to skip. A
 				// missing or unreadable one means sync is exactly what's needed.
@@ -65,23 +140,78 @@ func catalogSyncCmd() *cobra.Command {
 				}
 			}
 			start := time.Now()
-			// Report every page, not every thousand: this runs for minutes, and
-			// silence for the first stretch is indistinguishable from a hang.
-			cat, err := catalog.Sync(cmd.Context(), newPortalClient(), dtype, perPage, func(n int) {
+			progress := func(n int) {
 				fmt.Fprintf(cmd.ErrOrStderr(), "\r  수집 중… %d건", n)
-			})
+			}
+			var cat *catalog.Catalog
+			var err error
+			var source catalog.SyncSource
+			if sourceMode == catalog.SourceOfficialFile {
+				source = catalog.NewOfficialFileSource(newFetchClient(), catalogPortalBaseURL())
+				cat, err = source.Sync(cmd.Context(), dtype, perPage, progress)
+			}
+			if sourceMode == catalog.SourceCombined {
+				source = newCombinedCatalogSource()
+				cat, err = source.Sync(cmd.Context(), dtype, perPage, progress)
+			}
+			if sourceMode == "auto" || sourceMode == catalog.SourceOfficial {
+				key := strings.TrimSpace(os.Getenv("OPENDATACTL_CATALOG_KEY"))
+				var keyErr error
+				if key == "" {
+					key, keyErr = portal.APIKey(cmd.Context())
+				}
+				if keyErr == nil {
+					source = newOfficialSource(key)
+					cat, err = source.Sync(cmd.Context(), dtype, perPage, progress)
+				} else {
+					err = keyErr
+				}
+				if sourceMode == catalog.SourceOfficial && err != nil {
+					return err
+				}
+				if sourceMode == "auto" && err != nil {
+					fmt.Fprintf(cmd.ErrOrStderr(), "\n⚠ 공식 카탈로그 API를 사용할 수 없어 공개 월간 목록 CSV로 전환합니다: %v\n", err)
+					cat, err = nil, nil
+				}
+			}
+			if sourceMode == "auto" && cat == nil && err == nil {
+				source = newCombinedCatalogSource()
+				cat, err = source.Sync(cmd.Context(), dtype, perPage, progress)
+				if err != nil {
+					fmt.Fprintf(cmd.ErrOrStderr(), "\n⚠ 공개 월간 목록과 웹 보강을 결합할 수 없어 CSV-only fallback을 시도합니다: %v\n", err)
+					cat, err = nil, nil
+					source = catalog.NewOfficialFileSource(newFetchClient(), catalogPortalBaseURL())
+					cat, err = source.Sync(cmd.Context(), dtype, perPage, progress)
+					if err != nil {
+						fmt.Fprintf(cmd.ErrOrStderr(), "\n⚠ 공개 월간 목록 CSV를 사용할 수 없어 웹 수집으로 전환합니다: %v\n", err)
+						cat, err = nil, nil
+					}
+				}
+			}
+			if cat == nil && err == nil {
+				source = catalog.NewWebSource(newPortalClient())
+				cat, err = source.Sync(cmd.Context(), dtype, perPage, progress)
+			}
 			if err != nil {
 				return err
+			}
+			if sourceMode == "auto" {
+				if current, loadErr := catalog.Load(); loadErr == nil && catalog.PreserveOnAutoSync(current, cat) {
+					fmt.Fprintf(cmd.ErrOrStderr(), "\n⚠ 새 snapshot(source=%s, %d건)이 기존 snapshot(source=%s, %d건)의 coverage를 낮춰 기존 파일을 유지합니다\n",
+						cat.Source, len(cat.Entries), current.Source, len(current.Entries))
+					return nil
+				}
 			}
 			if err := cat.Save(); err != nil {
 				return err
 			}
-			fmt.Fprintf(cmd.ErrOrStderr(), "\r카탈로그 %d건 저장 (%s, %.0f초)\n",
-				len(cat.Entries), dtype, time.Since(start).Seconds())
+			fmt.Fprintf(cmd.ErrOrStderr(), "\r카탈로그 %d건 저장 (%s, source=%s, %.0f초)\n",
+				len(cat.Entries), dtype, cat.Source, time.Since(start).Seconds())
 			return nil
 		},
 	}
 	c.Flags().StringVar(&dtype, "type", "ALL", "데이터 유형: ALL | API | FILE")
+	c.Flags().StringVar(&sourceMode, "source", "auto", "수집 원천: auto | official | official-file+web | official-file | web")
 	c.Flags().IntVar(&perPage, "per-page", 200, "페이지당 요청 건수")
 	c.Flags().BoolVar(&ifStale, "if-stale", false, "카탈로그가 오래됐을 때만 수집 (cron/CI 용)")
 	return c
@@ -507,13 +637,18 @@ func catalogInfoCmd() *cobra.Command {
 			if format != output.Table {
 				return output.WriteJSON(cmd.OutOrStdout(), map[string]any{
 					"syncedAt": cat.SyncedAt, "type": cat.Type,
+					"source":  cat.Source,
 					"entries": len(cat.Entries), "stale": cat.Stale(),
 					"svcTypes": cat.SvcTypes(),
 				})
 			}
-			fmt.Fprintf(cmd.OutOrStdout(), "수집 %s (%.0f시간 전) · %s 유형 · %d건%s\n",
+			source := cat.Source
+			if source == "" {
+				source = "legacy"
+			}
+			fmt.Fprintf(cmd.OutOrStdout(), "수집 %s (%.0f시간 전) · %s 원천 · %s 유형 · %d건%s\n",
 				cat.SyncedAt.Local().Format("2006-01-02 15:04"), cat.Age().Hours(),
-				cat.Type, len(cat.Entries),
+				source, cat.Type, len(cat.Entries),
 				map[bool]string{true: " · ⚠ 오래됨, sync 권장", false: ""}[cat.Stale()])
 			// Which share is callable from the portal at all is the number that
 			// decides whether a search result is worth applying for.
@@ -534,6 +669,32 @@ func catalogInfoCmd() *cobra.Command {
 					note = " — 로그인 없이 파일 상세·다운로드 확인 가능, call 대상 아님"
 				}
 				fmt.Fprintf(cmd.OutOrStdout(), "  %-6s %6d건%s\n", k, byType[k], note)
+			}
+			return nil
+		},
+	}
+}
+
+func catalogValidateReleaseCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:    "validate-release",
+		Short:  "사람이 검수한 대표 검색 질의로 snapshot 회귀 검사",
+		Hidden: true,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			cat, err := loadCatalog(cmd)
+			if err != nil {
+				return err
+			}
+			golden, err := catalog.DefaultReleaseGoldenSet()
+			if err != nil {
+				return err
+			}
+			report := catalog.ValidateReleaseQuality(cat, golden)
+			if err := output.WriteJSON(cmd.OutOrStdout(), report); err != nil {
+				return err
+			}
+			if !report.Passed {
+				return fmt.Errorf("release 검색 품질 회귀 검사에 실패했습니다")
 			}
 			return nil
 		},

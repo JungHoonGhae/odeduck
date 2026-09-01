@@ -33,6 +33,11 @@ const DefaultDelay = 700 * time.Millisecond
 // long-lived MCP host can otherwise exhaust the process while decoding it.
 const DefaultMaxResponseBytes int64 = 32 << 20 // 32 MiB
 
+// DefaultStreamTimeout covers first-party catalogue/file downloads. It is
+// separate from the 60-second interactive response timeout because http.Client
+// timeout includes reading the entire streamed body.
+const DefaultStreamTimeout = 10 * time.Minute
+
 // ErrResponseTooLarge identifies a response that crossed the configured bound.
 var ErrResponseTooLarge = fmt.Errorf("HTTP 응답이 허용 크기를 초과했습니다")
 
@@ -45,14 +50,25 @@ type Response struct {
 	Body        []byte
 }
 
+// StreamResponse exposes a large response without buffering it. The caller must
+// close Body. It is reserved for first-party bulk files that are parsed as a
+// stream; ordinary API/page responses should keep using the bounded Response.
+type StreamResponse struct {
+	Status        int
+	ContentType   string
+	ContentLength int64
+	Body          io.ReadCloser
+}
+
 // Client is a rate-limited, host-agnostic HTTP transport. A single Client
 // shared across search/describe/call gives all of opendatactl's data.go.kr traffic
 // one throttle. Safe for concurrent use.
 type Client struct {
-	userAgent string
-	delay     time.Duration
-	http      *http.Client
-	maxBody   int64
+	userAgent     string
+	delay         time.Duration
+	http          *http.Client
+	maxBody       int64
+	streamTimeout time.Duration
 
 	mu      sync.Mutex
 	lastReq time.Time
@@ -82,13 +98,34 @@ func WithMaxResponseBytes(n int64) Option {
 	}
 }
 
+// WithStreamTimeout overrides the total timeout for OpenGET downloads.
+func WithStreamTimeout(d time.Duration) Option {
+	return func(c *Client) {
+		if d > 0 {
+			c.streamTimeout = d
+		}
+	}
+}
+
+// WithHTTPClient replaces the underlying HTTP client. It is primarily a test
+// seam for pinned-origin callers; production code should use NewHTTPClient so
+// the data.go.kr TLS policy and timeouts remain in force.
+func WithHTTPClient(client *http.Client) Option {
+	return func(c *Client) {
+		if client != nil {
+			c.http = client
+		}
+	}
+}
+
 // New builds a Client with sane defaults.
 func New(opts ...Option) *Client {
 	c := &Client{
-		userAgent: DefaultUserAgent,
-		delay:     DefaultDelay,
-		http:      NewHTTPClient(60 * time.Second),
-		maxBody:   DefaultMaxResponseBytes,
+		userAgent:     DefaultUserAgent,
+		delay:         DefaultDelay,
+		http:          NewHTTPClient(60 * time.Second),
+		maxBody:       DefaultMaxResponseBytes,
+		streamTimeout: DefaultStreamTimeout,
 	}
 	for _, o := range opts {
 		o(c)
@@ -137,7 +174,7 @@ func NewHTTPClient(timeout time.Duration) *http.Client {
 	}
 }
 
-// ponytail: single throttle across www+apis; split per-host if throughput matters.
+// Keep one throttle across www+apis; split per host only if measured throughput requires it.
 func (c *Client) throttle() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -155,7 +192,57 @@ func (c *Client) throttle() {
 // The error, when non-nil, may include the URL — a caller passing secrets in the
 // query (e.g. serviceKey) must redact it before surfacing.
 func (c *Client) Get(ctx context.Context, rawURL string) (*Response, error) {
-	return c.do(ctx, http.MethodGet, rawURL, nil, "")
+	return c.do(ctx, http.MethodGet, rawURL, nil, "", nil)
+}
+
+// GetWithHeadersNoRedirect performs a credentialed GET without following even
+// same-host redirects. Callers that pin a credential to one documented origin
+// use this method so a changed upstream redirect cannot carry the header across
+// a trust boundary before the destination is validated.
+func (c *Client) GetWithHeadersNoRedirect(ctx context.Context, rawURL string, headers http.Header) (*Response, error) {
+	httpClient := *c.http
+	httpClient.CheckRedirect = func(_ *http.Request, _ []*http.Request) error {
+		return http.ErrUseLastResponse
+	}
+	return c.doWithClient(ctx, &httpClient, http.MethodGet, rawURL, nil, "", headers)
+}
+
+// OpenGET starts a throttled GET and leaves the response body to the caller.
+// Unlike Get it does not apply maxBody because its purpose is streaming CSV.
+func (c *Client) OpenGET(ctx context.Context, rawURL string) (*StreamResponse, error) {
+	return c.open(ctx, http.MethodGet, rawURL, nil, "", "text/csv,application/octet-stream,*/*")
+}
+
+// OpenPostForm starts a streamed form POST for provider assets that are too
+// large for the ordinary bounded response path.
+func (c *Client) OpenPostForm(ctx context.Context, rawURL string, form url.Values) (*StreamResponse, error) {
+	return c.open(ctx, http.MethodPost, rawURL, strings.NewReader(form.Encode()), "application/x-www-form-urlencoded", "application/zip,text/csv,application/octet-stream,*/*")
+}
+
+func (c *Client) open(ctx context.Context, method, rawURL string, body io.Reader, contentType, accept string) (*StreamResponse, error) {
+	c.throttle()
+	req, err := http.NewRequestWithContext(ctx, method, rawURL, body)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("User-Agent", c.userAgent)
+	req.Header.Set("Accept", accept)
+	if contentType != "" {
+		req.Header.Set("Content-Type", contentType)
+	}
+	if ref := refererOf(rawURL); ref != "" {
+		req.Header.Set("Referer", ref)
+	}
+	streamClient := *c.http
+	streamClient.Timeout = c.streamTimeout
+	resp, err := streamClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("%s %s: %w", method, rawURL, err)
+	}
+	return &StreamResponse{
+		Status: resp.StatusCode, ContentType: resp.Header.Get("Content-Type"),
+		ContentLength: resp.ContentLength, Body: resp.Body,
+	}, nil
 }
 
 // GetNoRedirect performs the same bounded, throttled GET but returns the first
@@ -167,16 +254,16 @@ func (c *Client) GetNoRedirect(ctx context.Context, rawURL string) (*Response, e
 	httpClient.CheckRedirect = func(_ *http.Request, _ []*http.Request) error {
 		return http.ErrUseLastResponse
 	}
-	return c.doWithClient(ctx, &httpClient, http.MethodGet, rawURL, nil, "")
+	return c.doWithClient(ctx, &httpClient, http.MethodGet, rawURL, nil, "", nil)
 }
 
 // do is the one HTTP boundary so GET pages and the portal's form-backed detail
 // fragments share the same throttle, headers, TLS policy, and response shape.
-func (c *Client) do(ctx context.Context, method, rawURL string, requestBody io.Reader, contentType string) (*Response, error) {
-	return c.doWithClient(ctx, c.http, method, rawURL, requestBody, contentType)
+func (c *Client) do(ctx context.Context, method, rawURL string, requestBody io.Reader, contentType string, headers http.Header) (*Response, error) {
+	return c.doWithClient(ctx, c.http, method, rawURL, requestBody, contentType, headers)
 }
 
-func (c *Client) doWithClient(ctx context.Context, httpClient *http.Client, method, rawURL string, requestBody io.Reader, contentType string) (*Response, error) {
+func (c *Client) doWithClient(ctx context.Context, httpClient *http.Client, method, rawURL string, requestBody io.Reader, contentType string, headers http.Header) (*Response, error) {
 	c.throttle()
 	req, err := http.NewRequestWithContext(ctx, method, rawURL, requestBody)
 	if err != nil {
@@ -186,6 +273,11 @@ func (c *Client) doWithClient(ctx context.Context, httpClient *http.Client, meth
 	req.Header.Set("Accept", "text/html,application/json,application/xml,*/*")
 	if contentType != "" {
 		req.Header.Set("Content-Type", contentType)
+	}
+	for name, values := range headers {
+		for _, value := range values {
+			req.Header.Add(name, value)
+		}
 	}
 	if ref := refererOf(rawURL); ref != "" {
 		req.Header.Set("Referer", ref)
@@ -229,7 +321,7 @@ func (c *Client) GetDoc(ctx context.Context, rawURL string) (*goquery.Document, 
 // operation at a time; using the fragment endpoint avoids driving the UI and
 // still keeps all data.go.kr requests behind the shared polite transport.
 func (c *Client) PostFormDoc(ctx context.Context, rawURL string, form url.Values) (*goquery.Document, error) {
-	res, err := c.do(ctx, http.MethodPost, rawURL, strings.NewReader(form.Encode()), "application/x-www-form-urlencoded")
+	res, err := c.PostForm(ctx, rawURL, form)
 	if err != nil {
 		return nil, err
 	}
@@ -237,6 +329,13 @@ func (c *Client) PostFormDoc(ctx context.Context, rawURL string, form url.Values
 		return nil, fmt.Errorf("POST %s: unexpected status %d", rawURL, res.Status)
 	}
 	return goquery.NewDocumentFromReader(bytes.NewReader(res.Body))
+}
+
+// PostForm submits a bounded application/x-www-form-urlencoded request and
+// returns the raw response. Provider file adapters use it for official download
+// contracts whose response may be JSON metadata or binary data.
+func (c *Client) PostForm(ctx context.Context, rawURL string, form url.Values) (*Response, error) {
+	return c.do(ctx, http.MethodPost, rawURL, strings.NewReader(form.Encode()), "application/x-www-form-urlencoded", nil)
 }
 
 // refererOf returns "scheme://host/" for a URL, or "" if it can't be parsed.

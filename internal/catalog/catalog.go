@@ -1,4 +1,4 @@
-// Package catalog keeps a local copy of data.go.kr's OpenAPI catalogue so an
+// Package catalog keeps a local copy of data.go.kr's OpenAPI and file catalogue so an
 // agent can find out what exists without guessing keywords at the portal one
 // request at a time.
 //
@@ -33,18 +33,43 @@ import (
 // Entry is one catalogued dataset. Desc is used for matching and is not part of
 // what Search returns.
 type Entry struct {
-	PK         string   `json:"pk"`
-	Title      string   `json:"title"`
-	Org        string   `json:"org,omitempty"`
-	OrgType    string   `json:"orgType,omitempty"`
-	Category   string   `json:"category,omitempty"`
-	ApplyCount int      `json:"applyCount,omitempty"`
-	ViewCount  int      `json:"viewCount,omitempty"`
-	ModifiedAt string   `json:"modifiedAt,omitempty"`
-	SvcType    string   `json:"svcType,omitempty"`   // REST | LINK | FILE | "" (unknown)
-	DataTypes  []string `json:"dataTypes,omitempty"` // API | FILE; both when the portal exposes both representations
-	Formats    []string `json:"formats,omitempty"`   // publisher-declared delivery formats such as CSV, JSON, XML
-	Desc       string   `json:"desc,omitempty"`
+	PK          string               `json:"pk"`
+	Title       string               `json:"title"`
+	Org         string               `json:"org,omitempty"`
+	OrgType     string               `json:"orgType,omitempty"`
+	Category    string               `json:"category,omitempty"`
+	ApplyCount  int                  `json:"applyCount,omitempty"`
+	ViewCount   int                  `json:"viewCount,omitempty"`
+	ModifiedAt  string               `json:"modifiedAt,omitempty"`
+	SvcType     string               `json:"svcType,omitempty"`   // REST | LINK | FILE | "" (unknown)
+	DataTypes   []string             `json:"dataTypes,omitempty"` // API | FILE; both when the portal exposes both representations
+	Formats     []string             `json:"formats,omitempty"`   // publisher-declared delivery formats such as CSV, JSON, XML
+	Desc        string               `json:"desc,omitempty"`
+	OfficialAPI *OfficialAPIContract `json:"officialApi,omitempty"` // documented bulk API facts; never a credential or direct call authorization
+}
+
+// OfficialAPIContract is the operation-level metadata published by data.go.kr's
+// documented catalogue API. It is retained in the release snapshot so ordinary
+// users can inspect these facts without applying for the bulk-listing API.
+// Publisher URLs remain evidence, not trusted invocation instructions.
+type OfficialAPIContract struct {
+	APIType      string                 `json:"apiType,omitempty"`
+	GuideURL     string                 `json:"guideUrl,omitempty"`
+	EndpointURL  string                 `json:"endpointUrl,omitempty"`
+	LinkURL      string                 `json:"linkUrl,omitempty"`
+	MetaURL      string                 `json:"metaUrl,omitempty"`
+	DevApproval  string                 `json:"devApproval,omitempty"`
+	ProdApproval string                 `json:"prodApproval,omitempty"`
+	EvidenceKind string                 `json:"evidenceKind,omitempty"`
+	EvidenceURL  string                 `json:"evidenceUrl,omitempty"`
+	Operations   []OfficialAPIOperation `json:"operations,omitempty"`
+}
+
+type OfficialAPIOperation struct {
+	Sequence     string   `json:"sequence,omitempty"`
+	Name         string   `json:"name,omitempty"`
+	URL          string   `json:"url,omitempty"`
+	RequestNames []string `json:"requestNames,omitempty"`
 }
 
 // Service types worth labelling. REST means the portal publishes a spec, so
@@ -61,7 +86,26 @@ const (
 type Catalog struct {
 	SyncedAt time.Time `json:"syncedAt"`
 	Type     string    `json:"type"` // dataset type swept ("API")
+	Source   string    `json:"source,omitempty"`
 	Entries  []Entry   `json:"entries"`
+}
+
+const (
+	SourceOfficial     = "official"
+	SourceCombined     = "official-file+web"
+	SourceOfficialFile = "official-file"
+	SourceWeb          = "web"
+)
+
+// Find returns the catalogued Data Node for an exact publicDataPk. The returned
+// value is a copy so callers cannot mutate the loaded snapshot.
+func (c *Catalog) Find(pk string) (Entry, bool) {
+	for _, entry := range c.Entries {
+		if entry.PK == pk {
+			return entry, true
+		}
+	}
+	return Entry{}, false
 }
 
 // Hit is one search result — the compact shape callers get. No description.
@@ -72,11 +116,11 @@ type Hit struct {
 	ApplyCount int      `json:"applyCount,omitempty"`
 	ViewCount  int      `json:"viewCount,omitempty"`
 	ModifiedAt string   `json:"modifiedAt,omitempty"`
-	SvcType    string   `json:"svcType,omitempty"` // REST/LINK use describe_api; FILE is discovery/download evidence
+	SvcType    string   `json:"svcType,omitempty"` // REST/LINK/FILE are all inspected through inspect_dataset
 	DataTypes  []string `json:"dataTypes,omitempty"`
 	Formats    []string `json:"formats,omitempty"`
 	DetailURL  string   `json:"detailUrl,omitempty"`  // official page for FILE-only discovery nodes
-	NextAction string   `json:"nextAction,omitempty"` // describe_api | inspect_file_data | inspect_file_api_contract | inspect_dataset
+	NextAction string   `json:"nextAction,omitempty"` // inspect_dataset
 	Matched    int      `json:"matched,omitempty"`    // terms hit — only meaningful when Result.Relaxed
 	// Planned searches explain which model-inferred data axis surfaced the row.
 	// Preview is deliberately short and opt-in: useful for ideation without
@@ -95,7 +139,7 @@ type Hit struct {
 
 // EdgeHypothesis is a metadata-only claim about how an Anchor Node and Bridge
 // Node might join. Search never upgrades it beyond candidate: official fields
-// and sampled values must be inspected through describe_api and call_api.
+// and sampled values must be inspected through inspect_dataset and call_api.
 type EdgeHypothesis struct {
 	Kinds        []string `json:"kinds"`               // entity | spatial | temporal | proxy
 	ExpectedKeys []string `json:"expectedKeys"`        // e.g. 법정동코드, 기준연월
@@ -189,7 +233,7 @@ const (
 	RankBalanced = "balanced"
 
 	// MaxSearchLimit preserves progressive disclosure: search returns a compact
-	// candidate set and describe_api expands one selection. It also bounds model
+	// candidate set and inspect_dataset expands one selection. It also bounds model
 	// context when tools are invoked directly with untrusted arguments.
 	MaxSearchLimit = 100
 )
@@ -339,6 +383,64 @@ func (c *Catalog) CoversType(raw string) bool {
 	return current != "" && current == requested
 }
 
+// PreserveOnAutoSync reports whether an automatic refresh would replace a
+// broader local catalogue with a materially weaker fallback. Explicit --source
+// requests remain authoritative; this guard exists only for the unattended
+// default refresh path.
+func PreserveOnAutoSync(current, candidate *Catalog) bool {
+	if current == nil || candidate == nil {
+		return false
+	}
+	if current.CoversType("ALL") && !candidate.CoversType("ALL") {
+		return true
+	}
+	if sourceRank(current.Source) > sourceRank(candidate.Source) {
+		return true
+	}
+	currentCoverage := catalogueCoverage(current)
+	candidateCoverage := catalogueCoverage(candidate)
+	for _, pair := range [][2]int{
+		{currentCoverage.entries, candidateCoverage.entries},
+		{currentCoverage.api, candidateCoverage.api},
+		{currentCoverage.file, candidateCoverage.file},
+		{currentCoverage.officialContracts, candidateCoverage.officialContracts},
+	} {
+		// Monthly removals are legitimate. A loss above 10% in one automatic
+		// refresh is more likely a source/parser regression and requires an
+		// explicit source choice instead of silently replacing local state.
+		if pair[0] > 0 && pair[1]*10 < pair[0]*9 {
+			return true
+		}
+	}
+	return false
+}
+
+type coverageCounts struct {
+	entries, api, file, officialContracts int
+}
+
+func catalogueCoverage(candidate *Catalog) coverageCounts {
+	var coverage coverageCounts
+	if candidate == nil {
+		return coverage
+	}
+	coverage.entries = len(candidate.Entries)
+	for _, entry := range candidate.Entries {
+		for _, delivery := range entry.DataTypes {
+			switch strings.ToUpper(strings.TrimSpace(delivery)) {
+			case "API":
+				coverage.api++
+			case "FILE":
+				coverage.file++
+			}
+		}
+		if entry.OfficialAPI != nil {
+			coverage.officialContracts++
+		}
+	}
+	return coverage
+}
+
 // Sync sweeps the portal's dataset list into a catalogue. perPage is honoured by
 // the portal, so a large page size turns thousands of datasets into tens of
 // requests. progress, when non-nil, is called with the running total.
@@ -350,6 +452,23 @@ func (c *Catalog) CoversType(raw string) bool {
 // sweeps only label it. Unknown is preserved rather than guessed, because a guess
 // could send an agent to apply for something it cannot call.
 func Sync(ctx context.Context, pc *portal.Client, dType string, perPage int, progress func(int)) (*Catalog, error) {
+	return NewWebSource(pc).Sync(ctx, dType, perPage, progress)
+}
+
+// WebSource is the unauthenticated compatibility Adapter for the public portal
+// pages. It remains useful when the official catalogue operation has not been
+// approved for a user's account.
+type WebSource struct {
+	portal *portal.Client
+}
+
+func NewWebSource(client *portal.Client) *WebSource { return &WebSource{portal: client} }
+
+func (s *WebSource) Sync(ctx context.Context, dType string, perPage int, progress func(int)) (*Catalog, error) {
+	pc := s.portal
+	if pc == nil {
+		return nil, fmt.Errorf("web 카탈로그 source가 설정되지 않았습니다")
+	}
 	if perPage <= 0 {
 		perPage = 200
 	}
@@ -414,20 +533,24 @@ func Sync(ctx context.Context, pc *portal.Client, dType string, perPage int, pro
 		}
 	}
 
-	c := &Catalog{SyncedAt: time.Now().UTC(), Type: snapshotType}
+	c := &Catalog{SyncedAt: time.Now().UTC(), Type: snapshotType, Source: SourceWeb}
 	for _, e := range seen {
 		c.Entries = append(c.Entries, e)
 	}
-	sort.Slice(c.Entries, func(i, j int) bool {
-		if c.Entries[i].ApplyCount != c.Entries[j].ApplyCount {
-			return c.Entries[i].ApplyCount > c.Entries[j].ApplyCount
-		}
-		if c.Entries[i].ViewCount != c.Entries[j].ViewCount {
-			return c.Entries[i].ViewCount > c.Entries[j].ViewCount
-		}
-		return c.Entries[i].PK < c.Entries[j].PK
-	})
+	sortEntries(c.Entries)
 	return c, nil
+}
+
+func sortEntries(entries []Entry) {
+	sort.Slice(entries, func(i, j int) bool {
+		if entries[i].ApplyCount != entries[j].ApplyCount {
+			return entries[i].ApplyCount > entries[j].ApplyCount
+		}
+		if entries[i].ViewCount != entries[j].ViewCount {
+			return entries[i].ViewCount > entries[j].ViewCount
+		}
+		return entries[i].PK < entries[j].PK
+	})
 }
 
 func catalogTypes(raw string) ([]string, string, error) {
@@ -462,6 +585,7 @@ func mergeEntry(current, incoming Entry) Entry {
 	}
 	current.DataTypes = appendUniqueFold(current.DataTypes, incoming.DataTypes...)
 	current.Formats = appendUniqueFold(current.Formats, incoming.Formats...)
+	current.OfficialAPI = mergeOfficialAPI(current.OfficialAPI, incoming.OfficialAPI)
 	if current.Title == "" {
 		current.Title = incoming.Title
 	}
@@ -488,10 +612,77 @@ func mergeEntry(current, incoming Entry) Entry {
 	}
 	// A callable/inspectable API contract is more specific than FILE. FILE stays
 	// in DataTypes and Formats, so the download representation is not lost.
-	if current.SvcType == "" || current.SvcType == SvcFILE {
+	if serviceTypeRank(incoming.SvcType) > serviceTypeRank(current.SvcType) {
 		current.SvcType = incoming.SvcType
 	}
 	return current
+}
+
+func serviceTypeRank(value string) int {
+	switch value {
+	case SvcREST:
+		return 3
+	case SvcLINK:
+		return 2
+	case SvcFILE:
+		return 1
+	default:
+		return 0
+	}
+}
+
+func mergeOfficialAPI(current, incoming *OfficialAPIContract) *OfficialAPIContract {
+	if incoming == nil {
+		return current
+	}
+	if current == nil {
+		copy := *incoming
+		copy.Operations = append([]OfficialAPIOperation(nil), incoming.Operations...)
+		return &copy
+	}
+	for target, value := range map[*string]string{
+		&current.APIType: incoming.APIType, &current.GuideURL: incoming.GuideURL,
+		&current.EndpointURL: incoming.EndpointURL, &current.LinkURL: incoming.LinkURL,
+		&current.MetaURL: incoming.MetaURL, &current.DevApproval: incoming.DevApproval,
+		&current.ProdApproval: incoming.ProdApproval, &current.EvidenceKind: incoming.EvidenceKind,
+		&current.EvidenceURL: incoming.EvidenceURL,
+	} {
+		if *target == "" && value != "" {
+			*target = value
+		}
+	}
+	seen := make(map[string]bool, len(current.Operations)+len(incoming.Operations))
+	for _, operation := range current.Operations {
+		seen[officialOperationKey(operation)] = true
+	}
+	for _, operation := range incoming.Operations {
+		key := officialOperationKey(operation)
+		if key == "\x00\x00" || seen[key] {
+			continue
+		}
+		seen[key] = true
+		operation.RequestNames = appendUniqueExact(nil, operation.RequestNames...)
+		current.Operations = append(current.Operations, operation)
+	}
+	return current
+}
+
+func officialOperationKey(operation OfficialAPIOperation) string {
+	return operation.Sequence + "\x00" + operation.Name + "\x00" + operation.URL
+}
+
+func appendUniqueExact(dst []string, values ...string) []string {
+	seen := make(map[string]bool, len(dst)+len(values))
+	out := make([]string, 0, len(dst)+len(values))
+	for _, value := range append(append([]string(nil), dst...), values...) {
+		value = strings.TrimSpace(value)
+		if value == "" || seen[value] {
+			continue
+		}
+		seen[value] = true
+		out = append(out, value)
+	}
+	return out
 }
 
 func appendUniqueFold(dst []string, values ...string) []string {
@@ -822,29 +1013,26 @@ func hitFromEntry(entry *Entry) Hit {
 }
 
 func entryDetailURL(entry *Entry) string {
-	if entry != nil && entry.SvcType == SvcFILE && entry.PK != "" {
+	if entry != nil && entry.PK != "" && (entry.SvcType == SvcFILE || containsFold(entry.DataTypes, "FILE")) {
 		return portal.BaseURL + "/data/" + entry.PK + "/fileData.do"
 	}
 	return ""
+}
+
+func containsFold(values []string, target string) bool {
+	for _, value := range values {
+		if strings.EqualFold(strings.TrimSpace(value), target) {
+			return true
+		}
+	}
+	return false
 }
 
 func entryNextAction(entry *Entry) string {
 	if entry == nil {
 		return ""
 	}
-	switch entry.SvcType {
-	case SvcREST, SvcLINK:
-		return "describe_api"
-	case SvcFILE:
-		for _, dataType := range entry.DataTypes {
-			if dataType == "API" {
-				return "inspect_file_api_contract"
-			}
-		}
-		return "inspect_file_data"
-	default:
-		return "inspect_dataset"
-	}
+	return "inspect_dataset"
 }
 
 func buildConnectionOptionsFromHits(hits []Hit, anchorPKs []string, perRole int) []ConnectionOptionGroup {
@@ -1093,7 +1281,7 @@ func validCandidateAxis(axis DiscoveryAxis) bool {
 func evidenceFor(edge EdgeHypothesis, nodes ...Hit) []string {
 	hasFile := false
 	for _, node := range nodes {
-		if node.SvcType == SvcFILE {
+		if node.SvcType == SvcFILE || containsFold(node.DataTypes, "FILE") {
 			hasFile = true
 			break
 		}
@@ -1102,12 +1290,12 @@ func evidenceFor(edge EdgeHypothesis, nodes ...Hit) []string {
 	if hasFile {
 		evidence = []string{
 			"FILE 노드의 detailUrl에서 공식 컬럼·갱신일·coverage·다운로드 조건 확인",
-			"API는 describe_api/call_api, FILE은 bounded 표본으로 실제 결합키와 양방향 match rate 확인",
+			"API는 inspect_dataset/call_api, FILE은 bounded 표본으로 실제 결합키와 양방향 match rate 확인",
 			"uniqueness·null rate·join cardinality·duplicate expansion 확인",
 		}
 	} else {
 		evidence = []string{
-			"describe_api에서 실제 출력 field 이름·type·code namespace 확인",
+			"inspect_dataset에서 실제 출력 field 이름·type·code namespace 확인",
 			"공통 지역·기간 slice의 call_api 표본에서 matched keys와 양방향 match rate 확인",
 			"uniqueness·null rate·join cardinality·duplicate expansion 확인",
 		}

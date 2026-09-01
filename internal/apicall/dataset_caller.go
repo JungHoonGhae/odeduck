@@ -62,7 +62,7 @@ func (c *DatasetCaller) Call(ctx context.Context, request DatasetCallRequest) (*
 	if request.PK == "" {
 		return nil, fmt.Errorf("publicDataPk가 필요합니다")
 	}
-	spec, err := Describe(ctx, c.fetch, c.baseURL, request.PK)
+	spec, err := DescribeCatalogued(ctx, c.fetch, c.baseURL, request.PK)
 	if err != nil {
 		return nil, err
 	}
@@ -73,8 +73,11 @@ func (c *DatasetCaller) Call(ctx context.Context, request DatasetCallRequest) (*
 	if err != nil {
 		return nil, err
 	}
+	if !hasDetailedInvocationEvidence(spec, operation) {
+		return nil, fmt.Errorf("pk=%s의 필수 요청변수를 확인할 상세 호출 계약이 없어 credential 호출을 차단했습니다 — inspect_dataset을 다시 실행하거나 공식 명세를 확인하세요", request.PK)
+	}
 	if missing := MissingRequired(operation, request.Params); len(missing) > 0 {
-		return nil, fmt.Errorf("필수 요청변수가 빠졌습니다: %s — describe_api(pk=%s) 로 확인하세요", strings.Join(missing, ", "), request.PK)
+		return nil, fmt.Errorf("필수 요청변수가 빠졌습니다: %s — inspect_dataset(pk=%s)으로 확인하세요", strings.Join(missing, ", "), request.PK)
 	}
 	key, err := c.credentials.DataGoKR(ctx)
 	if err != nil {
@@ -91,6 +94,36 @@ func (c *DatasetCaller) Call(ctx context.Context, request DatasetCallRequest) (*
 		}
 	}
 	return result, callErr
+}
+
+func hasDetailedInvocationEvidence(spec *APISpec, operation *Operation) bool {
+	if spec == nil || spec.OfficialAPI == nil {
+		// Legacy/web-only descriptions are themselves the detailed contract.
+		return true
+	}
+	if operation == nil {
+		return false
+	}
+	if operation.ContractKind == ContractKindOfficialSwagger {
+		// Operation-scoped Swagger evidence can legitimately describe a
+		// parameterless operation. A different bulk-only operation does not
+		// inherit this authority merely because it is in the same APISpec.
+		return true
+	}
+	if operation.ContractKind != ContractKindFirstPartyWebContract || spec.EndpointOnly || strings.TrimSpace(operation.Endpoint) == "" || len(operation.Params) == 0 {
+		return false
+	}
+	// Merely reaching an HTML page is not a detailed invocation contract. Every
+	// parameter merged into the selected operation must have a known
+	// required/optional classification; bulk-only rows use ParamRequirementUnknown and remain
+	// fail-closed until the page proves those facts.
+	for _, param := range operation.Params {
+		required := strings.TrimSpace(param.Required)
+		if strings.TrimSpace(param.Name) == "" || required == ParamRequirementUnknown {
+			return false
+		}
+	}
+	return true
 }
 
 func (c *DatasetCaller) callExternal(ctx context.Context, spec *APISpec, request DatasetCallRequest) (*CallResult, error) {
@@ -141,5 +174,5 @@ func resolveExternalOperation(contract *ExternalContract, requested string) (str
 			return requested, nil
 		}
 	}
-	return "", fmt.Errorf("operation %q은 provider contract에 없습니다 — describe_api로 다시 확인하세요", requested)
+	return "", fmt.Errorf("operation %q은 provider contract에 없습니다 — inspect_dataset으로 다시 확인하세요", requested)
 }

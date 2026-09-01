@@ -8,7 +8,7 @@ date: 2026-09-01
 ## Context
 
 OpenDataCTL originally synced only data.go.kr OpenAPI entries. That kept every
-search hit close to `describe_api → call_api`, but excluded file datasets that
+search hit close to `inspect_dataset → call_api`, but excluded file datasets that
 can provide the other half of a valuable cross-domain comparison. The existing
 connection workflow also returned at most three final cards. That precision
 limit is useful, but callers could not clearly distinguish “the broader set of
@@ -26,11 +26,10 @@ Keep one deep catalogue module and the existing three-stage MCP interface.
 1. `catalog sync` defaults to `ALL` and sweeps both `API` and `FILE`. `--type
    API` and `--type FILE` remain available for narrower snapshots.
 2. Each entry and hit preserves `dataTypes`, publisher formats, and an explicit
-   delivery state. REST and LINK keep their existing behaviour. A FILE hit has
-   `svcType=FILE`, an official data.go.kr `detailUrl`, and either
-   `nextAction=inspect_file_data` or `inspect_file_api_contract`. The latter is
-   based on the portal's JSON+XML badge and records that an automatic API
-   representation exists; it is still not presented as a `call_api` contract.
+   delivery state. Every hit now uses the delivery-neutral
+   `nextAction=inspect_dataset`. A FILE hit also has `svcType=FILE` and an
+   official data.go.kr `detailUrl`; JSON/XML representation badges remain format
+   evidence and are not presented as a `call_api` contract.
 3. A structured search with an accepted Anchor returns
    `connectionOptions`: up to three nodes per valid Bridge role. At eight total
    roles, the pool is bounded to at most 21 Bridge nodes.
@@ -41,7 +40,7 @@ Keep one deep catalogue module and the existing three-stage MCP interface.
    the displayed page. Hybrid search rebuilds the pool from the bounded fused
    lexical + semantic result, so a useful semantic-only node can become an
    option without semantic similarity proving an edge.
-6. Evidence instructions are delivery-aware. API pairs use `describe_api` and
+6. Evidence instructions are delivery-aware. API pairs use `inspect_dataset` and
    bounded `call_api` samples. Any pair containing FILE data first verifies the
    official file columns, update date, coverage, and download conditions, then
    profiles a bounded file sample.

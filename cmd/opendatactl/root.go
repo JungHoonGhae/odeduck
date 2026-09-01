@@ -35,7 +35,7 @@ func init() {
 
 	rootCmd.AddCommand(versionCmd())
 	rootCmd.AddCommand(loginCmd(), logoutCmd(), statusCmd())
-	rootCmd.AddCommand(searchCmd(), describeCmd(), callCmd(), keyCmd())
+	rootCmd.AddCommand(searchCmd(), inspectCmd(), describeCmd(), callCmd(), keyCmd())
 	rootCmd.AddCommand(providerKeyCmd())
 	rootCmd.AddCommand(catalogCmd())
 	rootCmd.AddCommand(applyCmd(), applicationsCmd())

@@ -1,6 +1,7 @@
 package mcpserver
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"net/http"
@@ -12,6 +13,7 @@ import (
 
 	"github.com/JungHoonGhae/opendatactl/internal/apicall"
 	"github.com/JungHoonGhae/opendatactl/internal/catalog"
+	"github.com/JungHoonGhae/opendatactl/internal/dataset"
 	"github.com/JungHoonGhae/opendatactl/internal/fetch"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
@@ -163,6 +165,66 @@ func TestDescribeLinkHandoffRoundTrip(t *testing.T) {
 	}
 }
 
+func TestInspectDatasetResolvesAndObservesFileData(t *testing.T) {
+	isolateConfigHome(t)
+	const pk = "15151047"
+	if err := (&catalog.Catalog{SyncedAt: time.Now(), Type: "ALL", Entries: []catalog.Entry{{
+		PK: pk, Title: "성장상권", SvcType: catalog.SvcFILE, DataTypes: []string{"FILE"},
+	}}}).Save(); err != nil {
+		t.Fatal(err)
+	}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/catalog/" + pk + "/fileData.json":
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"alternateName":"성장상권","creator":{"name":"소상공인시장진흥공단"},"encodingFormat":"CSV","@type":"Dataset"}`))
+		case "/data/" + pk + "/fileData.do":
+			_, _ = w.Write([]byte(`<button onclick="fileDetailObj.fn_fileDataDown('15151047','uddi:growth','','1','3')">다운로드</button>
+				<li><strong class="key">파일데이터명</strong><div class="value">성장상권</div></li>
+				<li><strong class="key">제공기관</strong><div class="value">소상공인시장진흥공단</div></li>
+				<li><strong class="key">확장자</strong><div class="value">CSV</div></li>`))
+		case "/tcs/dss/selectFileDataDownload.do":
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"status":true,"atchFileId":"FILE_123","fileDetailSn":"1","fileDataRegistVO":{"dataNm":"성장상권","orginlFileNm":"growth.csv","atchFileExtsn":"csv"}}`))
+		case "/cmm/cmm/fileDownload.do":
+			w.Header().Set("Content-Type", "text/csv")
+			_, _ = w.Write([]byte("CRTR_YM,MJR_BZZNNO,AREA\n202401,100,42\n"))
+		default:
+			t.Fatalf("unexpected request: %s", r.URL)
+		}
+	}))
+	defer srv.Close()
+
+	sess := connectTestClient(t, New(Deps{Fetch: fetch.New(fetch.WithDelay(0)), BaseURL: srv.URL}))
+	res, err := sess.CallTool(context.Background(), &mcp.CallToolParams{
+		Name: "inspect_dataset", Arguments: map[string]any{"pk": pk, "observe": true},
+	})
+	if err != nil {
+		t.Fatalf("inspect_dataset transport: %v", err)
+	}
+	if res.IsError {
+		t.Fatalf("inspect_dataset error: %+v", res.Content)
+	}
+	raw, err := json.Marshal(res.StructuredContent)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got struct {
+		Delivery    string               `json:"delivery"`
+		File        *dataset.Contract    `json:"file"`
+		Observation *dataset.Observation `json:"observation"`
+	}
+	if err := json.NewDecoder(bytes.NewReader(raw)).Decode(&got); err != nil {
+		t.Fatal(err)
+	}
+	if got.Delivery != catalog.SvcFILE || got.File == nil || got.File.Capability != dataset.CapabilityRetrievable {
+		t.Fatalf("inspection = %+v", got)
+	}
+	if got.Observation == nil || len(got.Observation.Files) != 1 || strings.Join(got.Observation.Files[0].Columns, ",") != "CRTR_YM,MJR_BZZNNO,AREA" {
+		t.Fatalf("observation = %+v", got.Observation)
+	}
+}
+
 func TestApplyRejectsLinkBeforeDataGoKRSideEffect(t *testing.T) {
 	const pk = "15116894"
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -253,8 +315,15 @@ func TestToolCatalogPresentsProgressiveDiscoveryWorkflow(t *testing.T) {
 		stage string
 	}{
 		{name: "catalog_search", stage: "1단계"},
-		{name: "describe_api", stage: "2단계"},
+		{name: "inspect_dataset", stage: "2단계"},
 		{name: "call_api", stage: "3단계"},
+	}
+	if byName["describe_api"] == nil {
+		t.Fatal("describe_api compatibility tool must remain available")
+	}
+	if !strings.Contains(byName["inspect_dataset"].Description, "observe=true") ||
+		!strings.Contains(byName["inspect_dataset"].Description, "SHA-256") {
+		t.Fatal("inspect_dataset must explain observed FILE schema evidence")
 	}
 	for _, want := range wantSteps {
 		name := want.name
@@ -404,6 +473,7 @@ func TestCatalogSearchReturnsConnectionsOnlyAfterExplicitBridgeSelection(t *test
 	cat := &catalog.Catalog{
 		SyncedAt: time.Now(),
 		Type:     "API",
+		Source:   catalog.SourceOfficial,
 		Entries: []catalog.Entry{
 			{PK: "anchor", Title: "온비드 공매 물건", SvcType: catalog.SvcREST},
 			{PK: "bridge", Title: "상권 점포 개폐업", SvcType: catalog.SvcREST},
@@ -449,6 +519,9 @@ func TestCatalogSearchReturnsConnectionsOnlyAfterExplicitBridgeSelection(t *test
 	}
 	if len(got.Connections) != 1 {
 		t.Fatalf("connections = %+v", got.Connections)
+	}
+	if got.Source != catalog.SourceOfficial {
+		t.Fatalf("catalog source = %q, want official", got.Source)
 	}
 	connection := got.Connections[0]
 	if connection.Status != catalog.ConnectionStatusCandidate || connection.Anchor.PK != "anchor" || connection.Bridge.PK != "bridge" {
@@ -505,7 +578,7 @@ func TestCatalogSearchReturnsAConnectionOptionPoolBeforeSelection(t *testing.T) 
 			fileNode = &got.ConnectionOptions[0].Nodes[i]
 		}
 	}
-	if fileNode == nil || fileNode.NextAction != "inspect_file_api_contract" || fileNode.DetailURL == "" ||
+	if fileNode == nil || fileNode.NextAction != "inspect_dataset" || fileNode.DetailURL == "" ||
 		strings.Join(fileNode.DataTypes, ",") != "FILE,API" || strings.Join(fileNode.Formats, ",") != "CSV,JSON,XML" {
 		t.Fatalf("FILE handoff = %+v", fileNode)
 	}
