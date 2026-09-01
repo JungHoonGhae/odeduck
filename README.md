@@ -4,8 +4,9 @@
 
 **공공데이터를 찾고, 신청하고, 호출하는 AI 컨트롤 플레인.**
 정확한 검색어를 몰라도 AI가 필요한 공공데이터를 찾아 신청하고 실제 응답까지 가져옵니다.
-data.go.kr에 한 번 로그인하면 Codex, Claude, Gemini, Cursor가 자연어 목표를 검색축으로 바꾸고,
-11,900여 개 API의 검색·명세 확인·활용신청·승인 확인·호출을 CLI/MCP 한 경로로 끝냅니다.
+Codex, Claude, Gemini, Cursor가 자연어 목표를 검색축으로 바꾸고 data.go.kr의 OpenAPI와
+파일데이터를 함께 탐색합니다. 호출 가능한 API를 고르면 한 번의 data.go.kr 로그인으로 명세 확인,
+활용신청, 승인 확인과 실제 호출까지 CLI/MCP 한 경로로 끝냅니다.
 
 이름의 `Open Data`는 누구나 재사용할 수 있도록 공개된 공공데이터를, `CTL`은 검색부터 실제
 호출까지 하나의 명령 표면으로 연결하는 control plane을 뜻합니다. 데이터를 통제한다는 의미가
@@ -83,10 +84,11 @@ v0.9에는 새 `opendatactl`과 기존 스크립트·자동화를 위한 `gongct
 # 1. 브라우저가 한 번 열립니다 — data.go.kr에 로그인하세요 (SSO는 자동화하지 않음)
 opendatactl login
 
-# 2. 자연어 목표로 REST와 LINK 전체 후보 탐색
+# 2. 자연어 목표로 REST, LINK, FILE 전체 후보 탐색
 opendatactl catalog discover "우리 동네 대기질 서비스에 쓸 데이터"
 
-# 3. 명세·필수 요청변수·개발단계 승인유형 확인
+# 3. REST/LINK는 명세·필수 요청변수·승인유형 확인
+#    FILE은 검색 결과의 detailUrl에서 컬럼·갱신일·다운로드 조건 확인
 opendatactl describe <PK>
 
 # 4. 활용신청 (AI/MCP에서는 확인 없이 자동 제출, 첫 신청 때 인증키 자동 발급)
@@ -101,15 +103,21 @@ opendatactl call --pk <PK> --param numOfRows=5   # 엔드포인트·인증키 �
 
 ```bash
 # 무엇이 존재하는지 먼저 훑기 — 로컬 카탈로그(한 번 sync 후 즉시 검색)
-opendatactl catalog sync              # 전체 오픈API 목록 수집 (약 2~3분)
+opendatactl catalog sync              # OpenAPI + 파일데이터 통합 카탈로그 수집
+opendatactl catalog sync --type API   # 호출 가능한 API 탐색만 필요할 때
 opendatactl catalog search 폭염 온열   # 활용신청 많은 순, 설명문 없이 간결하게
 opendatactl catalog discover "내가 몰랐던 돈 될 만한 공공데이터"  # 로그인된 AI CLI로 검색축 생성
 opendatactl catalog discover "지역 소멸로 생길 사업 기회" --agent gemini
-opendatactl catalog search 폭염               # 기본: REST와 LINK 전체 탐색
+opendatactl catalog search 폭염               # 기본: REST, LINK, FILE 전체 탐색
 opendatactl catalog search 폭염 --rest-only   # 포털 명세가 있는 REST만 제한
 opendatactl catalog info               # 수집 시각 + 유형 분포
 opendatactl catalog orgs 폭염          # 그 주제를 개방한 기관 순위
 ```
+
+2026-09-01 실제 포털 동기화에서는 고유 노드 95,956건(REST 7,132, LINK 4,766, FILE 84,052,
+미확인 6)을 수집했습니다. 첫 ALL 동기화는 테스트 환경에서 약 7분이 걸렸으며 포털과 네트워크 상태에
+따라 달라집니다. 빠르게 호출 가능한 데이터부터 시작하려면 `--type API`, 조합 탐색 공간을 최대로
+넓히려면 기본 `ALL`을 사용합니다.
 
 ### 자연어 기회 탐색: 기존 AI 구독 우선, Ollama는 선택
 
@@ -127,8 +135,9 @@ CLI의 stdin으로 전달해 로컬 프로세스 목록에 남기지 않으며, 
 들어가는 후속 단계는 실행하지 않고 연결 카드를 Abstention합니다. subprocess에는 필요한 최소 환경만
 전달합니다.
 
-`catalog discover`는 이제 첫 검색 결과를 본 뒤 빠진 역할의 Bridge 데이터를 한 번 더 찾고, 실제
-결과의 제목과 공식 설명이 역할을 뒷받침하는 PK만 최대 3개 연결 후보로 고릅니다. 예를 들어 공매
+`catalog discover`는 이제 첫 검색 결과를 본 뒤 빠진 역할의 Bridge 데이터를 한 번 더 찾습니다.
+두 번째 응답은 역할별 최대 3개, 전체 최대 21개의 `connectionOptions`를 보여주고, 그중 실제
+제목과 공식 설명이 역할을 뒷받침하는 PK만 한 번에 최대 3개 연결 후보로 고릅니다. 예를 들어 공매
 물건을 찾는 질문에서 공매라는 단어가 없는 상권 변화·토양오염 데이터를 각각 수요 대리신호와 환경
 위험 후보로 발견할 수 있습니다. 검색 1위를 자동으로 연결하지 않으며, 역할·예상 결합키·둘을 함께
 볼 때 생기는 새 판단·metadata 근거가 모두 없는 결과는 버립니다.
@@ -141,11 +150,14 @@ opendatactl catalog discover \
   --agent codex --max-connections 3
 ```
 
-출력의 `connections`는 항상 `candidate`입니다. 지역 범위나 대상 유형의 제한은
+`connectionOptions`는 더 많은 조합을 검토하기 위한 선택지일 뿐 연결 주장이 아닙니다. 같은 풀에서
+다른 PK를 골라 여러 조합을 비교할 수 있습니다. 출력의 `connections`는 항상 `candidate`입니다. 지역 범위나 대상 유형의 제한은
 `candidateEvidence`에, 실제로 확인할 field·grain·값 교집합은 `evidenceRequired`에 나옵니다. 공식
 명세와 작은 응답 표본을 확인하기 전에는 join, 사업성, 인과관계가 검증됐다고 뜻하지 않습니다.
 적합한 항목이 없으면 `abstention`이 정상 결과입니다. 출시 전 세 시나리오에서 무엇이 달라졌고 어떤
 한계가 남았는지는 [연결 발견 평가](docs/research/connection-discovery-evaluation.md)에 기록했습니다.
+API 전용과 API+FILE 통합 검색의 실제 차이는
+[통합 카탈로그 스모크 평가](docs/research/broad-catalog-option-evaluation.md)에 기록했습니다.
 
 MCP에서 쓸 때는 상위 Codex·Claude·Gemini·Cursor가 이미 검색 계획기입니다. 에이전트가
 `catalog_search`의 `concepts`를 직접 채우므로 하위 CLI를 한 번 더 실행하지 않습니다. 즉 **MCP가
@@ -157,7 +169,7 @@ MCP에서 쓸 때는 상위 Codex·Claude·Gemini·Cursor가 이미 검색 계�
 
 Ollama 의미 벡터는 에이전트가 만든 검색축 밖의 표현까지 추가로 회수하거나, 네트워크 없이 반복
 검색할 때 쓰는 선택 기능입니다. [Ollama](https://docs.ollama.com/)만 설치한 뒤 아래 명령 한 번이면
-추천 다국어 모델 다운로드, 11,902개 카탈로그 임베딩, 로컬 인덱스 저장까지 처리합니다. 별도 벡터 DB와
+추천 다국어 모델 다운로드, 현재 통합 카탈로그 임베딩, 로컬 인덱스 저장까지 처리합니다. 별도 벡터 DB와
 API 키는 필요하지 않습니다. Ollama가 기본 주소가 아닌 곳에서 실행되면
 `OPENDATACTL_OLLAMA_URL`을 설정하세요. v0.8의 `GONGCTL_OLLAMA_URL`도 호환됩니다.
 
@@ -169,13 +181,46 @@ opendatactl catalog discover "시세보다 싸게 살 수 있는 물건"
 기본 모델은 한국어를 포함한 100개 이상 언어를 지원하는 약 238MB의
 `embeddinggemma:300m-qat-q4_0`입니다. 인덱스가 준비되면 `catalog search`와 MCP `catalog_search`가
 키워드 결과와 벡터 유사도를 자동 결합하고, Ollama나 인덱스가 없으면 기존 검색으로 폴백합니다.
-현재 규모에서는 768차원 벡터 전체가 약 51MB라 메모리 평면 검색으로 충분합니다. 벡터 저장소는
-별도 모듈 경계로 격리해, 향후 카탈로그가 수십만 건 이상이 될 때 벡터 DB로 교체할 수 있습니다.
+카탈로그를 다시 동기화한 뒤 같은 명령을 실행하면 문서별 hash가 같은 벡터를 재사용하고 새 항목과
+설명이 바뀐 항목만 임베딩합니다. 출력의 `재사용`과 `새 임베딩` 수로 실제 갱신량을 확인할 수 있습니다.
+
+2026-09-01의 95,951건 통합 스냅샷을 Mac Studio M4 Max 64GB에서 측정한 값은 다음과 같습니다. 이는
+고사양 기준의 절대 시간이므로 일반 PC의 속도를 보장하지 않지만, 저장공간과 메모리 판단에는 쓸 수
+있습니다.
+
+| 항목 | 실측 |
+|---|---:|
+| 카탈로그 | 약 100MiB |
+| 95,951 × 768 의미 인덱스 | 약 420MiB |
+| 최초 전체 빌드 | 17분 44초 |
+| 최초 빌드 최대 메모리 | OpenDataCTL 약 2.5GiB + Ollama 약 1.6GiB |
+| 변경 없는 전체 재사용 갱신 | 1.9초, 새 임베딩 0건 |
+| 단일 키워드 / 하이브리드 검색 | 약 1.0초 / 2.8~3.0초 |
+| 2개 검색축 계획형 hybrid (bounded top-K 적용 후) | 약 2.5~3.6초 |
+
+8GB RAM에서도 다른 무거운 프로그램을 닫으면 가능할 것으로 보이지만 여유가 작아 **16GB RAM과
+약 1GB의 여유 디스크를 권장**합니다. Ollama는 여전히 선택 기능입니다. 정확한 데이터명 검색이나
+MCP 에이전트가 만든 검색축만으로 충분하면 설치하지 않아도 됩니다. 자연어 표현 차이와 서로 다른
+데이터 축의 숨은 자료를 반복 탐색할 때만 설치 가치가 있습니다. 실측 품질과 한계는
+[통합 시맨틱 인덱스 평가](docs/research/integrated-semantic-index-evaluation.md), 최초 빌드를 없애는
+[사전 구축·증분 배포 조사](docs/research/semantic-index-distribution.md)에 기록했습니다. 공식 prebuilt
+인덱스가 릴리즈되기 전까지 최초 한 번의 전체 빌드는 필요합니다. 현재 증분 갱신의 호환성과 교체
+기준은 [ADR 0005](docs/adr/0005-incremental-semantic-index-distribution.md)에 고정했습니다.
+
+벡터 저장소는 별도 모듈의 작은 인터페이스 뒤에 두었습니다. 현재 규모에서는 정확한 평면 검색을
+유지하고, 일반 사양에서 검색 지연이 실제 병목으로 확인될 때만 mmap 또는 ANN backend를 검토합니다.
+검색 중에는 전수 점수를 그대로 계산하되 기존과 동일한 정렬 기준의 정확한 상위 후보만 메모리에
+유지합니다. 전수 정렬과 top-K 결과가 일치하는 회귀 테스트를 두어 속도를 위해 검색 품질을 근사화하지
+않습니다.
 
 > 포털은 키워드 검색만 제공합니다. 카탈로그가 없으면 "이런 데이터가 있나?"를 확인하려면
 > 검색어를 하나씩 추측해볼 수밖에 없고, 못 찾았을 때 *없는 것*인지 *단어가 틀린 것*인지
 > 알 수 없습니다. `catalog`는 전체를 로컬에 두고 한 번에 훑습니다.
 > `doctor`가 카탈로그가 오래됐는지도 함께 점검합니다.
+>
+> FILE 검색 결과는 공식 `detailUrl`, formats, nextAction을 함께 냅니다. `inspect_file_api_contract`는
+> 파일 페이지에 JSON+XML 자동변환 표현도 있다는 뜻이지만 현재 `call_api` 계약은 아닙니다. `svcType`이
+> REST/LINK인 노드만 `describe`로 보내고, FILE은 상세 컬럼과 작은 다운로드 표본으로 결합 가능성을 확인합니다.
 >
 > **오픈API의 약 40%(현재 카탈로그 11,902개 중 4,766개)는 `LINK` 유형**으로, 포털에 명세가 없고 제공기관
 > 사이트로 연결됩니다. OpenDataCTL은 이 4,766건을 기본 검색에서 숨기지 않고, `describe`에서
@@ -203,7 +248,7 @@ opendatactl catalog discover "시세보다 싸게 살 수 있는 물건"
 > 포털 조회가 실패하거나 안전하지 않은 주소를 반환하면 `state=resolution_failed`와 구조화된 `failure`가
 > 원인을 설명하고, 재시도 가능한 실패는 `nextAction=retry_link_resolution`, 그 밖의 실패는
 > `nextAction=choose_another_dataset`으로 다음 행동을 구분합니다.
-> 카탈로그는 각 항목의 유형을 표시합니다. 기본 검색은 LINK까지 발견하며, REST만 필요할 때
+> 카탈로그는 각 항목의 유형을 표시합니다. 기본 검색은 LINK와 FILE까지 발견하며, REST만 필요할 때
 > `--rest-only`로 제한합니다. 전후 검색·상세·호출 품질은
 > [LINK 품질 평가](docs/research/link-search-quality-evaluation.md)에 기록했습니다.
 >
@@ -354,7 +399,7 @@ OpenDataCTL이 세션 쿠키를 복사해 저장하고 **그 브라우저를 종
 | `provider-credentials/*.json` | SafetyKorea·FoodSafetyKorea·VWorld scope별 키 | Unix `0600`; Windows 현재 사용자+SYSTEM 전용 DACL |
 | `chrome-profile/` | 로그인용 Chrome 프로파일 | `0700` |
 | `chrome-headless-*` | 신청 제출 중에만 존재하는 격리된 임시 headless 프로파일 | `0700` |
-| `catalog.json` | 공개 OpenAPI 카탈로그 스냅샷 | `0644` |
+| `catalog.json` | 공개 OpenAPI·파일데이터 통합 카탈로그 스냅샷 | `0644` |
 | `catalog-semantic.gob` | 선택 기능인 공개 카탈로그 의미 벡터 | `0600` |
 
 **`opendatactl logout`은 세션·data.go.kr 키·provider 키·두 Chrome 프로파일을 삭제하고 공개 카탈로그 파일은 유지합니다.** 로그인 프로파일에는 사람이 로그인에 사용한
