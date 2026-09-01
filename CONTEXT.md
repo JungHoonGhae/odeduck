@@ -1,6 +1,6 @@
-# OpenDataCTL Discovery
+# oddsock Discovery
 
-OpenDataCTL이 고립된 공공데이터를 발견하고, 서로 결합할 가치와 가능성을 검증할 때 사용하는 공통 언어다.
+oddsock이 고립된 공공데이터를 발견하고, 서로 결합할 가치와 가능성을 검증할 때 사용하는 공통 언어다.
 
 ## Language
 

@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/JungHoonGhae/opendatactl/internal/apicall"
-	"github.com/JungHoonGhae/opendatactl/internal/output"
-	"github.com/JungHoonGhae/opendatactl/internal/portal"
+	"github.com/JungHoonGhae/oddsock/internal/apicall"
+	"github.com/JungHoonGhae/oddsock/internal/output"
+	"github.com/JungHoonGhae/oddsock/internal/portal"
 	"github.com/spf13/cobra"
 )
 
@@ -22,7 +22,7 @@ describe가 반환한 provider application URL을 안내합니다. 신청은
 계정에 실제 신청을 생성하므로 **한 번에 한 건만** 처리하고 **활용목적(--purpose)을
 반드시 요구**하며 제출 전 확인합니다 (투기적 대량신청 금지).
 
-예) opendatactl apply 15000908 --purpose "선거 데이터 분석" --category research`,
+예) oddsock apply 15000908 --purpose "선거 데이터 분석" --category research`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			format, err := resolveFormat()
@@ -66,7 +66,7 @@ describe가 반환한 provider application URL을 안내합니다. 신청은
 				return output.WriteJSON(cmd.OutOrStdout(), res)
 			}
 			if res.Submitted {
-				fmt.Fprintf(cmd.ErrOrStderr(), "✅ %s — `opendatactl applications` 로 확인하세요.\n", res.Message)
+				fmt.Fprintf(cmd.ErrOrStderr(), "✅ %s — `oddsock applications` 로 확인하세요.\n", res.Message)
 			} else if res.Canceled {
 				fmt.Fprintf(cmd.ErrOrStderr(), "⏹  %s\n", res.Message)
 			} else {

@@ -26,7 +26,7 @@ jobs:
         shell: bash
         run: |
           set -o pipefail
-          go run ./cmd/opendatactl doctor --adapters-only --delay 700ms -f table 2>&1 | tee adapter-doctor.txt
+          go run ./cmd/oddsock doctor --adapters-only --delay 700ms -f table 2>&1 | tee adapter-doctor.txt
 
       - name: Open or update a GitHub issue on drift
         if: steps.probe.outcome == 'failure'

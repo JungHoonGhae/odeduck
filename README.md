@@ -14,9 +14,8 @@
 Codex, Claude, Gemini, Cursor가 자연어 목표를 여러 검색축으로 바꿔 OpenAPI와 파일데이터를 함께
 탐색합니다.
 
-제품의 실행 엔진과 CLI 명령은 기존 이름인 `OpenDataCTL`/`opendatactl`을 유지합니다. 브랜드를
-바꾼다고 설치 경로, 자동화 스크립트, MCP 설정을 깨뜨리지 않습니다. `CTL`은 흩어진 이용 절차를
-검색부터 실제 호출까지 하나의 실행 경로로 묶는 control plane을 뜻합니다.
+`oddsock`이 저장소·Go module·CLI·MCP의 공식 이름입니다. 이전 `opendatactl`과 `gongctl` 명령도
+전환 기간에는 같은 엔진을 실행하고, 기존 설정·로그인 세션·인증키를 자동으로 다시 찾습니다.
 
 공개 브랜드 이름·문구·로고 경로는 [`docs/brand/brand.json`](docs/brand/brand.json)에 모아 두었습니다.
 값을 바꾼 뒤 `go run ./scripts/sync-brand.go`를 실행하면 이 상단 블록이 다시 만들어지며, CI는
@@ -32,7 +31,7 @@ Codex, Claude, Gemini, Cursor가 자연어 목표를 여러 검색축으로 바�
 
 ## 포털에서 끊기던 네 번을 한 번에
 
-| 기존 흐름의 병목 | OpenDataCTL 원스톱 흐름 |
+| 기존 흐름의 병목 | oddsock 원스톱 흐름 |
 | --- | --- |
 | 포털이 알아듣는 정확한 검색어를 사람이 추측 | 자연어 목표를 여러 기회축으로 나눠 전체 카탈로그 검색 |
 | 결과가 호출 가능한지, 파일인지, 어떤 값이 필수인지 상세페이지를 돌며 판별 | `inspect_dataset`이 API 명세 또는 실제 파일 자산·컬럼·심의유형 확인 |
@@ -42,7 +41,7 @@ Codex, Claude, Gemini, Cursor가 자연어 목표를 여러 검색축으로 바�
 공개된 대체 CLI/MCP와의 기능별 비교 근거는
 [경쟁 워크플로 조사](docs/research/competitive-workflow-audit.md)에 기록했습니다. 검색→상세→호출
 형태의 MCP 자체는 이미 있습니다. 2026-08-31에 확인한 공개 구현과의 차이는 그 앞뒤입니다.
-OpenDataCTL은 keyword gateway를 목표 기반 discovery로 확장하고, 기존 구현에서 빠져 있던
+oddsock은 keyword gateway를 목표 기반 discovery로 확장하고, 기존 구현에서 빠져 있던
 **활용신청·승인 확인·키 재사용**을 첫 실호출까지 연결합니다.
 
 > [!WARNING]
@@ -58,83 +57,85 @@ OpenDataCTL은 keyword gateway를 목표 기반 discovery로 확장하고, 기�
 ```sh
 gh auth login
 gh api -H 'Accept: application/vnd.github.raw+json' \
-  repos/JungHoonGhae/opendatactl/contents/install.sh | sh
+  repos/JungHoonGhae/oddsock/contents/install.sh | sh
 ```
 
 Windows:
 
 ```powershell
 gh auth login
-(& gh api -H "Accept: application/vnd.github.raw+json" repos/JungHoonGhae/opendatactl/contents/install.ps1) |
+(& gh api -H "Accept: application/vnd.github.raw+json" repos/JungHoonGhae/oddsock/contents/install.ps1) |
   Out-String | Invoke-Expression
 ```
 
 또는 저장소를 clone한 상태에서 Go가 있다면:
 
 ```sh
-go install ./cmd/opendatactl
+go install ./cmd/oddsock
 ```
 
-### `gongctl`에서 이전
+### `opendatactl`·`gongctl`에서 이전
 
-v0.9에는 새 `opendatactl`과 기존 스크립트·자동화를 위한 `gongctl` 호환 바이너리가 함께
-들어 있습니다. 기존 사용자의 설정 디렉터리 로그인 세션·인증키·카탈로그도 복사 없이 그대로
-사용합니다. 새 설치만 운영체제의 표준 설정 위치 아래 `opendatactl` 디렉터리에 상태를 저장합니다.
+현재 전환 릴리스에는 새 `oddsock`과 기존 스크립트·자동화를 위한 `opendatactl`, `gongctl` 호환
+바이너리가 함께 들어 있습니다. 기존 사용자의 설정 디렉터리·로그인 세션·인증키·카탈로그도 복사
+없이 그대로 사용합니다. 새 설치만 운영체제의 표준 설정 위치 아래 `oddsock` 디렉터리에 상태를
+저장합니다.
 저장소 비공개 전환 이후 공개 Homebrew cask 갱신은 중단했습니다. 기존 cask는 마지막 공개 버전에
 남으므로 v0.12.0 이상은 위의 인증된 `gh` 설치 경로를 사용합니다.
 
 단, 파일로 저장해 둔 **v0.8 Windows 설치 스크립트**를 버전 지정 없이 다시 실행하면 GitHub의
 저장소 이름 변경 리다이렉트를 따라가지 못합니다. 위의 최신 PowerShell 설치 명령을 한 번 실행하면
-기존 설치 폴더를 그대로 감지해 `opendatactl.exe`와 `gongctl.exe`를 함께 갱신합니다. 이미 설치된
-`gongctl` 실행 파일과 설정·로그인 상태에는 영향이 없습니다.
+기존 설치 폴더를 그대로 감지해 `oddsock.exe`, `opendatactl.exe`, `gongctl.exe`를 함께 갱신합니다.
+이미 설치된 실행 파일과 설정·로그인 상태에는 영향이 없습니다.
 
 환경변수도 새 이름을 우선하고 기존 이름을 호환합니다. Ollama 주소는
-`OPENDATACTL_OLLAMA_URL`(`GONGCTL_OLLAMA_URL` 폴백), 설치할 릴리스 버전은
-`OPENDATACTL_VERSION`(`GONGCTL_VERSION` 폴백)으로 지정할 수 있습니다. MCP 가이드의 기본 URI는
-`opendatactl://guide`이며, 기존 클라이언트를 위해 `gongctl://guide`도 같은 내용을 반환합니다.
+`ODDSOCK_OLLAMA_URL`(`OPENDATACTL_OLLAMA_URL` → `GONGCTL_OLLAMA_URL` 폴백), 설치할 릴리스
+버전은 `ODDSOCK_VERSION`(`OPENDATACTL_VERSION` → `GONGCTL_VERSION` 폴백)으로 지정할 수
+있습니다. MCP 가이드의 기본 URI는 `oddsock://guide`이며, 기존 클라이언트를 위해
+`opendatactl://guide`와 `gongctl://guide`도 같은 내용을 반환합니다.
 
 ## 사용법
 
 ```sh
 # 1. 브라우저가 한 번 열립니다 — data.go.kr에 로그인하세요 (SSO는 자동화하지 않음)
-opendatactl login
+oddsock login
 
 # 2. 자연어 목표로 REST, LINK, FILE 전체 후보 탐색
-opendatactl catalog discover "우리 동네 대기질 서비스에 쓸 데이터"
+oddsock catalog discover "우리 동네 대기질 서비스에 쓸 데이터"
 
 # 3A. REST와 구현된 LINK는 명세·필수 요청변수·승인유형 확인 후 4~6단계로 계속
-opendatactl describe <PK>
+oddsock describe <PK>
 
 # 3B. FILE은 공식 metadata → provider catalogue → 실제 파일 자산 순으로 검사
-opendatactl inspect <PK> --observe
+oddsock inspect <PK> --observe
 #     FILE PK를 아래 apply/call 흐름에 넣지 않음
 #     API+FILE 복수 제공형은 두 계약을 모두 반환; 하나만 필요하면 --delivery api|file
 
 # 4. REST 또는 구현된 LINK 활용신청 (AI/MCP에서는 확인 없이 자동 제출, 첫 신청 때 인증키 자동 발급)
-opendatactl apply <PK> --purpose "대기질 분석 프로젝트" --category research
+oddsock apply <PK> --purpose "대기질 분석 프로젝트" --category research
 
 # 5. 승인 확인
-opendatactl applications -f table
+oddsock applications -f table
 
 # 6. REST 또는 구현된 LINK 실제 호출 (XML 응답도 JSON으로 변환해 돌려줍니다)
-opendatactl call --pk <PK> --param numOfRows=5   # 엔드포인트·인증키 자동
+oddsock call --pk <PK> --param numOfRows=5   # 엔드포인트·인증키 자동
 ```
 
 ```bash
 # 무엇이 존재하는지 먼저 훑기 — 로컬 카탈로그(한 번 sync 후 즉시 검색)
-opendatactl catalog sync              # 공식 API → 공개 월간 CSV → 웹 순으로 fallback
-opendatactl catalog sync --source official-file      # 공개 96k 목록을 약 20초에 스트리밍
-opendatactl catalog sync --source official-file+web  # 릴리즈용: 정확한 분류 + 복수 제공형 보강
-opendatactl catalog sync --source official           # 기관 승인 키가 있을 때 operation까지 수집
-opendatactl catalog sync --source web                # 포털 웹 제공형만 수집
-opendatactl catalog sync --type API   # 호출 가능한 API 탐색만 필요할 때
-opendatactl catalog search 폭염 온열   # 활용신청 많은 순, 설명문 없이 간결하게
-opendatactl catalog discover "내가 몰랐던 돈 될 만한 공공데이터"  # 로그인된 AI CLI로 검색축 생성
-opendatactl catalog discover "지역 소멸로 생길 사업 기회" --agent gemini
-opendatactl catalog search 폭염               # 기본: REST, LINK, FILE 전체 탐색
-opendatactl catalog search 폭염 --rest-only   # 포털 명세가 있는 REST만 제한
-opendatactl catalog info               # 수집 시각 + 유형 분포
-opendatactl catalog orgs 폭염          # 그 주제를 개방한 기관 순위
+oddsock catalog sync              # 공식 API → 공개 월간 CSV → 웹 순으로 fallback
+oddsock catalog sync --source official-file      # 공개 96k 목록을 약 20초에 스트리밍
+oddsock catalog sync --source official-file+web  # 릴리즈용: 정확한 분류 + 복수 제공형 보강
+oddsock catalog sync --source official           # 기관 승인 키가 있을 때 operation까지 수집
+oddsock catalog sync --source web                # 포털 웹 제공형만 수집
+oddsock catalog sync --type API   # 호출 가능한 API 탐색만 필요할 때
+oddsock catalog search 폭염 온열   # 활용신청 많은 순, 설명문 없이 간결하게
+oddsock catalog discover "내가 몰랐던 돈 될 만한 공공데이터"  # 로그인된 AI CLI로 검색축 생성
+oddsock catalog discover "지역 소멸로 생길 사업 기회" --agent gemini
+oddsock catalog search 폭염               # 기본: REST, LINK, FILE 전체 탐색
+oddsock catalog search 폭염 --rest-only   # 포털 명세가 있는 REST만 제한
+oddsock catalog info               # 수집 시각 + 유형 분포
+oddsock catalog orgs 폭염          # 그 주제를 개방한 기관 순위
 ```
 
 2026-09-01 릴리즈 검증용 기존 웹 fallback 동기화에서는 고유 노드 95,951건(REST 7,132, LINK 4,766, FILE 84,047,
@@ -163,7 +164,7 @@ opendatactl catalog orgs 폭염          # 그 주제를 개방한 기관 순위
 `catalog discover`는 설치되어 있고 로그인된 **Codex, Claude Code, Gemini CLI, Cursor Agent** 중 하나를
 검색 계획기로 사용합니다. 사용자가 정부 데이터의 정확한 명칭을 몰라도 목표를 거래·가격, 선행지표,
 제약·위험, 지원·인프라 같은 3~8개의 서로 다른 검색축으로 바꾼 뒤 전체 카탈로그를 탐색합니다.
-`--agent auto`가 기본이며 `codex | claude | gemini | cursor`로 고정할 수 있습니다. OpenDataCTL은 로그인
+`--agent auto`가 기본이며 `codex | claude | gemini | cursor`로 고정할 수 있습니다. oddsock은 로그인
 토큰을 읽거나 저장하지 않고, 각 CLI가 평소 사용하는 인증·요금제를 그대로 사용합니다. 검색 목표는
 CLI의 stdin으로 전달해 로컬 프로세스 목록에 남기지 않으며, 읽기 전용/질문 모드로 실행합니다.
 `auto`는 첫 검색 계획 생성이 실패하면 설치된 다음 CLI에도 같은 목표를 전달합니다. 이후 결과 기반
@@ -184,7 +185,7 @@ CLI의 stdin으로 전달해 로컬 프로세스 목록에 남기지 않으며, 
 선택은 서버에서 거부됩니다.
 
 ```bash
-opendatactl catalog discover \
+oddsock catalog discover \
   "시세보다 저렴한 공매 부동산의 숨은 위험과 실제 수요를 비교하고 싶다" \
   --agent codex --max-connections 3
 ```
@@ -210,11 +211,12 @@ Ollama 의미 벡터는 에이전트가 만든 검색축 밖의 표현까지 추
 검색할 때 쓰는 선택 기능입니다. [Ollama](https://docs.ollama.com/)만 설치한 뒤 아래 명령 한 번이면
 추천 다국어 모델 다운로드, 현재 통합 카탈로그 임베딩, 로컬 인덱스 저장까지 처리합니다. 별도 벡터 DB와
 API 키는 필요하지 않습니다. Ollama가 기본 주소가 아닌 곳에서 실행되면
-`OPENDATACTL_OLLAMA_URL`을 설정하세요. v0.8의 `GONGCTL_OLLAMA_URL`도 호환됩니다.
+`ODDSOCK_OLLAMA_URL`을 설정하세요. 이전 `OPENDATACTL_OLLAMA_URL`과
+`GONGCTL_OLLAMA_URL`도 호환됩니다.
 
 ```bash
-opendatactl catalog semantic-build
-opendatactl catalog discover "시세보다 싸게 살 수 있는 물건"
+oddsock catalog semantic-build
+oddsock catalog discover "시세보다 싸게 살 수 있는 물건"
 ```
 
 기본 모델은 한국어를 포함한 100개 이상 언어를 지원하는 약 238MB의
@@ -232,7 +234,7 @@ opendatactl catalog discover "시세보다 싸게 살 수 있는 물건"
 | 카탈로그 | 약 113MiB |
 | 96,663 × 768 의미 인덱스 | 약 423MiB |
 | composite 인덱스 갱신 | 19분 1초, 553건 재사용·96,110건 임베딩 |
-| 최초 빌드 최대 메모리 | OpenDataCTL 약 2.5GiB + Ollama 약 1.6GiB |
+| 최초 빌드 최대 메모리 | oddsock 약 2.5GiB + Ollama 약 1.6GiB |
 | 변경 없는 전체 재사용 갱신 | 2.2초, 새 임베딩 0건 |
 | 단일 키워드 / 하이브리드 검색 | 약 1.0초 / 2.8~3.0초 |
 | 2개 검색축 계획형 hybrid (bounded top-K 적용 후) | 약 2.5~3.6초 |
@@ -269,7 +271,7 @@ MCP 에이전트가 만든 검색축만으로 충분하면 설치하지 않아�
 > 함께 나타납니다.
 >
 > **API 제공형의 약 40%(현재 composite의 REST+LINK 11,987개 중 4,780개)는 `LINK` 유형**으로, 포털에 명세가 없고 제공기관
-> 사이트로 연결됩니다. OpenDataCTL은 이 4,780건을 기본 검색에서 숨기지 않고, `describe`에서
+> 사이트로 연결됩니다. oddsock은 이 4,780건을 기본 검색에서 숨기지 않고, `describe`에서
 > provider 계약과 typed 호출 가능 여부를 판정합니다.
 > LINK의 경우 `describe`가 제공기관의 공식 시작점인 `linkUrl`과 구조화된 `handoff`를 반환합니다.
 > 이 주소는 OpenAPI 허브일 수도, 개별 데이터 상세나 일반 안내 페이지일 수도 있어 API 엔드포인트·명세로
@@ -284,7 +286,7 @@ MCP 에이전트가 만든 검색축만으로 충분하면 설치하지 않아�
 > 확인한 URL shape를 지원합니다. 응답의 `adapterId`, `adapterRevision`, `providerServiceId`로 어떤
 > 계약이 적용됐는지 추적할 수 있습니다. SafetyKorea 5개 operation, FoodSafetyKorea의 공식 요청표 기반
 > service 호출, VWorld data/address/search/WMS/WFS는 `invocationState=implemented`이며 기존
-> `call_api(pk, op, params)`가 자동 dispatch합니다. provider key는 `opendatactl provider-key set`으로
+> `call_api(pk, op, params)`가 자동 dispatch합니다. provider key는 `oddsock provider-key set`으로
 > 한 번만 저장하며 MCP 입력이나 출력에는 나타나지 않습니다.
 > 서울 일반 API와 실시간 지하철처럼 같은 사이트에서도 key scope가 갈리는 경우에는 검증한 service ID만
 > 계약으로 승격하되, 공식 호출 endpoint가 HTTP인 동안에는
@@ -298,30 +300,30 @@ MCP 에이전트가 만든 검색축만으로 충분하면 설치하지 않아�
 > `--rest-only`로 제한합니다. 전후 검색·상세·호출 품질은
 > [LINK 품질 평가](docs/research/link-search-quality-evaluation.md)에 기록했습니다.
 >
-> `opendatactl doctor --adapters-only`는 로그인이나 브라우저 없이 4개 adapter의 11개 live canary와
+> `oddsock doctor --adapters-only`는 로그인이나 브라우저 없이 4개 adapter의 11개 live canary와
 > 180일 계약 freshness를 점검합니다. 같은 검사가 매주 CI에서 실행되고 drift가 나면 GitHub 이슈를 갱신합니다.
 >
 > 구체적인 검색어는 `catalog search`에 문장으로 써도 됩니다 — 조사(`~에서`, `~으로`)와 군더더기(`데이터`, `알려줘`)는
 > 걸러집니다. 모든 단어를 포함하는 결과가 없으면 조용히 0건을 주는 대신 일부만 일치하는
 > 것까지 보여주고, 그렇게 넓혔다는 사실을 `relaxed`로 알려줍니다. 모호한 목표는 MCP 호스트 모델이
 > 여러 검색축으로 의미 분해합니다. 독립 터미널에서는 `catalog discover`가 같은 일을 로그인된 AI
-> CLI로 수행합니다. OpenDataCTL은 축별 검색·선택적 벡터 검색을 합쳐 다양하게 반환합니다.
+> CLI로 수행합니다. oddsock은 축별 검색·선택적 벡터 검색을 합쳐 다양하게 반환합니다.
 
 ```bash
 # 호출 — 엔드포인트 URL 을 타이핑하지 않습니다
-opendatactl call --pk 15077974 --param pageNo=1 --param numOfRows=3 --param type=xml
+oddsock call --pk 15077974 --param pageNo=1 --param numOfRows=3 --param type=xml
 
 # 외부 LINK provider key는 명령행 인자가 아닌 숨김 입력/stdin으로 한 번 저장
-opendatactl provider-key set safetykorea
-opendatactl provider-key status
+oddsock provider-key set safetykorea
+oddsock provider-key status
 
 # 같은 call 명령으로 LINK typed operation 호출
-opendatactl call --pk 15116894 --op certificationList \
+oddsock call --pk 15116894 --op certificationList \
   --param conditionKey=productName --param conditionValue=완구
 ```
 
 > **승인 조건은 `describe`의 `approval`에 나옵니다.** 포털은 개발단계와 운영단계를 따로
-> 심의하는데, OpenDataCTL이 쓰는 개발계정 경로는 조사한 데이터셋에서 사실상 모두 자동승인이었습니다
+> 심의하는데, oddsock이 쓰는 개발계정 경로는 조사한 데이터셋에서 사실상 모두 자동승인이었습니다
 > (무작위 90건 표본에 개발단계 심의는 0건). 운영단계는 약 1/3이 심의승인이므로, 나중에 상용으로
 > 옮길 계획이면 미리 확인할 값입니다. 그 행이 없는 데이터셋(대개 LINK)은 자동승인으로
 > 가정하지 않고 `approval` 없음으로 보고합니다.
@@ -333,26 +335,26 @@ opendatactl call --pk 15116894 --op certificationList \
 
 ```bash
 # 계정 인증키 조회 (call 은 생략 시 자동으로 이 키를 씁니다)
-opendatactl key
+oddsock key
 
 # 스크래핑이 아직 살아있는지 점검 (data.go.kr HTML 변경 감지, CI용 exit 1)
-opendatactl doctor -f table
+oddsock doctor -f table
 ```
 
-> **사람의 개입은 `opendatactl login` 한 번뿐입니다.** 검색 → 활용신청 → 승인 확인 → 인증키 획득 →
+> **사람의 개입은 `oddsock login` 한 번뿐입니다.** 검색 → 활용신청 → 승인 확인 → 인증키 획득 →
 > 호출까지 에이전트가 스스로 끝냅니다. 인증키를 사람이 복사해 붙여넣을 필요가 없습니다.
 >
-> **신청 직후 403은 정상입니다.** (`call --wait 10m` 을 주면 opendatactl이 1분 간격으로 재시도하며
+> **신청 직후 403은 정상입니다.** (`call --wait 10m` 을 주면 oddsock이 1분 간격으로 재시도하며
 > 기다립니다.) 승인은 즉시 끝나지만 게이트웨이 반영에 시간이 걸립니다 —
 > 실측 **7~10분**, 포털 안내상 최대 1시간. `list_applications`에 '승인'으로 보여도 아직
 > 호출이 안 될 수 있습니다. 1~2분 간격으로 재시도하면 되고, 키를 바꾸거나 다시 신청할 필요는
 > 없습니다. 여러 개를 쓸 계획이면 **먼저 다 신청해두고 함께 기다리는 편이 빠릅니다.**
 
-`opendatactl status` / `opendatactl logout` / `opendatactl version`도 있습니다.
+`oddsock status` / `oddsock logout` / `oddsock version`도 있습니다.
 
 ## MCP 서버로 쓰기
 
-`opendatactl mcp`는 stdio MCP 서버로 동작합니다. 수천 개의 개별 API를 MCP 도구로 한꺼번에 노출하지
+`oddsock mcp`는 stdio MCP 서버로 동작합니다. 수천 개의 개별 API를 MCP 도구로 한꺼번에 노출하지
 않고, 아래의 작은 흐름이 필요한 정보와 권한만 단계적으로 가져옵니다.
 
 1. `catalog_search` — 자연어 목표를 모델이 여러 검색축으로 의미 분해하고, 로컬 키워드·선택적 Ollama
@@ -382,16 +384,16 @@ data.go.kr REST는 로그인 한 번 뒤에 에이전트가 명세 확인, 신�
 예상 key가 없는 edge, 변환 설명이 없는 proxy, 중복 역할을 거부합니다. 전체 계약과 상태 승격 기준은
 [교차 데이터 연결 발견 v1 명세](docs/specs/cross-domain-connection-discovery-v1.md)에 있습니다.
 
-에이전트가 먼저 읽을 MCP 리소스는 `opendatactl://guide`입니다. 기존 `gongctl://guide` URI도
-v0.9 호환 기간에는 같은 가이드를 반환합니다.
+에이전트가 먼저 읽을 MCP 리소스는 `oddsock://guide`입니다. 기존 `opendatactl://guide`와
+`gongctl://guide` URI도 전환 기간에는 같은 가이드를 반환합니다.
 
 Codex·Claude Code·Gemini CLI에서는 각자 한 줄로 등록할 수 있습니다. 이 경로에서는 해당 호스트
 모델이 자연어 목표를 검색축으로 만들므로 `catalog discover`가 하위 에이전트를 다시 실행하지 않습니다.
 
 ```bash
-codex mcp add opendatactl -- opendatactl mcp
-claude mcp add opendatactl -- opendatactl mcp
-gemini mcp add --scope user opendatactl opendatactl mcp
+codex mcp add oddsock -- oddsock mcp
+claude mcp add oddsock -- oddsock mcp
+gemini mcp add --scope user oddsock oddsock mcp
 ```
 
 Cursor와 Claude Desktop처럼 JSON 설정을 쓰는 클라이언트의 예시는 같습니다:
@@ -399,26 +401,26 @@ Cursor와 Claude Desktop처럼 JSON 설정을 쓰는 클라이언트의 예시�
 ```json
 {
   "mcpServers": {
-    "opendatactl": {
-      "command": "opendatactl",
+    "oddsock": {
+      "command": "oddsock",
       "args": ["mcp"]
     }
   }
 }
 ```
 
-Cursor Agent는 `cursor-agent mcp list-tools opendatactl`로 연결과 도구 목록을 확인할 수 있습니다.
-ACP는 편집기와 에이전트 사이의 세션 프로토콜이고, opendatactl 같은 도구 서버를 연결하는 경계는 MCP입니다.
+Cursor Agent는 `cursor-agent mcp list-tools oddsock`로 연결과 도구 목록을 확인할 수 있습니다.
+ACP는 편집기와 에이전트 사이의 세션 프로토콜이고, oddsock 같은 도구 서버를 연결하는 경계는 MCP입니다.
 따라서 Gemini/Cursor의 ACP 실행 모드를 별도 추론 API처럼 중첩하지 않고, 호스트가 MCP
 `catalog_search → inspect_dataset → (미승인 시 apply) → call_api`를 호출하게 합니다.
 
 ## 보안 주의
 
-`opendatactl login`은 브라우저 창을 한 번 띄웁니다(정부 SSO는 자동화하지 않습니다). 로그인이 확인되면
-OpenDataCTL이 세션 쿠키를 복사해 저장하고 **그 브라우저를 종료합니다** — 이후 명령은 창 없이 동작합니다.
+`oddsock login`은 브라우저 창을 한 번 띄웁니다(정부 SSO는 자동화하지 않습니다). 로그인이 확인되면
+oddsock이 세션 쿠키를 복사해 저장하고 **그 브라우저를 종료합니다** — 이후 명령은 창 없이 동작합니다.
 세션이 유효한 동안에는 `applications`·`key` 같은 인증 요청에서 포털이 회전시킨 쿠키를 자동 병합해
 `datagokr-session.json`을 갱신하므로, 계속 사용하는 세션은 가능한 범위에서 연장됩니다. 정부 SSO의
-절대 만료나 재인증 요구가 오면 이를 우회하지 않고 다시 `opendatactl login`을 안내합니다.
+절대 만료나 재인증 요구가 오면 이를 우회하지 않고 다시 `oddsock login`을 안내합니다.
 
 **동작 방식**
 
@@ -433,10 +435,10 @@ OpenDataCTL이 세션 쿠키를 복사해 저장하고 **그 브라우저를 종
 
 **디스크에 저장되는 것** (디렉터리 `0700`)
 
-- macOS: `~/Library/Application Support/opendatactl`
-- Linux: `~/.config/opendatactl`
-- Windows: `%AppData%\opendatactl`
-- 기존 사용자는 같은 위치의 `gongctl` 디렉터리를 자동으로 계속 사용
+- macOS: `~/Library/Application Support/oddsock`
+- Linux: `~/.config/oddsock`
+- Windows: `%AppData%\oddsock`
+- 기존 사용자는 같은 위치의 `opendatactl` 또는 `gongctl` 디렉터리를 자동으로 계속 사용
 
 | 파일 | 내용 | 권한 |
 | --- | --- | --- |
@@ -448,7 +450,7 @@ OpenDataCTL이 세션 쿠키를 복사해 저장하고 **그 브라우저를 종
 | `catalog.json` | 공개 OpenAPI·파일데이터 통합 카탈로그 스냅샷 | `0644` |
 | `catalog-semantic.gob` | 선택 기능인 공개 카탈로그 의미 벡터 | `0600` |
 
-**`opendatactl logout`은 세션·data.go.kr 키·provider 키·두 Chrome 프로파일을 삭제하고 공개 카탈로그 파일은 유지합니다.** 로그인 프로파일에는 사람이 로그인에 사용한
+**`oddsock logout`은 세션·data.go.kr 키·provider 키·두 Chrome 프로파일을 삭제하고 공개 카탈로그 파일은 유지합니다.** 로그인 프로파일에는 사람이 로그인에 사용한
 SSO 제공자(네이버 등)의 쿠키도 함께 쌓이기 때문에, 쿠키 파일만 지우는 것으로는 충분하지 않습니다.
 작업이 끝나면 `logout`을 실행하세요.
 

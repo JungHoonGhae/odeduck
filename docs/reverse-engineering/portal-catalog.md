@@ -1,6 +1,6 @@
 # data.go.kr Portal Catalog
 
-Source of truth for the portal surface opendatactl depends on. It should grow before
+Source of truth for the portal surface oddsock depends on. It should grow before
 the Go client grows: add a row here (with how you verified it) before writing code
 against a path.
 
@@ -12,7 +12,7 @@ Verified against the live portal on **2026-07-25** with an authenticated session
 - `public` — works with no session
 - `auth` — needs a logged-in session
 - `precondition` — needs `auth` **plus** something else (a cookie, a prior page)
-- `driven` — opendatactl does not call it directly; it drives the page's own JS
+- `driven` — oddsock does not call it directly; it drives the page's own JS
 - `keyed` — needs a serviceKey, not a session
 
 ## Hosts
@@ -25,7 +25,7 @@ Verified against the live portal on **2026-07-25** with an authenticated session
 
 ## Paths
 
-| Status | Method | Path | Purpose | opendatactl mapping |
+| Status | Method | Path | Purpose | oddsock mapping |
 | --- | --- | --- | --- | --- |
 | `public` | GET | `/sso/login.do` | login entry page | `login` opens this for the human |
 | `auth` | GET | `/sso/profile.do` | **SSO trampoline** — auto-submitting form, needs JS | probe loops settle past it |
@@ -52,14 +52,14 @@ only source.**
   authenticated navigation in a fresh tab must run in a browser, not plain HTTP.
   Once the session has settled, the cookies work over plain HTTP.
 - **Auth cookies are session-scoped**: Chrome drops them on exit, but the values
-  stay valid server-side. opendatactl copies them out at login (`internal/portal/session.go`)
+  stay valid server-side. oddsock copies them out at login (`internal/portal/session.go`)
   and closes the window.
 
 ## Capture workflow
 
 To add or re-verify a row:
 
-1. Log in with `opendatactl login` (this leaves a session; add `--keep-browser` if
+1. Log in with `oddsock login` (this leaves a session; add `--keep-browser` if
    you need the window).
 2. Attach over CDP on the debug port and enable the Network domain, then load the
    page and record only `XHR`/`Fetch` requests — that separates data calls from
@@ -86,7 +86,7 @@ and ship the whole spec in the attached 참고문서 (hwp/xlsx/zip). Example: pk
 
     {baseURL}/cmm/cmm/fileDownload.do?atchFileId=FILE_...&fileDetailSn=N
 
-Verified 2026-07-25: that URL returns the guide (HTTP 200, 8 MB zip). opendatactl
+Verified 2026-07-25: that URL returns the guide (HTTP 200, 8 MB zip). oddsock
 never parses the document — reading it is the agent's job, by design (spec §9).
 For 15012005 the zip also carried a 30 MB `주요상권현황` CSV, i.e. guide documents
 sometimes contain bulk data the API itself does not expose.

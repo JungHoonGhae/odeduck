@@ -50,7 +50,7 @@
 
 ## 유사 구현에서 가져올 패턴
 
-| 구현 | 검증된 패턴 | OpenDataCTL에 적용할 부분 |
+| 구현 | 검증된 패턴 | oddsock에 적용할 부분 |
 |---|---|---|
 | Hugging Face Hub | revision별 snapshot, content blob 재사용, 파일·chunk cache로 같은 데이터를 다시 받지 않음. [공식 cache 구조](https://huggingface.co/docs/huggingface_hub/guides/manage-cache), [snapshot download](https://huggingface.co/docs/huggingface_hub/en/package_reference/file_download) | 논리 버전과 실제 blob을 분리하고, 동일 hash shard를 버전 사이에서 재사용 |
 | Apache Lucene | 새 파일을 먼저 쓰고 이를 가리키는 새 `segments_N`을 commit point로 공개한다. 이전 checkpoint 전용 파일은 나중에 정리한다. [IndexWriter source의 checkpoint 설명](https://github.com/apache/lucene/blob/main/lucene/core/src/java/org/apache/lucene/index/IndexWriter.java) | immutable vector shard를 먼저 검증하고 마지막에 `CURRENT` manifest만 교체; 이전 한 세대 보존 |
@@ -240,4 +240,4 @@ first-run document build를 없애는 문제와 별개이므로 1차 개선 범�
 8. flat scan이 실제 병목으로 확인될 때 USearch/ANN backend를 별도 ADR로 검토한다.
 
 이 순서라면 사용자는 처음부터 95,956건을 임베딩하지 않고, 유지보수자는 전체 index를 매번 다시 만들지
-않으며, OpenDataCTL은 별도 vector DB를 필수 설치하지 않는 현재 장점을 유지할 수 있다.
+않으며, oddsock은 별도 vector DB를 필수 설치하지 않는 현재 장점을 유지할 수 있다.

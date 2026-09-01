@@ -12,7 +12,7 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/JungHoonGhae/opendatactl/internal/fetch"
+	"github.com/JungHoonGhae/oddsock/internal/fetch"
 )
 
 // ErrKeyRejected reports that data.go.kr refused the serviceKey itself. Callers
@@ -90,7 +90,7 @@ func callTrusted(ctx context.Context, f *fetch.Client, endpoint string, params m
 	q := url.Values{}
 	for k, v := range params {
 		if strings.EqualFold(k, "serviceKey") {
-			return nil, fmt.Errorf("serviceKey는 opendatactl이 주입하므로 params에 넣지 마세요")
+			return nil, fmt.Errorf("serviceKey는 oddsock이 주입하므로 params에 넣지 마세요")
 		}
 		q.Set(k, v)
 	}

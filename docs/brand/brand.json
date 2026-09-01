@@ -4,6 +4,6 @@
   "proofline": "공개돼 있었습니다. 찾기 쉬웠다는 뜻은 아닙니다.",
   "logoPath": "docs/assets/brand-symbol.svg",
   "logoAlt": "한쪽 발에만 초록 양말을 신은 oddsock 미어캣",
-  "technicalName": "OpenDataCTL",
-  "command": "opendatactl"
+  "technicalName": "oddsock",
+  "command": "oddsock"
 }

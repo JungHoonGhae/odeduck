@@ -1,11 +1,25 @@
 # Changelog
 
-All notable changes to OpenDataCTL are documented here. Format follows
+All notable changes to oddsock are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); versions follow
 [SemVer](https://semver.org/). The release workflow uses the `## [X.Y.Z]`
 section matching a `vX.Y.Z` tag as the GitHub release notes.
 
 ## [Unreleased]
+
+### Changed
+
+- Renamed the canonical repository, Go module, CLI binary, release archive,
+  configuration root, MCP server and guide URI to `oddsock`.
+- Kept `opendatactl` and `gongctl` as deprecated compatibility binaries. The
+  canonical command reuses either former configuration root when it contains
+  login state, keys or a catalogue, and logout cleans all three roots.
+- Installers now prefer `ODDSOCK_*` settings and oddsock release assets, then
+  fall back through the former `OPENDATACTL_*` and `GONGCTL_*` contracts for
+  version-pinned upgrades.
+- Pull-request CI now validates the GoReleaser configuration and builds only the
+  native runner target. Full six-target packaging remains a mandatory release
+  gate, avoiding 18 redundant cross-builds on every ordinary change.
 
 ## [0.14.0] - 2026-09-02
 

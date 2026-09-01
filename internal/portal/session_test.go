@@ -42,7 +42,7 @@ func TestSessionFileLockSerializesIndependentHandles(t *testing.T) {
 func TestAllSessionLocksWaitForLegacyProcess(t *testing.T) {
 	configHome := isolatedUserConfigDir(t)
 	current := filepath.Join(configHome, configDirName)
-	legacy := filepath.Join(configHome, legacyConfigDirName)
+	legacy := filepath.Join(configHome, compatibilityConfigDirNames[0])
 	for _, dir := range []string{current, legacy} {
 		if err := os.MkdirAll(dir, 0o700); err != nil {
 			t.Fatal(err)
@@ -121,7 +121,7 @@ func TestClearSessionRemovesCrashLeftHeadlessProfiles(t *testing.T) {
 
 func TestClearSessionRemovesCredentialsFromCurrentAndLegacyDirectories(t *testing.T) {
 	configHome := isolatedUserConfigDir(t)
-	for _, name := range []string{configDirName, legacyConfigDirName} {
+	for _, name := range append([]string{configDirName}, compatibilityConfigDirNames...) {
 		dir := filepath.Join(configHome, name)
 		for _, profile := range []string{"chrome-profile", "chrome-headless", "chrome-headless-crash"} {
 			if err := os.MkdirAll(filepath.Join(dir, profile), 0o700); err != nil {
@@ -141,7 +141,7 @@ func TestClearSessionRemovesCredentialsFromCurrentAndLegacyDirectories(t *testin
 	if err := clearSession(); err != nil {
 		t.Fatal(err)
 	}
-	for _, name := range []string{configDirName, legacyConfigDirName} {
+	for _, name := range append([]string{configDirName}, compatibilityConfigDirNames...) {
 		dir := filepath.Join(configHome, name)
 		for _, path := range []string{
 			filepath.Join(dir, "datagokr-session.json"),

@@ -13,9 +13,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/JungHoonGhae/opendatactl/internal/agentplan"
-	"github.com/JungHoonGhae/opendatactl/internal/catalog"
-	"github.com/JungHoonGhae/opendatactl/internal/portal"
+	"github.com/JungHoonGhae/oddsock/internal/agentplan"
+	"github.com/JungHoonGhae/oddsock/internal/catalog"
+	"github.com/JungHoonGhae/oddsock/internal/portal"
 )
 
 type syncSourceFunc func(context.Context, string, int, func(int)) (*catalog.Catalog, error)
@@ -24,11 +24,11 @@ func (f syncSourceFunc) Sync(ctx context.Context, scope string, perPage int, pro
 	return f(ctx, scope, perPage, progress)
 }
 
-func TestRootCommandPresentsOpenDataCTLBrand(t *testing.T) {
-	if rootCmd.Use != "opendatactl" {
+func TestRootCommandPresentsOddsockBrand(t *testing.T) {
+	if rootCmd.Use != "oddsock" {
 		t.Fatalf("root command use = %q", rootCmd.Use)
 	}
-	if !strings.Contains(rootCmd.Long, "OpenDataCTL") {
+	if !strings.Contains(rootCmd.Long, "oddsock") {
 		t.Fatalf("root command does not present the product brand: %q", rootCmd.Long)
 	}
 }
@@ -238,7 +238,7 @@ func TestCatalogInstallSnapshotCommandInstallsValidatedPrebuilt(t *testing.T) {
 	t.Setenv("HOME", home)
 	t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, ".config"))
 	t.Setenv("APPDATA", filepath.Join(home, "AppData", "Roaming"))
-	snapshotPath := filepath.Join(t.TempDir(), "opendatactl-catalog.json.gz")
+	snapshotPath := filepath.Join(t.TempDir(), "oddsock-catalog.json.gz")
 	var compressed bytes.Buffer
 	zw := gzip.NewWriter(&compressed)
 	if err := json.NewEncoder(zw).Encode(&catalog.Catalog{
