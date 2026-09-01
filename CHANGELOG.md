@@ -17,6 +17,9 @@ section matching a `vX.Y.Z` tag as the GitHub release notes.
 - Installers now prefer `ODDSOCK_*` settings and oddsock release assets, then
   fall back through the former `OPENDATACTL_*` and `GONGCTL_*` contracts for
   version-pinned upgrades.
+- Pull-request CI now validates the GoReleaser configuration and builds only the
+  native runner target. Full six-target packaging remains a mandatory release
+  gate, avoiding 18 redundant cross-builds on every ordinary change.
 
 ## [0.14.0] - 2026-09-02
 
