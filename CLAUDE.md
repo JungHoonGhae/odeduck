@@ -5,7 +5,8 @@ Go CLI + MCP. 사람은 정부 SSO 로그인 한 번만 하고 이후 포털 작
 
 ## 현재 상태 (2026-09-01)
 
-- v0.12는 SafetyKorea, VWorld, FoodSafetyKorea, 서울 열린데이터광장의 adapter revision 2와 11개
+- v0.12는 SafetyKorea, VWorld, FoodSafetyKorea, 서울 열린데이터광장의 adapter revision을 각각
+  2, 3, 2, 2로 고정하고 11개
   live canary를 제공한다. SafetyKorea·FoodSafetyKorea·typed VWorld family는 provider-scoped key로
   자동 호출하고, 서울은 HTTPS 부재로 차단한다. 기본 카탈로그 검색은 LINK를 포함한다. v0.10의 connection discovery와 응답 필드
   프로파일링, v0.9에서 도입한 OpenDataCTL/`opendatactl` 이름, v0.8 자동화를 위한 `gongctl` 호환
@@ -24,8 +25,9 @@ Go CLI + MCP. 사람은 정부 SSO 로그인 한 번만 하고 이후 포털 작
 ## 확정된 핵심 결정 (스펙 요약)
 
 - **범위**: data.go.kr 전용, 깊게. 멀티포털(KOSIS·나라장터) 안 함.
-- **호출 설계**: surface-only + 에이전트 주도. 도구는 결정적인 것만(로그인·활용신청·키 주입·HTTP·
-  XML→JSON), 이질적 API 명세는 파싱하지 않고 에이전트에게 surface. (kvote 국정수행 PDF 교훈.)
+- **호출 설계**: data.go.kr REST는 surface-only + 에이전트 주도, LINK는 검증된 provider adapter만
+  typed 호출. 포털 명세를 임의로 추론하지 않으며, 외부 provider는 공식 계약·exact credential scope·
+  typed operation registry가 있을 때만 호출한다. (kvote 국정수행 PDF 교훈.)
 - **인터페이스**: CLI(사람) + MCP(에이전트), 같은 백엔드. kvote 패턴.
 - **MCP tools**: catalog_search → describe_api → apply(필요시) → call_api. search_datasets와 list_applications는 보조 도구다. 인증키는 call_api 내부에서만 사용하며 모델 컨텍스트로 반환하지 않는다.
   `call_api`는 key 생략 시 세션에서 자동 조회 → **검색→신청→승인확인→키→호출이 사람 개입 0**

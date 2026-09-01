@@ -278,6 +278,8 @@ MCP의 `call_api`는 raw endpoint와 인증키를 입력받지 않습니다. 항
 data.go.kr 로그인 세션 키 또는 provider scope에 저장된 별도 키를 주입하므로 상세 단계를 우회할 수
 없습니다. 최신 데이터 재확인용 `search_datasets`와 계정 확인용 `list_applications`는 보조 도구로
 분리되어 있습니다. 모든 인증키는 MCP 도구로 노출하지 않고 `call_api` 내부에서만 주입합니다.
+VWorld WMS처럼 응답 본문이 이미지인 경우 `body`는 base64 문자열이며
+`bodyEncoding="base64"`가 함께 반환됩니다. 클라이언트는 이 표시를 확인해 디코딩해야 합니다.
 `apply`는 보조 기능이 아니라 **발견한 데이터를 실제로 쓸 수 있게 만드는 핵심 연결 단계**입니다.
 data.go.kr REST는 로그인 한 번 뒤에 에이전트가 명세 확인, 신청 폼 제출, 승인 상태 확인, 인증키
 주입과 호출까지 스스로 이어갑니다. LINK provider는 각 기관의 별도 신청·발급 절차 뒤 키를 한 번
