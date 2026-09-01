@@ -1,0 +1,56 @@
+name: LINK adapter drift
+
+on:
+  schedule:
+    - cron: "17 0 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  doctor:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+
+      - name: Probe every registered provider canary
+        id: probe
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -o pipefail
+          go run ./cmd/opendatactl doctor --adapters-only --delay 700ms -f table 2>&1 | tee adapter-doctor.txt
+
+      - name: Open or update a GitHub issue on drift
+        if: steps.probe.outcome == 'failure'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          title='[automation] LINK provider adapter drift'
+          issue_number="$(gh issue list --state open --search "${title} in:title" --json number --jq '.[0].number // empty')"
+          {
+            echo 'Scheduled `doctor --adapters-only` detected provider URL drift or a contract older than 180 days.'
+            echo
+            echo '```text'
+            sed -n '1,200p' adapter-doctor.txt
+            echo '```'
+            echo
+            echo "Run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          } > issue-body.md
+          if [ -n "$issue_number" ]; then
+            gh issue comment "$issue_number" --body-file issue-body.md
+          else
+            gh issue create --title "$title" --body-file issue-body.md --label bug
+          fi
+
+      - name: Fail after recording drift
+        if: steps.probe.outcome == 'failure'
+        run: exit 1

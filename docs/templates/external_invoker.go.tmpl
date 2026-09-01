@@ -1,0 +1,50 @@
+// Add this pattern beside external_adapter_<provider>.go when promoting an
+// adapter to InvocationImplemented. Keep the surfaced contract and request
+// validator on one operation registry; do not maintain two parameter tables.
+package apicall
+
+type {{providerType}}OperationSpec struct {
+	operation ExternalOperation
+	path      string
+	method    string
+	enums     map[string]map[string]bool
+}
+
+var {{providerType}}OperationRegistry = []{{providerType}}OperationSpec{
+	{
+		operation: ExternalOperation{
+			Name: "{{operation}}", Description: "{{user-facing description}}", ResponseKind: "{{json|xml|image}}",
+			Params: []Param{
+				{Name: "{{requiredParam}}", Required: "필수", Desc: "{{official meaning}}"},
+				{Name: "{{optionalParam}}", Required: "선택", Desc: "{{official enum or bound}}"},
+			},
+		},
+		path: "{{/exact/api/path}}", method: "GET",
+		enums: map[string]map[string]bool{"{{optionalParam}}": stringSet("{{allowedValue}}")},
+	},
+}
+
+func {{providerType}}OperationFor(name string) ({{providerType}}OperationSpec, bool) {
+	for _, spec := range {{providerType}}OperationRegistry {
+		if spec.operation.Name == name {
+			return spec, true
+		}
+	}
+	return {{providerType}}OperationSpec{}, false
+}
+
+func {{providerType}}Operations() []ExternalOperation {
+	operations := make([]ExternalOperation, 0, len({{providerType}}OperationRegistry))
+	for _, spec := range {{providerType}}OperationRegistry {
+		operation := spec.operation
+		operation.Params = append([]Param(nil), operation.Params...)
+		operations = append(operations, operation)
+	}
+	return operations
+}
+
+// ContractFor uses {{providerType}}Operations(). The provider request builder
+// uses {{providerType}}OperationFor(), derives the allowed/required names from
+// spec.operation.Params, validates enums/bounds, then constructs only spec.path.
+// Also register the provider ID and exact credential scope in providerauth;
+// doctor rejects InvocationImplemented when that store contract is missing.
