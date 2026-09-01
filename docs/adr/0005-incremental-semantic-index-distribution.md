@@ -60,7 +60,8 @@ sources and repository examples are recorded in
 
 ## Consequences
 
-- A normal sync embeds only new or semantically changed documents.
+- Running `catalog semantic-build` after a normal sync embeds only new or
+  semantically changed documents.
 - Metadata-only changes no longer trigger expensive embedding work.
 - The CLI reports total, reused, and newly embedded counts so fallback cost is
   visible.

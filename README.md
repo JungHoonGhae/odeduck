@@ -87,17 +87,19 @@ opendatactl login
 # 2. 자연어 목표로 REST, LINK, FILE 전체 후보 탐색
 opendatactl catalog discover "우리 동네 대기질 서비스에 쓸 데이터"
 
-# 3. REST/LINK는 명세·필수 요청변수·승인유형 확인
-#    FILE은 검색 결과의 detailUrl에서 컬럼·갱신일·다운로드 조건 확인
+# 3A. REST와 구현된 LINK는 명세·필수 요청변수·승인유형 확인 후 4~6단계로 계속
 opendatactl describe <PK>
 
-# 4. 활용신청 (AI/MCP에서는 확인 없이 자동 제출, 첫 신청 때 인증키 자동 발급)
+# 3B. FILE은 검색 결과의 detailUrl에서 컬럼·갱신일·다운로드 조건 확인 후 여기서 중단
+#     FILE PK를 아래 describe/apply/call 흐름에 넣지 않음
+
+# 4. REST 또는 구현된 LINK 활용신청 (AI/MCP에서는 확인 없이 자동 제출, 첫 신청 때 인증키 자동 발급)
 opendatactl apply <PK> --purpose "대기질 분석 프로젝트" --category research
 
 # 5. 승인 확인
 opendatactl applications -f table
 
-# 6. 실제 호출 (XML 응답도 JSON으로 변환해 돌려줍니다)
+# 6. REST 또는 구현된 LINK 실제 호출 (XML 응답도 JSON으로 변환해 돌려줍니다)
 opendatactl call --pk <PK> --param numOfRows=5   # 엔드포인트·인증키 자동
 ```
 
@@ -114,7 +116,7 @@ opendatactl catalog info               # 수집 시각 + 유형 분포
 opendatactl catalog orgs 폭염          # 그 주제를 개방한 기관 순위
 ```
 
-2026-09-01 실제 포털 동기화에서는 고유 노드 95,956건(REST 7,132, LINK 4,766, FILE 84,052,
+2026-09-01 릴리즈 검증용 포털 동기화에서는 고유 노드 95,951건(REST 7,132, LINK 4,766, FILE 84,047,
 미확인 6)을 수집했습니다. 첫 ALL 동기화는 테스트 환경에서 약 7분이 걸렸으며 포털과 네트워크 상태에
 따라 달라집니다. 빠르게 호출 가능한 데이터부터 시작하려면 `--type API`, 조합 탐색 공간을 최대로
 넓히려면 기본 `ALL`을 사용합니다.
