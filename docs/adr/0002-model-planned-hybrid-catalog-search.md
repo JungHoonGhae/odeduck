@@ -64,7 +64,8 @@ metadata filtering is needed. That future change must not alter the MCP
 - Ollama is optional and free/local; no catalogue text or query leaves the
   machine through opendatactl's default semantic provider.
 - `opendatactl catalog semantic-build` downloads the model and builds the cache in
-  one command. Re-syncing the catalogue invalidates the index loudly.
+  one command. After a re-sync, version 2 reuses vectors whose model, recipe and
+  document hash still match, then atomically saves an index for the new snapshot.
 - Search results expose `matchedQuery`, short previews and semantic status so an
   agent can explain why an unexpected candidate appeared instead of presenting
   opaque vector similarity as fact.
