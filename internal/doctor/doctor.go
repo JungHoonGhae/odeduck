@@ -106,7 +106,7 @@ func semanticCheck() Check {
 	case errors.Is(err, catalog.ErrSemanticIndexNotBuilt):
 		return Check{"semantic", StatusSkipped, "선택 기능 미설치 — `opendatactl catalog semantic-build` 로 활성화"}
 	case errors.Is(err, catalog.ErrSemanticIndexStale):
-		return Check{"semantic", StatusSkipped, "카탈로그 갱신 후 의미 인덱스 재생성 필요"}
+		return Check{"semantic", StatusSkipped, "카탈로그 갱신 후 의미 인덱스 갱신 필요 — 호환 벡터는 재사용됨"}
 	default:
 		return Check{"semantic", StatusDrift, "의미 인덱스를 읽지 못했습니다: " + err.Error()}
 	}
