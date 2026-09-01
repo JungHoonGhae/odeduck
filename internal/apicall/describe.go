@@ -84,6 +84,7 @@ const (
 	HandoffInspectContract     = "inspect_provider_contract"
 	HandoffContractKnown       = "contract_known"
 	HandoffRequestAccess       = "request_provider_access"
+	HandoffUseProviderDirectly = "use_provider_directly"
 	HandoffPublisherUntrusted  = "publisher_supplied_untrusted"
 	HandoffSafeFetcherRequired = "safe_fetcher_required"
 	HandoffResolutionFailed    = "resolution_failed"
@@ -100,18 +101,41 @@ type linkResolutionError struct {
 func (e *linkResolutionError) Error() string { return e.err.Error() }
 func (e *linkResolutionError) Unwrap() error { return e.err }
 
-// ExternalContract records facts from a versioned provider document. It does
-// not imply that opendatactl can invoke the provider: InvocationState says
-// whether a provider-specific credential and caller have actually been wired.
+// ExternalContract records facts from a versioned provider document. AdapterID
+// and AdapterRevision identify our interpretation; DocumentationVersion and
+// VerifiedAt track the publisher evidence independently. None of these implies
+// that opendatactl can invoke the provider: InvocationState says whether a
+// provider-specific credential and caller have actually been wired.
 type ExternalContract struct {
+	AdapterID            string                `json:"adapterId"`
+	AdapterRevision      int                   `json:"adapterRevision"`
 	Provider             string                `json:"provider"`
+	ProviderFamily       string                `json:"providerFamily,omitempty"`
+	ProviderServiceID    string                `json:"providerServiceId,omitempty"`
 	DocumentationURL     string                `json:"documentationUrl"`
 	DocumentationVersion string                `json:"documentationVersion,omitempty"`
 	ApplicationURL       string                `json:"applicationUrl,omitempty"`
 	AccessMode           string                `json:"accessMode"`
 	Auth                 *ExternalAuthContract `json:"auth,omitempty"`
 	InvocationState      string                `json:"invocationState"`
+	Operations           []ExternalOperation   `json:"operations,omitempty"`
 	VerifiedAt           string                `json:"verifiedAt"`
+}
+
+const (
+	InvocationImplemented              = "implemented"
+	InvocationNotImplemented           = "not_implemented"
+	InvocationBlockedInsecureTransport = "blocked_insecure_transport"
+)
+
+// ExternalOperation is the typed invocation surface proven by the provider's
+// own documentation. Endpoint construction and credentials stay private.
+type ExternalOperation struct {
+	Name          string  `json:"name"`
+	Description   string  `json:"description"`
+	Params        []Param `json:"params,omitempty"`
+	ResponseKind  string  `json:"responseKind"`
+	DynamicParams bool    `json:"dynamicParams,omitempty"`
 }
 
 // ExternalAuthContract describes where the external provider expects its own
@@ -331,10 +355,19 @@ func Describe(ctx context.Context, f *fetch.Client, baseURL, pk string) (*APISpe
 			spec.Note = "이 API 는 유형이 LINK 입니다 — 포털은 명세를 싣지 않고 제공기관 사이트로 " +
 				"연결만 합니다. 엔드포인트·파라미터는 포털에서 알 수 없으니 추측해서 호출하지 마세요."
 			if spec.LinkURL != "" {
-				spec.Note += " handoff.url(" + spec.LinkURL + ") 은 포털이 확인한 외부 시작점입니다. " +
-					"API 엔드포인트나 명세라고 단정할 수 없습니다. 직접 가져오지 말고 DNS·리다이렉트마다 비공개 주소를 차단하는 " +
-					"safe fetcher로 문서·신청·인증 계약을 검사하세요. " +
-					"검사 전에는 call_api 로 호출할 수 없습니다."
+				spec.Note += " handoff.url(" + spec.LinkURL + ") 은 포털이 확인한 외부 시작점이며 API endpoint나 명세라고 단정할 수 없고 직접 호출하지 않습니다."
+				if spec.Handoff != nil && spec.Handoff.Contract != nil {
+					switch spec.Handoff.Contract.InvocationState {
+					case InvocationImplemented:
+						spec.Note += " 검증된 호출은 handoff.contract.operations에 있으며 provider key를 설정하면 call_api가 안전한 endpoint를 조립합니다."
+					case InvocationBlockedInsecureTransport:
+						spec.Note += " 제공기관 호출 endpoint가 HTTPS를 지원하지 않아 credential 자동 호출은 차단됩니다."
+					default:
+						spec.Note += " contract가 호출 가능으로 표시될 때까지 call_api로 보내지 마세요."
+					}
+				} else {
+					spec.Note += " 계약을 검사하기 전에는 call_api로 호출할 수 없습니다."
+				}
 			} else if linkLookupErr != nil {
 				spec.Note += " 포털의 제공기관 URL 조회도 실패했습니다: " + linkLookupErr.Error()
 			}
@@ -371,6 +404,29 @@ func isRESTAPIType(apiType string) bool {
 	return strings.Contains(strings.ToUpper(apiType), "REST")
 }
 
+// ValidateDataGoKRApplication keeps LINK datasets out of the portal's REST
+// application form. Known external providers surface their own application
+// URL; unknown LINK providers surface the official handoff for inspection.
+func ValidateDataGoKRApplication(spec *APISpec) error {
+	if spec == nil {
+		return fmt.Errorf("활용신청 전에 dataset 명세가 필요합니다")
+	}
+	if isLinkAPIType(spec.APIType) {
+		target := spec.LinkURL
+		if spec.Handoff != nil && spec.Handoff.Contract != nil && spec.Handoff.Contract.ApplicationURL != "" {
+			target = spec.Handoff.Contract.ApplicationURL
+		}
+		if target == "" {
+			target = "describe_api의 handoff.nextAction"
+		}
+		return fmt.Errorf("pk=%s 는 LINK 유형이라 data.go.kr 활용신청 대상이 아닙니다 — 제공기관 신청/안내: %s", spec.PublicDataPk, target)
+	}
+	if isRESTAPIType(spec.APIType) {
+		return nil
+	}
+	return fmt.Errorf("pk=%s 의 API 유형을 REST로 확인할 수 없어 data.go.kr 활용신청을 중단합니다", spec.PublicDataPk)
+}
+
 func (s *APISpec) setExternalHandoff(raw string) error {
 	validated, err := validatePublisherLinkURL(raw)
 	if err != nil {
@@ -388,8 +444,15 @@ func (s *APISpec) setExternalHandoff(raw string) error {
 	}
 	if contract := knownExternalContract(u); contract != nil {
 		s.Handoff.State = HandoffContractKnown
-		s.Handoff.NextAction = HandoffRequestAccess
 		s.Handoff.Contract = contract
+		switch contract.InvocationState {
+		case InvocationImplemented:
+			s.Handoff.NextAction = HandoffRequestAccess
+		case InvocationNotImplemented:
+			s.Handoff.NextAction = HandoffUseProviderDirectly
+		default:
+			s.Handoff.NextAction = HandoffChooseAnother
+		}
 	}
 	return nil
 }

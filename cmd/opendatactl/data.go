@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"strings"
@@ -9,8 +10,31 @@ import (
 	"github.com/JungHoonGhae/opendatactl/internal/apicall"
 	"github.com/JungHoonGhae/opendatactl/internal/output"
 	"github.com/JungHoonGhae/opendatactl/internal/portal"
+	"github.com/JungHoonGhae/opendatactl/internal/providerauth"
 	"github.com/spf13/cobra"
 )
+
+type commandCredentialSource struct {
+	explicitDataGoKey string
+	defaultSource     providerauth.Source
+}
+
+func (s *commandCredentialSource) DataGoKR(ctx context.Context) (string, error) {
+	if s.explicitDataGoKey != "" {
+		return s.explicitDataGoKey, nil
+	}
+	return s.defaultSource.DataGoKR(ctx)
+}
+
+func (s *commandCredentialSource) InvalidateDataGoKR() {
+	if s.explicitDataGoKey == "" {
+		s.defaultSource.InvalidateDataGoKR()
+	}
+}
+
+func (s *commandCredentialSource) External(ctx context.Context, provider, scope string) (string, string, error) {
+	return s.defaultSource.External(ctx, provider, scope)
+}
 
 func searchCmd() *cobra.Command {
 	var dtype, org string
@@ -83,11 +107,12 @@ func callCmd() *cobra.Command {
 	var wait time.Duration
 	c := &cobra.Command{
 		Use:   "call [endpoint]",
-		Short: "인증 API 호출 — serviceKey 주입 → GET → XML→JSON",
-		Long: `승인된 OpenAPI 엔드포인트를 호출합니다. --param k=v 로 요청변수를 전달합니다. 인증키는 로그인 세션에서 자동으로 조회하므로
---key 는 생략할 수 있습니다. 응답은 XML이면 JSON으로 변환해 출력합니다.
+		Short: "인증 API 호출 — REST/LINK typed dispatch → XML→JSON",
+		Long: `승인된 OpenAPI를 호출합니다. --param k=v 로 요청변수를 전달합니다. data.go.kr 인증키는 로그인 세션에서
+자동으로 조회합니다. 구현된 LINK provider는 provider-key로 저장한 scope별 키를 자동 주입합니다.
+--key는 data.go.kr REST에만 적용되며 LINK key를 명령행으로 받지 않습니다. 응답은 XML이면 JSON으로 변환해 출력합니다.
 
-엔드포인트 URL 대신 --pk 를 주면 포털에서 엔드포인트를 조회합니다. 경로는 추측할 수 없는
+--pk 를 주면 포털에서 REST 명세 또는 LINK provider contract를 조회하고 자동 dispatch합니다. 경로는 추측할 수 없는
 형태(HeatWaveCasualtiesRegion/getHeatWaveCasualtiesRegionList)이고 틀리면 404·500 이 오므로,
 직접 타이핑하기보다 이 방식이 안전합니다. 상세기능이 여럿이면 --op 로 지정하세요.
 --pk 를 쓰면 명세의 필수 요청변수가 빠졌는지도 호출 전에 확인합니다.
@@ -103,6 +128,7 @@ count, distinct, null, duplicate 수를 함께 반환합니다. 두 API를 같�
 
 예) opendatactl call --pk 15077974 --param numOfRows=10
     opendatactl call --pk 15077974 --wait 15m --param numOfRows=10   # 방금 신청한 API
+    opendatactl call --pk 15116894 --op certificationList --param conditionKey=productName --param conditionValue=완구
     opendatactl call https://apis.data.go.kr/9760000/.../getX --param numOfRows=10`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -123,27 +149,28 @@ count, distinct, null, duplicate 수를 함께 반환합니다. 두 API를 같�
 				}
 				pm[kv[0]] = kv[1]
 			}
-			endpoint := ""
-			if len(args) > 0 {
-				endpoint = args[0]
-			} else {
+			if len(args) == 0 {
 				base := flagBaseURL
 				if base == "" {
 					base = portal.BaseURL
 				}
-				resolved, rerr := apicall.Resolve(cmd.Context(), newFetchClient(), base, pk, op)
-				if rerr != nil {
-					return rerr
+				caller := apicall.NewDatasetCaller(newFetchClient(), base, &commandCredentialSource{explicitDataGoKey: key})
+				res, callErr := caller.Call(cmd.Context(), apicall.DatasetCallRequest{
+					PK: pk, Operation: op, Params: pm, Wait: wait,
+					OnWait: func(elapsed, remaining time.Duration) {
+						fmt.Fprintf(cmd.ErrOrStderr(),
+							"\r게이트웨이 반영 대기… %s 경과 (최대 %s 더 기다립니다)", elapsed, remaining)
+					},
+				})
+				if res != nil {
+					if len(profileFields) > 0 {
+						res.Profile, _ = apicall.ProfileBody(res.Body, profileFields)
+					}
+					output.WriteJSON(cmd.OutOrStdout(), res)
 				}
-				endpoint = resolved.Endpoint
-				fmt.Fprintf(cmd.ErrOrStderr(), "엔드포인트: %s\n", endpoint)
-				// Missing required variables usually come back as an empty result
-				// rather than an error, so refuse before spending the request.
-				if missing := apicall.MissingRequired(resolved, pm); len(missing) > 0 {
-					return fmt.Errorf("필수 요청변수가 빠졌습니다: %s — `opendatactl describe %s` 로 확인하세요",
-						strings.Join(missing, ", "), pk)
-				}
+				return callErr
 			}
+			endpoint := args[0]
 			secureEndpoint, secureErr := apicall.SecureEndpoint(endpoint)
 			if secureErr != nil {
 				return secureErr
@@ -188,11 +215,11 @@ count, distinct, null, duplicate 수를 함께 반환합니다. 두 API를 같�
 			return nil
 		},
 	}
-	c.Flags().StringVar(&key, "key", "", "계정 인증키 (생략 시 로그인 세션에서 자동 조회)")
+	c.Flags().StringVar(&key, "key", "", "data.go.kr 계정 인증키만 지정 (LINK provider key는 provider-key로 저장)")
 	c.Flags().StringArrayVar(&params, "param", nil, "요청변수 k=v (반복 가능)")
 	c.Flags().StringArrayVar(&profileFields, "profile-field", nil, "연결 검증용 응답 field 프로파일 (반복 가능, 최대 8개)")
-	c.Flags().StringVar(&pk, "pk", "", "publicDataPk — 엔드포인트를 포털에서 조회 (URL 대신)")
-	c.Flags().StringVar(&op, "op", "", "상세기능 이름 (엔드포인트 마지막 경로 조각). 하나뿐이면 생략 가능")
+	c.Flags().StringVar(&pk, "pk", "", "publicDataPk — REST/LINK contract를 조회해 자동 dispatch (URL 대신)")
+	c.Flags().StringVar(&op, "op", "", "describe에 나온 operation 이름. 하나뿐이면 생략 가능")
 	c.Flags().DurationVar(&wait, "wait", 0, "게이트웨이 반영(403)을 이 시간까지 기다리며 재시도 (예: 10m, 최대 1h)")
 	return c
 }

@@ -13,6 +13,7 @@ import (
 func doctorCmd() *cobra.Command {
 	var applyPK string
 	var skipApply bool
+	var adaptersOnly bool
 	c := &cobra.Command{
 		Use:   "doctor",
 		Short: "스크래핑 상태 점검 — data.go.kr 마크업 변경(drift) 감지",
@@ -34,11 +35,17 @@ apply 점검은 활용신청 폼을 실제로 열어 필요한 입력요소가 �
 				base = portal.BaseURL
 			}
 
-			checks := doctor.Run(cmd.Context(), newFetchClient(), base)
-			checks = append(checks, sessionCheck(cmd))
-			checks = append(checks, doctor.APIKeyCheck(cmd.Context()))
-			if !skipApply {
-				checks = append(checks, doctor.ApplyCheck(cmd.Context(), applyPK))
+			fc := newFetchClient()
+			checks := []doctor.Check{}
+			if adaptersOnly {
+				checks = append(checks, doctor.AdapterCheck(cmd.Context(), fc, base))
+			} else {
+				checks = doctor.Run(cmd.Context(), fc, base)
+				checks = append(checks, sessionCheck(cmd))
+				checks = append(checks, doctor.APIKeyCheck(cmd.Context()))
+				if !skipApply {
+					checks = append(checks, doctor.ApplyCheck(cmd.Context(), applyPK))
+				}
 			}
 
 			if err := renderChecks(cmd, format, checks); err != nil {
@@ -54,6 +61,7 @@ apply 점검은 활용신청 폼을 실제로 열어 필요한 입력요소가 �
 	}
 	c.Flags().StringVar(&applyPK, "apply-pk", "", "apply 폼 점검에 쓸 publicDataPk (아직 신청하지 않은 것)")
 	c.Flags().BoolVar(&skipApply, "skip-apply", false, "apply 폼 점검 생략 (브라우저를 띄우지 않음)")
+	c.Flags().BoolVar(&adaptersOnly, "adapters-only", false, "LINK provider 어댑터 canary와 계약 freshness만 점검")
 	return c
 }
 

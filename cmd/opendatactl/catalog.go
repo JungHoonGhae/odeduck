@@ -32,7 +32,7 @@ func catalogCmd() *cobra.Command {
   opendatactl catalog sync --if-stale 오래됐을 때만 수집 — cron/CI 로 주기 갱신할 때
   opendatactl catalog semantic-build  Ollama 의미 벡터 인덱스 생성(선택)
   opendatactl catalog search 폭염     하이브리드 검색(인덱스 없으면 키워드 검색)
-  opendatactl catalog search 폭염 --rest-only   호출 가능한(REST) 것만
+  opendatactl catalog search 폭염 --rest-only   포털 명세가 있는 REST만
   opendatactl catalog orgs 폭염       그 주제를 개방한 기관 순위
   opendatactl catalog info            언제 수집했는지 / 몇 건인지`,
 		RunE: func(cmd *cobra.Command, _ []string) error { return cmd.Help() },
@@ -288,7 +288,7 @@ func catalogQueryCmd(discover bool) *cobra.Command {
 		},
 	}
 	c.Flags().IntVar(&limit, "limit", 20, "표시할 최대 건수")
-	c.Flags().BoolVar(&restOnly, "rest-only", true, "호출 가능한 REST만 검색 (전체 탐색은 --rest-only=false)")
+	c.Flags().BoolVar(&restOnly, "rest-only", false, "포털 명세가 있는 REST만 검색 (기본은 LINK까지 발견)")
 	c.Flags().BoolVar(&semantic, "semantic", true, "준비된 Ollama 의미 인덱스를 자동 사용 (--semantic=false 로 비활성화)")
 	c.Flags().StringArrayVar(&concepts, "concept", nil, "자연어 목표에서 추론한 구체적 검색축 (반복 가능, MCP 의미 분해 재현용)")
 	c.Flags().StringVar(&agent, "agent", defaultAgent, "검색 계획기: none | auto | codex | claude | gemini | cursor (CLI의 기존 로그인 사용)")

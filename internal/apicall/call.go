@@ -65,10 +65,12 @@ func SecureEndpoint(endpoint string) (string, error) {
 // CallResult is a surfaced API response. Body is a map (XML→JSON or JSON),
 // or a string when the content isn't structured.
 type CallResult struct {
-	Status      int            `json:"status"`
-	ContentType string         `json:"contentType"`
-	Body        any            `json:"body"`
-	Profile     *SampleProfile `json:"profile,omitempty"`
+	Status       int            `json:"status"`
+	ContentType  string         `json:"contentType"`
+	BodyEncoding string         `json:"bodyEncoding,omitempty"`
+	Body         any            `json:"body"`
+	Profile      *SampleProfile `json:"profile,omitempty"`
+	rawBody      []byte
 }
 
 // Call injects serviceKey, GETs the endpoint, and surfaces the response. The
