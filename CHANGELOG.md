@@ -5,6 +5,56 @@ All notable changes to OpenDataCTL are documented here. Format follows
 [SemVer](https://semver.org/). The release workflow uses the `## [X.Y.Z]`
 section matching a `vX.Y.Z` tag as the GitHub release notes.
 
+## [0.13.0] - 2026-09-01
+
+### Added
+
+- Discovery now indexes both OpenAPI and FILE catalogues by default, expanding
+  the locally searchable snapshot to 95,951 current portal entries. FILE hits
+  expose their official detail page, declared formats, available
+  representations, view demand and a capability-specific next action without
+  pretending they are immediately callable APIs.
+- Planned and hybrid discovery return a bounded `connectionOptions` pool with up
+  to three real datasets per complementary role. Agents can compare alternative
+  cross-domain combinations before explicitly selecting the small set of
+  candidate connection cards that merit schema and value-level verification.
+- Added reproducible broad-catalog, semantic-search and distribution research,
+  including measured full-build and incremental-refresh resource costs for the
+  current 95k-entry catalogue.
+
+### Changed
+
+- `catalog sync` now defaults to `ALL`; `--type API` and `--type FILE` remain
+  available for deliberately narrower snapshots. `--if-stale` upgrades a fresh
+  legacy API-only snapshot instead of incorrectly skipping the first ALL sync.
+- Semantic index format v2 stores per-document hashes, model dimensions and an
+  embedding recipe version. `semantic-build` reuses unchanged vectors, migrates
+  an exact v1 index without embedding, and automatically rebuilds incompatible
+  or changed indexes instead of requiring manual cache deletion.
+- Hybrid retrieval builds connection choices from its expanded fused candidate
+  pool while keeping the visible result page and final connection cards bounded.
+- Planned and semantic retrieval still score every eligible catalogue row but
+  retain only the exact top-ranked candidates as `Hit` values. This removes
+  per-axis 95k-result arrays without changing exhaustive top-K ordering.
+
+### Fixed
+
+- API and FILE representations sharing a portal PK are merged without losing
+  the more specific REST/LINK contract, file formats, demand signals or either
+  representation label.
+- FILE popularity is ranked by portal views when utilization-application counts
+  are unavailable, preventing useful download datasets from clustering at an
+  artificial zero-demand tie.
+- Semantic cache loading rejects oversized, structurally inconsistent,
+  dimension-mismatched and non-finite vector data before it can be reused.
+
+### Safety
+
+- FILE discovery remains inspection-only: `call_api` is not advertised until a
+  real invocation contract exists. Connection options remain explicitly
+  unverified and require column, coverage, grain and sampled-key evidence before
+  a join or business claim can be promoted.
+
 ## [0.12.0] - 2026-09-01
 
 ### Added
