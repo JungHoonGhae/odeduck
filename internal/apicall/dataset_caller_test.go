@@ -7,10 +7,12 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/JungHoonGhae/opendatactl/internal/catalog"
 	"github.com/JungHoonGhae/opendatactl/internal/fetch"
 )
 
@@ -123,6 +125,110 @@ func TestDatasetCallerRESTPreflightFailsBeforeCredentialOrNetwork(t *testing.T) 
 	}
 	if credentials.dataGoReads != 0 || credentials.externalReads != 0 {
 		t.Fatalf("preflight read credentials: data.go=%d external=%d", credentials.dataGoReads, credentials.externalReads)
+	}
+}
+
+func TestDatasetCallerBlocksBulkOnlyContractBeforeCredentialRead(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, ".config"))
+	t.Setenv("APPDATA", filepath.Join(home, "AppData", "Roaming"))
+	const pk = "15000020"
+	if err := (&catalog.Catalog{SyncedAt: time.Now(), Type: "ALL", Source: catalog.SourceOfficial,
+		Entries: []catalog.Entry{{PK: pk, Title: "불완전 계약", SvcType: catalog.SvcREST,
+			OfficialAPI: &catalog.OfficialAPIContract{APIType: catalog.SvcREST,
+				Operations: []catalog.OfficialAPIOperation{{Name: "list", URL: "https://apis.data.go.kr/test/list", RequestNames: []string{"pageNo"}}}}}},
+	}).Save(); err != nil {
+		t.Fatal(err)
+	}
+	portalServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		http.Error(w, "fallback unavailable", http.StatusBadGateway)
+	}))
+	defer portalServer.Close()
+	credentials := &fakeCredentialSource{dataGoKey: "MUST-NOT-BE-READ"}
+	caller := newDatasetCaller(fetch.New(fetch.WithDelay(0)), portalServer.URL, credentials, NewExternalCaller())
+	_, err := caller.Call(context.Background(), DatasetCallRequest{PK: pk, Params: map[string]string{"pageNo": "1"}})
+	if err == nil || !strings.Contains(err.Error(), "상세 호출 계약") {
+		t.Fatalf("error = %v", err)
+	}
+	if credentials.dataGoReads != 0 {
+		t.Fatalf("credential reads = %d", credentials.dataGoReads)
+	}
+}
+
+func TestDatasetCallerDoesNotTreatEmptyHTMLAsDetailedInvocationEvidence(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, ".config"))
+	t.Setenv("APPDATA", filepath.Join(home, "AppData", "Roaming"))
+	const pk = "15000021"
+	if err := (&catalog.Catalog{SyncedAt: time.Now(), Type: "ALL", Source: catalog.SourceOfficial,
+		Entries: []catalog.Entry{{PK: pk, Title: "빈 상세 계약", SvcType: catalog.SvcREST,
+			OfficialAPI: &catalog.OfficialAPIContract{APIType: catalog.SvcREST,
+				Operations: []catalog.OfficialAPIOperation{{Name: "list", URL: "https://apis.data.go.kr/test/list", RequestNames: []string{"pageNo"}}}}}},
+	}).Save(); err != nil {
+		t.Fatal(err)
+	}
+	portalServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(`<html><body><h1>상세 화면</h1></body></html>`))
+	}))
+	defer portalServer.Close()
+
+	credentials := &fakeCredentialSource{dataGoKey: "MUST-NOT-BE-READ"}
+	caller := newDatasetCaller(fetch.New(fetch.WithDelay(0)), portalServer.URL, credentials, NewExternalCaller())
+	caller.rest = func(context.Context, *fetch.Client, string, map[string]string, string, time.Duration, func(time.Duration, time.Duration)) (*CallResult, error) {
+		return nil, errors.New("REST invocation must remain blocked")
+	}
+	_, err := caller.Call(context.Background(), DatasetCallRequest{PK: pk, Params: map[string]string{"pageNo": "1"}})
+	if err == nil || !strings.Contains(err.Error(), "상세 호출 계약") {
+		t.Fatalf("error = %v, want missing detailed invocation contract", err)
+	}
+	if credentials.dataGoReads != 0 {
+		t.Fatalf("credential reads = %d, want 0", credentials.dataGoReads)
+	}
+}
+
+func TestDatasetCallerScopesSwaggerEvidenceToItsOperation(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, ".config"))
+	t.Setenv("APPDATA", filepath.Join(home, "AppData", "Roaming"))
+	const pk = "15000022"
+	if err := (&catalog.Catalog{SyncedAt: time.Now(), Type: "ALL", Source: catalog.SourceOfficial,
+		Entries: []catalog.Entry{{PK: pk, Title: "혼합 Swagger 계약", SvcType: catalog.SvcREST,
+			OfficialAPI: &catalog.OfficialAPIContract{APIType: catalog.SvcREST,
+				Operations: []catalog.OfficialAPIOperation{{Name: "Bulk B", URL: "https://apis.data.go.kr/test/bulkB", RequestNames: []string{"pageNo"}}}}}},
+	}).Save(); err != nil {
+		t.Fatal(err)
+	}
+	portalServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(`<html><body>
+			<ul><li><strong class="key">API 유형</strong><div class="value">REST</div></li></ul>
+			<script>var swaggerJson = ` + "`" + `{"swagger":"2.0","host":"apis.data.go.kr","basePath":"/test","schemes":["https"],"paths":{"/swaggerA":{"get":{"summary":"Swagger A"}}}}` + "`" + `;</script>
+		</body></html>`))
+	}))
+	defer portalServer.Close()
+
+	credentials := &fakeCredentialSource{dataGoKey: "TEST-KEY"}
+	caller := newDatasetCaller(fetch.New(fetch.WithDelay(0)), portalServer.URL, credentials, NewExternalCaller())
+	var invoked []string
+	caller.rest = func(_ context.Context, _ *fetch.Client, endpoint string, _ map[string]string, _ string, _ time.Duration, _ func(time.Duration, time.Duration)) (*CallResult, error) {
+		invoked = append(invoked, endpoint)
+		return &CallResult{Status: http.StatusOK, Body: map[string]any{"ok": true}}, nil
+	}
+	if _, err := caller.Call(context.Background(), DatasetCallRequest{PK: pk, Operation: "swaggerA"}); err != nil {
+		t.Fatalf("parameterless Swagger operation: %v", err)
+	}
+	if credentials.dataGoReads != 1 || len(invoked) != 1 || !strings.HasSuffix(invoked[0], "/swaggerA") {
+		t.Fatalf("Swagger dispatch reads=%d invoked=%v", credentials.dataGoReads, invoked)
+	}
+
+	_, err := caller.Call(context.Background(), DatasetCallRequest{PK: pk, Operation: "bulkB", Params: map[string]string{"pageNo": "1"}})
+	if err == nil || !strings.Contains(err.Error(), "상세 호출 계약") {
+		t.Fatalf("unmatched bulk operation error = %v", err)
+	}
+	if credentials.dataGoReads != 1 || len(invoked) != 1 {
+		t.Fatalf("bulk operation crossed credential boundary: reads=%d invoked=%v", credentials.dataGoReads, invoked)
 	}
 }
 

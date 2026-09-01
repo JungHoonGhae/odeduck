@@ -1,0 +1,55 @@
+{
+  "version": 1,
+  "reviewedAt": "2026-09-01",
+  "cases": [
+    {
+      "id": "seoul-monthly-ridership",
+      "query": "서울교통공사 월별 승하차인원",
+      "expectedPk": "15044249",
+      "expectedSvcType": "FILE",
+      "maxRank": 5
+    },
+    {
+      "id": "weather-commerce-cross-domain",
+      "query": "상권별 업종별 이용률 기상현황 유동인구",
+      "expectedPk": "15097043",
+      "expectedSvcType": "FILE",
+      "maxRank": 5
+    },
+    {
+      "id": "product-recall-link",
+      "query": "제품 리콜 인증",
+      "expectedPk": "15116894",
+      "expectedSvcType": "LINK",
+      "maxRank": 5
+    },
+    {
+      "id": "elderly-group-home",
+      "query": "노인요양 공동생활가정",
+      "expectedPk": "15063207",
+      "expectedSvcType": "FILE",
+      "maxRank": 5
+    },
+    {
+      "id": "onbid-auction-property",
+      "query": "온비드 공매 물건",
+      "expectedPk": "15157207",
+      "expectedSvcType": "REST",
+      "maxRank": 5
+    },
+    {
+      "id": "natural-language-undervalued-asset",
+      "query": "싸게 살 수 있는 투자 물건",
+      "expectedPk": "15157207",
+      "expectedSvcType": "REST",
+      "maxRank": 10
+    },
+    {
+      "id": "natural-language-heat-risk",
+      "query": "아이들이 폭염에 위험한 지역",
+      "expectedPk": "15134907",
+      "expectedSvcType": "FILE",
+      "maxRank": 5
+    }
+  ]
+}

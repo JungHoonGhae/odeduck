@@ -1,26 +1,41 @@
-# OpenDataCTL
+<!-- brand:start -->
+<p align="center">
+  <img src="docs/assets/brand-symbol.svg" width="190" alt="한쪽 발에만 초록 양말을 신은 oddsock 미어캣">
+</p>
 
-> The AI control plane for Korean open data.
+<h1 align="center">oddsock</h1>
 
-**공공데이터를 찾고, 신청하고, 호출하는 AI 컨트롤 플레인.**
-정확한 검색어를 몰라도 AI가 필요한 공공데이터를 찾아 신청하고 실제 응답까지 가져옵니다.
-Codex, Claude, Gemini, Cursor가 자연어 목표를 검색축으로 바꾸고 data.go.kr의 OpenAPI와
-파일데이터를 함께 탐색합니다. 호출 가능한 API를 고르면 한 번의 data.go.kr 로그인으로 명세 확인,
-활용신청, 승인 확인과 실제 호출까지 CLI/MCP 한 경로로 끝냅니다.
+<p align="center"><em>양말은 한 짝만 신습니다. 데이터는 짝을 찾아줍니다.</em></p>
+<p align="center">공개돼 있었습니다. 찾기 쉬웠다는 뜻은 아닙니다.</p>
+<!-- brand:end -->
 
-이름의 `Open Data`는 누구나 재사용할 수 있도록 공개된 공공데이터를, `CTL`은 검색부터 실제
-호출까지 하나의 명령 표면으로 연결하는 control plane을 뜻합니다. 데이터를 통제한다는 의미가
-아니라, 흩어진 이용 절차를 AI가 실행할 수 있는 한 경로로 묶는다는 의미입니다.
+이 도구는 흩어진 약 9.6만 개 공공데이터에서 질문과 연결되는 후보를 먼저 찾고, 실제로 쓸 수
+있는지 확인하고, 필요한 활용신청과 호출까지 이어주는 CLI/MCP입니다. 정확한 데이터 이름을 몰라도
+Codex, Claude, Gemini, Cursor가 자연어 목표를 여러 검색축으로 바꿔 OpenAPI와 파일데이터를 함께
+탐색합니다.
+
+제품의 실행 엔진과 CLI 명령은 기존 이름인 `OpenDataCTL`/`opendatactl`을 유지합니다. 브랜드를
+바꾼다고 설치 경로, 자동화 스크립트, MCP 설정을 깨뜨리지 않습니다. `CTL`은 흩어진 이용 절차를
+검색부터 실제 호출까지 하나의 실행 경로로 묶는 control plane을 뜻합니다.
+
+공개 브랜드 이름·문구·로고 경로는 [`docs/brand/brand.json`](docs/brand/brand.json)에 모아 두었습니다.
+값을 바꾼 뒤 `go run ./scripts/sync-brand.go`를 실행하면 이 상단 블록이 다시 만들어지며, CI는
+`--check`로 설정과 문서가 어긋나지 않았는지 확인합니다.
 
 실제 계정에서 온비드 공매, 나라장터 입찰, 공영도매시장 경매, 중소기업 지원사업 API를
 신청하고 승인된 데이터까지 호출해 검증했습니다.
+
+- 검색 결과를 그대로 믿지 않습니다. 실제 명세와 파일을 열어봅니다.
+- API면 부르고, 파일이면 엽니다. 링크면 검증된 Adapter로 따라갑니다.
+- 신청서는 재미없습니다. 그래서 로그인 뒤에는 이 도구가 대신합니다.
+- 잘 안 맞는 데이터는 억지로 엮지 않고 `abstention`으로 남깁니다.
 
 ## 포털에서 끊기던 네 번을 한 번에
 
 | 기존 흐름의 병목 | OpenDataCTL 원스톱 흐름 |
 | --- | --- |
 | 포털이 알아듣는 정확한 검색어를 사람이 추측 | 자연어 목표를 여러 기회축으로 나눠 전체 카탈로그 검색 |
-| 결과가 호출 가능한지, 어떤 값이 필수인지 상세페이지를 돌며 판별 | `describe_api`가 상세기능·엔드포인트·필수 요청변수·심의유형 확인 |
+| 결과가 호출 가능한지, 파일인지, 어떤 값이 필수인지 상세페이지를 돌며 판별 | `inspect_dataset`이 API 명세 또는 실제 파일 자산·컬럼·심의유형 확인 |
 | 활용신청 폼을 열어 목적을 쓰고 기능을 선택한 뒤 승인 상태를 다시 확인 | `apply`가 실제 포털 폼을 제출하고 자동승인 결과 확인 |
 | 인증키를 복사하고 엔드포인트별 호출 코드를 별도 구현 | `call_api`가 `pk`로 명세를 검증하고 키를 주입해 XML도 JSON으로 반환 |
 
@@ -90,8 +105,10 @@ opendatactl catalog discover "우리 동네 대기질 서비스에 쓸 데이터
 # 3A. REST와 구현된 LINK는 명세·필수 요청변수·승인유형 확인 후 4~6단계로 계속
 opendatactl describe <PK>
 
-# 3B. FILE은 검색 결과의 detailUrl에서 컬럼·갱신일·다운로드 조건 확인 후 여기서 중단
-#     FILE PK를 아래 describe/apply/call 흐름에 넣지 않음
+# 3B. FILE은 공식 metadata → provider catalogue → 실제 파일 자산 순으로 검사
+opendatactl inspect <PK> --observe
+#     FILE PK를 아래 apply/call 흐름에 넣지 않음
+#     API+FILE 복수 제공형은 두 계약을 모두 반환; 하나만 필요하면 --delivery api|file
 
 # 4. REST 또는 구현된 LINK 활용신청 (AI/MCP에서는 확인 없이 자동 제출, 첫 신청 때 인증키 자동 발급)
 opendatactl apply <PK> --purpose "대기질 분석 프로젝트" --category research
@@ -105,7 +122,11 @@ opendatactl call --pk <PK> --param numOfRows=5   # 엔드포인트·인증키 �
 
 ```bash
 # 무엇이 존재하는지 먼저 훑기 — 로컬 카탈로그(한 번 sync 후 즉시 검색)
-opendatactl catalog sync              # OpenAPI + 파일데이터 통합 카탈로그 수집
+opendatactl catalog sync              # 공식 API → 공개 월간 CSV → 웹 순으로 fallback
+opendatactl catalog sync --source official-file      # 공개 96k 목록을 약 20초에 스트리밍
+opendatactl catalog sync --source official-file+web  # 릴리즈용: 정확한 분류 + 복수 제공형 보강
+opendatactl catalog sync --source official           # 기관 승인 키가 있을 때 operation까지 수집
+opendatactl catalog sync --source web                # 포털 웹 제공형만 수집
 opendatactl catalog sync --type API   # 호출 가능한 API 탐색만 필요할 때
 opendatactl catalog search 폭염 온열   # 활용신청 많은 순, 설명문 없이 간결하게
 opendatactl catalog discover "내가 몰랐던 돈 될 만한 공공데이터"  # 로그인된 AI CLI로 검색축 생성
@@ -116,10 +137,26 @@ opendatactl catalog info               # 수집 시각 + 유형 분포
 opendatactl catalog orgs 폭염          # 그 주제를 개방한 기관 순위
 ```
 
-2026-09-01 릴리즈 검증용 포털 동기화에서는 고유 노드 95,951건(REST 7,132, LINK 4,766, FILE 84,047,
+2026-09-01 릴리즈 검증용 기존 웹 fallback 동기화에서는 고유 노드 95,951건(REST 7,132, LINK 4,766, FILE 84,047,
 미확인 6)을 수집했습니다. 첫 ALL 동기화는 테스트 환경에서 약 7분이 걸렸으며 포털과 네트워크 상태에
 따라 달라집니다. 빠르게 호출 가능한 데이터부터 시작하려면 `--type API`, 조합 탐색 공간을 최대로
 넓히려면 기본 `ALL`을 사용합니다.
+
+같은 날 공식 `공공 데이터 포털 목록 조회 API`의 `dataset` operation은 96,519건을 보고했고,
+`open-data-list`는 17,053 operation, `file-data-list`는 208,112개 파일 버전을 보고했습니다. `catalog sync`는
+기관 승인 키가 있으면 세 operation을 결합해 복수 제공 형태·공식 operation·승인 metadata를 보존합니다.
+다만 이 API는 개인 계정 신청이 제한됩니다. 누구나 받을 수 있는 공식 월간 목록 CSV는 96,110건을 약
+22초에 스트리밍했고 REST 7,176·LINK 4,778을 분류했습니다. CSV만으로는 포털이 자동 생성한 API+FILE
+대체 제공형이 누락되므로 릴리즈 작업은 CSV와 웹 제공형을 합친 `official-file+web` snapshot을 만들고
+유형별 coverage를 검증한 뒤 checksum에 포함합니다. 2026-09-01 실측 composite는 반복 실행에서
+4분 47초~5분 25초에 96,663개
+노드(REST 7,207·LINK 4,780·FILE 84,370·API+FILE 56,744)를 만들었습니다. release gate는 이 복수
+제공형이 5만 개 아래로 줄면 실패하므로 속도 최적화가 검색 결과를 조용히 훼손할 수 없습니다.
+설치 스크립트는 이 snapshot을 함께 검증·설치하므로
+일반 사용자는 목록조회 API를 별도로 신청하거나 첫
+95,000건 동기화를 기다릴 필요가 없습니다. 이전 릴리즈처럼 snapshot asset이 없으면 설치는 계속되고
+웹 fallback도 명시적으로 선택할 수 있습니다. `catalog info`의 `source`로 현재 원천을 확인합니다.
+판단 근거와 fallback 경계는 [ADR 0001](docs/adr/0001-html-scraping-over-api-discovery.md)에 기록했습니다.
 
 ### 자연어 기회 탐색: 기존 AI 구독 우선, Ollama는 선택
 
@@ -186,17 +223,17 @@ opendatactl catalog discover "시세보다 싸게 살 수 있는 물건"
 카탈로그를 다시 동기화한 뒤 같은 명령을 실행하면 문서별 hash가 같은 벡터를 재사용하고 새 항목과
 설명이 바뀐 항목만 임베딩합니다. 출력의 `재사용`과 `새 임베딩` 수로 실제 갱신량을 확인할 수 있습니다.
 
-2026-09-01의 95,951건 통합 스냅샷을 Mac Studio M4 Max 64GB에서 측정한 값은 다음과 같습니다. 이는
+2026-09-01의 96,663건 composite 스냅샷을 Mac Studio M4 Max 64GB에서 측정한 값은 다음과 같습니다. 이는
 고사양 기준의 절대 시간이므로 일반 PC의 속도를 보장하지 않지만, 저장공간과 메모리 판단에는 쓸 수
 있습니다.
 
 | 항목 | 실측 |
 |---|---:|
-| 카탈로그 | 약 100MiB |
-| 95,951 × 768 의미 인덱스 | 약 420MiB |
-| 최초 전체 빌드 | 17분 44초 |
+| 카탈로그 | 약 113MiB |
+| 96,663 × 768 의미 인덱스 | 약 423MiB |
+| composite 인덱스 갱신 | 19분 1초, 553건 재사용·96,110건 임베딩 |
 | 최초 빌드 최대 메모리 | OpenDataCTL 약 2.5GiB + Ollama 약 1.6GiB |
-| 변경 없는 전체 재사용 갱신 | 1.9초, 새 임베딩 0건 |
+| 변경 없는 전체 재사용 갱신 | 2.2초, 새 임베딩 0건 |
 | 단일 키워드 / 하이브리드 검색 | 약 1.0초 / 2.8~3.0초 |
 | 2개 검색축 계획형 hybrid (bounded top-K 적용 후) | 약 2.5~3.6초 |
 
@@ -220,12 +257,19 @@ MCP 에이전트가 만든 검색축만으로 충분하면 설치하지 않아�
 > 알 수 없습니다. `catalog`는 전체를 로컬에 두고 한 번에 훑습니다.
 > `doctor`가 카탈로그가 오래됐는지도 함께 점검합니다.
 >
-> FILE 검색 결과는 공식 `detailUrl`, formats, nextAction을 함께 냅니다. `inspect_file_api_contract`는
-> 파일 페이지에 JSON+XML 자동변환 표현도 있다는 뜻이지만 현재 `call_api` 계약은 아닙니다. `svcType`이
-> REST/LINK인 노드만 `describe`로 보내고, FILE은 상세 컬럼과 작은 다운로드 표본으로 결합 가능성을 확인합니다.
+> 모든 검색 결과의 `nextAction`은 delivery-neutral한 `inspect_dataset`입니다. API+FILE 복수 제공형은
+> 기본 검사에서 두 계약을 함께 반환하고 `delivery=api|file`로 하나만 선택할 수 있습니다. `svcType`이
+> REST/LINK인 노드는 공식 목록 API의 operation metadata를 먼저 반환하고 포털 화면은 필수 여부·샘플처럼
+> 공식 API에 없는 세부 계약만 보완합니다. FILE은 실제 컬럼과 작은 다운로드 표본으로 결합
+> 가능성을 확인합니다. FILE 계약의 `evidence`는 사실별 출처를 구분합니다:
+> `official_api`, `official_catalog_file`, `standard_metadata`가 우선이고, 공식 machine interface에 없는 필수 파라미터 세부사항·다운로드 식별자만
+> `first_party_web_contract`/`fallback`입니다. 예를 들어 서울시 데이터는 공식
+> `SearchOpenDataServiceList`로 SHEET·FILE·OPENAPI 제공 여부와 canonical URL을 먼저 확인한 다음,
+> HTTPS 파일 페이지에서는 버전별 자산 목록만 읽습니다. `alternatives`에 같은 데이터의 다른 제공 형태가
+> 함께 나타납니다.
 >
-> **오픈API의 약 40%(현재 카탈로그 11,902개 중 4,766개)는 `LINK` 유형**으로, 포털에 명세가 없고 제공기관
-> 사이트로 연결됩니다. OpenDataCTL은 이 4,766건을 기본 검색에서 숨기지 않고, `describe`에서
+> **API 제공형의 약 40%(현재 composite의 REST+LINK 11,987개 중 4,780개)는 `LINK` 유형**으로, 포털에 명세가 없고 제공기관
+> 사이트로 연결됩니다. OpenDataCTL은 이 4,780건을 기본 검색에서 숨기지 않고, `describe`에서
 > provider 계약과 typed 호출 가능 여부를 판정합니다.
 > LINK의 경우 `describe`가 제공기관의 공식 시작점인 `linkUrl`과 구조화된 `handoff`를 반환합니다.
 > 이 주소는 OpenAPI 허브일 수도, 개별 데이터 상세나 일반 안내 페이지일 수도 있어 API 엔드포인트·명세로
@@ -314,7 +358,7 @@ opendatactl doctor -f table
 1. `catalog_search` — 자연어 목표를 모델이 여러 검색축으로 의미 분해하고, 로컬 키워드·선택적 Ollama
    벡터 검색을 결합해 작은 후보 목록을 반환. 교차 데이터 발견은 같은 도구를 세 번 점진적으로
    호출해 Anchor 회수 → 실제 결과 기반 Bridge 회수 → 명시적 PK 선택을 수행
-2. `describe_api` — 선택한 `pk` 하나의 상세기능·엔드포인트·요청변수 또는 LINK의 구조화된 외부 제공기관 인계를 반환
+2. `inspect_dataset` — 선택한 `pk` 하나의 API·LINK 계약 또는 FILE 자산·실제 컬럼을 반환 (`describe_api`는 API 전용 호환 도구)
    - `apply`(2.5단계) — 미승인 API라면 AI가 활용목적을 작성해 신청하고 자동승인 결과를 확인
 3. `call_api` — 같은 `pk`와 확인한 파라미터로 REST 또는 구현된 LINK provider를 자동 dispatch해
    실제 호출. 연결 검증에서는
@@ -366,7 +410,7 @@ Cursor와 Claude Desktop처럼 JSON 설정을 쓰는 클라이언트의 예시�
 Cursor Agent는 `cursor-agent mcp list-tools opendatactl`로 연결과 도구 목록을 확인할 수 있습니다.
 ACP는 편집기와 에이전트 사이의 세션 프로토콜이고, opendatactl 같은 도구 서버를 연결하는 경계는 MCP입니다.
 따라서 Gemini/Cursor의 ACP 실행 모드를 별도 추론 API처럼 중첩하지 않고, 호스트가 MCP
-`catalog_search → describe_api → (미승인 시 apply) → call_api`를 호출하게 합니다.
+`catalog_search → inspect_dataset → (미승인 시 apply) → call_api`를 호출하게 합니다.
 
 ## 보안 주의
 

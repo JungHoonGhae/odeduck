@@ -1,7 +1,8 @@
 // Package apicall surfaces data.go.kr OpenAPI specs to an agent (describe) and
-// performs authenticated calls (call). It never parses a spec into claims it
-// can't back with the page's own markup — uncertain structure is surfaced as
-// raw HTML for the agent to read.
+// performs authenticated calls (call). It starts with documented bulk API
+// metadata retained in the local catalogue and uses page contracts only for
+// facts that interface omits. Uncertain structure is surfaced rather than
+// guessed.
 package apicall
 
 import (
@@ -15,6 +16,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/JungHoonGhae/opendatactl/internal/catalog"
 	"github.com/JungHoonGhae/opendatactl/internal/fetch"
 	"github.com/JungHoonGhae/opendatactl/internal/portal"
 	"github.com/PuerkitoBio/goquery"
@@ -52,7 +54,31 @@ type APISpec struct {
 	// Note is set only when the spec is incomplete, to say where the rest of it
 	// lives. Without it an empty Operations list is a dead end.
 	Note string `json:"note,omitempty"`
+	// OfficialAPI preserves the documented bulk-catalogue facts used before the
+	// portal page fallback. Evidence makes the boundary visible to callers.
+	OfficialAPI *catalog.OfficialAPIContract `json:"officialApi,omitempty"`
+	Evidence    []SpecEvidence               `json:"evidence,omitempty"`
+	Warnings    []string                     `json:"warnings,omitempty"`
 }
+
+type SpecEvidence struct {
+	Purpose   string `json:"purpose"`
+	Kind      string `json:"kind"`
+	URL       string `json:"url"`
+	Stability string `json:"stability"`
+}
+
+// ContractKind identifies the evidence that authorizes one operation. Keeping
+// it operation-scoped prevents a documented operation from lending credential
+// authority to an unrelated bulk-only row in the same dataset.
+type ContractKind string
+
+const (
+	ContractKindOfficialAPI           ContractKind = "official_api"
+	ContractKindOfficialSwagger       ContractKind = "official_swagger"
+	ContractKindFirstPartyWebContract ContractKind = "first_party_web_contract"
+	ParamRequirementUnknown           string       = "미제공"
+)
 
 // ExternalHandoff is the only contract shared by heterogeneous LINK datasets.
 // URL is an official starting point resolved through data.go.kr, not necessarily
@@ -173,10 +199,11 @@ var reApproval = regexp.MustCompile(`개발단계\s*[:：]\s*(\S+)\s*/\s*운영�
 // Operation is one 상세기능. When the request-variable table parses cleanly,
 // Params is filled; otherwise RawHTML carries the section verbatim.
 type Operation struct {
-	Name     string  `json:"name"`
-	Endpoint string  `json:"endpoint,omitempty"`
-	Params   []Param `json:"params,omitempty"`
-	RawHTML  string  `json:"rawHtml,omitempty"`
+	Name         string       `json:"name"`
+	Endpoint     string       `json:"endpoint,omitempty"`
+	Params       []Param      `json:"params,omitempty"`
+	RawHTML      string       `json:"rawHtml,omitempty"`
+	ContractKind ContractKind `json:"contractKind,omitempty"`
 }
 
 // Param is one request variable, surfaced from the 요청변수 table.
@@ -200,10 +227,18 @@ func Describe(ctx context.Context, f *fetch.Client, baseURL, pk string) (*APISpe
 	if err := portal.ValidatePublicDataPK(pk); err != nil {
 		return nil, err
 	}
-	url := strings.TrimRight(baseURL, "/") + "/data/" + pk + "/openapi.do"
+	base := strings.TrimRight(baseURL, "/") + "/data/" + pk
+	url := base + "/openapi.do"
 	doc, err := f.GetDoc(ctx, url)
 	if err != nil {
-		return nil, err
+		// The 2026 portal redesign can render an API+FILE dataset only at the
+		// combined fileData route while the legacy openapi route returns 500.
+		// Both are first-party detail pages for the same validated publicDataPk.
+		url = base + "/fileData.do"
+		doc, err = f.GetDoc(ctx, url)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	spec := &APISpec{PublicDataPk: pk}
@@ -220,6 +255,25 @@ func Describe(ctx context.Context, f *fetch.Client, baseURL, pk string) (*APISpe
 	if value, ok := labeledValue(doc.Selection, "API 유형"); ok {
 		spec.APIType = cleanText(value.Text())
 	}
+	preloadedOperations := operationsFromSwagger(doc)
+	referencedSwaggerURL := ""
+	if len(preloadedOperations) == 0 {
+		if candidate := swaggerReferenceURL(doc, pk); candidate != "" {
+			operations, swaggerErr := operationsFromSwaggerURL(ctx, f, candidate)
+			if swaggerErr != nil {
+				spec.Warnings = append(spec.Warnings, "공식 Swagger 문서를 읽지 못했습니다: "+swaggerErr.Error())
+			} else if len(operations) > 0 {
+				preloadedOperations = operations
+				referencedSwaggerURL = candidate
+			}
+		}
+	}
+	// Combined API+FILE pages do not repeat the API 유형 label, but a validated
+	// first-party Swagger document with callable operations is itself a REST
+	// contract. This is an evidence-backed classification, not a title guess.
+	if spec.APIType == "" && len(preloadedOperations) > 0 {
+		spec.APIType = "REST"
+	}
 
 	if isRESTAPIType(spec.APIType) {
 		// Operation containers: real per-operation content lives in
@@ -233,8 +287,8 @@ func Describe(ctx context.Context, f *fetch.Client, baseURL, pk string) (*APISpe
 		// separate result div.
 		// The portal embeds an authoritative Swagger 2.0 spec on modern pages; prefer
 		// it over scraping the rendered tables, which carry less and break more.
-		if ops := operationsFromSwagger(doc); len(ops) > 0 {
-			spec.Operations = ops
+		if len(preloadedOperations) > 0 {
+			spec.Operations = preloadedOperations
 		}
 		if len(spec.Operations) == 0 {
 			ops, err := operationsFromKRDS(ctx, f, baseURL, doc, pk)
@@ -252,7 +306,7 @@ func Describe(ctx context.Context, f *fetch.Client, baseURL, pk string) (*APISpe
 			sections = doc.Find("__none__") // swagger already answered; skip the tables
 		}
 		sections.Each(func(_ int, sel *goquery.Selection) {
-			op := Operation{Name: cleanText(sel.Find("h4, .tit").First().Text())}
+			op := Operation{Name: cleanText(sel.Find("h4, .tit").First().Text()), ContractKind: ContractKindFirstPartyWebContract}
 			if html, err := sel.Html(); err == nil {
 				if m := reEndpoint.FindString(html); m != "" {
 					op.Endpoint = m
@@ -279,7 +333,7 @@ func Describe(ctx context.Context, f *fetch.Client, baseURL, pk string) (*APISpe
 		if len(spec.Operations) == 0 {
 			if html, err := doc.Html(); err == nil {
 				if m := reEndpoint.FindString(html); m != "" {
-					spec.Operations = append(spec.Operations, Operation{Endpoint: m})
+					spec.Operations = append(spec.Operations, Operation{Endpoint: m, ContractKind: ContractKindFirstPartyWebContract})
 					spec.EndpointOnly = true
 				}
 			}
@@ -393,7 +447,156 @@ func Describe(ctx context.Context, f *fetch.Client, baseURL, pk string) (*APISpe
 		}
 	}
 
+	if referencedSwaggerURL != "" {
+		spec.Evidence = append(spec.Evidence, SpecEvidence{
+			Purpose: "operation-and-parameter-contract", Kind: "official_swagger",
+			URL: referencedSwaggerURL, Stability: "documented",
+		})
+	}
+	spec.Evidence = append(spec.Evidence, SpecEvidence{
+		Purpose: "detail-and-required-parameters", Kind: "first_party_web_contract",
+		URL: url, Stability: "fallback",
+	})
 	return spec, nil
+}
+
+// DescribeCatalogued starts from operation metadata already preserved in an
+// official release snapshot, then uses the portal page only to fill facts the
+// bulk API omits (notably required/sample parameter details and guide assets).
+// A legacy/web snapshot simply follows the existing page contract.
+func DescribeCatalogued(ctx context.Context, f *fetch.Client, baseURL, pk string) (*APISpec, error) {
+	cat, err := catalog.Load()
+	if err != nil {
+		return Describe(ctx, f, baseURL, pk)
+	}
+	entry, ok := cat.Find(pk)
+	if !ok || entry.OfficialAPI == nil {
+		return Describe(ctx, f, baseURL, pk)
+	}
+	return DescribeCataloguedEntry(ctx, f, baseURL, entry)
+}
+
+// DescribeCataloguedEntry describes an entry already loaded by a higher-level
+// catalogue workflow. It avoids reparsing the ~96k-entry snapshot for every
+// API inspection while preserving the same official-first fallback contract.
+func DescribeCataloguedEntry(ctx context.Context, f *fetch.Client, baseURL string, entry catalog.Entry) (*APISpec, error) {
+	if entry.OfficialAPI == nil {
+		return Describe(ctx, f, baseURL, entry.PK)
+	}
+	return describeWithOfficial(ctx, f, baseURL, entry)
+}
+
+func describeWithOfficial(ctx context.Context, f *fetch.Client, baseURL string, entry catalog.Entry) (*APISpec, error) {
+	official := specFromOfficial(entry)
+	fallback, err := Describe(ctx, f, baseURL, entry.PK)
+	if err != nil {
+		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+			return nil, err
+		}
+		official.Warnings = append(official.Warnings, "포털 HTML fallback을 읽지 못해 공식 목록 API가 제공한 범위만 반환합니다: "+err.Error())
+		return official, nil
+	}
+	return mergeOfficialSpec(official, fallback), nil
+}
+
+func specFromOfficial(entry catalog.Entry) *APISpec {
+	contract := entry.OfficialAPI
+	spec := &APISpec{PublicDataPk: entry.PK, DataName: entry.Title, OfficialAPI: contract}
+	if contract == nil {
+		return spec
+	}
+	spec.APIType = contract.APIType
+	if contract.DevApproval != "" || contract.ProdApproval != "" {
+		spec.Approval = &Approval{Dev: contract.DevApproval, Ops: contract.ProdApproval,
+			Raw: "개발단계 : " + contract.DevApproval + " / 운영단계 : " + contract.ProdApproval}
+	}
+	for _, source := range contract.Operations {
+		op := Operation{Name: source.Name, Endpoint: source.URL, ContractKind: ContractKind(contract.EvidenceKind)}
+		if op.ContractKind == "" {
+			op.ContractKind = ContractKindOfficialAPI
+		}
+		for _, name := range source.RequestNames {
+			op.Params = append(op.Params, Param{Name: name, Required: ParamRequirementUnknown, Desc: "공식 목록 API는 필수 여부·샘플을 제공하지 않음"})
+		}
+		if op.Name != "" || op.Endpoint != "" || len(op.Params) > 0 {
+			spec.Operations = append(spec.Operations, op)
+		}
+	}
+	if isLinkAPIType(spec.APIType) && strings.TrimSpace(contract.LinkURL) != "" {
+		if err := spec.setExternalHandoff(contract.LinkURL); err != nil {
+			spec.Warnings = append(spec.Warnings, "공식 목록 API의 LINK URL을 안전한 handoff로 해석하지 못했습니다: "+err.Error())
+		}
+	}
+	spec.Note = "공식 목록 API가 operation·요청변수 이름을 제공했지만 필수 여부·샘플 값은 제공하지 않습니다. evidence의 HTML fallback이 그 세부 계약을 보완합니다."
+	kind, evidenceURL := contract.EvidenceKind, contract.EvidenceURL
+	if kind == "" {
+		kind = "official_api"
+	}
+	if evidenceURL == "" {
+		evidenceURL = "https://api.odcloud.kr/api/15077093/v1/open-data-list"
+	}
+	spec.Evidence = []SpecEvidence{{
+		Purpose: "dataset-operation-metadata", Kind: kind,
+		URL: evidenceURL, Stability: "documented",
+	}}
+	return spec
+}
+
+func mergeOfficialSpec(official, fallback *APISpec) *APISpec {
+	if fallback == nil {
+		return official
+	}
+	fallback.OfficialAPI = official.OfficialAPI
+	fallback.Evidence = append(append([]SpecEvidence(nil), official.Evidence...), fallback.Evidence...)
+	fallback.Warnings = append(append([]string(nil), official.Warnings...), fallback.Warnings...)
+	if official.DataName != "" {
+		fallback.DataName = official.DataName
+	}
+	if official.APIType != "" {
+		fallback.APIType = official.APIType
+	}
+	if official.Approval != nil {
+		fallback.Approval = official.Approval
+	}
+	if official.LinkURL != "" {
+		fallback.LinkURL, fallback.Handoff = official.LinkURL, official.Handoff
+	}
+	fallback.Operations = mergeSpecOperations(fallback.Operations, official.Operations)
+	if len(official.Operations) > 0 {
+		fallback.Note = official.Note
+	}
+	return fallback
+}
+
+func mergeSpecOperations(detailed, official []Operation) []Operation {
+	out := append([]Operation(nil), detailed...)
+	for _, source := range official {
+		matched := -1
+		for index := range out {
+			if source.Name != "" && strings.EqualFold(strings.TrimSpace(out[index].Name), strings.TrimSpace(source.Name)) {
+				matched = index
+				break
+			}
+		}
+		if matched < 0 {
+			out = append(out, source)
+			continue
+		}
+		if source.Endpoint != "" {
+			out[matched].Endpoint = source.Endpoint
+		}
+		have := map[string]bool{}
+		for _, param := range out[matched].Params {
+			have[strings.ToLower(strings.TrimSpace(param.Name))] = true
+		}
+		for _, param := range source.Params {
+			if name := strings.ToLower(strings.TrimSpace(param.Name)); name != "" && !have[name] {
+				out[matched].Params = append(out[matched].Params, param)
+				have[name] = true
+			}
+		}
+	}
+	return dedupeOperations(out)
 }
 
 func isLinkAPIType(apiType string) bool {
@@ -417,7 +620,7 @@ func ValidateDataGoKRApplication(spec *APISpec) error {
 			target = spec.Handoff.Contract.ApplicationURL
 		}
 		if target == "" {
-			target = "describe_api의 handoff.nextAction"
+			target = "inspect_dataset의 handoff.nextAction"
 		}
 		return fmt.Errorf("pk=%s 는 LINK 유형이라 data.go.kr 활용신청 대상이 아닙니다 — 제공기관 신청/안내: %s", spec.PublicDataPk, target)
 	}
@@ -668,7 +871,7 @@ func operationsFromKRDS(ctx context.Context, f *fetch.Client, baseURL string, do
 }
 
 func operationFromKRDS(root *goquery.Selection, name string) Operation {
-	op := Operation{Name: cleanText(name)}
+	op := Operation{Name: cleanText(name), ContractKind: ContractKindFirstPartyWebContract}
 	if value, ok := labeledValue(root, "요청주소"); ok {
 		op.Endpoint = reEndpoint.FindString(value.Text())
 	}
@@ -816,6 +1019,8 @@ func cleanText(s string) string { return strings.Join(strings.Fields(s), " ") }
 // `var swaggerJson = \`{…}\`;` template literal.
 var reSwaggerJSON = regexp.MustCompile("(?s)swaggerJson\\s*=\\s*`(.*?)`")
 
+var reSwaggerReference = regexp.MustCompile(`(?i)url\s*:\s*['"](https://infuser\.odcloud\.kr/oas/docs\?namespace=([0-9]+)/v[0-9]+)['"]`)
+
 // swaggerDoc is the slice of Swagger 2.0 opendatactl reads. Parameters sit at the
 // PATH level on data.go.kr's specs, not under the operation, so both are read.
 type swaggerDoc struct {
@@ -860,8 +1065,40 @@ func operationsFromSwagger(doc *goquery.Document) []Operation {
 	if raw == "" {
 		return nil
 	}
+	return operationsFromSwaggerJSON([]byte(raw))
+}
+
+func swaggerReferenceURL(doc *goquery.Document, pk string) string {
+	var found string
+	doc.Find("script").EachWithBreak(func(_ int, script *goquery.Selection) bool {
+		match := reSwaggerReference.FindStringSubmatch(script.Text())
+		if len(match) == 3 && match[2] == pk {
+			found = match[1]
+			return false
+		}
+		return true
+	})
+	return found
+}
+
+func operationsFromSwaggerURL(ctx context.Context, client *fetch.Client, rawURL string) ([]Operation, error) {
+	response, err := client.Get(ctx, rawURL)
+	if err != nil {
+		return nil, err
+	}
+	if response.Status != 200 {
+		return nil, fmt.Errorf("GET %s: unexpected status %d", rawURL, response.Status)
+	}
+	operations := operationsFromSwaggerJSON(response.Body)
+	if len(operations) == 0 {
+		return nil, fmt.Errorf("GET %s: Swagger operation을 찾지 못했습니다", rawURL)
+	}
+	return operations, nil
+}
+
+func operationsFromSwaggerJSON(raw []byte) []Operation {
 	var sd swaggerDoc
-	if err := json.Unmarshal([]byte(raw), &sd); err != nil || sd.Host == "" {
+	if err := json.Unmarshal(raw, &sd); err != nil || sd.Host == "" {
 		return nil
 	}
 	scheme := "https"
@@ -888,8 +1125,9 @@ func operationsFromSwagger(doc *goquery.Document) []Operation {
 		// Path-level parameters first, then any the operation adds.
 		params := append(append([]swaggerParam{}, item.Parameters...), op.Parameters...)
 		o := Operation{
-			Name:     cleanText(name),
-			Endpoint: scheme + "://" + strings.TrimRight(sd.Host, "/") + sd.BasePath + path,
+			Name:         cleanText(name),
+			Endpoint:     scheme + "://" + strings.TrimRight(sd.Host, "/") + sd.BasePath + path,
+			ContractKind: ContractKindOfficialSwagger,
 		}
 		for _, p := range params {
 			req := "옵션"

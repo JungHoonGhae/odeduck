@@ -2,7 +2,8 @@
 
 `data.go.kr`의 LINK 데이터셋은 포털 바깥의 서로 다른 API 계약으로 연결된다.
 OpenDataCTL은 provider마다 MCP tool을 추가하지 않고
-`catalog_search → describe_api → call_api` 세 진입점 안에서 provider별 차이를 격리한다.
+`catalog_search → inspect_dataset → call_api` 세 진입점 안에서 provider별 차이를 격리한다.
+`describe_api`는 기존 API-only 클라이언트를 위한 호환 도구다.
 
 ## 어디까지 템플릿화되는가
 

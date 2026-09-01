@@ -2,14 +2,117 @@ package apicall
 
 import (
 	"context"
+	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/JungHoonGhae/opendatactl/internal/catalog"
 	"github.com/JungHoonGhae/opendatactl/internal/fetch"
 )
+
+type roundTripFunc func(*http.Request) (*http.Response, error)
+
+func (f roundTripFunc) RoundTrip(request *http.Request) (*http.Response, error) {
+	return f(request)
+}
+
+func TestDescribeCataloguedStartsWithOfficialAPIAndLabelsHTMLFallback(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, ".config"))
+	t.Setenv("APPDATA", filepath.Join(home, "AppData", "Roaming"))
+	const pk = "15000017"
+	if err := (&catalog.Catalog{
+		SyncedAt: time.Now(), Type: "ALL", Source: catalog.SourceOfficial,
+		Entries: []catalog.Entry{{
+			PK: pk, Title: "관광실태조사서비스", SvcType: catalog.SvcREST,
+			OfficialAPI: &catalog.OfficialAPIContract{
+				APIType: "REST", DevApproval: "자동승인", ProdApproval: "심의승인",
+				Operations: []catalog.OfficialAPIOperation{{
+					Sequence: "2366", Name: "국민여행총량조회",
+					URL:          "https://apis.data.go.kr/tour/getNationalTourismTotal",
+					RequestNames: []string{"year"},
+				}},
+			},
+		}},
+	}).Save(); err != nil {
+		t.Fatal(err)
+	}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(`<h1 class="h-tit">오래된 화면 이름</h1><ul>
+			<li><strong class="key">API 유형</strong><div class="value">REST</div></li>
+			<li><strong class="key">심의유형</strong><div class="value">개발단계 : 자동승인 / 운영단계 : 심의승인</div></li>
+			<li><strong class="key">참고문서</strong><div class="value"></div></li></ul>`))
+	}))
+	defer srv.Close()
+
+	spec, err := DescribeCatalogued(context.Background(), fetch.New(fetch.WithDelay(0)), srv.URL, pk)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if spec.DataName != "관광실태조사서비스" || spec.OfficialAPI == nil || len(spec.Operations) != 1 ||
+		spec.Operations[0].Endpoint != "https://apis.data.go.kr/tour/getNationalTourismTotal" ||
+		len(spec.Operations[0].Params) != 1 || spec.Operations[0].Params[0].Name != "year" {
+		t.Fatalf("api-first spec = %+v", spec)
+	}
+	if len(spec.Evidence) != 2 || spec.Evidence[0].Kind != "official_api" || spec.Evidence[1].Kind != "first_party_web_contract" {
+		t.Fatalf("evidence = %+v", spec.Evidence)
+	}
+}
+
+func TestDescribeCataloguedPreservesOfficialFileProvenance(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, ".config"))
+	t.Setenv("APPDATA", filepath.Join(home, "AppData", "Roaming"))
+	const pk = "15000018"
+	if err := (&catalog.Catalog{SyncedAt: time.Now(), Type: "ALL", Source: catalog.SourceOfficialFile,
+		Entries: []catalog.Entry{{PK: pk, Title: "공개 CSV 계약", SvcType: catalog.SvcREST,
+			OfficialAPI: &catalog.OfficialAPIContract{APIType: catalog.SvcREST,
+				EvidenceKind: "official_catalog_file", EvidenceURL: "https://www.data.go.kr/data/15062804/fileData.do"}}},
+	}).Save(); err != nil {
+		t.Fatal(err)
+	}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		http.Error(w, "fallback unavailable", http.StatusBadGateway)
+	}))
+	defer srv.Close()
+
+	spec, err := DescribeCatalogued(context.Background(), fetch.New(fetch.WithDelay(0)), srv.URL, pk)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(spec.Evidence) != 1 || spec.Evidence[0].Kind != "official_catalog_file" ||
+		spec.Evidence[0].URL != "https://www.data.go.kr/data/15062804/fileData.do" {
+		t.Fatalf("evidence = %+v", spec.Evidence)
+	}
+}
+
+func TestDescribeCataloguedPropagatesCancellation(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, ".config"))
+	t.Setenv("APPDATA", filepath.Join(home, "AppData", "Roaming"))
+	const pk = "15000019"
+	if err := (&catalog.Catalog{SyncedAt: time.Now(), Type: "ALL", Source: catalog.SourceOfficial,
+		Entries: []catalog.Entry{{PK: pk, Title: "취소 테스트", SvcType: catalog.SvcREST,
+			OfficialAPI: &catalog.OfficialAPIContract{APIType: catalog.SvcREST}}},
+	}).Save(); err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	_, err := DescribeCatalogued(ctx, fetch.New(fetch.WithDelay(0)), "https://data.go.kr", pk)
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("error = %v, want context.Canceled", err)
+	}
+}
 
 func TestDescribeReadsKRDSMetadata(t *testing.T) {
 	body := `<html><body>
@@ -39,6 +142,37 @@ func TestDescribeReadsKRDSMetadata(t *testing.T) {
 	}
 	if spec.Approval == nil || spec.Approval.Dev != "자동승인" || spec.Approval.Ops != "심의승인" {
 		t.Errorf("approval = %+v", spec.Approval)
+	}
+}
+
+func TestDescribeFallsBackToCombinedFileDataPageAfterPortalRedesign(t *testing.T) {
+	body := `<html><body>
+		<h1 class="h-tit">공공데이터포털 목록개방현황</h1>
+		<ul><li><strong class="key">API 유형</strong><div class="value">REST</div></li></ul>
+		<div class="open-api-detail-result"><h4>목록 조회</h4><div>https://apis.data.go.kr/combined/list</div></div>
+	</body></html>`
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html; charset=UTF-8")
+		switch r.URL.Path {
+		case "/data/15062804/openapi.do":
+			http.Error(w, "legacy route removed", http.StatusInternalServerError)
+		case "/data/15062804/fileData.do":
+			_, _ = w.Write([]byte(body))
+		default:
+			t.Fatalf("unexpected request: %s", r.URL)
+		}
+	}))
+	defer srv.Close()
+
+	spec, err := Describe(context.Background(), fetch.New(fetch.WithDelay(0)), srv.URL, "15062804")
+	if err != nil {
+		t.Fatalf("describe combined page: %v", err)
+	}
+	if spec.APIType != "REST" || len(spec.Operations) != 1 || !strings.HasSuffix(spec.Operations[0].Endpoint, "/combined/list") {
+		t.Fatalf("combined spec = %+v", spec)
+	}
+	if len(spec.Evidence) != 1 || !strings.HasSuffix(spec.Evidence[0].URL, "/data/15062804/fileData.do") {
+		t.Fatalf("combined evidence = %+v", spec.Evidence)
 	}
 }
 
@@ -289,5 +423,72 @@ func TestDescribeReadsEmbeddedSwagger(t *testing.T) {
 	if spec.EndpointOnly || spec.Note != "" {
 		t.Errorf("complete swagger spec should carry no note; got endpointOnly=%v note=%q",
 			spec.EndpointOnly, spec.Note)
+	}
+}
+
+func TestDescribeReadsReferencedOfficialSwaggerAndRecordsEvidence(t *testing.T) {
+	const (
+		pk         = "15127058"
+		swaggerURL = "https://infuser.odcloud.kr/oas/docs?namespace=15127058/v1"
+	)
+	page := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(`<ul><li><strong class="key">API 유형</strong><div class="value">REST</div></li></ul>
+			<script>const swaggerOptions = { url: '` + swaggerURL + `' };</script>`))
+	}))
+	defer page.Close()
+
+	transport := roundTripFunc(func(request *http.Request) (*http.Response, error) {
+		if request.URL.String() == swaggerURL {
+			body := `{"swagger":"2.0","host":"apis.data.go.kr","basePath":"/example","schemes":["https"],"paths":{"/getData":{"get":{"summary":"데이터 조회","parameters":[{"name":"pageNo","in":"query","required":true}]}}}}`
+			return &http.Response{
+				StatusCode: http.StatusOK,
+				Header:     http.Header{"Content-Type": {"application/json"}},
+				Body:       io.NopCloser(strings.NewReader(body)),
+				Request:    request,
+			}, nil
+		}
+		return http.DefaultTransport.RoundTrip(request)
+	})
+	client := fetch.New(fetch.WithDelay(0), fetch.WithHTTPClient(&http.Client{Transport: transport, Timeout: time.Second}))
+	spec, err := Describe(context.Background(), client, page.URL, pk)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(spec.Operations) != 1 || spec.Operations[0].ContractKind != ContractKindOfficialSwagger || !strings.HasSuffix(spec.Operations[0].Endpoint, "/example/getData") {
+		t.Fatalf("referenced Swagger operations = %+v", spec.Operations)
+	}
+	var found bool
+	for _, evidence := range spec.Evidence {
+		if evidence.Kind == string(ContractKindOfficialSwagger) && evidence.URL == swaggerURL && evidence.Stability == "documented" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("referenced Swagger evidence = %+v", spec.Evidence)
+	}
+}
+
+func TestOperationsFromSwaggerURLRejectsInvalidResponses(t *testing.T) {
+	tests := map[string]struct {
+		status int
+		body   string
+		want   string
+	}{
+		"non-200":   {status: http.StatusBadGateway, want: "unexpected status 502"},
+		"malformed": {status: http.StatusOK, body: `{`, want: "operation을 찾지 못했습니다"},
+		"zero-ops":  {status: http.StatusOK, body: `{"swagger":"2.0","host":"apis.data.go.kr","paths":{}}`, want: "operation을 찾지 못했습니다"},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				w.WriteHeader(test.status)
+				_, _ = w.Write([]byte(test.body))
+			}))
+			defer server.Close()
+			_, err := operationsFromSwaggerURL(context.Background(), fetch.New(fetch.WithDelay(0)), server.URL)
+			if err == nil || !strings.Contains(err.Error(), test.want) {
+				t.Fatalf("error = %v, want %q", err, test.want)
+			}
+		})
 	}
 }

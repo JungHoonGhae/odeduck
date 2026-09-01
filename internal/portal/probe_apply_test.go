@@ -12,7 +12,7 @@ import (
 func TestApplyFormJSSharesSelectorsWithFill(t *testing.T) {
 	probeJS := applyFormJS("", PurposeResearch, false)
 	fillJS := applyFormJS("연구", PurposeResearch, true)
-	for _, sel := range []string{"reqForm", "prcusePrpos", "prcusePurps", ".col-table input[type=checkbox]", "useScopeAgreAt", ".tagset"} {
+	for _, sel := range []string{"reqForm", "prcusePrpos", "prcusePurps", ".col-table input[type=checkbox]", "multiCloudApiRequestForm.do", "publicDataDetailPk", "useScopeAgreAt", ".tagset", "#reqForm .key"} {
 		if !strings.Contains(probeJS, sel) {
 			t.Errorf("probe script missing selector %q", sel)
 		}
@@ -38,6 +38,9 @@ func TestApplyFormJSSharesSelectorsWithFill(t *testing.T) {
 	}
 	if !strings.HasSuffix(strings.TrimSpace(probeJS), ",false)") {
 		t.Errorf("probe must pass fill=false so it cannot modify the page: %q", probeJS[len(probeJS)-20:])
+	}
+	if !strings.Contains(probeJS, "detailPk.value") || !strings.Contains(probeJS, ".trim() !== ''") {
+		t.Error("multiCloud probe must reject an empty publicDataDetailPk")
 	}
 }
 

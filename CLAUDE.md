@@ -5,22 +5,27 @@ Go CLI + MCP. 사람은 정부 SSO 로그인 한 번만 하고 이후 포털 작
 
 ## 현재 상태 (2026-09-01)
 
-- v0.12는 SafetyKorea, VWorld, FoodSafetyKorea, 서울 열린데이터광장의 adapter revision을 각각
-  2, 3, 2, 2로 고정하고 11개
-  live canary를 제공한다. SafetyKorea·FoodSafetyKorea·typed VWorld family는 provider-scoped key로
-  자동 호출하고, 서울은 HTTPS 부재로 차단한다. 기본 카탈로그 검색은 LINK를 포함한다. v0.10의 connection discovery와 응답 필드
-  프로파일링, v0.9에서 도입한 OpenDataCTL/`opendatactl` 이름, v0.8 자동화를 위한 `gongctl` 호환
-  바이너리·설정 경로·환경변수·MCP 가이드 URI는 유지한다.
-- 목표 기반 카탈로그 검색, 선택형 Ollama 의미 검색, 검색→상세→활용신청→호출 MCP 흐름을 제공한다.
+- v0.14는 공식 월간 목록 CSV와 포털 제공형을 합친 약 9.6만 건의 prebuilt composite 카탈로그를
+  릴리즈에 포함한다. API+FILE 복수 제공형을 보존하고, REST·LINK·FILE을 공통 `inspect_dataset`으로
+  검사한 뒤 호출 가능한 계약만 신청·호출 흐름으로 넘긴다. 신규 통합 API+FILE 페이지, 공식 ODCloud
+  Swagger, `multiCloudApiRequestForm` 신청 폼과 `api.odcloud.kr` HTTPS 호출을 지원한다.
+- v0.12의 SafetyKorea, VWorld, FoodSafetyKorea, 서울 열린데이터광장 adapter와 11개 live canary를
+  유지한다. SafetyKorea·FoodSafetyKorea·typed VWorld family는 provider-scoped key로 자동 호출하고,
+  서울은 HTTPS 부재로 차단한다. v0.10의 connection discovery와 응답 필드 프로파일링, v0.9에서 도입한
+  OpenDataCTL/`opendatactl` 이름, v0.8 자동화를 위한 `gongctl` 호환 바이너리·설정 경로·환경변수·MCP
+  가이드 URI도 유지한다.
+- 목표 기반 카탈로그 검색, 선택형 Ollama 의미 검색, 검색→검사→활용신청→호출 MCP 흐름을 제공한다.
   discovery는 Generate→Search→Expand→Search→Compose→Search의 세 단계 검색으로 동작하며,
   Codex·Claude·Gemini는 전체 계획을, Cursor는 안전한 초기 검색 계획을 지원한다.
 - data.go.kr KRDS 개편 파서와 세션 쿠키 회전 갱신을 적용했다.
 - 온비드·나라장터·도매시장·중소기업 지원사업 API를 실계정으로 신청·승인·호출했다.
 - 현재 설계 근거는 `docs/adr/`, discovery 계약은 `docs/specs/cross-domain-connection-discovery-v1.md`, 실제 검색 평가는
   `docs/research/connection-discovery-evaluation.md`와 `docs/research/semantic-search-evaluation.md`, 경쟁 조사는
-  `docs/research/competitive-workflow-audit.md`, 포털 경계는 `docs/reverse-engineering/portal-catalog.md`가
-  단일 소스다. `docs/superpowers/specs/`와 `docs/superpowers/plans/`는 최초 구현의 역사적 기록이고,
-  홍보 영상 제작 기록은 `docs/promo/opendatactl-agent-explainer.md`에 있다.
+  `docs/research/competitive-workflow-audit.md`와
+  `docs/research/competitor-and-demand-cross-validation-2026.md`, 포털 경계는
+  `docs/reverse-engineering/portal-catalog.md`가 단일 소스다. `docs/superpowers/specs/`와
+  `docs/superpowers/plans/`는 최초 구현의 역사적 기록이고, 홍보 영상 제작 기록은
+  `docs/promo/opendatactl-agent-explainer.md`에 있다.
 
 ## 확정된 핵심 결정 (스펙 요약)
 
@@ -29,7 +34,9 @@ Go CLI + MCP. 사람은 정부 SSO 로그인 한 번만 하고 이후 포털 작
   typed 호출. 포털 명세를 임의로 추론하지 않으며, 외부 provider는 공식 계약·exact credential scope·
   typed operation registry가 있을 때만 호출한다. (kvote 국정수행 PDF 교훈.)
 - **인터페이스**: CLI(사람) + MCP(에이전트), 같은 백엔드. kvote 패턴.
-- **MCP tools**: catalog_search → describe_api → apply(필요시) → call_api. search_datasets와 list_applications는 보조 도구다. 인증키는 call_api 내부에서만 사용하며 모델 컨텍스트로 반환하지 않는다.
+- **MCP tools**: catalog_search → inspect_dataset → apply(필요시) → call_api. `describe_api`는 API-only
+  호환 surface이고 search_datasets와 list_applications는 보조 도구다. 인증키는 call_api 내부에서만
+  사용하며 모델 컨텍스트로 반환하지 않는다.
   `call_api`는 key 생략 시 세션에서 자동 조회 → **검색→신청→승인확인→키→호출이 사람 개입 0**
   (로그인 1회 제외). 인증키는 `/iim/api/selectApiKeyList.do`의 `#pblisrCrtfcKeyPlain`에서 파싱.
 - **인증키**: data.go.kr은 **계정당 일반 인증키 하나**(첫 신청 시 발급). 엔드포인트별 매칭 불필요.
@@ -56,14 +63,18 @@ Go CLI + MCP. 사람은 정부 SSO 로그인 한 번만 하고 이후 포털 작
 - `internal/apicall/external_call.go`, `internal/providerauth/` — provider별 exact HTTPS caller와 scope 제한 key lifecycle.
 - `internal/apicall/call.go` — data.go.kr 계정 인증키 주입 + HTTP GET + XML→JSON + 에러코드 surface.
 - `internal/agentplan/` — provider별 계획 생성과 검색 결과 기반 확장·조합, 안전한 abstention.
-- `internal/catalog/` — 키워드·의미 검색, connection discovery의 제한·중복 제거·증거 경계.
+- `internal/catalog/` — 공식 API·월간 CSV·웹 composite 수집, prebuilt snapshot, 키워드·의미 검색,
+  release golden query gate, connection discovery의 제한·중복 제거·증거 경계.
+- `internal/dataset/` — REST/LINK/FILE 공통 검사와 실제 FILE 자산·bounded CSV/DBF schema 관찰.
 - `internal/apicall/profile.go` — 호출 응답의 선택 필드에 대한 경로·고유값 프로파일링.
 
 ## 경쟁 지형
 
-검색→상세→호출 MCP는 이미 존재한다. OpenDataCTL의 검증된 차이는 목표 기반 전체 카탈로그 탐색과
-data.go.kr 활용신청·승인·키 재사용·실호출을 하나로 연결하는 것이다. 비교 주장과 커밋 고정 근거는
-`docs/research/competitive-workflow-audit.md`만 갱신한다.
+검색→상세→호출 MCP와 9.6만 건 한국 카탈로그 검색기는 이미 존재한다. OpenDataCTL의 검증된 차이는
+목표 기반 전체 카탈로그 탐색, API/FILE/LINK 실제 계약 검사, data.go.kr 활용신청·승인·키 재사용·
+실호출을 하나로 연결하는 조합이다. 경쟁·수요 주장은
+`docs/research/competitive-workflow-audit.md`와
+`docs/research/competitor-and-demand-cross-validation-2026.md`의 고정 근거로만 갱신한다.
 
 ## 주의
 

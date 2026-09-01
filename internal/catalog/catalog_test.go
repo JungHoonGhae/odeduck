@@ -1,7 +1,10 @@
 package catalog
 
 import (
+	"bytes"
+	"compress/gzip"
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -15,6 +18,29 @@ import (
 	"github.com/JungHoonGhae/opendatactl/internal/fetch"
 	"github.com/JungHoonGhae/opendatactl/internal/portal"
 )
+
+type officialHTTPFunc func(context.Context, string, http.Header) (*fetch.Response, error)
+
+func (f officialHTTPFunc) GetWithHeadersNoRedirect(ctx context.Context, rawURL string, headers http.Header) (*fetch.Response, error) {
+	return f(ctx, rawURL, headers)
+}
+
+func officialHTTPHandler(t *testing.T, handler http.Handler) officialHTTPFunc {
+	t.Helper()
+	return func(ctx context.Context, rawURL string, headers http.Header) (*fetch.Response, error) {
+		request := httptest.NewRequest(http.MethodGet, rawURL, nil).WithContext(ctx)
+		request.Header = headers.Clone()
+		recorder := httptest.NewRecorder()
+		handler.ServeHTTP(recorder, request)
+		result := recorder.Result()
+		defer result.Body.Close()
+		return &fetch.Response{
+			Status:      result.StatusCode,
+			ContentType: result.Header.Get("Content-Type"),
+			Body:        append([]byte(nil), recorder.Body.Bytes()...),
+		}, nil
+	}
+}
 
 func sample() *Catalog {
 	return &Catalog{
@@ -127,9 +153,236 @@ func TestSyncAllKeepsAPIAndFileDatasetsInOneSnapshot(t *testing.T) {
 		t.Fatalf("FILE entry = %+v", byPK["200"])
 	}
 	hits := got.Search("평가", 10, false).Hits
-	if len(hits) != 1 || hits[0].NextAction != "inspect_file_api_contract" || !strings.HasSuffix(hits[0].DetailURL, "/data/200/fileData.do") {
+	if len(hits) != 1 || hits[0].NextAction != "inspect_dataset" || !strings.HasSuffix(hits[0].DetailURL, "/data/200/fileData.do") {
 		t.Fatalf("FILE search handoff = %+v", hits)
 	}
+	dualHits := got.Search("상세", 10, false).Hits
+	if len(dualHits) != 1 || !strings.HasSuffix(dualHits[0].DetailURL, "/data/100/fileData.do") {
+		t.Fatalf("API+FILE search handoff = %+v", dualHits)
+	}
+}
+
+func TestOfficialSourceBuildsCatalogFromDocumentedDatasetOperation(t *testing.T) {
+	requests := map[string]int{}
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Scheme != "https" || r.URL.Host != "api.odcloud.kr" {
+			t.Fatalf("official catalogue origin = %s", r.URL)
+		}
+		if got := r.Header.Get("Authorization"); got != "Infuser secret-key" {
+			t.Fatalf("Authorization = %q, want Infuser credential header", got)
+		}
+		if r.URL.Query().Get("perPage") != "2" {
+			t.Fatalf("official catalogue request = %s", r.URL)
+		}
+		requests[r.URL.Path]++
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path + ":" + r.URL.Query().Get("page") {
+		case "/api/15077093/v1/dataset:1":
+			_, _ = w.Write([]byte(`{"currentCount":2,"matchCount":3,"totalCount":3,"data":[
+				{"id":"100","title":"기상 관측 API","org_nm":"기상청","new_category_nm":"환경기상","download_cnt":42,"view_cnt":90,"updated_at":"2026-08-31","ext":"JSON+XML","page_url":"https://www.data.go.kr/data/100/openapi.do","swagger_json_url":"https://infuser.odcloud.kr/oas/100","desc":"관측 설명"},
+				{"id":"200","title":"외부 제공 API","org_nm":"서울시","new_category_nm":"공공행정","download_cnt":7,"view_cnt":30,"updated_at":"2026-08-30","ext":"JSON","page_url":"https://www.data.go.kr/data/200/openapi.do","swagger_json_url":"-","desc":"LINK 설명"}
+			]}`))
+		case "/api/15077093/v1/dataset:2":
+			_, _ = w.Write([]byte(`{"currentCount":1,"matchCount":3,"totalCount":3,"data":[
+				{"id":"300","title":"상권 매출 파일","org_nm":"서울신용보증재단","new_category_nm":"산업경제","download_cnt":3,"view_cnt":120,"updated_at":"2026-08-29","ext":"CSV","page_url":"https://www.data.go.kr/data/300/fileData.do","swagger_json_url":"-","desc":"파일 설명"}
+			]}`))
+		case "/api/15077093/v1/open-data-list:1":
+			_, _ = w.Write([]byte(`{"currentCount":2,"matchCount":2,"totalCount":2,"data":[
+				{"list_id":"100","list_title":"기상 관측 API","api_type":"REST","request_cnt":50,"data_format":"JSON","operation_seq":"1","operation_nm":"관측 조회","operation_url":"https://apis.data.go.kr/weather/getObservation","request_param_nm_en":"\"base_date\",\"nx\"","is_confirmed_for_dev_nm":"자동승인","is_confirmed_for_prod_nm":"심의승인","is_deleted":"N","is_list_deleted":"N"},
+				{"list_id":"200","list_title":"외부 제공 API","api_type":"LINK","link_url":"https://data.seoul.go.kr/example","request_cnt":9,"is_deleted":"N","is_list_deleted":"N"}
+			]}`))
+		case "/api/15077093/v1/file-data-list:1":
+			_, _ = w.Write([]byte(`{"currentCount":2,"matchCount":2,"totalCount":2,"data":[
+				{"list_id":"100","list_title":"기상 관측 API","title":"기상 관측 파일 2026","org_nm":"기상청","ext":"CSV","download_cnt":60,"updated_at":"2026-08-31","is_deleted":"N","is_list_deleted":"N"},
+				{"list_id":"300","list_title":"상권 매출 파일","title":"상권 매출 2026","org_nm":"서울신용보증재단","ext":"CSV","download_cnt":4,"updated_at":"2026-08-30","is_deleted":"N","is_list_deleted":"N"}
+			]}`))
+		default:
+			t.Fatalf("unexpected official request %s", r.URL)
+		}
+	})
+
+	source := newOfficialSource(officialHTTPHandler(t, handler), "secret-key")
+	var progress []int
+	got, err := source.Sync(context.Background(), "ALL", 2, func(n int) { progress = append(progress, n) })
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Source != SourceOfficial || got.Type != "ALL" || len(got.Entries) != 3 ||
+		requests["/api/15077093/v1/dataset"] != 2 || requests["/api/15077093/v1/open-data-list"] != 1 ||
+		requests["/api/15077093/v1/file-data-list"] != 1 {
+		t.Fatalf("catalog = %+v, requests=%v", got, requests)
+	}
+	byPK := map[string]Entry{}
+	for _, entry := range got.Entries {
+		byPK[entry.PK] = entry
+	}
+	if byPK["100"].SvcType != SvcREST || strings.Join(byPK["100"].DataTypes, ",") != "API,FILE" || strings.Join(byPK["100"].Formats, ",") != "JSON,XML,CSV" || byPK["100"].ApplyCount != 60 {
+		t.Fatalf("REST entry = %+v", byPK["100"])
+	}
+	api := byPK["100"].OfficialAPI
+	if api == nil || api.APIType != SvcREST || api.DevApproval != "자동승인" || api.ProdApproval != "심의승인" ||
+		len(api.Operations) != 1 || api.Operations[0].Name != "관측 조회" ||
+		strings.Join(api.Operations[0].RequestNames, ",") != "base_date,nx" {
+		t.Fatalf("official operation contract = %+v", api)
+	}
+	if byPK["200"].SvcType != SvcLINK || byPK["200"].ApplyCount != 9 {
+		t.Fatalf("LINK entry = %+v", byPK["200"])
+	}
+	if byPK["300"].SvcType != SvcFILE || strings.Join(byPK["300"].DataTypes, ",") != "FILE" || byPK["300"].ViewCount != 120 {
+		t.Fatalf("FILE entry = %+v", byPK["300"])
+	}
+	if strings.Join(intStrings(progress), ",") != "2,3,3,3" {
+		t.Fatalf("progress = %v", progress)
+	}
+}
+
+func TestOfficialEntryPreservesUnknownDeliveryButRejectsDeletedRows(t *testing.T) {
+	unknown, ok := entryFromOfficial(officialRow{
+		ID: "400", Title: "신규 제공 형태", PageURL: "https://publisher.example/dataset/400",
+	})
+	if !ok || unknown.PK != "400" || unknown.SvcType != "" || len(unknown.DataTypes) != 0 {
+		t.Fatalf("unknown official row = %+v, ok=%v", unknown, ok)
+	}
+	if _, ok := entryFromOfficial(officialRow{
+		ID: "500", Title: "폐기 데이터", PageURL: "https://www.data.go.kr/data/500/fileData.do", IsDeleted: "Y",
+	}); ok {
+		t.Fatal("official row marked deleted must not enter the release catalogue")
+	}
+}
+
+func TestOfficialSourceRejectsKeysThatDoNotActuallyPaginate(t *testing.T) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(`{"page":1,"perPage":10,"currentCount":1,"totalCount":2,"data":[
+			{"id":"100","title":"첫 행","page_url":"https://www.data.go.kr/data/100/fileData.do","is_deleted":"N"}
+		]}`))
+	})
+	_, err := newOfficialSource(officialHTTPHandler(t, handler), "test-only-key").Sync(context.Background(), "ALL", 1000, nil)
+	if err == nil || !strings.Contains(err.Error(), "pagination") {
+		t.Fatalf("non-paginating credential error = %v", err)
+	}
+}
+
+func TestOfficialSourceTreatsRedirectAsFailure(t *testing.T) {
+	var requested string
+	transport := officialHTTPFunc(func(_ context.Context, rawURL string, _ http.Header) (*fetch.Response, error) {
+		requested = rawURL
+		return &fetch.Response{Status: http.StatusFound}, nil
+	})
+	_, err := newOfficialSource(transport, "test-only-key").Sync(context.Background(), "ALL", 10, nil)
+	if err == nil || !strings.Contains(err.Error(), "HTTP 302") {
+		t.Fatalf("redirect error = %v", err)
+	}
+	if !strings.HasPrefix(requested, DefaultOfficialBaseURL+officialDatasetPath+"?") {
+		t.Fatalf("credentialed origin = %q", requested)
+	}
+}
+
+func TestInstallSnapshotUpgradesLessCompleteLocalCatalogAndPreservesNewerOfficial(t *testing.T) {
+	isolateConfigHome(t)
+	bundle := func(catalog *Catalog) []byte {
+		var compressed bytes.Buffer
+		zw := gzip.NewWriter(&compressed)
+		if err := json.NewEncoder(zw).Encode(catalog); err != nil {
+			t.Fatal(err)
+		}
+		if err := zw.Close(); err != nil {
+			t.Fatal(err)
+		}
+		return compressed.Bytes()
+	}
+	prebuilt := &Catalog{
+		SyncedAt: time.Date(2026, 9, 1, 0, 0, 0, 0, time.UTC), Type: "ALL", Source: SourceOfficial,
+		Entries: []Entry{{PK: "100", Title: "공식 snapshot", SvcType: SvcREST, DataTypes: []string{"API"}}},
+	}
+	validated, err := ValidateSnapshot(bytes.NewReader(bundle(prebuilt)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if validated.Installed || validated.Reason != "validated" || validated.Entries != 1 {
+		t.Fatalf("validation result = %+v", validated)
+	}
+	if _, err := Load(); err == nil {
+		t.Fatal("validation-only path must not install local state")
+	}
+	result, err := InstallSnapshot(bytes.NewReader(bundle(prebuilt)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !result.Installed || result.Entries != 1 || result.Source != SourceOfficial {
+		t.Fatalf("install result = %+v", result)
+	}
+
+	newer := &Catalog{
+		SyncedAt: prebuilt.SyncedAt.Add(time.Hour), Type: "ALL", Source: SourceWeb,
+		Entries: []Entry{{PK: "200", Title: "사용자 최신 snapshot", SvcType: SvcFILE, DataTypes: []string{"FILE"}}},
+	}
+	if err := newer.Save(); err != nil {
+		t.Fatal(err)
+	}
+	result, err = InstallSnapshot(bytes.NewReader(bundle(prebuilt)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !result.Installed {
+		t.Fatalf("less complete web snapshot must not block official prebuilt: %+v", result)
+	}
+	loaded, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(loaded.Entries) != 1 || loaded.Entries[0].PK != "100" {
+		t.Fatalf("official prebuilt was not installed: %+v", loaded)
+	}
+
+	newerOfficial := &Catalog{
+		SyncedAt: prebuilt.SyncedAt.Add(2 * time.Hour), Type: "ALL", Source: SourceOfficial,
+		Entries: []Entry{{PK: "300", Title: "더 최신 공식 snapshot", SvcType: SvcREST, DataTypes: []string{"API"}}},
+	}
+	if err := newerOfficial.Save(); err != nil {
+		t.Fatal(err)
+	}
+	result, err = InstallSnapshot(bytes.NewReader(bundle(prebuilt)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Installed || result.Reason != "local_newer_or_complete" {
+		t.Fatalf("newer official preservation result = %+v", result)
+	}
+}
+
+func TestInstallSnapshotRejectsNonOfficialAndDuplicateNodes(t *testing.T) {
+	isolateConfigHome(t)
+	encode := func(catalog *Catalog) []byte {
+		var compressed bytes.Buffer
+		zw := gzip.NewWriter(&compressed)
+		_ = json.NewEncoder(zw).Encode(catalog)
+		_ = zw.Close()
+		return compressed.Bytes()
+	}
+	for name, candidate := range map[string]*Catalog{
+		"web source": {
+			SyncedAt: time.Now(), Type: "ALL", Source: SourceWeb,
+			Entries: []Entry{{PK: "100", Title: "web"}},
+		},
+		"duplicate PK": {
+			SyncedAt: time.Now(), Type: "ALL", Source: SourceOfficial,
+			Entries: []Entry{{PK: "100", Title: "first"}, {PK: "100", Title: "second"}},
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			if _, err := InstallSnapshot(bytes.NewReader(encode(candidate))); err == nil {
+				t.Fatal("invalid prebuilt snapshot was accepted")
+			}
+		})
+	}
+}
+
+func intStrings(values []int) []string {
+	out := make([]string, len(values))
+	for index, value := range values {
+		out[index] = fmt.Sprint(value)
+	}
+	return out
 }
 
 // Every term must match, and matches rank by demand — the agent should see the
@@ -325,6 +578,29 @@ func TestCatalogCoverageDistinguishesFreshButNarrowSnapshots(t *testing.T) {
 	}
 }
 
+func TestPreserveOnAutoSyncRejectsCoverageDowngrade(t *testing.T) {
+	entry := func(pk string, deliveries ...string) Entry {
+		return Entry{PK: pk, Title: pk, DataTypes: deliveries}
+	}
+	current := &Catalog{Type: "ALL", Source: SourceCombined, Entries: []Entry{
+		entry("1", "API", "FILE"), entry("2", "API", "FILE"), entry("3", "FILE"),
+	}}
+	fileOnly := &Catalog{Type: "ALL", Source: SourceOfficialFile, Entries: []Entry{
+		entry("1", "FILE"), entry("2", "FILE"), entry("3", "FILE"),
+	}}
+	if !PreserveOnAutoSync(current, fileOnly) {
+		t.Fatal("auto sync should preserve a composite snapshot over CSV-only fallback")
+	}
+	refreshed := &Catalog{Type: "ALL", Source: SourceCombined, Entries: append([]Entry(nil), current.Entries...)}
+	if PreserveOnAutoSync(current, refreshed) {
+		t.Fatal("same-quality composite refresh should be accepted")
+	}
+	catastrophic := &Catalog{Type: "ALL", Source: SourceCombined, Entries: []Entry{entry("1", "FILE")}}
+	if !PreserveOnAutoSync(current, catastrophic) {
+		t.Fatal("automatic refresh should stop a material same-source coverage collapse")
+	}
+}
+
 // A word in the dataset's name is a stronger signal than the same word buried in
 // its description — otherwise a relaxed search recommends whatever popular
 // dataset happens to mention the word.
@@ -497,6 +773,16 @@ func TestSearchPlanExposesRoleDiverseOptionsWithoutInflatingFinalCards(t *testin
 	}
 	if got := res.ConnectionOptions[0].Nodes[1]; got.SvcType != SvcFILE {
 		t.Fatalf("file discovery metadata was not preserved: %+v", got)
+	}
+}
+
+func TestConnectionEvidenceIncludesFileAlternativeWhenRESTIsPrimary(t *testing.T) {
+	evidence := evidenceFor(
+		EdgeHypothesis{Kinds: []string{"spatial"}, ExpectedKeys: []string{"법정동코드"}},
+		Hit{PK: "dual", SvcType: SvcREST, DataTypes: []string{"API", "FILE"}},
+	)
+	if len(evidence) == 0 || !strings.Contains(evidence[0], "FILE 노드") {
+		t.Fatalf("API+FILE evidence = %v, want FILE inspection guidance", evidence)
 	}
 }
 
