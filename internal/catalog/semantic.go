@@ -2,6 +2,7 @@ package catalog
 
 import (
 	"bytes"
+	"container/heap"
 	"context"
 	"crypto/sha256"
 	"encoding/gob"
@@ -26,7 +27,11 @@ const (
 	// almost all of the full model's multilingual retrieval quality.
 	DefaultOllamaURL      = "http://127.0.0.1:11434"
 	DefaultEmbeddingModel = "embeddinggemma:300m-qat-q4_0"
-	semanticIndexVersion  = 1
+	semanticIndexVersion  = 2
+	semanticRecipeVersion = 1
+	maxSemanticIndexBytes = int64(1 << 30)
+	maxSemanticIndexRows  = 1_000_000
+	maxSemanticDimensions = 8_192
 )
 
 // OllamaURLFromEnv returns the renamed environment setting while preserving the
@@ -161,53 +166,186 @@ func (e *OllamaEmbedder) Pull(ctx context.Context) error {
 	return nil
 }
 
-// SemanticIndex is intentionally a flat local matrix. At the current 11k-row
-// scale it is roughly 35 MB at 768 dimensions and brute-force cosine search is
-// faster and operationally simpler than running a vector database. The type is
-// isolated so an ANN/vector-DB backend can replace it if the corpus grows by
-// orders of magnitude or becomes a concurrent service.
+// SemanticIndex is intentionally a flat local matrix. At the current 96k-row
+// scale brute-force cosine search remains operationally simpler than requiring
+// a vector database. DocumentHashes let refreshes reuse vectors whose actual
+// embedding input did not change, even when catalogue metadata or SyncedAt did.
 type SemanticIndex struct {
-	Version       int
-	Model         string
-	CatalogDigest string
-	CreatedAt     time.Time
-	PKs           []string
-	Vectors       [][]float32
+	Version        int
+	RecipeVersion  int
+	Model          string
+	Dimensions     int
+	CatalogDigest  string
+	CreatedAt      time.Time
+	PKs            []string
+	DocumentHashes []string
+	Vectors        [][]float32
 }
 
-// BuildSemanticIndex embeds the complete catalogue in bounded batches.
+// SemanticBuildStats exposes whether a refresh avoided the expensive document
+// embedding work. Query embedding remains necessary when semantic search runs.
+type SemanticBuildStats struct {
+	Total    int
+	Reused   int
+	Embedded int
+}
+
+type semanticCandidate struct {
+	entry *Entry
+	score float32
+}
+
+// semanticCandidateHeap keeps the worst retained candidate at index zero so a
+// full catalogue scan only materializes the requested top K results.
+type semanticCandidateHeap []semanticCandidate
+
+func (h semanticCandidateHeap) Len() int { return len(h) }
+func (h semanticCandidateHeap) Less(i, j int) bool {
+	if h[i].score != h[j].score {
+		return h[i].score < h[j].score
+	}
+	return moreDemandedEntry(h[j].entry, h[i].entry)
+}
+func (h semanticCandidateHeap) Swap(i, j int) { h[i], h[j] = h[j], h[i] }
+func (h *semanticCandidateHeap) Push(value any) {
+	*h = append(*h, value.(semanticCandidate))
+}
+func (h *semanticCandidateHeap) Pop() any {
+	old := *h
+	last := old[len(old)-1]
+	*h = old[:len(old)-1]
+	return last
+}
+
+func moreDemandedEntry(left, right *Entry) bool {
+	if left.ApplyCount != right.ApplyCount {
+		return left.ApplyCount > right.ApplyCount
+	}
+	if left.ViewCount != right.ViewCount {
+		return left.ViewCount > right.ViewCount
+	}
+	return left.PK < right.PK
+}
+
+func betterSemanticCandidate(left, right semanticCandidate) bool {
+	if left.score != right.score {
+		return left.score > right.score
+	}
+	return moreDemandedEntry(left.entry, right.entry)
+}
+
+// BuildSemanticIndex embeds the complete catalogue in bounded batches. It is a
+// pure full-build interface used by tests and custom callers; the CLI uses
+// RefreshSemanticIndex so unchanged vectors survive normal catalogue refreshes.
 func BuildSemanticIndex(ctx context.Context, c *Catalog, embedder Embedder, batchSize int, progress func(done, total int)) (*SemanticIndex, error) {
+	idx, _, err := buildSemanticIndex(ctx, c, embedder, batchSize, nil, progress)
+	return idx, err
+}
+
+// RefreshSemanticIndex loads the previous local index, reuses vectors with the
+// same model, recipe and document hash, and embeds only changed or new entries.
+// A version-1 index can be migrated without re-embedding when it exactly matches
+// the current catalogue digest.
+func RefreshSemanticIndex(ctx context.Context, c *Catalog, embedder Embedder, batchSize int, progress func(done, total int)) (*SemanticIndex, SemanticBuildStats, error) {
+	previous, err := loadSemanticIndexFile()
+	if errors.Is(err, ErrSemanticIndexNotBuilt) || errors.Is(err, ErrSemanticIndexStale) {
+		previous = nil
+	} else if err != nil {
+		return nil, SemanticBuildStats{}, err
+	}
+	return buildSemanticIndex(ctx, c, embedder, batchSize, previous, progress)
+}
+
+func buildSemanticIndex(ctx context.Context, c *Catalog, embedder Embedder, batchSize int, previous *SemanticIndex, progress func(done, total int)) (*SemanticIndex, SemanticBuildStats, error) {
 	if batchSize <= 0 {
 		batchSize = 32
 	}
+	total := len(c.Entries)
+	currentDigest := catalogDigest(c)
 	idx := &SemanticIndex{
-		Version: semanticIndexVersion, Model: embedder.Model(),
-		CatalogDigest: catalogDigest(c), CreatedAt: time.Now().UTC(),
-		PKs: make([]string, len(c.Entries)), Vectors: make([][]float32, len(c.Entries)),
+		Version: semanticIndexVersion, RecipeVersion: semanticRecipeVersion, Model: embedder.Model(),
+		CatalogDigest: currentDigest, CreatedAt: time.Now().UTC(),
+		PKs: make([]string, total), DocumentHashes: make([]string, total), Vectors: make([][]float32, total),
 	}
-	for start := 0; start < len(c.Entries); start += batchSize {
+
+	type reusableVector struct {
+		hash   string
+		vector []float32
+	}
+	reusable := make(map[string]reusableVector)
+	legacyExactMatch := previous != nil && previous.Version == 1 && previous.CatalogDigest == currentDigest
+	if previous != nil && previous.Model == embedder.Model() && (legacyExactMatch ||
+		(previous.Version == semanticIndexVersion && previous.RecipeVersion == semanticRecipeVersion && len(previous.DocumentHashes) == len(previous.PKs))) {
+		for i, pk := range previous.PKs {
+			if i >= len(previous.Vectors) || len(previous.Vectors[i]) == 0 {
+				continue
+			}
+			hash := ""
+			if !legacyExactMatch {
+				hash = previous.DocumentHashes[i]
+			}
+			reusable[pk] = reusableVector{hash: hash, vector: previous.Vectors[i]}
+		}
+	}
+
+	pending := make([]int, 0, total)
+	stats := SemanticBuildStats{Total: total}
+	for i, entry := range c.Entries {
+		docHash := semanticDocumentHash(entry)
+		idx.PKs[i] = entry.PK
+		idx.DocumentHashes[i] = docHash
+		if old, ok := reusable[entry.PK]; ok && (legacyExactMatch || old.hash == docHash) {
+			if idx.Dimensions != 0 && len(old.vector) != idx.Dimensions {
+				pending = append(pending, i)
+				continue
+			}
+			idx.Vectors[i] = old.vector
+			if idx.Dimensions == 0 {
+				idx.Dimensions = len(old.vector)
+			}
+			stats.Reused++
+			continue
+		}
+		pending = append(pending, i)
+	}
+	if progress != nil && stats.Reused > 0 {
+		progress(stats.Reused, total)
+	}
+
+	for start := 0; start < len(pending); start += batchSize {
 		end := start + batchSize
-		if end > len(c.Entries) {
-			end = len(c.Entries)
+		if end > len(pending) {
+			end = len(pending)
 		}
 		docs := make([]string, end-start)
-		for i := start; i < end; i++ {
-			idx.PKs[i] = c.Entries[i].PK
-			docs[i-start] = semanticDocument(c.Entries[i])
+		for i, position := range pending[start:end] {
+			docs[i] = semanticDocument(c.Entries[position])
 		}
 		vectors, err := embedder.Embed(ctx, docs)
 		if err != nil {
-			return nil, fmt.Errorf("semantic index %d-%d/%d: %w", start+1, end, len(c.Entries), err)
+			return nil, SemanticBuildStats{}, fmt.Errorf("semantic index %d-%d/%d changed documents: %w", start+1, end, len(pending), err)
 		}
 		if len(vectors) != len(docs) {
-			return nil, fmt.Errorf("semantic index 벡터 수 %d, 문서 수 %d", len(vectors), len(docs))
+			return nil, SemanticBuildStats{}, fmt.Errorf("semantic index 벡터 수 %d, 문서 수 %d", len(vectors), len(docs))
 		}
-		copy(idx.Vectors[start:end], vectors)
+		for i, vector := range vectors {
+			if !validSemanticVector(vector, idx.Dimensions) {
+				return nil, SemanticBuildStats{}, fmt.Errorf("semantic index 벡터 차원 %d, 기대값 %d", len(vector), idx.Dimensions)
+			}
+			if idx.Dimensions == 0 {
+				idx.Dimensions = len(vector)
+			}
+			idx.Vectors[pending[start+i]] = vector
+		}
+		stats.Embedded += len(vectors)
 		if progress != nil {
-			progress(end, len(c.Entries))
+			progress(stats.Reused+stats.Embedded, total)
 		}
 	}
-	return idx, nil
+	if progress != nil && len(pending) == 0 {
+		progress(total, total)
+	}
+	return idx, stats, nil
 }
 
 func semanticDocument(e Entry) string {
@@ -219,6 +357,11 @@ func semanticDocument(e Entry) string {
 
 func semanticQuery(query string) string {
 	return "task: search result | query: " + strings.TrimSpace(query)
+}
+
+func semanticDocumentHash(e Entry) string {
+	sum := sha256.Sum256([]byte(semanticDocument(e)))
+	return hex.EncodeToString(sum[:])
 }
 
 func catalogDigest(c *Catalog) string {
@@ -248,7 +391,7 @@ func (s *SemanticIndex) Save() error {
 	})
 }
 
-func LoadSemanticIndex(c *Catalog) (*SemanticIndex, error) {
+func loadSemanticIndexFile() (*SemanticIndex, error) {
 	path, err := semanticIndexPath()
 	if err != nil {
 		return nil, err
@@ -261,14 +404,63 @@ func LoadSemanticIndex(c *Catalog) (*SemanticIndex, error) {
 		return nil, err
 	}
 	defer f.Close()
-	var idx SemanticIndex
-	if err := gob.NewDecoder(f).Decode(&idx); err != nil {
+	info, err := f.Stat()
+	if err != nil {
 		return nil, err
 	}
-	if idx.Version != semanticIndexVersion || idx.CatalogDigest != catalogDigest(c) || len(idx.PKs) != len(idx.Vectors) {
+	if info.Size() <= 0 || info.Size() > maxSemanticIndexBytes {
+		return nil, ErrSemanticIndexStale
+	}
+	var idx SemanticIndex
+	if err := gob.NewDecoder(io.LimitReader(f, maxSemanticIndexBytes)).Decode(&idx); err != nil {
+		return nil, ErrSemanticIndexStale
+	}
+	if err := validateSemanticIndex(&idx); err != nil {
+		return nil, ErrSemanticIndexStale
+	}
+	if idx.Version == semanticIndexVersion && (idx.RecipeVersion != semanticRecipeVersion || len(idx.DocumentHashes) != len(idx.PKs)) {
 		return nil, ErrSemanticIndexStale
 	}
 	return &idx, nil
+}
+
+func validateSemanticIndex(idx *SemanticIndex) error {
+	if idx == nil || (idx.Version != 1 && idx.Version != semanticIndexVersion) ||
+		len(idx.PKs) != len(idx.Vectors) || len(idx.PKs) > maxSemanticIndexRows {
+		return ErrSemanticIndexStale
+	}
+	expectedDimensions := idx.Dimensions
+	for _, vector := range idx.Vectors {
+		if len(vector) == 0 || len(vector) > maxSemanticDimensions {
+			return ErrSemanticIndexStale
+		}
+		if expectedDimensions == 0 {
+			expectedDimensions = len(vector)
+		}
+		if len(vector) != expectedDimensions {
+			return ErrSemanticIndexStale
+		}
+		for _, value := range vector {
+			if math.IsNaN(float64(value)) || math.IsInf(float64(value), 0) {
+				return ErrSemanticIndexStale
+			}
+		}
+	}
+	if len(idx.PKs) > 0 && (expectedDimensions == 0 || expectedDimensions > maxSemanticDimensions) {
+		return ErrSemanticIndexStale
+	}
+	return nil
+}
+
+func LoadSemanticIndex(c *Catalog) (*SemanticIndex, error) {
+	idx, err := loadSemanticIndexFile()
+	if err != nil {
+		return nil, err
+	}
+	if idx.CatalogDigest != catalogDigest(c) {
+		return nil, ErrSemanticIndexStale
+	}
+	return idx, nil
 }
 
 // Search performs a flat cosine scan. Vectors are normalized at build/query
@@ -277,12 +469,20 @@ func (s *SemanticIndex) Search(c *Catalog, query []float32, limit int, restOnly,
 	if limit <= 0 {
 		limit = 20
 	}
-	normalize(query)
 	entries := make(map[string]*Entry, len(c.Entries))
 	for i := range c.Entries {
 		entries[c.Entries[i].PK] = &c.Entries[i]
 	}
-	var hits []Hit
+	return s.search(entries, query, limit, restOnly, includePreviews)
+}
+
+func (s *SemanticIndex) search(entries map[string]*Entry, query []float32, limit int, restOnly, includePreviews bool) []Hit {
+	if limit <= 0 {
+		limit = 20
+	}
+	normalize(query)
+	candidates := make(semanticCandidateHeap, 0, limit)
+	heap.Init(&candidates)
 	for i, vector := range s.Vectors {
 		if i >= len(s.PKs) || len(vector) != len(query) {
 			continue
@@ -291,22 +491,27 @@ func (s *SemanticIndex) Search(c *Catalog, query []float32, limit int, restOnly,
 		if e == nil || (restOnly && e.SvcType != SvcREST) {
 			continue
 		}
-		score := dot(query, vector)
-		h := Hit{PK: e.PK, Title: e.Title, Org: e.Org, ApplyCount: e.ApplyCount,
-			ModifiedAt: e.ModifiedAt, SvcType: e.SvcType, SemanticScore: score}
+		candidate := semanticCandidate{entry: e, score: dot(query, vector)}
+		if candidates.Len() < limit {
+			heap.Push(&candidates, candidate)
+			continue
+		}
+		if betterSemanticCandidate(candidate, candidates[0]) {
+			candidates[0] = candidate
+			heap.Fix(&candidates, 0)
+		}
+	}
+	selected := make([]semanticCandidate, len(candidates))
+	copy(selected, candidates)
+	sort.SliceStable(selected, func(i, j int) bool { return betterSemanticCandidate(selected[i], selected[j]) })
+	hits := make([]Hit, 0, len(selected))
+	for _, candidate := range selected {
+		h := hitFromEntry(candidate.entry)
+		h.SemanticScore = candidate.score
 		if includePreviews {
-			h.Preview = descriptionPreview(e, 180)
+			h.Preview = descriptionPreview(candidate.entry, 180)
 		}
 		hits = append(hits, h)
-	}
-	sort.SliceStable(hits, func(i, j int) bool {
-		if hits[i].SemanticScore != hits[j].SemanticScore {
-			return hits[i].SemanticScore > hits[j].SemanticScore
-		}
-		return hits[i].ApplyCount > hits[j].ApplyCount
-	})
-	if len(hits) > limit {
-		hits = hits[:limit]
 	}
 	return hits
 }
@@ -364,6 +569,29 @@ func (c *Catalog) SearchHybrid(ctx context.Context, plan QueryPlan, index *Seman
 		base.Semantic = &SemanticInfo{Status: SemanticUnavailable, Model: index.Model, Detail: err.Error()}
 		return base
 	}
+	expectedDimensions := index.Dimensions
+	if expectedDimensions == 0 {
+		for _, vector := range index.Vectors {
+			if len(vector) > 0 {
+				expectedDimensions = len(vector)
+				break
+			}
+		}
+	}
+	if len(vectors) != len(inputs) {
+		base.Hits = trimHits(base.Hits, want)
+		finalizeConnectionCandidates(normalizedPlan, &base, entries)
+		base.Semantic = &SemanticInfo{Status: SemanticUnavailable, Model: index.Model, Detail: "query embedding count does not match inputs"}
+		return base
+	}
+	for _, vector := range vectors {
+		if !validSemanticVector(vector, expectedDimensions) {
+			base.Hits = trimHits(base.Hits, want)
+			finalizeConnectionCandidates(normalizedPlan, &base, entries)
+			base.Semantic = &SemanticInfo{Status: SemanticUnavailable, Model: index.Model, Detail: "query embedding dimensions or values are invalid"}
+			return base
+		}
+	}
 
 	perQuery := expanded.Limit
 	buckets := make([][]Hit, len(vectors))
@@ -372,7 +600,7 @@ func (c *Catalog) SearchHybrid(ctx context.Context, plan QueryPlan, index *Seman
 		axisByQuery[axis.Query] = axis
 	}
 	for i, vector := range vectors {
-		buckets[i] = index.Search(c, vector, perQuery, plan.RESTOnly, plan.IncludePreviews)
+		buckets[i] = index.search(entries, vector, perQuery, plan.RESTOnly, plan.IncludePreviews)
 		for j := range buckets[i] {
 			buckets[i][j].MatchedQuery = queries[i]
 			if axis, ok := axisByQuery[queries[i]]; ok {
@@ -393,7 +621,9 @@ func (c *Catalog) SearchHybrid(ctx context.Context, plan QueryPlan, index *Seman
 		// remainder when the requested page has room.
 		diversityOrder = concepts
 	}
-	base.Hits = fuseHits(base.Hits, semantic, want, diversityOrder)
+	fused := fuseHits(base.Hits, semantic, expanded.Limit, diversityOrder)
+	base.Hits = trimHits(fused, want)
+	base.ConnectionOptions = buildConnectionOptionsFromHits(fused, normalizedPlan.AnchorPKs, MaxOptionsPerRole)
 	finalizeConnectionCandidates(normalizedPlan, &base, entries)
 	base.Mode = SearchModeHybrid
 	base.Semantic = &SemanticInfo{Status: SemanticUsed, Model: index.Model}
@@ -483,7 +713,7 @@ func fuseHits(lexical, semantic []Hit, limit int, queryOrder []string) []Hit {
 		if items[i].score != items[j].score {
 			return items[i].score > items[j].score
 		}
-		return items[i].hit.ApplyCount > items[j].hit.ApplyCount
+		return moreDemandedHit(items[i].hit, items[j].hit)
 	})
 	out := make([]Hit, len(items))
 	for i := range items {
@@ -555,6 +785,18 @@ func normalize(v []float32) {
 	for i := range v {
 		v[i] *= inv
 	}
+}
+
+func validSemanticVector(vector []float32, expectedDimensions int) bool {
+	if len(vector) == 0 || len(vector) > maxSemanticDimensions || (expectedDimensions > 0 && len(vector) != expectedDimensions) {
+		return false
+	}
+	for _, value := range vector {
+		if math.IsNaN(float64(value)) || math.IsInf(float64(value), 0) {
+			return false
+		}
+	}
+	return true
 }
 
 func dot(a, b []float32) float32 {

@@ -22,8 +22,8 @@ var (
 func catalogCmd() *cobra.Command {
 	c := &cobra.Command{
 		Use:   "catalog",
-		Short: "API 카탈로그 — 무엇이 존재하는지 로컬에서 즉시 검색",
-		Long: `data.go.kr 의 오픈API 목록을 로컬에 한 번 받아두고, 이후 검색을 네트워크 없이
+		Short: "공개데이터 카탈로그 — API와 파일에서 무엇이 존재하는지 즉시 검색",
+		Long: `data.go.kr 의 오픈API와 파일데이터 목록을 로컬에 한 번 받아두고, 이후 검색을 네트워크 없이
 즉시 처리합니다. 포털은 키워드 검색만 제공하므로, 카탈로그가 없으면 "이런 데이터가
 있나?"를 확인하려면 검색어를 하나씩 추측해 볼 수밖에 없습니다.
 
@@ -48,7 +48,7 @@ func catalogSyncCmd() *cobra.Command {
 	c := &cobra.Command{
 		Use:   "sync",
 		Short: "포털에서 전체 목록을 받아 로컬 카탈로그 갱신",
-		Long: `포털의 전체 오픈API 목록을 수집해 로컬 카탈로그를 갱신합니다.
+		Long: `포털의 전체 오픈API와 파일데이터 목록을 수집해 로컬 카탈로그를 갱신합니다.
 
 --if-stale 은 카탈로그가 아직 신선하면 아무것도 하지 않고 성공합니다. 갱신 주기를
 판단하는 일을 사람이 기억하지 않아도 되도록, cron 이나 CI 가 조건 없이 걸어두는 용도입니다:
@@ -58,7 +58,7 @@ func catalogSyncCmd() *cobra.Command {
 			if ifStale {
 				// Only an existing, still-fresh catalogue is a reason to skip. A
 				// missing or unreadable one means sync is exactly what's needed.
-				if cur, err := catalog.Load(); err == nil && !cur.Stale() {
+				if cur, err := catalog.Load(); err == nil && !cur.Stale() && cur.CoversType(dtype) {
 					fmt.Fprintf(cmd.ErrOrStderr(), "카탈로그가 아직 신선합니다 (%.0f일 전, %d건) — 건너뜁니다\n",
 						cur.Age().Hours()/24, len(cur.Entries))
 					return nil
@@ -81,7 +81,7 @@ func catalogSyncCmd() *cobra.Command {
 			return nil
 		},
 	}
-	c.Flags().StringVar(&dtype, "type", "API", "데이터 유형: API | FILE")
+	c.Flags().StringVar(&dtype, "type", "ALL", "데이터 유형: ALL | API | FILE")
 	c.Flags().IntVar(&perPage, "per-page", 200, "페이지당 요청 건수")
 	c.Flags().BoolVar(&ifStale, "if-stale", false, "카탈로그가 오래됐을 때만 수집 (cron/CI 용)")
 	return c
@@ -197,7 +197,11 @@ func catalogQueryCmd(discover bool) *cobra.Command {
 							Ranking: ranking, MaxConnections: maxConnections,
 						}
 						res = runCatalogQuery(cmd, cat, bridgePlan, semantic)
-						selected, selectErr := composeDiscoveryPlan(cmd.Context(), q, planner.Provider, anchors, res.Hits)
+						optionHits := connectionOptionHits(res.ConnectionOptions)
+						if len(optionHits) == 0 {
+							optionHits = res.Hits
+						}
+						selected, selectErr := composeDiscoveryPlan(cmd.Context(), q, planner.Provider, anchors, optionHits)
 						if selectErr != nil {
 							res.Abstention = &catalog.Abstention{Reason: "실제 Bridge PK 선택에 실패해 연결 카드를 만들지 않았습니다: " + selectErr.Error()}
 							fmt.Fprintf(cmd.ErrOrStderr(), "⚠ Bridge 후보 선택에 실패해 카드 생성을 중단합니다: %v\n", selectErr)
@@ -219,7 +223,7 @@ func catalogQueryCmd(discover bool) *cobra.Command {
 					"mode": res.Mode, "intent": res.Intent, "queries": res.Queries, "semantic": res.Semantic,
 					"terms": res.Terms, "relaxed": res.Relaxed,
 					"total": total, "shown": len(hits), "hits": hits,
-					"anchors": res.Anchors, "connections": res.Connections,
+					"anchors": res.Anchors, "connectionOptions": res.ConnectionOptions, "connections": res.Connections,
 					"warnings": res.Warnings, "abstention": res.Abstention,
 				}
 				if planner != nil {
@@ -251,17 +255,29 @@ func catalogQueryCmd(discover bool) *cobra.Command {
 						strings.Join(res.Terms, " "))
 				}
 			}
-			headers := []string{"pk", "유형", "활용신청", "수정일", "발견축", "제공기관", "데이터명"}
+			headers := []string{"pk", "유형", "활용신청", "조회", "수정일", "발견축", "제공기관", "데이터명"}
 			rows := make([][]string, 0, len(hits))
 			for _, h := range hits {
 				svc := h.SvcType
 				if svc == "" {
 					svc = "?"
 				}
-				rows = append(rows, []string{h.PK, svc, fmt.Sprintf("%d", h.ApplyCount), h.ModifiedAt, h.MatchedQuery, h.Org, h.Title})
+				rows = append(rows, []string{h.PK, svc, fmt.Sprintf("%d", h.ApplyCount), fmt.Sprintf("%d", h.ViewCount), h.ModifiedAt, h.MatchedQuery, h.Org, h.Title})
 			}
 			if err := output.WriteTable(cmd.OutOrStdout(), headers, rows); err != nil {
 				return err
+			}
+			if len(res.ConnectionOptions) > 0 {
+				fmt.Fprintln(cmd.OutOrStdout(), "\n조합 선택지 (역할별 검색 후보, 아직 연결 주장이 아님)")
+				var optionRows [][]string
+				for _, group := range res.ConnectionOptions {
+					for _, node := range group.Nodes {
+						optionRows = append(optionRows, []string{group.Role, node.PK, node.SvcType, node.Org, node.Title})
+					}
+				}
+				if err := output.WriteTable(cmd.OutOrStdout(), []string{"역할", "PK", "유형", "제공기관", "데이터명"}, optionRows); err != nil {
+					return err
+				}
 			}
 			if len(res.Connections) > 0 {
 				fmt.Fprintln(cmd.OutOrStdout(), "\n연결 후보 (아직 실제 join을 확인하지 않은 candidate)")
@@ -356,6 +372,21 @@ func anchorAxes(axes []catalog.DiscoveryAxis) []catalog.DiscoveryAxis {
 	return nil
 }
 
+func connectionOptionHits(groups []catalog.ConnectionOptionGroup) []catalog.Hit {
+	var out []catalog.Hit
+	seen := map[string]bool{}
+	for _, group := range groups {
+		for _, hit := range group.Nodes {
+			if seen[hit.PK] {
+				continue
+			}
+			seen[hit.PK] = true
+			out = append(out, hit)
+		}
+	}
+	return out
+}
+
 // mergeBridgeAxes gives post-retrieval roles first, then fills unused slots
 // from the initial plan. Repeating a role or query cannot buy another candidate.
 func mergeBridgeAxes(primary, fallback []catalog.DiscoveryAxis, limit int) []catalog.DiscoveryAxis {
@@ -386,9 +417,9 @@ func catalogSemanticBuildCmd() *cobra.Command {
 	c := &cobra.Command{
 		Use:   "semantic-build",
 		Short: "Ollama로 전체 카탈로그 의미 벡터 인덱스 생성",
-		Long: `선택 기능입니다. Ollama 하나만 설치되어 있으면 모델 다운로드부터 전체 카탈로그
+		Long: `선택 기능입니다. Ollama 하나만 설치되어 있으면 모델 다운로드부터 카탈로그
 임베딩·로컬 캐시까지 한 번에 처리합니다. 별도 벡터 DB는 필요하지 않습니다. 카탈로그를
-sync 한 뒤 다시 실행하면 새 스냅샷에 맞춰 인덱스를 교체합니다.`,
+sync 한 뒤 다시 실행하면 변경되거나 새로 생긴 문서만 임베딩하고 기존 벡터는 재사용합니다.`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			cat, err := loadCatalog(cmd)
 			if err != nil {
@@ -402,7 +433,7 @@ sync 한 뒤 다시 실행하면 새 스냅샷에 맞춰 인덱스를 교체합�
 				}
 			}
 			start := time.Now()
-			idx, err := catalog.BuildSemanticIndex(cmd.Context(), cat, embedder, batchSize, func(done, total int) {
+			idx, stats, err := catalog.RefreshSemanticIndex(cmd.Context(), cat, embedder, batchSize, func(done, total int) {
 				fmt.Fprintf(cmd.ErrOrStderr(), "\r  의미 인덱싱… %d/%d (%.0f%%)", done, total, float64(done)*100/float64(total))
 			})
 			if err != nil {
@@ -411,8 +442,8 @@ sync 한 뒤 다시 실행하면 새 스냅샷에 맞춰 인덱스를 교체합�
 			if err := idx.Save(); err != nil {
 				return err
 			}
-			fmt.Fprintf(cmd.ErrOrStderr(), "\r의미 인덱스 %d건 저장 · 모델 %s · %.1f초\n",
-				len(idx.PKs), idx.Model, time.Since(start).Seconds())
+			fmt.Fprintf(cmd.ErrOrStderr(), "\r의미 인덱스 %d건 저장 · 재사용 %d · 새 임베딩 %d · 모델 %s · %.1f초\n",
+				len(idx.PKs), stats.Reused, stats.Embedded, idx.Model, time.Since(start).Seconds())
 			return nil
 		},
 	}
@@ -448,7 +479,7 @@ func catalogOrgsCmd() *cobra.Command {
 			if format != output.Table {
 				return output.WriteJSON(cmd.OutOrStdout(), orgs)
 			}
-			headers := []string{"API수", "활용신청 합", "제공기관"}
+			headers := []string{"데이터수", "활용신청 합", "제공기관"}
 			rows := make([][]string, 0, len(orgs))
 			for _, o := range orgs {
 				rows = append(rows, []string{fmt.Sprintf("%d", o.Count), fmt.Sprintf("%d", o.ApplySum), o.Org})
@@ -499,6 +530,8 @@ func catalogInfoCmd() *cobra.Command {
 					note = " — 포털에 명세 있음, describe/call 가능"
 				case catalog.SvcLINK:
 					note = " — 포털에 명세 없음(제공기관 사이트로 연결)"
+				case catalog.SvcFILE:
+					note = " — 로그인 없이 파일 상세·다운로드 확인 가능, call 대상 아님"
 				}
 				fmt.Fprintf(cmd.OutOrStdout(), "  %-6s %6d건%s\n", k, byType[k], note)
 			}

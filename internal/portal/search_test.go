@@ -2,11 +2,13 @@ package portal
 
 import (
 	"context"
-	"github.com/JungHoonGhae/opendatactl/internal/fetch"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strings"
 	"testing"
+
+	"github.com/JungHoonGhae/opendatactl/internal/fetch"
 )
 
 func TestSearchDatasets(t *testing.T) {
@@ -80,5 +82,30 @@ func TestSearchDatasetsMetadata(t *testing.T) {
 	}
 	if withView == 0 {
 		t.Error("조회수 not parsed for any dataset")
+	}
+}
+
+func TestSearchDatasetsDetectsFileWithAutomaticOpenAPI(t *testing.T) {
+	body := `<article class="apply-result-item">
+		<div class="apply-result-link">
+			<span class="krds-badge" data-ext="CSV">CSV</span>
+			<span class="krds-badge bg-light-primary">JSON + XML</span>
+			<a href="/data/15104801/fileData.do">장기요양기관 평가 결과</a>
+		</div>
+	</article>`
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(body))
+	}))
+	defer srv.Close()
+	datasets, err := New(fetch.New(fetch.WithDelay(0)), WithBaseURL(srv.URL)).
+		SearchDatasets(context.Background(), SearchOptions{Type: "FILE"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(datasets) != 1 || !datasets[0].HasOpenAPI {
+		t.Fatalf("automatic OpenAPI not detected: %+v", datasets)
+	}
+	if got := strings.Join(datasets[0].Formats, ","); got != "CSV,JSON,XML" {
+		t.Fatalf("formats = %q", got)
 	}
 }

@@ -459,6 +459,58 @@ func TestCatalogSearchReturnsConnectionsOnlyAfterExplicitBridgeSelection(t *test
 	}
 }
 
+func TestCatalogSearchReturnsAConnectionOptionPoolBeforeSelection(t *testing.T) {
+	isolateConfigHome(t)
+	cat := &catalog.Catalog{
+		SyncedAt: time.Now(), Type: "ALL",
+		Entries: []catalog.Entry{
+			{PK: "anchor", Title: "요양시설 매물", SvcType: catalog.SvcREST},
+			{PK: "demand-api", Title: "시군구 장기요양 인정자", SvcType: catalog.SvcREST},
+			{PK: "demand-file", Title: "시군구 고령인구 전망", SvcType: catalog.SvcFILE,
+				DataTypes: []string{"FILE", "API"}, Formats: []string{"CSV", "JSON", "XML"}},
+		},
+	}
+	if err := cat.Save(); err != nil {
+		t.Fatal(err)
+	}
+	sess := connectTestClient(t, New(Deps{Fetch: fetch.New(fetch.WithDelay(0))}))
+	res, err := sess.CallTool(context.Background(), &mcp.CallToolParams{
+		Name: "catalog_search",
+		Arguments: map[string]any{
+			"query": "요양시설 인수", "anchorPks": []string{"anchor"}, "semantic": false,
+			"axes": []map[string]any{
+				{"role": "anchor", "query": "요양시설 매물"},
+				{
+					"role": "지역 수요", "query": "시군구 장기요양 고령인구",
+					"contribution": "공급 대비 잠재 수요 비교",
+					"edge":         map[string]any{"kinds": []string{"spatial"}, "expectedKeys": []string{"시군구코드"}},
+				},
+			},
+		},
+	})
+	if err != nil || res.IsError {
+		t.Fatalf("catalog_search err=%v result=%+v", err, res)
+	}
+	raw, _ := json.Marshal(res.StructuredContent)
+	var got catalogOut
+	if err := json.Unmarshal(raw, &got); err != nil {
+		t.Fatal(err)
+	}
+	if len(got.Connections) != 0 || len(got.ConnectionOptions) != 1 || len(got.ConnectionOptions[0].Nodes) != 2 {
+		t.Fatalf("options=%+v connections=%+v", got.ConnectionOptions, got.Connections)
+	}
+	var fileNode *catalog.Hit
+	for i := range got.ConnectionOptions[0].Nodes {
+		if got.ConnectionOptions[0].Nodes[i].PK == "demand-file" {
+			fileNode = &got.ConnectionOptions[0].Nodes[i]
+		}
+	}
+	if fileNode == nil || fileNode.NextAction != "inspect_file_api_contract" || fileNode.DetailURL == "" ||
+		strings.Join(fileNode.DataTypes, ",") != "FILE,API" || strings.Join(fileNode.Formats, ",") != "CSV,JSON,XML" {
+		t.Fatalf("FILE handoff = %+v", fileNode)
+	}
+}
+
 func TestDiscoveryAndProfileInputBoundsFailBeforeIO(t *testing.T) {
 	sess := connectTestClient(t, New(Deps{Fetch: fetch.New(fetch.WithDelay(0))}))
 	manyAxes := make([]map[string]any, 9)
