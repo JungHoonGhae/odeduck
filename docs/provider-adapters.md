@@ -1,7 +1,7 @@
 # LINK provider adapter guide
 
 `data.go.kr`의 LINK 데이터셋은 포털 바깥의 서로 다른 API 계약으로 연결된다.
-OpenDataCTL은 provider마다 MCP tool을 추가하지 않고
+oddsock은 provider마다 MCP tool을 추가하지 않고
 `catalog_search → inspect_dataset → call_api` 세 진입점 안에서 provider별 차이를 격리한다.
 `describe_api`는 기존 API-only 클라이언트를 위한 호환 도구다.
 
@@ -76,11 +76,11 @@ request를 만든다. [`DatasetCaller`](../internal/apicall/dataset_caller.go)�
 provider key는 별도 namespace에 저장한다.
 
 ```bash
-opendatactl provider-key set safetykorea
-opendatactl provider-key set foodsafetykorea
-opendatactl provider-key set vworld --domain https://example.com/map
-opendatactl provider-key status
-opendatactl provider-key delete vworld
+oddsock provider-key set safetykorea
+oddsock provider-key set foodsafetykorea
+oddsock provider-key set vworld --domain https://example.com/map
+oddsock provider-key status
+oddsock provider-key delete vworld
 ```
 
 비밀값은 command argument나 MCP payload로 받지 않는다. config directory의 제한된 하위에
@@ -109,7 +109,7 @@ DACL) exact credential scope에서만 읽는다. `logout`은 현재·호환 conf
    이 store inventory에서 자동 생성된다.
 7. header/query/path credential 각각에 대해 redirect rejection과 raw/query/path-escaped redaction을
    public seam에서 테스트한다. response size와 timeout도 제한한다.
-8. MCP JSON round-trip, `go test ./...`, `opendatactl doctor --adapters-only`와 고정 자연어 검색
+8. MCP JSON round-trip, `go test ./...`, `oddsock doctor --adapters-only`와 고정 자연어 검색
    시나리오를 통과시킨다.
 
 ## 언제 inspector가 필요한가
@@ -130,7 +130,7 @@ provider는 일반 parser template의 범위를 벗어나므로 별도 ADR과 �
 
 세 숫자는 의미가 다르다.
 
-- OpenDataCTL SemVer: 공개 CLI/MCP 호환성과 릴리즈 버전
+- oddsock SemVer: 공개 CLI/MCP 호환성과 릴리즈 버전
 - `adapterRevision`: matcher, family, auth scope, operation 계약이 바뀔 때 올리는 정수
 - `documentationVersion`: provider가 게시한 문서 버전(없으면 비워 둠)
 
@@ -138,7 +138,7 @@ provider는 일반 parser template의 범위를 벗어나므로 별도 ADR과 �
 URL·adapter 해석이 달라지면 doctor가 exit 1을 반환한다.
 
 ```bash
-opendatactl doctor --adapters-only -f table
+oddsock doctor --adapters-only -f table
 ```
 
 매주 [LINK adapter drift workflow](../.github/workflows/adapter-drift.yml)가 같은 검사를 실행한다.

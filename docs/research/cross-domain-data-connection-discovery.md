@@ -6,7 +6,7 @@
 
 결론은 **전체 데이터셋의 의미 유사도**와 **두 데이터셋을 잇는 Connection Edge**를 분리해야 한다는 것이다. 교차 분야 연결은 두 노드의 주제가 비슷해서가 아니라, 좁은 엔티티·공간·시간 키를 공유하면서 서로 다른 속성이나 역할을 제공할 때 생긴다. 따라서 semantic similarity는 후보 회수 신호일 뿐이고, Verified Connection은 방향성 있는 값 포함률, 키 의미, 공간·시간 grain, cardinality와 실제 표본 join을 모두 통과해야 한다.
 
-OpenDataCTL의 약 1.2만 카탈로그에는 외부 vector DB나 전역 all-pairs 그래프가 필요하지 않다. 현재의 모델 계획 + 결정적 로컬 검색으로 역할별 후보를 좁힌 뒤, 소수 후보만 `describe_api`와 `call_api`로 검증하는 bounded cascade가 맞다. 다만 현재 카탈로그에는 출력 column과 값 profile이 없으므로, **카탈로그만 보고 `structurally_verified` 또는 `sample_verified`라고 부르는 것은 불가능**하다. 이 증거가 없으면 `candidate` 또는 `blocked`로 남기고 Abstention해야 한다.
+oddsock의 약 1.2만 카탈로그에는 외부 vector DB나 전역 all-pairs 그래프가 필요하지 않다. 현재의 모델 계획 + 결정적 로컬 검색으로 역할별 후보를 좁힌 뒤, 소수 후보만 `describe_api`와 `call_api`로 검증하는 bounded cascade가 맞다. 다만 현재 카탈로그에는 출력 column과 값 profile이 없으므로, **카탈로그만 보고 `structurally_verified` 또는 `sample_verified`라고 부르는 것은 불가능**하다. 이 증거가 없으면 `candidate` 또는 `blocked`로 남기고 Abstention해야 한다.
 
 ## 1. 문헌에서 반복되는 발견 원리
 
@@ -20,7 +20,7 @@ OpenDataCTL의 약 1.2만 카탈로그에는 외부 vector DB나 전역 all-pair
 
 SANTOS 자체는 table union search이므로 이 신호를 join validity 증명으로 전용할 수는 없다. 여기서 가져올 수 있는 것은 column 하나의 유사도보다 **관계의 문맥**을 함께 보라는 후보 생성 원리뿐이다.
 
-이 세 결과를 OpenDataCTL 언어로 옮기면 다음과 같다.
+이 세 결과를 oddsock 언어로 옮기면 다음과 같다.
 
 - semantic similarity와 schema-name similarity는 Data Node 회수에 쓴다.
 - Connection Edge 후보는 별도로 만들며, edge 종류를 `entity`, `spatial`, `temporal`, `proxy`로 명시한다.
@@ -34,7 +34,7 @@ SANTOS 자체는 table union search이므로 이 신호를 join validity 증명�
 
 [Juneau](https://www.cis.upenn.edu/~zives/research/Finding_Related_Tables_in_Data_Lakes_for_Interactive_Data_Science.pdf)는 search task별 relatedness를 다르게 정의한다. linkable-data 검색에서는 key/FK 관계와 row overlap을 찾고, feature-extraction 검색에서는 row overlap과 **new column rate**를 함께 본다. 평가에서 keyword search와 단순 LSH는 겹치는 내용만 돌려주어 complementary data가 있는 joinable result를 top-k에 내지 못했지만, relation mapping·profile·provenance를 조합한 Juneau는 의미 있는 linkable table을 반환했다.
 
-따라서 OpenDataCTL의 complementarity는 별도 gate여야 한다.
+따라서 oddsock의 complementarity는 별도 gate여야 한다.
 
 1. 적어도 하나의 유효한 Connection Edge가 있다.
 2. Bridge Node에는 Anchor Node에 없는 측정값·제약·선행/결과 신호·공급/수요 관점이 있다.
@@ -55,7 +55,7 @@ SANTOS 자체는 table union search이므로 이 신호를 join validity 증명�
 - exact equality인지, normalization인지, crosswalk·집계·근접 매칭을 쓰는 proxy인지
 - proxy라면 변환식, 정보 손실, 예상 cardinality와 검증 방법
 
-D3L의 name/value/format/embedding/distribution 결합과 Juneau의 type·unique values·range·pattern을 쓰는 data profile은 서로 다른 표기와 결측 metadata를 견디기 위한 **후보 신호**다. 반면 SANTOS의 intent-rooted relationship match는 개별 column type이 우연히 같은 false positive를 줄이는 정밀 신호다. OpenDataCTL에서도 “field 이름이 비슷함”과 “같은 code system임”을 서로 다른 evidence로 보존해야 한다.
+D3L의 name/value/format/embedding/distribution 결합과 Juneau의 type·unique values·range·pattern을 쓰는 data profile은 서로 다른 표기와 결측 metadata를 견디기 위한 **후보 신호**다. 반면 SANTOS의 intent-rooted relationship match는 개별 column type이 우연히 같은 false positive를 줄이는 정밀 신호다. oddsock에서도 “field 이름이 비슷함”과 “같은 code system임”을 서로 다른 evidence로 보존해야 한다.
 
 ### 2.2 inclusion dependency와 값 overlap
 
@@ -74,7 +74,7 @@ JOSIE가 강조하듯 join으로 실제 매치되는 distinct key 수인 interse
 K(A,B)=\frac{\min(|A|,|B|)}{\max(|A|,|B|)}
 \]
 
-OpenDataCTL은 이 값을 hard truth로 쓰기보다, containment가 높은데 $K$가 극단적으로 낮은 후보를 정밀 검증 대상으로 내리거나 거부하는 guard로 써야 한다. 고유 ID의 정상적인 PK→FK 관계도 양쪽 row 수는 크게 다를 수 있으므로 아래 중복·방향성 지표와 함께 해석해야 한다.
+oddsock은 이 값을 hard truth로 쓰기보다, containment가 높은데 $K$가 극단적으로 낮은 후보를 정밀 검증 대상으로 내리거나 거부하는 guard로 써야 한다. 고유 ID의 정상적인 PK→FK 관계도 양쪽 row 수는 크게 다를 수 있으므로 아래 중복·방향성 지표와 함께 해석해야 한다.
 
 ### 2.3 cardinality와 join 폭증
 
@@ -105,7 +105,7 @@ extent가 겹치지 않으면 reject한다. 같은 grain이거나 공식 crosswa
 
 ## 3. 조합 폭발을 막는 cascade
 
-Aurum은 “한 번 profile → LSH 후보 → 후보 관계 판정”의 two-step build로 all-pairs를 피한다. JOSIE는 inverted index에서 top-k의 현재 k번째 overlap을 threshold로 삼아, 그 점수를 이길 수 없는 posting list와 candidate를 prefix/position bound로 잘라낸다. Juneau는 cheap하고 selective한 description/provenance/profile 신호로 후보를 먼저 줄이고, 비싼 relation mapping과 값 비교를 남은 후보에만 적용한다. 이 공통 구조에서 도출되는 OpenDataCTL용 설계는 다음과 같다.
+Aurum은 “한 번 profile → LSH 후보 → 후보 관계 판정”의 two-step build로 all-pairs를 피한다. JOSIE는 inverted index에서 top-k의 현재 k번째 overlap을 threshold로 삼아, 그 점수를 이길 수 없는 posting list와 candidate를 prefix/position bound로 잘라낸다. Juneau는 cheap하고 selective한 description/provenance/profile 신호로 후보를 먼저 줄이고, 비싼 relation mapping과 값 비교를 남은 후보에만 적용한다. 이 공통 구조에서 도출되는 oddsock용 설계는 다음과 같다.
 
 | 단계 | 하는 일 | 통과 조건 | 시작 예산 |
 |---|---|---|---|
@@ -147,7 +147,7 @@ live API의 첫 페이지는 기간·지역이 달라 overlap을 과소평가할
 
 평가자는 카드별 precision과 query별 best-of-three를 함께 보아야 한다. 최고 카드 하나만 보고 나머지 억지 카드를 숨기면 안 된다. 0–3 순서형 평정은 weighted kappa 또는 ICC로 합의를 보고, 개선은 동일 query의 paired delta로 비교한다. no-connection 반례, 같은 주제지만 join 불가능한 hard negative, 값 일부만 우연히 겹치는 hard negative를 반드시 포함한다.
 
-## 5. OpenDataCTL에서 가능한 것과 불가능한 것
+## 5. oddsock에서 가능한 것과 불가능한 것
 
 ### 지금 가능한 최소 메커니즘
 
@@ -172,7 +172,7 @@ v1은 다음 범위가 현실적이다.
 - 표본이 아닌 전체 모집단의 IND, match rate, cardinality와 결측률 보장
 - task 없는 조합의 사업 성과·인과관계 자동 판정
 
-SANTOS의 약 1.1만 **실제 표** 실험은 규모 자체는 다룰 수 있음을 보여주지만, synthesized KB를 만드는 데 cell values와 FD mining이 필요했고 큰 benchmark의 index는 수 시간과 수 GB를 사용했다. OpenDataCTL의 1.2만 항목은 동일한 1.2만 표가 아니라 metadata/API entry이며, 상당수는 승인 전 값을 읽을 수 없다. 따라서 SANTOS식 전역 relationship graph를 지금 흉내 내면 근거 없는 graph가 된다.
+SANTOS의 약 1.1만 **실제 표** 실험은 규모 자체는 다룰 수 있음을 보여주지만, synthesized KB를 만드는 데 cell values와 FD mining이 필요했고 큰 benchmark의 index는 수 시간과 수 GB를 사용했다. oddsock의 1.2만 항목은 동일한 1.2만 표가 아니라 metadata/API entry이며, 상당수는 승인 전 값을 읽을 수 없다. 따라서 SANTOS식 전역 relationship graph를 지금 흉내 내면 근거 없는 graph가 된다.
 
 ### 나중에 추가할 수 있는 로컬 profile
 
@@ -182,7 +182,7 @@ SANTOS의 약 1.1만 **실제 표** 실험은 규모 자체는 다룰 수 있음
 
 ## 결정
 
-OpenDataCTL은 **semantic-neighbor recommender나 all-pairs join graph를 만들지 않는다.** 현재 구조 위에 역할 기반 후보 생성 → edge별 schema/grain/cardinality gate → 공통 slice의 실제 sample join → usefulness 평가 순서의 bounded cascade를 명세한다.
+oddsock은 **semantic-neighbor recommender나 all-pairs join graph를 만들지 않는다.** 현재 구조 위에 역할 기반 후보 생성 → edge별 schema/grain/cardinality gate → 공통 slice의 실제 sample join → usefulness 평가 순서의 bounded cascade를 명세한다.
 
 가장 중요한 제품 규칙은 다음 세 가지다.
 

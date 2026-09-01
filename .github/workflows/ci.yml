@@ -39,7 +39,7 @@ jobs:
         run: |
           mkdir -p release-assets
           printf '%s' '{"syncedAt":"2026-09-01T00:00:00Z","type":"ALL","source":"official","entries":[{"pk":"15000001","title":"CI packaging fixture","svcType":"FILE","dataTypes":["FILE"]}]}' \
-            | gzip -n -9 > release-assets/opendatactl-catalog.json.gz
+            | gzip -n -9 > release-assets/oddsock-catalog.json.gz
 
       - name: Verify release packaging
         uses: goreleaser/goreleaser-action@v7
@@ -51,24 +51,33 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          archive="$(find dist -maxdepth 1 -name 'opendatactl_*_linux_amd64.tar.gz' -print -quit)"
+          archive="$(find dist -maxdepth 1 -name 'oddsock_*_linux_amd64.tar.gz' -print -quit)"
           test -n "$archive"
           archive_entries="$(tar -tzf "$archive")"
+          grep -qx 'oddsock' <<<"$archive_entries"
           grep -qx 'opendatactl' <<<"$archive_entries"
           grep -qx 'gongctl' <<<"$archive_entries"
 
           extract_dir="$(mktemp -d)"
           trap 'rm -rf "$extract_dir"' EXIT
           tar -xzf "$archive" -C "$extract_dir"
+          "$extract_dir/oddsock" version | grep -q '^oddsock '
           "$extract_dir/opendatactl" version | grep -q '^opendatactl '
           "$extract_dir/gongctl" version | grep -q '^gongctl '
+          "$extract_dir/oddsock" --help | grep -q '^  oddsock '
           "$extract_dir/opendatactl" --help | grep -q '^  opendatactl '
           "$extract_dir/gongctl" --help | grep -q '^  gongctl '
 
-          legacy_archive="$(find dist -maxdepth 1 -name 'gongctl_*_linux_amd64.tar.gz' -print -quit)"
-          test -n "$legacy_archive"
-          legacy_entries="$(tar -tzf "$legacy_archive")"
-          grep -qx 'gongctl' <<<"$legacy_entries"
+          former_archive="$(find dist -maxdepth 1 -name 'opendatactl_*_linux_amd64.tar.gz' -print -quit)"
+          test -n "$former_archive"
+          former_entries="$(tar -tzf "$former_archive")"
+          grep -qx 'opendatactl' <<<"$former_entries"
+          grep -qx 'gongctl' <<<"$former_entries"
+
+          oldest_archive="$(find dist -maxdepth 1 -name 'gongctl_*_linux_amd64.tar.gz' -print -quit)"
+          test -n "$oldest_archive"
+          oldest_entries="$(tar -tzf "$oldest_archive")"
+          grep -qx 'gongctl' <<<"$oldest_entries"
 
   windows-installer:
     runs-on: windows-latest

@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/JungHoonGhae/opendatactl/internal/fetch"
+	"github.com/JungHoonGhae/oddsock/internal/fetch"
 )
 
 type externalRoundTripFunc func(*http.Request) (*http.Response, error)

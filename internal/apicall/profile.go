@@ -16,7 +16,7 @@ const (
 
 // SampleProfile describes key evidence inside one bounded call response. It is
 // intentionally per-response and stateless: callers compare two profiles from
-// two call_api invocations without opendatactl retaining public response data.
+// two call_api invocations without oddsock retaining public response data.
 type SampleProfile struct {
 	Fields []FieldProfile `json:"fields"`
 }

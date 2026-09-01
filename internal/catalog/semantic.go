@@ -19,7 +19,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/JungHoonGhae/opendatactl/internal/portal"
+	"github.com/JungHoonGhae/oddsock/internal/portal"
 )
 
 const (
@@ -34,11 +34,14 @@ const (
 	maxSemanticDimensions = 8_192
 )
 
-// OllamaURLFromEnv returns the renamed environment setting while preserving the
-// v0.8 variable during the command compatibility window.
+// OllamaURLFromEnv returns the canonical setting while preserving both former
+// names during the command compatibility window.
 func OllamaURLFromEnv() string {
-	if current := strings.TrimSpace(os.Getenv("OPENDATACTL_OLLAMA_URL")); current != "" {
+	if current := strings.TrimSpace(os.Getenv("ODDSOCK_OLLAMA_URL")); current != "" {
 		return current
+	}
+	if former := strings.TrimSpace(os.Getenv("OPENDATACTL_OLLAMA_URL")); former != "" {
+		return former
 	}
 	return strings.TrimSpace(os.Getenv("GONGCTL_OLLAMA_URL"))
 }

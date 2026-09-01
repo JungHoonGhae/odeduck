@@ -7,7 +7,7 @@ date: 2026-09-01
 
 ## Context
 
-OpenDataCTL originally synced only data.go.kr OpenAPI entries. That kept every
+oddsock originally synced only data.go.kr OpenAPI entries. That kept every
 search hit close to `inspect_dataset → call_api`, but excluded file datasets that
 can provide the other half of a valuable cross-domain comparison. The existing
 connection workflow also returned at most three final cards. That precision

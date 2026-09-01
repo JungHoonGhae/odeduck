@@ -1,5 +1,5 @@
 // Package fetch is the one throttled HTTP transport for every data.go.kr
-// request opendatactl makes over plain HTTP — dataset search and OpenAPI describe
+// request oddsock makes over plain HTTP — dataset search and OpenAPI describe
 // (www.data.go.kr) and authenticated call (apis.data.go.kr). It hides the
 // User-Agent, timeout, rate-limit throttle, and document status-gating +
 // goquery parsing behind a small interface, so callers keep only their
@@ -22,8 +22,8 @@ import (
 	"github.com/PuerkitoBio/goquery"
 )
 
-// DefaultUserAgent identifies opendatactl honestly to the server operator.
-const DefaultUserAgent = "opendatactl (+https://github.com/JungHoonGhae/opendatactl)"
+// DefaultUserAgent identifies oddsock honestly to the server operator.
+const DefaultUserAgent = "oddsock (+https://github.com/JungHoonGhae/oddsock)"
 
 // DefaultDelay is the minimum spacing between requests (politeness throttle).
 const DefaultDelay = 700 * time.Millisecond
@@ -61,7 +61,7 @@ type StreamResponse struct {
 }
 
 // Client is a rate-limited, host-agnostic HTTP transport. A single Client
-// shared across search/describe/call gives all of opendatactl's data.go.kr traffic
+// shared across search/describe/call gives all of oddsock's data.go.kr traffic
 // one throttle. Safe for concurrent use.
 type Client struct {
 	userAgent     string

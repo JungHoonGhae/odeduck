@@ -15,8 +15,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/JungHoonGhae/opendatactl/internal/fetch"
-	"github.com/JungHoonGhae/opendatactl/internal/portal"
+	"github.com/JungHoonGhae/oddsock/internal/fetch"
+	"github.com/JungHoonGhae/oddsock/internal/portal"
 )
 
 type officialHTTPFunc func(context.Context, string, http.Header) (*fetch.Response, error)

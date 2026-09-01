@@ -21,7 +21,7 @@ var BaseURL = "https://www.data.go.kr"
 const LoginTimeout = 5 * time.Minute
 
 // Login ensures a live, authenticated browser session exists. It launches (or
-// reuses) opendatactl's detached Chrome, opens the login page, and waits until the
+// reuses) oddsock's detached Chrome, opens the login page, and waits until the
 // session can actually load an authenticated page. The browser is left running
 // so later commands re-attach to it. progress receives status lines (may be nil).
 func Login(ctx context.Context, progress io.Writer, keepBrowser bool) error {
@@ -136,7 +136,7 @@ func Login(ctx context.Context, progress io.Writer, keepBrowser bool) error {
 // the window off the user's screen once its cookies have been copied out.
 //
 // It sends the CDP Browser.close command rather than cancelling the chromedp
-// context: with a RemoteAllocator opendatactl only ATTACHED to this browser, so
+// context: with a RemoteAllocator oddsock only ATTACHED to this browser, so
 // cancelling merely detaches and leaves the window on screen (the bug the old
 // Logout shipped).
 func closeBrowser(ctx context.Context, st *daemonState) {

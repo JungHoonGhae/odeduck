@@ -1,4 +1,4 @@
-module github.com/JungHoonGhae/opendatactl
+module github.com/JungHoonGhae/oddsock
 
 go 1.26.6
 

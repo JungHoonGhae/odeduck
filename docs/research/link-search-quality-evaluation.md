@@ -49,10 +49,10 @@ REST-only 검색은 정확히 일치하는 LINK가 제거된 뒤 일부 단어�
 
 ```bash
 # 변경된 기본 경로
-opendatactl catalog search "주소 지오코딩 좌표" --limit 10 -f json
+oddsock catalog search "주소 지오코딩 좌표" --limit 10 -f json
 
 # 이전 기본 경로 재현
-opendatactl catalog search "주소 지오코딩 좌표" --limit 10 --rest-only -f json
+oddsock catalog search "주소 지오코딩 좌표" --limit 10 --rest-only -f json
 ```
 
 ## 상위 수요 LINK 50건의 실제 진행 가능 상태
@@ -92,7 +92,7 @@ SafetyKorea는 상위 50 표본 밖이지만 별도로 5개 operation이 구현�
 
 ```text
 SafetyKorea credential을 얻지 못했습니다: ...
-`opendatactl provider-key set safetykorea` ...
+`oddsock provider-key set safetykorea` ...
 
 Seoul Open Data Plaza 호출은 credential을 보호할 HTTPS endpoint가 없어 차단되었습니다
 ```

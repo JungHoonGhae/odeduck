@@ -1,4 +1,4 @@
-# OpenDataCTL 에이전트 기회 발견 — 60초 홍보 영상
+# oddsock 에이전트 기회 발견 — 60초 홍보 영상
 
 ## Production
 
@@ -23,7 +23,7 @@
 
 ### Block 3
 
-OpenDataCTL은 AI와 공공데이터포털을 이어주는 MCP 도구입니다. 필요한 정보를 평소 말하듯 물어보면 됩니다.
+oddsock은 AI와 공공데이터포털을 이어주는 MCP 도구입니다. 필요한 정보를 평소 말하듯 물어보면 됩니다.
 
 ### Block 4
 

@@ -10,7 +10,7 @@ import (
 
 const sessionLockFile = "datagokr-session.lock"
 
-// acquireSessionFileLock prevents separate opendatactl processes from consuming the
+// acquireSessionFileLock prevents separate oddsock processes from consuming the
 // same rotating cookie concurrently. The lock file contains no credentials and
 // intentionally remains after release; removing a lock path while another
 // process is waiting on its inode can split future callers across two locks.

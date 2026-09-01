@@ -20,7 +20,7 @@ func isolatedUserConfigDir(t *testing.T) string {
 	return dir
 }
 
-func TestConfigDirUsesOpenDataCTLForFreshInstall(t *testing.T) {
+func TestConfigDirUsesOddsockForFreshInstall(t *testing.T) {
 	configHome := isolatedUserConfigDir(t)
 
 	got, err := configDir()
@@ -33,26 +33,30 @@ func TestConfigDirUsesOpenDataCTLForFreshInstall(t *testing.T) {
 	}
 }
 
-func TestConfigDirReusesLegacyGongCTLDirectory(t *testing.T) {
-	configHome := isolatedUserConfigDir(t)
-	legacy := filepath.Join(configHome, legacyConfigDirName)
-	if err := os.MkdirAll(legacy, 0o700); err != nil {
-		t.Fatal(err)
-	}
+func TestConfigDirReusesCompatibilityDirectories(t *testing.T) {
+	for _, name := range compatibilityConfigDirNames {
+		t.Run(name, func(t *testing.T) {
+			configHome := isolatedUserConfigDir(t)
+			legacy := filepath.Join(configHome, name)
+			if err := os.MkdirAll(legacy, 0o700); err != nil {
+				t.Fatal(err)
+			}
 
-	got, err := configDir()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got != legacy {
-		t.Fatalf("configDir() = %q, want legacy directory %q", got, legacy)
+			got, err := configDir()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got != legacy {
+				t.Fatalf("configDir() = %q, want compatibility directory %q", got, legacy)
+			}
+		})
 	}
 }
 
-func TestConfigDirPrefersOpenDataCTLWhenBothExist(t *testing.T) {
+func TestConfigDirPrefersOddsockWhenBothExist(t *testing.T) {
 	configHome := isolatedUserConfigDir(t)
 	current := filepath.Join(configHome, configDirName)
-	legacy := filepath.Join(configHome, legacyConfigDirName)
+	legacy := filepath.Join(configHome, compatibilityConfigDirNames[0])
 	for _, dir := range []string{legacy, current} {
 		if err := os.MkdirAll(dir, 0o700); err != nil {
 			t.Fatal(err)
@@ -71,7 +75,7 @@ func TestConfigDirPrefersOpenDataCTLWhenBothExist(t *testing.T) {
 func TestConfigDirUsesPopulatedLegacyWhenCurrentIsEmpty(t *testing.T) {
 	configHome := isolatedUserConfigDir(t)
 	current := filepath.Join(configHome, configDirName)
-	legacy := filepath.Join(configHome, legacyConfigDirName)
+	legacy := filepath.Join(configHome, compatibilityConfigDirNames[0])
 	for _, dir := range []string{legacy, current} {
 		if err := os.MkdirAll(dir, 0o700); err != nil {
 			t.Fatal(err)
@@ -93,7 +97,7 @@ func TestConfigDirUsesPopulatedLegacyWhenCurrentIsEmpty(t *testing.T) {
 func TestConfigDirPrefersLegacyCredentialsOverCurrentPublicCatalog(t *testing.T) {
 	configHome := isolatedUserConfigDir(t)
 	current := filepath.Join(configHome, configDirName)
-	legacy := filepath.Join(configHome, legacyConfigDirName)
+	legacy := filepath.Join(configHome, compatibilityConfigDirNames[0])
 	for _, dir := range []string{legacy, current} {
 		if err := os.MkdirAll(dir, 0o700); err != nil {
 			t.Fatal(err)
@@ -118,7 +122,7 @@ func TestConfigDirPrefersLegacyCredentialsOverCurrentPublicCatalog(t *testing.T)
 func TestConfigDirPrefersLegacySessionOverCurrentBrowserResidue(t *testing.T) {
 	configHome := isolatedUserConfigDir(t)
 	current := filepath.Join(configHome, configDirName)
-	legacy := filepath.Join(configHome, legacyConfigDirName)
+	legacy := filepath.Join(configHome, compatibilityConfigDirNames[0])
 	for _, dir := range []string{legacy, filepath.Join(current, "chrome-profile")} {
 		if err := os.MkdirAll(dir, 0o700); err != nil {
 			t.Fatal(err)

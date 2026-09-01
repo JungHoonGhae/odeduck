@@ -42,7 +42,7 @@
 ```text
 의미 인덱스 95951건 저장 · 1064.1초
 wall time 1064.54초
-OpenDataCTL maximum resident set size 약 2.53GiB
+oddsock maximum resident set size 약 2.53GiB
 관찰된 Ollama llama-server RSS 약 1.57GiB
 ```
 
@@ -179,15 +179,15 @@ Recall/nDCG 평가 대상으로 둔다. 이번 결과는 벡터가 표현 기반
 ## 재현 명령
 
 ```bash
-opendatactl catalog sync --type ALL --per-page 200
-opendatactl catalog semantic-build --pull=false --batch-size 32
+oddsock catalog sync --type ALL --per-page 200
+oddsock catalog semantic-build --pull=false --batch-size 32
 
-opendatactl catalog search "시세보다 싸게 살 수 있는 물건을 찾아 투자하고 싶어" \
+oddsock catalog search "시세보다 싸게 살 수 있는 물건을 찾아 투자하고 싶어" \
   --limit 10 --semantic=false --format json
-opendatactl catalog search "시세보다 싸게 살 수 있는 물건을 찾아 투자하고 싶어" \
+oddsock catalog search "시세보다 싸게 살 수 있는 물건을 찾아 투자하고 싶어" \
   --limit 10 --semantic=true --format json
 
-opendatactl catalog search "비가 많이 오면 매출이 떨어질 업종과 지역을 찾고 싶어" \
+oddsock catalog search "비가 많이 오면 매출이 떨어질 업종과 지역을 찾고 싶어" \
   --limit 12 --concept "강수량 기상 관측" --concept "업종별 지역 매출" \
   --semantic=true --format json
 ```
