@@ -46,6 +46,8 @@ section matching a `vX.Y.Z` tag as the GitHub release notes.
 - FILE observation streams GET and POST assets through bounded temporary files,
   avoiding the ordinary 32 MiB in-memory response limit while retaining archive
   entry, expanded-size and total-download guards.
+- Composite snapshot builds retry bounded transient network timeouts at each
+  source while parser/schema drift still fails immediately and loudly.
 
 ### Safety
 
