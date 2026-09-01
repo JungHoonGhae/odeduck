@@ -33,9 +33,9 @@ func TestCredentialFileDACLAllowsOnlyCurrentUserAndSystem(t *testing.T) {
 	if control&windows.SE_DACL_PROTECTED == 0 {
 		t.Fatal("credential DACL still inherits broader parent permissions")
 	}
-	dacl, present, err := descriptor.DACL()
-	if err != nil || !present || dacl == nil {
-		t.Fatalf("credential DACL missing: present=%v error=%v", present, err)
+	dacl, _, err := descriptor.DACL()
+	if err != nil || dacl == nil {
+		t.Fatalf("credential DACL missing: error=%v", err)
 	}
 	user, err := windows.GetCurrentProcessToken().GetTokenUser()
 	if err != nil {

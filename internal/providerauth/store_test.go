@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -58,7 +59,9 @@ func TestCredentialLifecycleIsScopedAndNeverListed(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if info.Mode().Perm() != 0o600 {
+	// Windows reports synthesized POSIX mode bits; its real boundary is the
+	// protected DACL covered by store_windows_test.go.
+	if runtime.GOOS != "windows" && info.Mode().Perm() != 0o600 {
 		t.Fatalf("credential mode = %o, want 600", info.Mode().Perm())
 	}
 
