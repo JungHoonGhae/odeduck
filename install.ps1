@@ -1,6 +1,7 @@
 # opendatactl installer (Windows PowerShell)
 #
-#   irm https://raw.githubusercontent.com/JungHoonGhae/opendatactl/main/install.ps1 | iex
+#   (& gh api -H "Accept: application/vnd.github.raw+json" repos/JungHoonGhae/opendatactl/contents/install.ps1) |
+#     Out-String | Invoke-Expression
 #
 # Environment variables:
 #   $env:OPENDATACTL_VERSION  pin a version (e.g. v0.4.0, default: latest)
@@ -30,11 +31,15 @@ $Arch = switch ((Get-CimInstance Win32_Processor).Architecture) {
     default { "amd64" }
 }
 
-# Resolve the latest tag from the releases/latest redirect (no API rate limit).
 $Version = if ($env:OPENDATACTL_VERSION) { $env:OPENDATACTL_VERSION } else { $env:GONGCTL_VERSION }
 if (-not $Version) {
-    $resp = Invoke-WebRequest -Uri "https://github.com/$Repo/releases/latest" -MaximumRedirection 0 -SkipHttpErrorCheck -ErrorAction SilentlyContinue
-    $Version = ($resp.Headers.Location | Select-Object -First 1) -replace ".*/tag/", ""
+    if (Get-Command gh -ErrorAction SilentlyContinue) {
+        $Version = ((& gh release view --repo $Repo --json tagName) | ConvertFrom-Json).tagName
+    }
+    else {
+        $resp = Invoke-WebRequest -Uri "https://github.com/$Repo/releases/latest" -MaximumRedirection 0 -SkipHttpErrorCheck -ErrorAction SilentlyContinue
+        $Version = ($resp.Headers.Location | Select-Object -First 1) -replace ".*/tag/", ""
+    }
 }
 if (-not $Version) { throw "Could not resolve latest version." }
 $VerNoV = $Version.TrimStart("v")
@@ -48,19 +53,37 @@ New-Item -ItemType Directory -Path $Tmp | Out-Null
 try {
     $Zip = Join-Path $Tmp $Asset
     try {
-        Invoke-WebRequest -Uri $Url -OutFile $Zip
+        if (Get-Command gh -ErrorAction SilentlyContinue) {
+            & gh release download $Version --repo $Repo --pattern $Asset --dir $Tmp --clobber
+            if ($LASTEXITCODE -ne 0) { throw "gh release download failed" }
+        }
+        else {
+            Invoke-WebRequest -Uri $Url -OutFile $Zip
+        }
     }
     catch {
         # Pinned pre-rename releases only contain gongctl_* archives.
         $Asset = "gongctl_${VerNoV}_windows_${Arch}.zip"
         $Url = "https://github.com/$Repo/releases/download/$Version/$Asset"
         $Zip = Join-Path $Tmp $Asset
-        Invoke-WebRequest -Uri $Url -OutFile $Zip
+        if (Get-Command gh -ErrorAction SilentlyContinue) {
+            & gh release download $Version --repo $Repo --pattern $Asset --dir $Tmp --clobber
+            if ($LASTEXITCODE -ne 0) { throw "gh release download failed" }
+        }
+        else {
+            Invoke-WebRequest -Uri $Url -OutFile $Zip
+        }
     }
 
     # Verify against checksums.txt from the same release.
     $ChecksumFile = Join-Path $Tmp "checksums.txt"
-    Invoke-WebRequest -Uri "https://github.com/$Repo/releases/download/$Version/checksums.txt" -OutFile $ChecksumFile
+    if (Get-Command gh -ErrorAction SilentlyContinue) {
+        & gh release download $Version --repo $Repo --pattern "checksums.txt" --dir $Tmp --clobber
+        if ($LASTEXITCODE -ne 0) { throw "gh checksum download failed" }
+    }
+    else {
+        Invoke-WebRequest -Uri "https://github.com/$Repo/releases/download/$Version/checksums.txt" -OutFile $ChecksumFile
+    }
     $Expected = (Select-String -Path $ChecksumFile -Pattern ([regex]::Escape($Asset))).Line.Split(" ")[0]
     $Actual = (Get-FileHash -Algorithm SHA256 -Path $Zip).Hash.ToLower()
     if ($Expected -ne $Actual) { throw "Checksum mismatch for $Asset" }

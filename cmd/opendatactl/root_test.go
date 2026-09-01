@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -19,6 +21,45 @@ func TestRootCommandPresentsOpenDataCTLBrand(t *testing.T) {
 	}
 	if !strings.Contains(rootCmd.Long, "OpenDataCTL") {
 		t.Fatalf("root command does not present the product brand: %q", rootCmd.Long)
+	}
+}
+
+func TestCatalogSearchKeepsLinkDatasetsDiscoverableByDefault(t *testing.T) {
+	cmd := catalogQueryCmd(false)
+	flag := cmd.Flags().Lookup("rest-only")
+	if flag == nil {
+		t.Fatal("catalog search is missing --rest-only")
+	}
+	if flag.DefValue != "false" {
+		t.Fatalf("--rest-only default = %q, want false so LINK datasets are not buried", flag.DefValue)
+	}
+}
+
+func TestApplyCommandRejectsLinkAndSurfacesProviderApplication(t *testing.T) {
+	const pk = "15116894"
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/data/" + pk + "/openapi.do":
+			_, _ = w.Write([]byte(`<ul><li><strong class="key">API 유형</strong><div class="value">LINK</div></li></ul>`))
+		case "/tcs/dss/selectApiLinkUrl.do":
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"linkUrl":"https://www.safetykorea.kr/release/openapi","status":true}`))
+		default:
+			t.Fatalf("unexpected request before LINK apply rejection: %s", r.URL)
+		}
+	}))
+	defer srv.Close()
+
+	oldBase := flagBaseURL
+	flagBaseURL = srv.URL
+	t.Cleanup(func() { flagBaseURL = oldBase })
+	cmd := applyCmd()
+	cmd.SetArgs([]string{pk, "--purpose", "제품 안전 분석", "--category", "research", "--yes"})
+	cmd.SetOut(&bytes.Buffer{})
+	cmd.SetErr(&bytes.Buffer{})
+	err := cmd.Execute()
+	if err == nil || !strings.Contains(err.Error(), "LINK") || !strings.Contains(err.Error(), "https://www.safetykorea.kr/release/openapi2") {
+		t.Fatalf("LINK apply error = %v", err)
 	}
 }
 

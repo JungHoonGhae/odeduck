@@ -5,6 +5,97 @@ All notable changes to OpenDataCTL are documented here. Format follows
 [SemVer](https://semver.org/). The release workflow uses the `## [X.Y.Z]`
 section matching a `vX.Y.Z` tag as the GitHub release notes.
 
+## [0.12.0] - 2026-09-01
+
+### Added
+
+- Added a real LINK provider adapter seam and evidence-backed reference
+  implementations for SafetyKorea, VWorld, FoodSafetyKorea and Seoul Open Data
+  Plaza. Together they cover the three providers found in 56% of the top-50
+  demand sample plus the product-safety reference contract.
+- Contracts now expose a stable `adapterId`, integer `adapterRevision` and, when
+  proven by the publisher URL, `providerServiceId`. Provider documentation
+  version and `verifiedAt` remain separate so source updates and matcher changes
+  are not conflated.
+- Added 11 live canaries across legacy/current URL shapes and Seoul's separate
+  general/metro credential scopes. `doctor --adapters-only` runs these checks
+  without login or a browser.
+- Added a weekly GitHub Actions drift monitor that opens or updates a canonical
+  issue when a canary changes or a contract exceeds the 180-day verification
+  window, plus an adapter contribution/maintenance guide and official-source
+  research record.
+- Added provider-scoped credential lifecycle commands:
+  `provider-key set|status|delete`. Secrets are accepted through hidden terminal
+  input or stdin, never as command arguments or MCP fields.
+- Added typed LINK invocation behind the existing `call --pk` and MCP `call_api`
+  surface: SafetyKorea's five certification/recall operations,
+  FoodSafetyKorea's service-specific official parameter-table inspector, and
+  VWorld data, address, search, WMS and WFS families.
+- Added copyable matcher, typed-operation registry and fail-closed contract-test
+  templates, plus a fixed before/after search evaluation covering eight
+  natural-language scenarios and the 50 highest-demand LINK datasets.
+
+### Changed
+
+- Known-provider matching now uses exact official origins, path families,
+  allowlisted single-value queries and validated provider service IDs. Similar
+  hosts, apex redirects, unknown paths, unknown Seoul OA identifiers and
+  ambiguous queries fall back to `inspection_required`.
+- Credential scopes now identify the actual provider API prefix rather than a
+  broad host. Seoul general and real-time subway keys are classified separately;
+  both remain non-invokable because the official endpoints are still HTTP.
+- The provider registry remains inside the single Go module while adapters share
+  one binary and release cycle. Its one-method interface and fixture contract
+  preserve an extraction seam if independent packages or runtimes are needed.
+- `catalog search`, `catalog discover` and MCP `catalog_search` now include LINK
+  datasets by default so 40% of the catalogue is not silently hidden. Use
+  `--rest-only` or `restOnly=true` only for an explicit portal-REST-only search.
+- CLI and MCP now share one dataset caller: it describes a PK once, validates the
+  advertised operation, resolves only the matching credential scope, and
+  dispatches REST or an implemented external provider without accepting raw
+  external endpoints.
+- Distribution now matches the repository's private visibility: install scripts
+  use an authenticated GitHub CLI session, releases remain private, and public
+  Homebrew tap publishing is paused instead of emitting unusable private URLs.
+
+### Fixed
+
+- `describe` now surfaces every VWorld parameter accepted by the typed caller;
+  provider operation metadata and request validation are generated from one
+  registry so they cannot drift into contradictory schemas.
+- VWorld 2D contracts bind nine reviewed guide service IDs to their exact
+  published `data` codes and inject them automatically. Unknown service IDs are
+  non-invokable, and the provider's not-yet-available `GetFeatureType` operation
+  is no longer advertised.
+- `logout` attempts every credential cleanup even when portal cleanup or one
+  provider file fails, then reports the combined errors instead of silently
+  leaving later provider keys on disk.
+- Known LINK contracts now give capability-specific next actions: request access
+  for implemented callers, use the official provider directly when no caller is
+  implemented, and choose another dataset when credential transport is unsafe.
+- Repeated FoodSafetyKorea calls reuse a bounded five-minute, revision-aware
+  request-schema cache instead of downloading and parsing the same official
+  parameter table before every data request.
+- External HTTP-200 responses now require provider-specific success envelopes;
+  FoodSafetyKorea/VWorld XML errors and OGC exception documents can no longer be
+  mistaken for successful calls.
+- `logout` clears provider keys and interrupted atomic-write fragments from both
+  current and `gongctl` compatibility roots. Provider files use a protected
+  current-user/SYSTEM DACL on Windows instead of ineffective POSIX mode bits.
+
+### Safety
+
+- External provider calls require exact HTTPS hosts and path prefixes, reject
+  redirects, bound response size and request values, validate provider-specific
+  operations/enums/page limits, and interpret errors embedded in HTTP 200 bodies.
+- Header, query and path credentials are redacted in raw and escaped forms.
+  Provider credential files are atomically written as Unix `0600` or a protected
+  current-user/SYSTEM Windows DACL; `logout` clears them with the data.go.kr
+  session state.
+- Seoul general and real-time subway contracts remain discoverable but are
+  `blocked_insecure_transport` because their official invocation endpoints do
+  not currently provide verified HTTPS.
+
 ## [0.11.0] - 2026-09-01
 
 ### Added

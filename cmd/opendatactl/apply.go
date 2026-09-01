@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/JungHoonGhae/opendatactl/internal/apicall"
 	"github.com/JungHoonGhae/opendatactl/internal/output"
 	"github.com/JungHoonGhae/opendatactl/internal/portal"
 	"github.com/spf13/cobra"
@@ -16,7 +17,8 @@ func applyCmd() *cobra.Command {
 	c := &cobra.Command{
 		Use:   "apply <publicDataPk>",
 		Short: "OpenAPI 활용신청 자동화 — 에이전트는 확인 없이 제출 가능",
-		Long: `data.go.kr OpenAPI 1건의 활용신청을 자동 제출합니다(자동승인). 신청은
+		Long: `data.go.kr REST OpenAPI 1건의 활용신청을 자동 제출합니다(자동승인). LINK는 제출하지 않고
+describe가 반환한 provider application URL을 안내합니다. 신청은
 계정에 실제 신청을 생성하므로 **한 번에 한 건만** 처리하고 **활용목적(--purpose)을
 반드시 요구**하며 제출 전 확인합니다 (투기적 대량신청 금지).
 
@@ -25,6 +27,17 @@ func applyCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			format, err := resolveFormat()
 			if err != nil {
+				return err
+			}
+			base := flagBaseURL
+			if base == "" {
+				base = portal.BaseURL
+			}
+			spec, err := apicall.Describe(cmd.Context(), newFetchClient(), base, args[0])
+			if err != nil {
+				return fmt.Errorf("활용신청 전 명세 확인 실패: %w", err)
+			}
+			if err := apicall.ValidateDataGoKRApplication(spec); err != nil {
 				return err
 			}
 			cat, err := portal.NormalizePurposeCategory(category)

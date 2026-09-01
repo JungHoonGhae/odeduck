@@ -53,6 +53,11 @@ type daemonState struct {
 // catalogue) can store their own state beside the session files.
 func ConfigDir() (string, error) { return configDir() }
 
+// ConfigDirsForCleanup returns every existing current or compatibility config
+// root without creating one. Packages that store credentials beneath the same
+// roots use this only for exhaustive logout cleanup.
+func ConfigDirsForCleanup() ([]string, error) { return configDirsForCleanup() }
+
 func configDir() (string, error) {
 	dir, err := os.UserConfigDir()
 	if err != nil {

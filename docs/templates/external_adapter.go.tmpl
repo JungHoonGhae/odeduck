@@ -1,0 +1,34 @@
+// Copy this file to internal/apicall/external_adapter_<provider>.go, replace the
+// {{...}} markers, and register the adapter in externalProviderAdapters.
+// Recognition and invocation are deliberately separate: land this matcher with
+// InvocationNotImplemented first unless the typed caller is implemented and
+// covered by contract tests in the same change.
+package apicall
+
+import "net/url"
+
+type {{providerType}}Adapter struct{}
+
+func ({{providerType}}Adapter) ContractFor(target *url.URL) (*ExternalContract, bool) {
+	host, path, ok := providerURLShape(target)
+	if !ok || !isHTTPS(target) || target.RawQuery != "" ||
+		host != "{{exact.provider.example}}" || path != "{{/exact/documentation/path}}" {
+		return nil, false
+	}
+	return &ExternalContract{
+		Provider:             "{{Provider Name}}",
+		ProviderFamily:       "{{family}}",
+		DocumentationURL:     "{{official documentation URL}}",
+		DocumentationVersion: "{{publisher version, if any}}",
+		ApplicationURL:       "{{official application URL}}",
+		AccessMode:           "{{manual_approval|provider_account_required|automatic}}",
+		Auth: &ExternalAuthContract{
+			Type:            "api_key",
+			Placement:       "{{header|query|path}}",
+			Name:            "{{wire parameter name}}",
+			CredentialScope: "https://{{exact-api-origin}}/{{exact/path/prefix/}}",
+		},
+		InvocationState: InvocationNotImplemented,
+		VerifiedAt:      "{{YYYY-MM-DD}}",
+	}, true
+}

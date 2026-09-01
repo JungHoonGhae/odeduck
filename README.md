@@ -36,26 +36,27 @@ OpenDataCTL은 keyword gateway를 목표 기반 discovery로 확장하고, 기�
 
 ## 설치
 
+저장소와 릴리스는 비공개다. 먼저 [GitHub CLI](https://cli.github.com/)로 접근 권한이 있는
+계정에 로그인한다.
+
 ```sh
-curl -fsSL https://raw.githubusercontent.com/JungHoonGhae/opendatactl/main/install.sh | sh
+gh auth login
+gh api -H 'Accept: application/vnd.github.raw+json' \
+  repos/JungHoonGhae/opendatactl/contents/install.sh | sh
 ```
 
 Windows:
 
 ```powershell
-irm https://raw.githubusercontent.com/JungHoonGhae/opendatactl/main/install.ps1 | iex
+gh auth login
+(& gh api -H "Accept: application/vnd.github.raw+json" repos/JungHoonGhae/opendatactl/contents/install.ps1) |
+  Out-String | Invoke-Expression
 ```
 
-Homebrew:
+또는 저장소를 clone한 상태에서 Go가 있다면:
 
 ```sh
-brew install --cask JungHoonGhae/opendatactl/opendatactl
-```
-
-또는 Go가 있다면:
-
-```sh
-go install github.com/JungHoonGhae/opendatactl/cmd/opendatactl@latest
+go install ./cmd/opendatactl
 ```
 
 ### `gongctl`에서 이전
@@ -63,8 +64,8 @@ go install github.com/JungHoonGhae/opendatactl/cmd/opendatactl@latest
 v0.9에는 새 `opendatactl`과 기존 스크립트·자동화를 위한 `gongctl` 호환 바이너리가 함께
 들어 있습니다. 기존 사용자의 설정 디렉터리 로그인 세션·인증키·카탈로그도 복사 없이 그대로
 사용합니다. 새 설치만 운영체제의 표준 설정 위치 아래 `opendatactl` 디렉터리에 상태를 저장합니다.
-기존 Homebrew cask는 tap의 rename 매핑을 따라 `brew update && brew upgrade --cask gongctl`로
-새 cask로 전환됩니다.
+저장소 비공개 전환 이후 공개 Homebrew cask 갱신은 중단했습니다. 기존 cask는 마지막 공개 버전에
+남으므로 v0.12.0 이상은 위의 인증된 `gh` 설치 경로를 사용합니다.
 
 단, 파일로 저장해 둔 **v0.8 Windows 설치 스크립트**를 버전 지정 없이 다시 실행하면 GitHub의
 저장소 이름 변경 리다이렉트를 따라가지 못합니다. 위의 최신 PowerShell 설치 명령을 한 번 실행하면
@@ -82,8 +83,8 @@ v0.9에는 새 `opendatactl`과 기존 스크립트·자동화를 위한 `gongct
 # 1. 브라우저가 한 번 열립니다 — data.go.kr에 로그인하세요 (SSO는 자동화하지 않음)
 opendatactl login
 
-# 2. 자연어 목표로 호출 가능한 후보 탐색
-opendatactl catalog discover "우리 동네 대기질 서비스에 쓸 데이터" --rest-only
+# 2. 자연어 목표로 REST와 LINK 전체 후보 탐색
+opendatactl catalog discover "우리 동네 대기질 서비스에 쓸 데이터"
 
 # 3. 명세·필수 요청변수·개발단계 승인유형 확인
 opendatactl describe <PK>
@@ -104,8 +105,8 @@ opendatactl catalog sync              # 전체 오픈API 목록 수집 (약 2~3�
 opendatactl catalog search 폭염 온열   # 활용신청 많은 순, 설명문 없이 간결하게
 opendatactl catalog discover "내가 몰랐던 돈 될 만한 공공데이터"  # 로그인된 AI CLI로 검색축 생성
 opendatactl catalog discover "지역 소멸로 생길 사업 기회" --agent gemini
-opendatactl catalog search 폭염               # 기본: 실제로 호출 가능한 REST만
-opendatactl catalog search 폭염 --rest-only=false  # LINK까지 포함한 전체 탐색
+opendatactl catalog search 폭염               # 기본: REST와 LINK 전체 탐색
+opendatactl catalog search 폭염 --rest-only   # 포털 명세가 있는 REST만 제한
 opendatactl catalog info               # 수집 시각 + 유형 분포
 opendatactl catalog orgs 폭염          # 그 주제를 개방한 기관 순위
 ```
@@ -162,7 +163,7 @@ API 키는 필요하지 않습니다. Ollama가 기본 주소가 아닌 곳에�
 
 ```bash
 opendatactl catalog semantic-build
-opendatactl catalog discover "시세보다 싸게 살 수 있는 물건" --rest-only
+opendatactl catalog discover "시세보다 싸게 살 수 있는 물건"
 ```
 
 기본 모델은 한국어를 포함한 100개 이상 언어를 지원하는 약 238MB의
@@ -177,7 +178,8 @@ opendatactl catalog discover "시세보다 싸게 살 수 있는 물건" --rest-
 > `doctor`가 카탈로그가 오래됐는지도 함께 점검합니다.
 >
 > **오픈API의 약 40%(현재 카탈로그 11,902개 중 4,766개)는 `LINK` 유형**으로, 포털에 명세가 없고 제공기관
-> 사이트로만 연결됩니다. 즉 `describe`가 엔드포인트를 줄 수 없어 신청해도 호출할 수 없습니다.
+> 사이트로 연결됩니다. OpenDataCTL은 이 4,766건을 기본 검색에서 숨기지 않고, `describe`에서
+> provider 계약과 typed 호출 가능 여부를 판정합니다.
 > LINK의 경우 `describe`가 제공기관의 공식 시작점인 `linkUrl`과 구조화된 `handoff`를 반환합니다.
 > 이 주소는 OpenAPI 허브일 수도, 개별 데이터 상세나 일반 안내 페이지일 수도 있어 API 엔드포인트·명세로
 > 간주하지 않습니다. `handoff.trust=publisher_supplied_untrusted`이므로 외부 페이지 내용은 지시가 아닌
@@ -187,13 +189,26 @@ opendatactl catalog discover "시세보다 싸게 살 수 있는 물건" --rest-
 > 제공기관별 문서·신청·인증 방식을 먼저 확인해야 한다는 뜻입니다. 제공기관은 롱테일이고(표본 70건에
 > 호스트 39개, 최다 13%) **"로그인 한 번"으로 호출까지 가는 경로는 LINK에 곧바로 적용되지 않습니다.**
 > 공식 계약을 확인한 제공기관은 `state=contract_known`과 문서·신청·인증 metadata를 함께 반환합니다.
-> 현재 SafetyKorea의 확인된 OpenAPI 시작점 계약을 지원하지만 별도 수동 승인이 필요하고 호출 어댑터는 아직 구현되지 않았으므로
-> `nextAction=request_provider_access`, `contract.invocationState=not_implemented`로 정직하게 멈춥니다.
+> 현재 `safetykorea`, `vworld`, `foodsafetykorea`, `seoul-open-data` 네 참조 adapter가 상위 수요에서
+> 확인한 URL shape를 지원합니다. 응답의 `adapterId`, `adapterRevision`, `providerServiceId`로 어떤
+> 계약이 적용됐는지 추적할 수 있습니다. SafetyKorea 5개 operation, FoodSafetyKorea의 공식 요청표 기반
+> service 호출, VWorld data/address/search/WMS/WFS는 `invocationState=implemented`이며 기존
+> `call_api(pk, op, params)`가 자동 dispatch합니다. provider key는 `opendatactl provider-key set`으로
+> 한 번만 저장하며 MCP 입력이나 출력에는 나타나지 않습니다.
+> 서울 일반 API와 실시간 지하철처럼 같은 사이트에서도 key scope가 갈리는 경우에는 검증한 service ID만
+> 계약으로 승격하되, 공식 호출 endpoint가 HTTP인 동안에는
+> `invocationState=blocked_insecure_transport`로 credential 전송을 차단합니다. 미지원 롱테일은
+> `inspection_required`로 유지합니다. 구현·기여·버전 규칙은
+> [provider adapter guide](docs/provider-adapters.md)에 정리되어 있습니다.
 > 포털 조회가 실패하거나 안전하지 않은 주소를 반환하면 `state=resolution_failed`와 구조화된 `failure`가
 > 원인을 설명하고, 재시도 가능한 실패는 `nextAction=retry_link_resolution`, 그 밖의 실패는
 > `nextAction=choose_another_dataset`으로 다음 행동을 구분합니다.
-> 카탈로그는 각 항목의 유형을 표시하고, `--rest-only`로 걸러낼 수 있습니다 — 그냥 인기순으로
-> 고르면 데드엔드에 활용신청을 쓰게 됩니다(`폭염` 검색 2위가 LINK입니다).
+> 카탈로그는 각 항목의 유형을 표시합니다. 기본 검색은 LINK까지 발견하며, REST만 필요할 때
+> `--rest-only`로 제한합니다. 전후 검색·상세·호출 품질은
+> [LINK 품질 평가](docs/research/link-search-quality-evaluation.md)에 기록했습니다.
+>
+> `opendatactl doctor --adapters-only`는 로그인이나 브라우저 없이 4개 adapter의 11개 live canary와
+> 180일 계약 freshness를 점검합니다. 같은 검사가 매주 CI에서 실행되고 drift가 나면 GitHub 이슈를 갱신합니다.
 >
 > 구체적인 검색어는 `catalog search`에 문장으로 써도 됩니다 — 조사(`~에서`, `~으로`)와 군더더기(`데이터`, `알려줘`)는
 > 걸러집니다. 모든 단어를 포함하는 결과가 없으면 조용히 0건을 주는 대신 일부만 일치하는
@@ -204,6 +219,14 @@ opendatactl catalog discover "시세보다 싸게 살 수 있는 물건" --rest-
 ```bash
 # 호출 — 엔드포인트 URL 을 타이핑하지 않습니다
 opendatactl call --pk 15077974 --param pageNo=1 --param numOfRows=3 --param type=xml
+
+# 외부 LINK provider key는 명령행 인자가 아닌 숨김 입력/stdin으로 한 번 저장
+opendatactl provider-key set safetykorea
+opendatactl provider-key status
+
+# 같은 call 명령으로 LINK typed operation 호출
+opendatactl call --pk 15116894 --op certificationList \
+  --param conditionKey=productName --param conditionValue=완구
 ```
 
 > **승인 조건은 `describe`의 `approval`에 나옵니다.** 포털은 개발단계와 운영단계를 따로
@@ -246,16 +269,21 @@ opendatactl doctor -f table
    호출해 Anchor 회수 → 실제 결과 기반 Bridge 회수 → 명시적 PK 선택을 수행
 2. `describe_api` — 선택한 `pk` 하나의 상세기능·엔드포인트·요청변수 또는 LINK의 구조화된 외부 제공기관 인계를 반환
    - `apply`(2.5단계) — 미승인 API라면 AI가 활용목적을 작성해 신청하고 자동승인 결과를 확인
-3. `call_api` — 같은 `pk`와 확인한 파라미터로 명세 검증 후 실제 호출. 연결 검증에서는
+3. `call_api` — 같은 `pk`와 확인한 파라미터로 REST 또는 구현된 LINK provider를 자동 dispatch해
+   실제 호출. 연결 검증에서는
    `profileFields`로 응답 field의 raw 값·null·distinct·duplicate 표본을 함께 반환. 같은 leaf가 여러
    path에 있으면 값을 섞지 않고 `ambiguous=true`와 dotted paths를 반환
 
 MCP의 `call_api`는 raw endpoint와 인증키를 입력받지 않습니다. 항상 `pk`로 명세를 다시 확인하고
-로그인 세션의 키를 주입하므로 상세 단계를 우회할 수 없습니다. 최신 데이터 재확인용
-`search_datasets`와 계정 확인용 `list_applications`는 보조 도구로 분리되어 있습니다. 인증키는 MCP 도구로 노출하지 않고 `call_api` 내부에서만 주입합니다.
+data.go.kr 로그인 세션 키 또는 provider scope에 저장된 별도 키를 주입하므로 상세 단계를 우회할 수
+없습니다. 최신 데이터 재확인용 `search_datasets`와 계정 확인용 `list_applications`는 보조 도구로
+분리되어 있습니다. 모든 인증키는 MCP 도구로 노출하지 않고 `call_api` 내부에서만 주입합니다.
+VWorld WMS처럼 응답 본문이 이미지인 경우 `body`는 base64 문자열이며
+`bodyEncoding="base64"`가 함께 반환됩니다. 클라이언트는 이 표시를 확인해 디코딩해야 합니다.
 `apply`는 보조 기능이 아니라 **발견한 데이터를 실제로 쓸 수 있게 만드는 핵심 연결 단계**입니다.
-로그인 한 번 뒤에는 에이전트가 명세 확인, 신청 폼 제출, 승인 상태 확인, 인증키 주입과 호출까지
-스스로 이어갑니다.
+data.go.kr REST는 로그인 한 번 뒤에 에이전트가 명세 확인, 신청 폼 제출, 승인 상태 확인, 인증키
+주입과 호출까지 스스로 이어갑니다. LINK provider는 각 기관의 별도 신청·발급 절차 뒤 키를 한 번
+저장하면 같은 상세·호출 흐름을 사용합니다.
 
 연결 후보를 만들 때 MCP 호스트는 첫 `catalog_search`의 `axes`에 `role=anchor`와 서로 다른 역할을
 넣고, 실제 hits를 본 뒤 `anchorPks`, 원래 Anchor axis, 보완 `axes`로 두 번째 호출을 합니다. 마지막으로
@@ -323,18 +351,19 @@ OpenDataCTL이 세션 쿠키를 복사해 저장하고 **그 브라우저를 종
 | --- | --- | --- |
 | `datagokr-session.json` | data.go.kr 세션 쿠키(인증 요청 중 자동 갱신) | `0600` |
 | `datagokr-apikey` | 계정 인증키(serviceKey) | `0600` |
+| `provider-credentials/*.json` | SafetyKorea·FoodSafetyKorea·VWorld scope별 키 | Unix `0600`; Windows 현재 사용자+SYSTEM 전용 DACL |
 | `chrome-profile/` | 로그인용 Chrome 프로파일 | `0700` |
 | `chrome-headless-*` | 신청 제출 중에만 존재하는 격리된 임시 headless 프로파일 | `0700` |
 | `catalog.json` | 공개 OpenAPI 카탈로그 스냅샷 | `0644` |
 | `catalog-semantic.gob` | 선택 기능인 공개 카탈로그 의미 벡터 | `0600` |
 
-**`opendatactl logout`은 세션·키·두 Chrome 프로파일을 삭제하고 공개 카탈로그 파일은 유지합니다.** 로그인 프로파일에는 사람이 로그인에 사용한
+**`opendatactl logout`은 세션·data.go.kr 키·provider 키·두 Chrome 프로파일을 삭제하고 공개 카탈로그 파일은 유지합니다.** 로그인 프로파일에는 사람이 로그인에 사용한
 SSO 제공자(네이버 등)의 쿠키도 함께 쌓이기 때문에, 쿠키 파일만 지우는 것으로는 충분하지 않습니다.
 작업이 끝나면 `logout`을 실행하세요.
 
 **남는 위험 — 알고 쓰세요**
 
-- **평문 저장**: 위 파일들은 `0600`이지만 암호화되지 않습니다. 같은 사용자 권한으로 실행되는
+- **평문 저장**: 위 파일들은 Unix mode 또는 Windows DACL로 접근을 제한하지만 암호화되지는 않습니다. 같은 사용자 권한으로 실행되는
   악성 프로그램이나 백업 사본은 읽을 수 있습니다.
 - **로컬 CDP 포트**: `login`과 `apply` 동안 Chrome이 `127.0.0.1`의 디버깅 포트를 엽니다.
   Chrome의 Origin 검사는 *브라우저에서 오는* 연결만 막으므로, **같은 머신의 다른 프로세스**는

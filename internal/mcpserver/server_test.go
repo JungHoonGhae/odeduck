@@ -40,6 +40,39 @@ func isolateConfigHome(t *testing.T) {
 	t.Setenv("APPDATA", filepath.Join(home, "AppData", "Roaming"))
 }
 
+type datasetCallFunc func(context.Context, apicall.DatasetCallRequest) (*apicall.CallResult, error)
+
+func (f datasetCallFunc) Call(ctx context.Context, request apicall.DatasetCallRequest) (*apicall.CallResult, error) {
+	return f(ctx, request)
+}
+
+func TestCallAPIDispatchesThroughUnifiedDatasetCaller(t *testing.T) {
+	called := false
+	caller := datasetCallFunc(func(_ context.Context, request apicall.DatasetCallRequest) (*apicall.CallResult, error) {
+		called = true
+		if request.PK != "15116894" || request.Operation != "certificationDetail" || request.Params["certNum"] != "SU123" {
+			t.Fatalf("request = %#v", request)
+		}
+		if request.Wait != maxToolWait {
+			t.Fatalf("wait = %s, want clamp %s", request.Wait, maxToolWait)
+		}
+		return &apicall.CallResult{Status: 200, ContentType: "application/json", Body: map[string]any{"items": []any{map[string]any{"certNum": "SU123"}}}}, nil
+	})
+	sess := connectTestClient(t, New(Deps{Fetch: fetch.New(fetch.WithDelay(0)), Caller: caller}))
+	res, err := sess.CallTool(context.Background(), &mcp.CallToolParams{Name: "call_api", Arguments: map[string]any{
+		"pk": "15116894", "op": "certificationDetail", "params": map[string]any{"certNum": "SU123"},
+		"waitSeconds": 3600, "profileFields": []string{"certNum"},
+	}})
+	if err != nil || res.IsError || !called {
+		t.Fatalf("call_api err=%v result=%#v called=%v", err, res, called)
+	}
+	raw, _ := json.Marshal(res.StructuredContent)
+	var result apicall.CallResult
+	if err := json.Unmarshal(raw, &result); err != nil || result.Profile == nil || len(result.Profile.Fields) != 1 || result.Profile.Fields[0].DistinctCount != 1 {
+		t.Fatalf("profiled result = %#v decode error=%v", result, err)
+	}
+}
+
 func TestSearchToolRoundTrip(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/html; charset=UTF-8")
@@ -123,9 +156,82 @@ func TestDescribeLinkHandoffRoundTrip(t *testing.T) {
 		got.Handoff.Trust != apicall.HandoffPublisherUntrusted ||
 		got.Handoff.FetchPolicy != apicall.HandoffSafeFetcherRequired ||
 		got.Handoff.NextAction != apicall.HandoffRequestAccess || got.Handoff.Contract == nil ||
-		got.Handoff.Contract.InvocationState != "not_implemented" || got.Handoff.Contract.Auth == nil ||
-		got.Handoff.Contract.Auth.Name != "AuthKey" {
+		got.Handoff.Contract.AdapterID != "safetykorea" || got.Handoff.Contract.AdapterRevision != 2 ||
+		got.Handoff.Contract.InvocationState != apicall.InvocationImplemented || len(got.Handoff.Contract.Operations) != 5 ||
+		got.Handoff.Contract.Auth == nil || got.Handoff.Contract.Auth.Name != "AuthKey" {
 		t.Fatalf("LINK structured content = %+v", got)
+	}
+}
+
+func TestApplyRejectsLinkBeforeDataGoKRSideEffect(t *testing.T) {
+	const pk = "15116894"
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/data/" + pk + "/openapi.do":
+			_, _ = w.Write([]byte(`<ul><li><strong class="key">API 유형</strong><div class="value">LINK</div></li></ul>`))
+		case "/tcs/dss/selectApiLinkUrl.do":
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"linkUrl":"https://www.safetykorea.kr/release/openapi","status":true}`))
+		default:
+			t.Fatalf("unexpected request before LINK apply rejection: %s", r.URL)
+		}
+	}))
+	defer srv.Close()
+
+	sess := connectTestClient(t, New(Deps{Fetch: fetch.New(fetch.WithDelay(0)), BaseURL: srv.URL}))
+	res, err := sess.CallTool(context.Background(), &mcp.CallToolParams{Name: "apply", Arguments: map[string]any{
+		"pk": pk, "purpose": "제품 안전 분석", "category": "research",
+	}})
+	if err != nil {
+		t.Fatalf("apply transport: %v", err)
+	}
+	raw, _ := json.Marshal(res.Content)
+	if !res.IsError || !strings.Contains(string(raw), "LINK") || !strings.Contains(string(raw), "https://www.safetykorea.kr/release/openapi2") {
+		t.Fatalf("LINK apply result = %#v", res)
+	}
+}
+
+func TestDescribeProviderServiceAdapterRoundTrip(t *testing.T) {
+	const pk = "15058359"
+	const target = "https://www.foodsafetykorea.go.kr/api/openApiInfo.do?svc_no=I-0040&svc_type_cd=API_TYPE06"
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/data/" + pk + "/openapi.do":
+			_, _ = w.Write([]byte(`<html><body>
+				<h1 class="h-tit">건강기능식품 기능성 원료인정 현황</h1>
+				<ul><li><strong class="key">API 유형</strong><div class="value">LINK</div></li></ul>
+			</body></html>`))
+		case "/tcs/dss/selectApiLinkUrl.do":
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"linkUrl":"` + target + `","status":true}`))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer srv.Close()
+
+	sess := connectTestClient(t, New(Deps{Fetch: fetch.New(fetch.WithDelay(0)), BaseURL: srv.URL}))
+	res, err := sess.CallTool(context.Background(), &mcp.CallToolParams{
+		Name: "describe_api", Arguments: map[string]any{"pk": pk},
+	})
+	if err != nil {
+		t.Fatalf("call describe_api: %v", err)
+	}
+	raw, err := json.Marshal(res.StructuredContent)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got apicall.APISpec
+	if err := json.Unmarshal(raw, &got); err != nil {
+		t.Fatal(err)
+	}
+	if got.Handoff == nil || got.Handoff.Contract == nil ||
+		got.Handoff.Contract.AdapterID != "foodsafetykorea" || got.Handoff.Contract.AdapterRevision != 2 ||
+		got.Handoff.Contract.ProviderServiceID != "I-0040" || got.Handoff.Contract.Auth == nil ||
+		got.Handoff.Contract.Auth.Placement != "path" ||
+		got.Handoff.Contract.Auth.CredentialScope != "https://openapi.foodsafetykorea.go.kr/api/" ||
+		got.Handoff.Contract.InvocationState != apicall.InvocationImplemented || len(got.Handoff.Contract.Operations) != 1 {
+		t.Fatalf("FoodSafetyKorea structured content = %+v", got.Handoff)
 	}
 }
 
@@ -163,9 +269,10 @@ func TestToolCatalogPresentsProgressiveDiscoveryWorkflow(t *testing.T) {
 			t.Errorf("primary tool %q does not identify itself as %s", name, want.stage)
 		}
 	}
-	if !strings.Contains(byName["describe_api"].Description, "invocationState=not_implemented") ||
-		!strings.Contains(byName["describe_api"].Description, "call_api") {
-		t.Fatal("describe_api must preserve the LINK non-invocation instruction")
+	if !strings.Contains(byName["describe_api"].Description, "invocationState=implemented") ||
+		!strings.Contains(byName["describe_api"].Description, "call_api") ||
+		!strings.Contains(byName["describe_api"].Description, "safe_fetcher_required") {
+		t.Fatal("describe_api must explain typed LINK invocation")
 	}
 
 	callSchema, ok := byName["call_api"].InputSchema.(map[string]any)
@@ -240,13 +347,13 @@ func TestGuideResourceUsesOpenDataCTLAndKeepsLegacyURI(t *testing.T) {
 	}
 }
 
-func TestCatalogSearchDefaultsToCallableDatasets(t *testing.T) {
-	if !((catalogIn{}).restOnly()) {
-		t.Fatal("omitting restOnly should search callable REST datasets")
+func TestCatalogSearchDefaultsToAllDiscoverableDatasets(t *testing.T) {
+	if (catalogIn{}).restOnly() {
+		t.Fatal("omitting restOnly should keep LINK datasets discoverable")
 	}
-	no := false
-	if (catalogIn{RESTOnly: &no}).restOnly() {
-		t.Fatal("restOnly=false should include non-callable catalogue entries")
+	yes := true
+	if !((catalogIn{RESTOnly: &yes}).restOnly()) {
+		t.Fatal("restOnly=true should explicitly restrict search to REST datasets")
 	}
 }
 
@@ -390,7 +497,7 @@ func TestDiscoveryAndProfileInputBoundsFailBeforeIO(t *testing.T) {
 	}
 }
 
-func TestCatalogSearchToolReturnsCompactCallableCandidatesByDefault(t *testing.T) {
+func TestCatalogSearchToolKeepsLinkCandidatesDiscoverableByDefault(t *testing.T) {
 	isolateConfigHome(t)
 	cat := &catalog.Catalog{
 		SyncedAt: time.Now(),
@@ -423,8 +530,15 @@ func TestCatalogSearchToolReturnsCompactCallableCandidatesByDefault(t *testing.T
 	if err := json.Unmarshal(raw, &got); err != nil {
 		t.Fatalf("decode result: %v", err)
 	}
-	if got.Total != 1 || len(got.Hits) != 1 || got.Hits[0].PK != "rest" {
-		t.Fatalf("default catalog result = %+v, want only callable REST candidate", got)
+	if got.Total != 2 || len(got.Hits) != 2 {
+		t.Fatalf("default catalog result = %+v, want REST and LINK candidates", got)
+	}
+	seen := map[string]bool{}
+	for _, hit := range got.Hits {
+		seen[hit.PK] = true
+	}
+	if !seen["rest"] || !seen["link"] {
+		t.Fatalf("default catalog result = %+v, want REST and LINK candidates", got)
 	}
 }
 
