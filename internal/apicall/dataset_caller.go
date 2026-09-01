@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/JungHoonGhae/opendatactl/internal/fetch"
+	"github.com/JungHoonGhae/oddsock/internal/fetch"
 )
 
 // CredentialSource keeps secret acquisition outside the invocation module. The

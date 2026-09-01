@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/JungHoonGhae/opendatactl/internal/fetch"
+	"github.com/JungHoonGhae/oddsock/internal/fetch"
 )
 
 func TestOfficialFileSourceStreamsPublicMonthlySnapshot(t *testing.T) {

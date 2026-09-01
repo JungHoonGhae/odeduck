@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/JungHoonGhae/opendatactl/internal/fetch"
+	"github.com/JungHoonGhae/oddsock/internal/fetch"
 )
 
 // serveAfter answers 403 for the first n requests, then 200 — the gateway's actual

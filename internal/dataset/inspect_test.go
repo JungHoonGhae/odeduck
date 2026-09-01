@@ -12,7 +12,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/JungHoonGhae/opendatactl/internal/fetch"
+	"github.com/JungHoonGhae/oddsock/internal/fetch"
 	"golang.org/x/text/encoding/korean"
 	"golang.org/x/text/transform"
 )

@@ -178,6 +178,7 @@ func TestClearAllRemovesCredentialsFromCurrentAndLegacyConfigRoots(t *testing.T)
 		t.Fatal(err)
 	}
 	paths := []string{
+		filepath.Join(configHome, "oddsock", "provider-credentials", "safetykorea.json"),
 		filepath.Join(configHome, "opendatactl", "provider-credentials", "safetykorea.json"),
 		filepath.Join(configHome, "gongctl", "provider-credentials", "safetykorea.json"),
 	}

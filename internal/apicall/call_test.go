@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/JungHoonGhae/opendatactl/internal/fetch"
+	"github.com/JungHoonGhae/oddsock/internal/fetch"
 )
 
 func TestCallXMLToJSON(t *testing.T) {

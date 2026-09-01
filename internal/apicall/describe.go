@@ -16,9 +16,9 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/JungHoonGhae/opendatactl/internal/catalog"
-	"github.com/JungHoonGhae/opendatactl/internal/fetch"
-	"github.com/JungHoonGhae/opendatactl/internal/portal"
+	"github.com/JungHoonGhae/oddsock/internal/catalog"
+	"github.com/JungHoonGhae/oddsock/internal/fetch"
+	"github.com/JungHoonGhae/oddsock/internal/portal"
 	"github.com/PuerkitoBio/goquery"
 	"golang.org/x/net/idna"
 )
@@ -43,7 +43,7 @@ type APISpec struct {
 	// sampled, so telling a
 	// caller to "check the publisher's documentation" without handing over the
 	// address it already holds is withholding the one actionable thing on the page.
-	// opendatactl does not follow it: the publishers are a long tail (39 distinct hosts
+	// oddsock does not follow it: the publishers are a long tail (39 distinct hosts
 	// in 70 sampled datasets, the largest 13%), each with its own registration and
 	// spec format, so reading it is the agent's job — surfacing it is ours.
 	LinkURL string           `json:"linkUrl,omitempty"`
@@ -130,7 +130,7 @@ func (e *linkResolutionError) Unwrap() error { return e.err }
 // ExternalContract records facts from a versioned provider document. AdapterID
 // and AdapterRevision identify our interpretation; DocumentationVersion and
 // VerifiedAt track the publisher evidence independently. None of these implies
-// that opendatactl can invoke the provider: InvocationState says whether a
+// that oddsock can invoke the provider: InvocationState says whether a
 // provider-specific credential and caller have actually been wired.
 type ExternalContract struct {
 	AdapterID            string                `json:"adapterId"`
@@ -173,7 +173,7 @@ type ExternalAuthContract struct {
 	CredentialScope string `json:"credentialScope"`
 }
 
-// Approval reports the two stages the portal grades separately. opendatactl applies
+// Approval reports the two stages the portal grades separately. oddsock applies
 // for a development account, so Dev is the one that decides whether a key arrives
 // immediately; Ops describes what a later move to production would face and is
 // surfaced because that is a decision a caller may need to make now.
@@ -430,7 +430,7 @@ func Describe(ctx context.Context, f *fetch.Client, baseURL, pk string) (*APISpe
 				"guideDocUrl 을 내려받아 읽고 엔드포인트·파라미터를 확인하세요. 파라미터를 추측해 호출하지 마세요."
 		} else {
 			spec.Note = "API 유형을 REST 또는 LINK로 확인하지 못했습니다 — 페이지 구조나 유형 표기가 바뀐 것일 수 있습니다. " +
-				"opendatactl doctor로 점검하고, 유형을 확인하기 전에는 엔드포인트를 추측하거나 call_api로 호출하지 마세요."
+				"oddsock doctor로 점검하고, 유형을 확인하기 전에는 엔드포인트를 추측하거나 call_api로 호출하지 마세요."
 		}
 		if isRESTAPIType(spec.APIType) && spec.GuideDocURL == "" {
 			// A 참고문서 row that carries no file (fn_fileDownload('','')) is the
@@ -442,7 +442,7 @@ func Describe(ctx context.Context, f *fetch.Client, baseURL, pk string) (*APISpe
 					"포털에 없으니 제공기관에 문의하거나 다른 API 를 쓰세요. 추측해서 호출하지 마세요."
 			} else {
 				spec.Note = "이 페이지에서 상세기능·요청변수와 참고문서 항목 자체를 찾지 못했습니다 — " +
-					"페이지 구조가 바뀐 것일 수 있습니다 (opendatactl doctor 로 확인). 파라미터를 추측하지 마세요."
+					"페이지 구조가 바뀐 것일 수 있습니다 (oddsock doctor 로 확인). 파라미터를 추측하지 마세요."
 			}
 		}
 	}
@@ -1021,7 +1021,7 @@ var reSwaggerJSON = regexp.MustCompile("(?s)swaggerJson\\s*=\\s*`(.*?)`")
 
 var reSwaggerReference = regexp.MustCompile(`(?i)url\s*:\s*['"](https://infuser\.odcloud\.kr/oas/docs\?namespace=([0-9]+)/v[0-9]+)['"]`)
 
-// swaggerDoc is the slice of Swagger 2.0 opendatactl reads. Parameters sit at the
+// swaggerDoc is the slice of Swagger 2.0 oddsock reads. Parameters sit at the
 // PATH level on data.go.kr's specs, not under the operation, so both are read.
 type swaggerDoc struct {
 	Host     string   `json:"host"`

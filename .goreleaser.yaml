@@ -1,17 +1,32 @@
-# GoReleaser config — OpenDataCTL과 한시적 gongctl 호환 바이너리용.
+# GoReleaser config — oddsock과 한시적 opendatactl/gongctl 호환 바이너리용.
 # 태그 푸시(vX.Y.Z) 시 GitHub Actions(release.yml)가 실행 → 크로스플랫폼 바이너리 +
 # 체크섬 + private GitHub Release를 생성한다. 인증된 설치 스크립트가 asset을 받는다.
 version: 2
 
-project_name: opendatactl
+project_name: oddsock
 
 before:
   hooks:
     - go mod tidy
 
 builds:
-  - id: opendatactl
-    main: ./cmd/opendatactl
+  - id: oddsock
+    main: ./cmd/oddsock
+    binary: oddsock
+    env:
+      - CGO_ENABLED=0
+    goos: [darwin, linux, windows]
+    goarch: [amd64, arm64]
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w
+      - -X github.com/JungHoonGhae/oddsock/internal/version.CommandName=oddsock
+      - -X github.com/JungHoonGhae/oddsock/internal/version.Version={{ .Version }}
+      - -X github.com/JungHoonGhae/oddsock/internal/version.Commit={{ .ShortCommit }}
+      - -X github.com/JungHoonGhae/oddsock/internal/version.Date={{ .Date }}
+  - id: opendatactl-compat
+    main: ./cmd/oddsock
     binary: opendatactl
     env:
       - CGO_ENABLED=0
@@ -21,12 +36,12 @@ builds:
       - -trimpath
     ldflags:
       - -s -w
-      - -X github.com/JungHoonGhae/opendatactl/internal/version.CommandName=opendatactl
-      - -X github.com/JungHoonGhae/opendatactl/internal/version.Version={{ .Version }}
-      - -X github.com/JungHoonGhae/opendatactl/internal/version.Commit={{ .ShortCommit }}
-      - -X github.com/JungHoonGhae/opendatactl/internal/version.Date={{ .Date }}
+      - -X github.com/JungHoonGhae/oddsock/internal/version.CommandName=opendatactl
+      - -X github.com/JungHoonGhae/oddsock/internal/version.Version={{ .Version }}
+      - -X github.com/JungHoonGhae/oddsock/internal/version.Commit={{ .ShortCommit }}
+      - -X github.com/JungHoonGhae/oddsock/internal/version.Date={{ .Date }}
   - id: gongctl-compat
-    main: ./cmd/opendatactl
+    main: ./cmd/oddsock
     binary: gongctl
     env:
       - CGO_ENABLED=0
@@ -36,22 +51,26 @@ builds:
       - -trimpath
     ldflags:
       - -s -w
-      - -X github.com/JungHoonGhae/opendatactl/internal/version.CommandName=gongctl
-      - -X github.com/JungHoonGhae/opendatactl/internal/version.Version={{ .Version }}
-      - -X github.com/JungHoonGhae/opendatactl/internal/version.Commit={{ .ShortCommit }}
-      - -X github.com/JungHoonGhae/opendatactl/internal/version.Date={{ .Date }}
+      - -X github.com/JungHoonGhae/oddsock/internal/version.CommandName=gongctl
+      - -X github.com/JungHoonGhae/oddsock/internal/version.Version={{ .Version }}
+      - -X github.com/JungHoonGhae/oddsock/internal/version.Commit={{ .ShortCommit }}
+      - -X github.com/JungHoonGhae/oddsock/internal/version.Date={{ .Date }}
 
 archives:
+  - id: oddsock
+    ids: [oddsock, opendatactl-compat, gongctl-compat]
+    name_template: "oddsock_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    format_overrides:
+      - goos: windows
+        formats: ["zip"]
   - id: opendatactl
-    ids: [opendatactl, gongctl-compat]
+    ids: [opendatactl-compat, gongctl-compat]
     name_template: "opendatactl_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
     format_overrides:
       - goos: windows
         formats: ["zip"]
-  # Keep the old asset name for saved v0.8 macOS/Linux installers and explicitly
-  # version-pinned Windows installers. Unpinned v0.8 Windows installers cannot
-  # follow GitHub's intermediate repository-rename redirect; README documents
-  # rerunning the current installer for that one migration case.
+  # Keep both former asset names while saved installers and pinned automation
+  # migrate to oddsock.
   - id: gongctl
     ids: [gongctl-compat]
     name_template: "gongctl_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
@@ -62,7 +81,7 @@ archives:
 checksum:
   name_template: "checksums.txt"
   extra_files:
-    - glob: ./release-assets/opendatactl-catalog.json.gz
+    - glob: ./release-assets/oddsock-catalog.json.gz
 
 changelog:
   sort: asc
@@ -77,4 +96,4 @@ release:
   draft: false
   prerelease: auto
   extra_files:
-    - glob: ./release-assets/opendatactl-catalog.json.gz
+    - glob: ./release-assets/oddsock-catalog.json.gz

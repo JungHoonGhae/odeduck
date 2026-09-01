@@ -14,14 +14,14 @@ import (
 )
 
 // Browser lifecycle. The human logs in once in a visible Chrome (government SSO
-// is not automated); OpenDataCTL then copies the session cookies out (session.go) and
+// is not automated); oddsock then copies the session cookies out (session.go) and
 // closes that window, so nothing stays on screen. Reads go over plain HTTP with
 // those cookies, and the one flow that still needs a browser — driving the
 // 활용신청 form's own JS — starts a short-lived headless Chrome and injects them.
 // A visible browser is only kept alive as a fallback, when the cookies alone turn
 // out not to authenticate.
 
-// debugPort is the fixed CDP remote-debugging port for OpenDataCTL's login browser.
+// debugPort is the fixed CDP remote-debugging port for oddsock's login browser.
 const debugPort = 9333
 
 // The browser is dedicated to data.go.kr. Its TLS 1.3 endpoint returned corrupt
@@ -31,13 +31,14 @@ const debugPort = 9333
 const portalTLSMaxArg = "--ssl-version-max=tls1.2"
 
 const (
-	configDirName       = "opendatactl"
-	legacyConfigDirName = "gongctl"
-	daemonStateFile     = "datagokr-cdp.json"
+	configDirName   = "oddsock"
+	daemonStateFile = "datagokr-cdp.json"
 	// Keep the marker name through the compatibility window so logout can reap
 	// a headless browser left by a v0.8 process.
 	headlessStateFile = "gongctl-headless.json"
 )
+
+var compatibilityConfigDirNames = []string{"opendatactl", "gongctl"}
 
 var localCDPClient = &http.Client{Timeout: 2 * time.Second}
 
@@ -49,7 +50,7 @@ type daemonState struct {
 	ProfileDir   string `json:"profileDir,omitempty"`
 }
 
-// ConfigDir is OpenDataCTL's config directory, exported so sibling packages (the
+// ConfigDir is oddsock's config directory, exported so sibling packages (the
 // catalogue) can store their own state beside the session files.
 func ConfigDir() (string, error) { return configDir() }
 
@@ -59,56 +60,40 @@ func ConfigDir() (string, error) { return configDir() }
 func ConfigDirsForCleanup() ([]string, error) { return configDirsForCleanup() }
 
 func configDir() (string, error) {
-	dir, err := os.UserConfigDir()
+	base, err := os.UserConfigDir()
 	if err != nil {
 		return "", err
 	}
-	current := filepath.Join(dir, configDirName)
-	currentInfo, currentErr := os.Stat(current)
-	if currentErr != nil && !os.IsNotExist(currentErr) {
-		return "", currentErr
-	}
-	if currentErr == nil && !currentInfo.IsDir() {
-		return "", fmt.Errorf("설정 경로가 디렉터리가 아닙니다: %s", current)
-	}
-
-	legacy := filepath.Join(dir, legacyConfigDirName)
-	legacyInfo, legacyErr := os.Stat(legacy)
-	if legacyErr != nil && !os.IsNotExist(legacyErr) {
-		return "", legacyErr
-	}
-	if legacyErr == nil && !legacyInfo.IsDir() {
-		return "", fmt.Errorf("이전 설정 경로가 디렉터리가 아닙니다: %s", legacy)
-	}
-
-	if currentErr == nil {
-		// A preview or manual setup can leave a new directory beside a populated
-		// v0.8 directory. Prefer the side with the strongest usable state: session,
-		// then key, then browser state, then public/config data. A true tie goes to
-		// the current name.
-		if legacyErr == nil {
-			currentPriority, err := configDirPriority(current)
-			if err != nil {
-				return "", err
-			}
-			legacyPriority, err := configDirPriority(legacy)
-			if err != nil {
-				return "", err
-			}
-			if legacyPriority > currentPriority {
-				return legacy, nil
-			}
+	current := filepath.Join(base, configDirName)
+	bestPath := ""
+	bestPriority := -1
+	for _, name := range append([]string{configDirName}, compatibilityConfigDirNames...) {
+		candidate := filepath.Join(base, name)
+		info, statErr := os.Stat(candidate)
+		if os.IsNotExist(statErr) {
+			continue
 		}
-		return current, nil
+		if statErr != nil {
+			return "", statErr
+		}
+		if !info.IsDir() {
+			return "", fmt.Errorf("설정 경로가 디렉터리가 아닙니다: %s", candidate)
+		}
+		priority, err := configDirPriority(candidate)
+		if err != nil {
+			return "", err
+		}
+		// Canonical oddsock wins ties because it is visited first. A populated
+		// former root still wins over an empty new directory, so upgrades retain
+		// login state and keys without copying account credentials.
+		if priority > bestPriority {
+			bestPath = candidate
+			bestPriority = priority
+		}
 	}
-
-	// v0.8 and earlier stored credentials and catalogue data under gongctl.
-	// Reusing that directory keeps both old and new binaries safe during the
-	// compatibility window and avoids copying account credentials on disk.
-	if legacyErr == nil {
-		return legacy, nil
+	if bestPath != "" {
+		return bestPath, nil
 	}
-
 	return current, os.MkdirAll(current, 0o700)
 }
 
@@ -174,8 +159,8 @@ func configDirsForCleanup() ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	dirs := make([]string, 0, 2)
-	for _, name := range []string{configDirName, legacyConfigDirName} {
+	dirs := make([]string, 0, 1+len(compatibilityConfigDirNames))
+	for _, name := range append([]string{configDirName}, compatibilityConfigDirNames...) {
 		dir := filepath.Join(base, name)
 		info, statErr := os.Stat(dir)
 		if os.IsNotExist(statErr) {
@@ -252,8 +237,8 @@ func loadStateFrom(path string) (*daemonState, error) {
 	return &s, nil
 }
 
-// ErrNotLoggedIn means no live browser session is available; run `opendatactl login`.
-var ErrNotLoggedIn = fmt.Errorf("data.go.kr 세션이 없습니다 — 먼저 `opendatactl login` 을 실행하세요")
+// ErrNotLoggedIn means no live browser session is available; run `oddsock login`.
+var ErrNotLoggedIn = fmt.Errorf("data.go.kr 세션이 없습니다 — 먼저 `oddsock login` 을 실행하세요")
 
 // findChrome locates a Chrome-family browser executable.
 func findChrome() (string, error) {
@@ -287,7 +272,7 @@ func findChrome() (string, error) {
 }
 
 // launchBrowser starts a detached Chrome with the remote-debugging port and
-// OpenDataCTL's persistent profile. The process outlives OpenDataCTL (Setpgid + Release) so
+// oddsock's persistent profile. The process outlives oddsock (Setpgid + Release) so
 // the session stays alive between commands. startURL is the initial page.
 func launchBrowser(startURL string) (*exec.Cmd, error) {
 	chrome, err := findChrome()
@@ -300,7 +285,7 @@ func launchBrowser(startURL string) (*exec.Cmd, error) {
 	}
 	args := loginBrowserArgs(profile, startURL)
 	cmd := exec.Command(chrome, args...)
-	setDetached(cmd) // OpenDataCTL 프로세스 그룹에서 분리해 browser가 CLI 종료 후에도 생존
+	setDetached(cmd) // oddsock 프로세스 그룹에서 분리해 browser가 CLI 종료 후에도 생존
 	if err := cmd.Start(); err != nil {
 		return nil, fmt.Errorf("브라우저 실행 실패: %w", err)
 	}

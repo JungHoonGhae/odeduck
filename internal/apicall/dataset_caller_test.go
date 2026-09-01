@@ -12,8 +12,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/JungHoonGhae/opendatactl/internal/catalog"
-	"github.com/JungHoonGhae/opendatactl/internal/fetch"
+	"github.com/JungHoonGhae/oddsock/internal/catalog"
+	"github.com/JungHoonGhae/oddsock/internal/fetch"
 )
 
 type fakeCredentialSource struct {

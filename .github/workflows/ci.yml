@@ -34,41 +34,35 @@ jobs:
       - name: Build
         run: go build ./...
 
-      - name: Create snapshot-only catalogue fixture
-        shell: bash
-        run: |
-          mkdir -p release-assets
-          printf '%s' '{"syncedAt":"2026-09-01T00:00:00Z","type":"ALL","source":"official","entries":[{"pk":"15000001","title":"CI packaging fixture","svcType":"FILE","dataTypes":["FILE"]}]}' \
-            | gzip -n -9 > release-assets/opendatactl-catalog.json.gz
-
-      - name: Verify release packaging
+      - name: Verify release configuration
         uses: goreleaser/goreleaser-action@v7
         with:
           version: "~> v2"
-          args: release --snapshot --clean --skip=publish
+          args: check
+
+      # A full release cross-builds three command identities for six targets.
+      # PRs only need the runner target; release.yml performs the complete matrix
+      # before publishing any tag.
+      - name: Build release binaries for CI target
+        uses: goreleaser/goreleaser-action@v7
+        with:
+          version: "~> v2"
+          args: build --snapshot --clean --single-target
 
       - name: Verify current and compatibility binaries
         shell: bash
         run: |
           set -euo pipefail
-          archive="$(find dist -maxdepth 1 -name 'opendatactl_*_linux_amd64.tar.gz' -print -quit)"
-          test -n "$archive"
-          archive_entries="$(tar -tzf "$archive")"
-          grep -qx 'opendatactl' <<<"$archive_entries"
-          grep -qx 'gongctl' <<<"$archive_entries"
-
-          extract_dir="$(mktemp -d)"
-          trap 'rm -rf "$extract_dir"' EXIT
-          tar -xzf "$archive" -C "$extract_dir"
-          "$extract_dir/opendatactl" version | grep -q '^opendatactl '
-          "$extract_dir/gongctl" version | grep -q '^gongctl '
-          "$extract_dir/opendatactl" --help | grep -q '^  opendatactl '
-          "$extract_dir/gongctl" --help | grep -q '^  gongctl '
-
-          legacy_archive="$(find dist -maxdepth 1 -name 'gongctl_*_linux_amd64.tar.gz' -print -quit)"
-          test -n "$legacy_archive"
-          legacy_entries="$(tar -tzf "$legacy_archive")"
-          grep -qx 'gongctl' <<<"$legacy_entries"
+          oddsock_bin="$(find dist -type f -name oddsock -print -quit)"
+          opendatactl_bin="$(find dist -type f -name opendatactl -print -quit)"
+          gongctl_bin="$(find dist -type f -name gongctl -print -quit)"
+          test -n "$oddsock_bin" -a -n "$opendatactl_bin" -a -n "$gongctl_bin"
+          "$oddsock_bin" version | grep -q '^oddsock '
+          "$opendatactl_bin" version | grep -q '^opendatactl '
+          "$gongctl_bin" version | grep -q '^gongctl '
+          "$oddsock_bin" --help | grep -q '^  oddsock '
+          "$opendatactl_bin" --help | grep -q '^  opendatactl '
+          "$gongctl_bin" --help | grep -q '^  gongctl '
 
   windows-installer:
     runs-on: windows-latest

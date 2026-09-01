@@ -1,16 +1,16 @@
 # Issue tracker: GitHub Issues
 
-이 저장소의 canonical issue tracker는 [JungHoonGhae/opendatactl GitHub Issues](https://github.com/JungHoonGhae/opendatactl/issues)다. `.scratch/`의 기존 문서는 이전 local-markdown tracker의 기록이며 새 이슈나 상태 변경을 그곳에 만들지 않는다. 과거 노력을 다시 시작할 때 필요한 항목만 GitHub로 이관한다.
+이 저장소의 canonical issue tracker는 [JungHoonGhae/oddsock GitHub Issues](https://github.com/JungHoonGhae/oddsock/issues)다. `.scratch/`의 기존 문서는 이전 local-markdown tracker의 기록이며 새 이슈나 상태 변경을 그곳에 만들지 않는다. 과거 노력을 다시 시작할 때 필요한 항목만 GitHub로 이관한다.
 
 구현 spec과 장기 문서는 저장소에 versioned Markdown으로 두고, 이를 추적하는 GitHub issue에서 링크한다.
 
 ## When a skill says "publish to the issue tracker"
 
-`gh issue create -R JungHoonGhae/opendatactl`로 GitHub issue를 만든다. 상태는 GitHub 자체 상태와 assignee를 사용하고, 본문에 별도 `Status:` 줄을 만들지 않는다.
+`gh issue create -R JungHoonGhae/oddsock`로 GitHub issue를 만든다. 상태는 GitHub 자체 상태와 assignee를 사용하고, 본문에 별도 `Status:` 줄을 만들지 않는다.
 
 ## When a skill says "fetch the relevant ticket"
 
-사용자가 준 issue URL이나 번호를 `gh issue view -R JungHoonGhae/opendatactl`로 읽는다. sub-issue와 dependency는 GitHub의 Relationships에서 확인한다.
+사용자가 준 issue URL이나 번호를 `gh issue view -R JungHoonGhae/oddsock`로 읽는다. sub-issue와 dependency는 GitHub의 Relationships에서 확인한다.
 
 ## Wayfinding operations
 
@@ -25,15 +25,15 @@ GitHub REST 예시:
 
 ```sh
 # child 연결
-gh api -X POST repos/JungHoonGhae/opendatactl/issues/<MAP>/sub_issues \
+gh api -X POST repos/JungHoonGhae/oddsock/issues/<MAP>/sub_issues \
   -H "X-GitHub-Api-Version: 2026-03-10" -F sub_issue_id=<REST_ISSUE_ID>
 
 # <ISSUE>가 <BLOCKER>에 막히도록 연결
-gh api -X POST repos/JungHoonGhae/opendatactl/issues/<ISSUE>/dependencies/blocked_by \
+gh api -X POST repos/JungHoonGhae/oddsock/issues/<ISSUE>/dependencies/blocked_by \
   -H "X-GitHub-Api-Version: 2026-03-10" -F issue_id=<BLOCKER_REST_ISSUE_ID>
 ```
 
-REST integer id는 `gh api repos/JungHoonGhae/opendatactl/issues/<NUMBER> --jq .id`로 얻는다.
+REST integer id는 `gh api repos/JungHoonGhae/oddsock/issues/<NUMBER> --jq .id`로 얻는다.
 
 ## Triage
 

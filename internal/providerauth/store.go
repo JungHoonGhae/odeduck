@@ -13,7 +13,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/JungHoonGhae/opendatactl/internal/portal"
+	"github.com/JungHoonGhae/oddsock/internal/portal"
 )
 
 type providerDefinition struct {
@@ -166,7 +166,7 @@ func Get(provider, scope string) (Credential, error) {
 	}
 	data, err := os.ReadFile(path)
 	if os.IsNotExist(err) {
-		return Credential{}, fmt.Errorf("%w: `opendatactl provider-key set %s` 로 저장하세요", ErrNotConfigured, provider)
+		return Credential{}, fmt.Errorf("%w: `oddsock provider-key set %s` 로 저장하세요", ErrNotConfigured, provider)
 	}
 	if err != nil {
 		return Credential{}, err
