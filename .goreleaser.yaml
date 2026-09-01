@@ -93,6 +93,7 @@ changelog:
       - "Merge "
 
 release:
+  name_template: "oddsock v{{ .Version }}"
   draft: false
   prerelease: auto
   extra_files:

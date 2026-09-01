@@ -7,6 +7,8 @@ section matching a `vX.Y.Z` tag as the GitHub release notes.
 
 ## [Unreleased]
 
+## [0.15.0] - 2026-09-02
+
 ### Changed
 
 - Renamed the canonical repository, Go module, CLI binary, release archive,
