@@ -35,6 +35,52 @@ func TestCatalogSearchKeepsLinkDatasetsDiscoverableByDefault(t *testing.T) {
 	}
 }
 
+func TestCatalogSyncDefaultsToAPIAndFileDiscovery(t *testing.T) {
+	cmd := catalogSyncCmd()
+	flag := cmd.Flags().Lookup("type")
+	if flag == nil {
+		t.Fatal("catalog sync is missing --type")
+	}
+	if flag.DefValue != "ALL" {
+		t.Fatalf("--type default = %q, want ALL so file datasets join the discovery catalogue", flag.DefValue)
+	}
+}
+
+func TestCatalogSyncIfStaleUpgradesFreshAPISnapshotToAll(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, ".config"))
+	t.Setenv("APPDATA", filepath.Join(home, "AppData", "Roaming"))
+	if err := (&catalog.Catalog{SyncedAt: time.Now(), Type: "API"}).Save(); err != nil {
+		t.Fatal(err)
+	}
+	fileRequests := 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Query().Get("dType") == "FILE" {
+			fileRequests++
+		}
+		_, _ = w.Write([]byte(`<html></html>`))
+	}))
+	defer srv.Close()
+	oldBase := flagBaseURL
+	flagBaseURL = srv.URL
+	t.Cleanup(func() { flagBaseURL = oldBase })
+	cmd := catalogSyncCmd()
+	cmd.SetArgs([]string{"--if-stale"})
+	cmd.SetOut(&bytes.Buffer{})
+	cmd.SetErr(&bytes.Buffer{})
+	if err := cmd.Execute(); err != nil {
+		t.Fatal(err)
+	}
+	got, err := catalog.Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if fileRequests == 0 || got.Type != "ALL" {
+		t.Fatalf("file requests=%d catalog type=%q", fileRequests, got.Type)
+	}
+}
+
 func TestApplyCommandRejectsLinkAndSurfacesProviderApplication(t *testing.T) {
 	const pk = "15116894"
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -98,6 +144,7 @@ func TestCatalogDiscoverRunsProgressiveThreeStageFlow(t *testing.T) {
 		{PK: "anchor", Title: "온비드 공매 물건", SvcType: catalog.SvcREST},
 		{PK: "demand", Title: "상권 점포 개폐업", SvcType: catalog.SvcREST},
 		{PK: "risk", Title: "침수 위험 지도", SvcType: catalog.SvcREST},
+		{PK: "risk-history", Title: "침수 위험 이력", SvcType: catalog.SvcREST},
 	}}
 	if err := cat.Save(); err != nil {
 		t.Fatal(err)
@@ -122,7 +169,7 @@ func TestCatalogDiscoverRunsProgressiveThreeStageFlow(t *testing.T) {
 			t.Fatalf("expand provider=%q observed=%+v", provider, observed)
 		}
 		return agentplan.Plan{Provider: provider, Status: agentplan.StatusUsed, Axes: []catalog.DiscoveryAxis{{
-			Role: "재난 위험", Query: "침수 위험 지도", Contribution: "위험조정 판단", Edge: spatial,
+			Role: "재난 위험", Query: "침수 위험", Contribution: "위험조정 판단", Edge: spatial,
 		}}}, nil
 	}
 	composeDiscoveryPlan = func(_ context.Context, _ string, provider string, anchors, candidates []catalog.Hit) (agentplan.SelectionPlan, error) {
@@ -130,9 +177,9 @@ func TestCatalogDiscoverRunsProgressiveThreeStageFlow(t *testing.T) {
 			t.Fatalf("compose provider=%q anchors=%+v", provider, anchors)
 		}
 		for _, hit := range candidates {
-			if hit.PK == "risk" {
+			if hit.PK == "risk-history" {
 				return agentplan.SelectionPlan{Provider: provider, Status: agentplan.StatusUsed, Selections: []catalog.BridgeSelection{{
-					PK: hit.PK, WhyCandidate: "침수 위험 지도라는 제목이 위험 역할을 뒷받침",
+					PK: hit.PK, WhyCandidate: "침수 위험 이력이라는 제목이 위험 역할을 뒷받침",
 				}}}, nil
 			}
 		}
@@ -141,7 +188,7 @@ func TestCatalogDiscoverRunsProgressiveThreeStageFlow(t *testing.T) {
 	}
 
 	cmd := catalogQueryCmd(true)
-	cmd.SetArgs([]string{"공매 투자 판단", "--semantic=false"})
+	cmd.SetArgs([]string{"공매 투자 판단", "--semantic=false", "--limit=2"})
 	var stdout, stderr bytes.Buffer
 	cmd.SetOut(&stdout)
 	cmd.SetErr(&stderr)
@@ -162,7 +209,7 @@ func TestCatalogDiscoverRunsProgressiveThreeStageFlow(t *testing.T) {
 		t.Fatalf("progressive result = %+v\nstderr: %s", result, stderr.String())
 	}
 	connection := result.Connections[0]
-	if connection.Anchor.PK != "anchor" || connection.Bridge.PK != "risk" || connection.BridgeRole != "재난 위험" {
+	if connection.Anchor.PK != "anchor" || connection.Bridge.PK != "risk-history" || connection.BridgeRole != "재난 위험" {
 		t.Fatalf("connection = %+v", connection)
 	}
 }

@@ -59,7 +59,7 @@ type catalogIn struct {
 	Query string `json:"query" jsonschema:"the user's original natural-language need. For a concrete lookup this is also searched directly; for a broad or implicit goal, preserve it here and provide model-inferred concepts below"`
 	// Semantic interpretation belongs to the MCP host model that already
 	// understands the conversation. opendatactl then executes the plan against all
-	// 11k+ rows locally; this avoids both a brittle synonym dictionary and a
+	// API and FILE rows locally; this avoids both a brittle synonym dictionary and a
 	// second embedding/LLM credential inside the CLI.
 	Concepts         []string                  `json:"concepts,omitempty" jsonschema:"for broad, exploratory or implicit intent: 2-8 concrete Korean catalogue queries inferred from the user's goal. Cover distinct direct, adjacent, leading-indicator or constraint axes rather than mere synonyms; omit only for a concrete dataset lookup"`
 	Axes             []catalog.DiscoveryAxis   `json:"axes,omitempty" jsonschema:"structured alternative to concepts for connection discovery. First call: include role=anchor plus distinct roles. Later calls must retain the original anchor axis and add complementary Bridge roles with contribution and edge{kinds,expectedKeys,transform when proxy}"`
@@ -76,7 +76,7 @@ type catalogIn struct {
 	// explicit REST-only request. describe_api is the capability boundary: search
 	// must not hide a useful LINK dataset merely because only some providers have
 	// a typed caller today.
-	RESTOnly *bool `json:"restOnly,omitempty" jsonschema:"default false: keep REST and LINK datasets discoverable. Set true only when the user explicitly wants portal-hosted REST datasets"`
+	RESTOnly *bool `json:"restOnly,omitempty" jsonschema:"default false: keep REST, LINK, and FILE datasets discoverable. Set true only when the user explicitly wants portal-hosted REST datasets"`
 }
 
 func (in catalogIn) restOnly() bool {
@@ -93,21 +93,22 @@ func (in catalogIn) includePreviews() bool {
 func (in catalogIn) semanticEnabled() bool { return in.Semantic == nil || *in.Semantic }
 
 type catalogOut struct {
-	Mode        string                        `json:"mode"`              // lexical | planned
-	Intent      string                        `json:"intent,omitempty"`  // the user's original goal
-	Queries     []string                      `json:"queries,omitempty"` // model-inferred concrete data axes
-	Terms       []string                      `json:"terms,omitempty"`   // what a single query was reduced to
-	Relaxed     bool                          `json:"relaxed,omitempty"` // true = no entry had every term, so any-term matches are shown
-	Total       int                           `json:"total"`             // matches found
-	Shown       int                           `json:"shown"`             // rows returned
-	SyncedAt    string                        `json:"syncedAt"`          // when the catalogue was built
-	Stale       bool                          `json:"stale"`             // true = re-sync, results may be incomplete
-	Hits        []catalog.Hit                 `json:"hits"`
-	Semantic    *catalog.SemanticInfo         `json:"semantic,omitempty"`
-	Anchors     []catalog.Hit                 `json:"anchors,omitempty"`
-	Connections []catalog.ConnectionCandidate `json:"connections,omitempty"`
-	Warnings    []string                      `json:"warnings,omitempty"`
-	Abstention  *catalog.Abstention           `json:"abstention,omitempty"`
+	Mode              string                          `json:"mode"`              // lexical | planned
+	Intent            string                          `json:"intent,omitempty"`  // the user's original goal
+	Queries           []string                        `json:"queries,omitempty"` // model-inferred concrete data axes
+	Terms             []string                        `json:"terms,omitempty"`   // what a single query was reduced to
+	Relaxed           bool                            `json:"relaxed,omitempty"` // true = no entry had every term, so any-term matches are shown
+	Total             int                             `json:"total"`             // matches found
+	Shown             int                             `json:"shown"`             // rows returned
+	SyncedAt          string                          `json:"syncedAt"`          // when the catalogue was built
+	Stale             bool                            `json:"stale"`             // true = re-sync, results may be incomplete
+	Hits              []catalog.Hit                   `json:"hits"`
+	Semantic          *catalog.SemanticInfo           `json:"semantic,omitempty"`
+	Anchors           []catalog.Hit                   `json:"anchors,omitempty"`
+	ConnectionOptions []catalog.ConnectionOptionGroup `json:"connectionOptions,omitempty"`
+	Connections       []catalog.ConnectionCandidate   `json:"connections,omitempty"`
+	Warnings          []string                        `json:"warnings,omitempty"`
+	Abstention        *catalog.Abstention             `json:"abstention,omitempty"`
 }
 type appsOut struct {
 	Applications []portal.Application `json:"applications"`
@@ -158,7 +159,7 @@ func New(deps Deps) *mcp.Server {
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "catalog_search",
 		Annotations: readOnlyAnnotations("1단계 · 공공데이터 카탈로그 검색", false),
-		Description: "[1단계: 검색] 자연어 요청으로 로컬 카탈로그에서 호출 가능한 API 후보를 찾는다. 포털 검색과 달리 전체 목록을 한 번에 " +
+		Description: "[1단계: 검색] 자연어 요청으로 로컬 카탈로그에서 OpenAPI와 파일데이터 후보를 찾는다. 포털 검색과 달리 전체 목록을 한 번에 " +
 			"훑으므로 '이런 데이터가 있나?'를 키워드를 추측해가며 여러 번 물을 필요가 없다. " +
 			"구체적인 데이터명을 찾을 때는 query 만 쓴다. 하지만 '돈 될 만한 것', '새 서비스를 기획하고 싶다', " +
 			"'대한민국이 어떻게 변하고 있나'처럼 의미 해석이 필요한 목표는 원문을 query 에 보존하고, **호출하기 전에 " +
@@ -171,14 +172,17 @@ func New(deps Deps) *mcp.Server {
 			"서로 무관해 보이는 데이터의 연결을 찾을 때도 새 도구를 쓰지 않는다. 첫 호출은 axes 에 role=anchor 와 서로 다른 역할을 넣는다. " +
 			"실제 hits 를 본 뒤 두 번째 catalog_search 를 호출해 anchorPks, 원래 anchor axis, 아직 다루지 않은 Bridge axes 를 넣어라. Bridge 축은 " +
 			"contribution(둘을 결합해야만 생기는 새 판단)과 edge.kinds/entity|spatial|temporal|proxy, expectedKeys 를 모두 가져야 한다. " +
-			"proxy 는 transform 도 필수다. 두 번째 hits 를 읽은 뒤 적합한 실제 PK만 bridgeSelections 로 명시해 같은 catalog_search 를 한 번 더 호출하라. " +
+			"proxy 는 transform 도 필수다. 두 번째 응답의 connectionOptions는 역할별 최대 3개 선택지를 담으며 연결 주장이 아니다. " +
+			"여기서 서로 다른 조합을 검토하고, 적합한 실제 PK만 bridgeSelections 로 명시해 같은 catalog_search 를 한 번 더 호출하라. 필요하면 다른 3개를 선택해 재호출할 수 있다. " +
 			"검색 1위는 자동으로 카드가 되지 않는다. title/preview가 역할을 뒷받침하고 coverage 제한을 whyCandidate에 쓸 수 있는 후보만 고른다. " +
 			"서버는 명시적으로 선택되고 역할·edge·Incremental Value 계약을 통과한 소수 pair만 connections 로 반환하지만 " +
 			"상태는 항상 candidate다. 의미 유사도나 metadata만으로 실제 join·사업성·인과를 검증했다고 말하지 마라. 유효한 pair가 없으면 " +
 			"abstention이 정상 결과다. 각 connection의 evidenceRequired를 따라 여러 describe_api와 call_api로 검증하라. " +
 			"svcType 이 LINK 면 포털에 명세가 없다(전체의 약 40%가 LINK다). 기본 검색은 이 후보도 숨기지 않는다. " +
 			"describe_api 로 공식 외부 handoff와 typed 호출 가능 여부를 확인하라. provider adapter가 invocationState=implemented이면 " +
-			"call_api로 호출하고, 그 외에는 nextAction을 따른다. REST만 원할 때만 restOnly=true로 둬라. " +
+			"call_api로 호출하고, 그 외에는 nextAction을 따른다. svcType=FILE이면 호출 가능한 API라고 말하지 말고 nextAction=inspect_file_data 또는 " +
+			"inspect_file_api_contract와 공식 detailUrl에서 컬럼·갱신일·다운로드 조건을 확인한다. 후자는 포털이 JSON+XML 자동변환 표현의 존재를 표시한 " +
+			"상태지만 아직 call_api 계약을 뜻하지 않는다. FILE도 연결 후보가 될 수 있지만 call_api 대상은 아니다. REST만 원할 때만 restOnly=true로 둬라. " +
 			"svcType 이 비어 있으면 유형이 확인되지 않은 것이다. " +
 			"relaxed=true 면 모든 단어를 포함하는 데이터가 없어 일부만 일치하는 것까지 보여준 것이므로 " +
 			"matched 가 낮은 결과는 무관할 수 있다. terms 로 실제 검색된 단어를 확인하라. " +
@@ -244,7 +248,8 @@ func New(deps Deps) *mcp.Server {
 			Total: res.Total, Shown: len(hits),
 			SyncedAt: cat.SyncedAt.Format("2006-01-02"), Stale: cat.Stale(),
 			Hits: hits, Semantic: res.Semantic, Anchors: res.Anchors,
-			Connections: res.Connections, Warnings: res.Warnings, Abstention: res.Abstention,
+			ConnectionOptions: res.ConnectionOptions, Connections: res.Connections,
+			Warnings: res.Warnings, Abstention: res.Abstention,
 		}, nil
 	})
 

@@ -1,7 +1,10 @@
 package catalog
 
 import (
+	"context"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -9,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/JungHoonGhae/opendatactl/internal/fetch"
 	"github.com/JungHoonGhae/opendatactl/internal/portal"
 )
 
@@ -67,6 +71,67 @@ func TestCatalogSaveAtomicallyReplacesSnapshot(t *testing.T) {
 	}
 }
 
+func TestSyncAllKeepsAPIAndFileDatasetsInOneSnapshot(t *testing.T) {
+	page := func(pk, href, title, format string) string {
+		autoAPI := ""
+		if strings.Contains(href, "fileData.do") {
+			autoAPI = `<span class="krds-badge bg-light-primary">JSON + XML</span>`
+		}
+		return `<article class="apply-result-item">
+			<div class="apply-result-link"><a href="` + href + `">` + title + `</a><span class="krds-badge" data-ext="` + format + `"></span>` + autoAPI + `</div>
+			<div class="apply-result-summary">공식 설명</div>
+			<div class="apply-result-category"><span class="krds-badge">사회복지</span><span class="krds-badge">공공기관</span></div>
+			<div class="in-result-item"><ul><li><strong>제공기관</strong>테스트기관</li><li><strong>수정일</strong>2026-09-01</li><li><strong>조회수</strong>10</li><li><strong>활용신청</strong>3</li></ul></div>
+		</article>`
+	}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Query().Get("currentPage") != "1" {
+			_, _ = w.Write([]byte(`<html></html>`))
+			return
+		}
+		switch r.URL.Query().Get("dType") + "/" + r.URL.Query().Get("svcType") {
+		case "API/":
+			_, _ = w.Write([]byte(page("api", "/data/100/openapi.do", "장기요양기관 상세", "XML")))
+		case "API/REST":
+			_, _ = w.Write([]byte(page("api", "/data/100/openapi.do", "장기요양기관 상세", "XML")))
+		case "API/LINK":
+			_, _ = w.Write([]byte(`<html></html>`))
+		case "FILE/":
+			_, _ = w.Write([]byte(
+				page("shared", "/data/100/fileData.do", "장기요양기관 상세 파일", "CSV") +
+					page("file", "/data/200/fileData.do", "장기요양기관 평가 결과", "CSV"),
+			))
+		default:
+			t.Fatalf("unexpected sync query: %s", r.URL.RawQuery)
+		}
+	}))
+	defer srv.Close()
+
+	client := portal.New(fetch.New(fetch.WithDelay(0)), portal.WithBaseURL(srv.URL))
+	got, err := Sync(context.Background(), client, "ALL", 200, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Type != "ALL" || len(got.Entries) != 2 {
+		t.Fatalf("snapshot = type %q entries %+v", got.Type, got.Entries)
+	}
+	byPK := map[string]Entry{}
+	for _, entry := range got.Entries {
+		byPK[entry.PK] = entry
+	}
+	if byPK["100"].SvcType != SvcREST || strings.Join(byPK["100"].DataTypes, ",") != "API,FILE" ||
+		strings.Join(byPK["100"].Formats, ",") != "XML,CSV,JSON" {
+		t.Fatalf("API entry = %+v", byPK["100"])
+	}
+	if byPK["200"].SvcType != SvcFILE || strings.Join(byPK["200"].DataTypes, ",") != "FILE,API" || strings.Join(byPK["200"].Formats, ",") != "CSV,JSON,XML" {
+		t.Fatalf("FILE entry = %+v", byPK["200"])
+	}
+	hits := got.Search("평가", 10, false).Hits
+	if len(hits) != 1 || hits[0].NextAction != "inspect_file_api_contract" || !strings.HasSuffix(hits[0].DetailURL, "/data/200/fileData.do") {
+		t.Fatalf("FILE search handoff = %+v", hits)
+	}
+}
+
 // Every term must match, and matches rank by demand — the agent should see the
 // heavily used dataset first rather than whatever happened to be stored first.
 func TestSearchRanksByDemand(t *testing.T) {
@@ -84,6 +149,17 @@ func TestSearchRanksByDemand(t *testing.T) {
 	}
 	if hits[0].ApplyCount < hits[1].ApplyCount {
 		t.Errorf("not ranked by applyCount: %d then %d", hits[0].ApplyCount, hits[1].ApplyCount)
+	}
+}
+
+func TestSearchRanksFilesByViewsWhenApplicationsDoNotExist(t *testing.T) {
+	c := &Catalog{Entries: []Entry{
+		{PK: "quiet", Title: "장기요양기관 평가", SvcType: SvcFILE, ViewCount: 10},
+		{PK: "used", Title: "장기요양기관 평가", SvcType: SvcFILE, ViewCount: 900},
+	}}
+	hits := c.Search("장기요양기관 평가", 10, false).Hits
+	if len(hits) != 2 || hits[0].PK != "used" || hits[0].ViewCount != 900 {
+		t.Fatalf("FILE demand ranking = %+v", hits)
 	}
 }
 
@@ -178,6 +254,25 @@ func TestSearchPlanRecentInspectsBeyondExternalResultCap(t *testing.T) {
 	}
 }
 
+func TestSearchPlanBalancedPreservesDemandRecentInterleave(t *testing.T) {
+	c := &Catalog{Entries: []Entry{
+		{PK: "popular-old", Title: "상권 현황", ApplyCount: 1000, ModifiedAt: "2020-01-01"},
+		{PK: "popular-new", Title: "상권 현황", ApplyCount: 900, ModifiedAt: "2025-01-01"},
+		{PK: "quiet-newest", Title: "상권 현황", ApplyCount: 1, ModifiedAt: "2026-09-01"},
+		{PK: "quiet-new", Title: "상권 현황", ApplyCount: 0, ModifiedAt: "2026-08-01"},
+	}}
+	res := c.SearchPlan(QueryPlan{Concepts: []string{"상권"}, Limit: 4, Ranking: RankBalanced})
+	want := []string{"popular-old", "quiet-newest", "popular-new", "quiet-new"}
+	if len(res.Hits) != len(want) {
+		t.Fatalf("hits = %+v", res.Hits)
+	}
+	for i, pk := range want {
+		if res.Hits[i].PK != pk {
+			t.Fatalf("rank %d = %s, want %s: %+v", i, res.Hits[i].PK, pk, res.Hits)
+		}
+	}
+}
+
 // The description is what makes matching work, and is exactly what must not be
 // handed back — ten descriptions is thousands of characters of an agent's context.
 func TestSearchDoesNotReturnDescriptions(t *testing.T) {
@@ -214,6 +309,19 @@ func TestStale(t *testing.T) {
 	c.SyncedAt = time.Now().Add(-StaleAfter - time.Hour)
 	if !c.Stale() {
 		t.Error("old catalogue must be stale")
+	}
+}
+
+func TestCatalogCoverageDistinguishesFreshButNarrowSnapshots(t *testing.T) {
+	api := &Catalog{Type: "API"}
+	if !api.CoversType("API") || api.CoversType("ALL") || api.CoversType("FILE") {
+		t.Fatalf("API coverage is wrong")
+	}
+	all := &Catalog{Type: "ALL"}
+	for _, requested := range []string{"ALL", "API", "FILE"} {
+		if !all.CoversType(requested) {
+			t.Errorf("ALL should cover %s", requested)
+		}
 	}
 }
 
@@ -346,6 +454,86 @@ func TestSearchPlanBuildsConnectionsOnlyFromExplicitBridgeSelections(t *testing.
 		if len(connection.EvidenceRequired) < 3 || connection.ClaimBoundary == "" {
 			t.Errorf("candidate lacks verification boundary: %+v", connection)
 		}
+	}
+}
+
+func TestSearchPlanExposesRoleDiverseOptionsWithoutInflatingFinalCards(t *testing.T) {
+	c := &Catalog{SyncedAt: time.Now(), Entries: []Entry{
+		{PK: "anchor", Title: "요양시설 매물", SvcType: SvcREST},
+		{PK: "demand-a", Title: "시군구 장기요양 인정자", SvcType: SvcREST, ApplyCount: 10},
+		{PK: "demand-b", Title: "시군구 고령인구 전망", SvcType: SvcFILE, ApplyCount: 9},
+		{PK: "property-a", Title: "건축물대장 용도 면적", SvcType: SvcREST, ApplyCount: 8},
+		{PK: "property-b", Title: "토지이용계획 용도지역", SvcType: SvcFILE, ApplyCount: 7},
+	}}
+	spatial := EdgeHypothesis{Kinds: []string{"spatial"}, ExpectedKeys: []string{"시군구코드"}}
+	res := c.SearchPlan(QueryPlan{
+		Intent: "요양시설 인수 기회",
+		Axes: []DiscoveryAxis{
+			{Role: "anchor", Query: "요양시설 매물"},
+			{Role: "지역 수요", Query: "시군구 장기요양 고령인구", Contribution: "공급 대비 잠재 수요 비교", Edge: spatial},
+			{Role: "부동산 제약", Query: "건축물대장 토지이용계획", Contribution: "시설 운영과 증축 제약 확인", Edge: spatial},
+		},
+		AnchorPKs: []string{"anchor"}, Limit: 1,
+	})
+	if len(res.Connections) != 0 {
+		t.Fatalf("unselected options became connection cards: %+v", res.Connections)
+	}
+	if len(res.ConnectionOptions) != 2 {
+		t.Fatalf("option groups = %+v", res.ConnectionOptions)
+	}
+	seen := map[string]bool{}
+	for _, group := range res.ConnectionOptions {
+		if len(group.Nodes) != 2 {
+			t.Fatalf("role %q nodes = %+v, want two alternatives despite result limit", group.Role, group.Nodes)
+		}
+		for _, node := range group.Nodes {
+			seen[node.PK] = true
+		}
+	}
+	for _, pk := range []string{"demand-a", "demand-b", "property-a", "property-b"} {
+		if !seen[pk] {
+			t.Errorf("option pool omitted %s: %+v", pk, res.ConnectionOptions)
+		}
+	}
+	if got := res.ConnectionOptions[0].Nodes[1]; got.SvcType != SvcFILE {
+		t.Fatalf("file discovery metadata was not preserved: %+v", got)
+	}
+}
+
+func TestConnectionOptionsBoundRolesNodesAndDuplicatePKs(t *testing.T) {
+	entries := []Entry{{PK: "anchor", Title: "기준 데이터", SvcType: SvcREST}}
+	axes := []DiscoveryAxis{{Role: "anchor", Query: "기준 데이터"}}
+	for role := 1; role <= 7; role++ {
+		axes = append(axes, DiscoveryAxis{
+			Role: fmt.Sprintf("역할%d", role), Query: fmt.Sprintf("후보%d", role), Contribution: "새 판단",
+			Edge: EdgeHypothesis{Kinds: []string{"spatial"}, ExpectedKeys: []string{"시군구코드"}},
+		})
+		for candidate := 1; candidate <= 4; candidate++ {
+			pk := fmt.Sprintf("r%d-%d", role, candidate)
+			if candidate == 1 && role > 1 {
+				pk = "shared"
+			}
+			entries = append(entries, Entry{PK: pk, Title: fmt.Sprintf("후보%d 자료 %d", role, candidate), SvcType: SvcREST})
+		}
+	}
+	res := (&Catalog{Entries: entries}).SearchPlan(QueryPlan{Axes: axes, AnchorPKs: []string{"anchor"}, Limit: 100})
+	if len(res.ConnectionOptions) != 7 {
+		t.Fatalf("roles = %d, want 7: %+v", len(res.ConnectionOptions), res.ConnectionOptions)
+	}
+	seen := map[string]bool{}
+	for _, group := range res.ConnectionOptions {
+		if len(group.Nodes) > MaxOptionsPerRole {
+			t.Fatalf("role %q nodes = %d", group.Role, len(group.Nodes))
+		}
+		for _, node := range group.Nodes {
+			if node.PK == "anchor" || seen[node.PK] {
+				t.Fatalf("duplicate or anchor option: %+v", node)
+			}
+			seen[node.PK] = true
+		}
+	}
+	if len(seen) > 7*MaxOptionsPerRole {
+		t.Fatalf("options = %d, want at most %d", len(seen), 7*MaxOptionsPerRole)
 	}
 }
 
