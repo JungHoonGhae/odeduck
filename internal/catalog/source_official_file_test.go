@@ -2,6 +2,7 @@ package catalog
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -186,6 +187,52 @@ type fixedSyncSource struct{ catalog *Catalog }
 
 func (source fixedSyncSource) Sync(context.Context, string, int, func(int)) (*Catalog, error) {
 	return source.catalog, nil
+}
+
+type timeoutSyncError struct{}
+
+func (timeoutSyncError) Error() string   { return "temporary timeout" }
+func (timeoutSyncError) Timeout() bool   { return true }
+func (timeoutSyncError) Temporary() bool { return true }
+
+type flakySyncSource struct {
+	catalog   *Catalog
+	failures  int
+	attempts  int
+	permanent error
+}
+
+func (source *flakySyncSource) Sync(context.Context, string, int, func(int)) (*Catalog, error) {
+	source.attempts++
+	if source.permanent != nil {
+		return nil, source.permanent
+	}
+	if source.attempts <= source.failures {
+		return nil, fmt.Errorf("download failed: %w", timeoutSyncError{})
+	}
+	return source.catalog, nil
+}
+
+func TestCombinedSourceRetriesOnlyTransientNetworkFailures(t *testing.T) {
+	primary := &flakySyncSource{catalog: &Catalog{Type: "ALL"}, failures: 1}
+	enrichment := &flakySyncSource{catalog: &Catalog{Type: "ALL"}}
+	source := NewCombinedSource(primary, enrichment).(*combinedSource)
+	source.retryDelay = []time.Duration{time.Millisecond}
+
+	if _, err := source.Sync(context.Background(), "ALL", 1000, nil); err != nil {
+		t.Fatal(err)
+	}
+	if primary.attempts != 2 || enrichment.attempts != 1 {
+		t.Fatalf("attempts primary=%d enrichment=%d", primary.attempts, enrichment.attempts)
+	}
+
+	permanent := &flakySyncSource{permanent: fmt.Errorf("schema drift")}
+	if _, err := NewCombinedSource(permanent, enrichment).Sync(context.Background(), "ALL", 1000, nil); err == nil {
+		t.Fatal("permanent parser error must fail without retry")
+	}
+	if permanent.attempts != 1 {
+		t.Fatalf("permanent error attempts = %d, want 1", permanent.attempts)
+	}
 }
 
 func TestCombinedSourcePreservesOfficialFactsAndWebCoRepresentation(t *testing.T) {

@@ -4,8 +4,10 @@ import (
 	"context"
 	"encoding/csv"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -36,24 +38,28 @@ type OfficialFileSource struct {
 type combinedSource struct {
 	primary    SyncSource
 	enrichment SyncSource
+	retryDelay []time.Duration
 }
 
 // NewCombinedSource joins the fast official monthly snapshot with current web
 // delivery discovery. The official rows provide classifications/provenance;
 // the web adapter restores API+FILE co-representations omitted by the CSV.
 func NewCombinedSource(primary, enrichment SyncSource) SyncSource {
-	return &combinedSource{primary: primary, enrichment: enrichment}
+	return &combinedSource{
+		primary: primary, enrichment: enrichment,
+		retryDelay: []time.Duration{250 * time.Millisecond, time.Second},
+	}
 }
 
 func (s *combinedSource) Sync(ctx context.Context, scope string, perPage int, progress func(int)) (*Catalog, error) {
 	if s == nil || s.primary == nil || s.enrichment == nil {
 		return nil, fmt.Errorf("combined 카탈로그 source가 설정되지 않았습니다")
 	}
-	base, err := s.primary.Sync(ctx, scope, perPage, progress)
+	base, err := s.syncWithRetry(ctx, "공식 월간 snapshot", s.primary, scope, perPage, progress)
 	if err != nil {
 		return nil, err
 	}
-	extra, err := s.enrichment.Sync(ctx, scope, perPage, progress)
+	extra, err := s.syncWithRetry(ctx, "웹 제공형 보강", s.enrichment, scope, perPage, progress)
 	if err != nil {
 		return nil, err
 	}
@@ -70,6 +76,37 @@ func (s *combinedSource) Sync(ctx context.Context, scope string, perPage int, pr
 	}
 	sortEntries(entries)
 	return &Catalog{SyncedAt: time.Now().UTC(), Type: base.Type, Source: SourceCombined, Entries: entries}, nil
+}
+
+func (s *combinedSource) syncWithRetry(
+	ctx context.Context,
+	label string,
+	source SyncSource,
+	scope string,
+	perPage int,
+	progress func(int),
+) (*Catalog, error) {
+	for attempt := 0; ; attempt++ {
+		result, err := source.Sync(ctx, scope, perPage, progress)
+		if err == nil {
+			return result, nil
+		}
+		if !transientSyncError(err) || attempt >= len(s.retryDelay) {
+			return nil, err
+		}
+		timer := time.NewTimer(s.retryDelay[attempt])
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			return nil, fmt.Errorf("%s 재시도 중단: %w", label, ctx.Err())
+		case <-timer.C:
+		}
+	}
+}
+
+func transientSyncError(err error) bool {
+	var networkError net.Error
+	return errors.As(err, &networkError) && (networkError.Timeout() || networkError.Temporary())
 }
 
 func NewOfficialFileSource(transport *fetch.Client, baseURL string) *OfficialFileSource {
