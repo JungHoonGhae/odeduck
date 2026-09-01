@@ -107,10 +107,21 @@ func (c *Client) SearchDatasets(ctx context.Context, opts SearchOptions) ([]Data
 			HasOpenAPI:   hasAPI,
 		}
 		// Formats are their own badges now (data-ext="CSV"), no longer a prefix
-		// glued onto the title.
-		item.Find(".apply-result-link .krds-badge[data-ext]").Each(func(_ int, b *goquery.Selection) {
+		// glued onto the title. FILE results with an automatically converted API
+		// also carry a separate "JSON + XML" badge without data-ext.
+		item.Find(".apply-result-link .krds-badge").Each(func(_ int, b *goquery.Selection) {
 			if ext, ok := b.Attr("data-ext"); ok {
-				d.Formats = append(d.Formats, strings.ToUpper(cleanText(ext)))
+				d.Formats = appendFormat(d.Formats, ext)
+				return
+			}
+			badge := strings.ToUpper(cleanText(b.Text()))
+			for _, format := range []string{"JSON", "XML"} {
+				if strings.Contains(badge, format) {
+					d.Formats = appendFormat(d.Formats, format)
+				}
+			}
+			if strings.Contains(badge, "JSON") && strings.Contains(badge, "XML") {
+				d.HasOpenAPI = true
 			}
 		})
 		badges := item.Find(".apply-result-category .krds-badge")
@@ -134,6 +145,19 @@ func (c *Client) SearchDatasets(ctx context.Context, opts SearchOptions) ([]Data
 		out = append(out, d)
 	})
 	return out, nil
+}
+
+func appendFormat(formats []string, value string) []string {
+	value = strings.ToUpper(cleanText(value))
+	if value == "" {
+		return formats
+	}
+	for _, existing := range formats {
+		if existing == value {
+			return formats
+		}
+	}
+	return append(formats, value)
 }
 
 // atoiLoose parses a count out of the portal's rendering of it — "132,828회",

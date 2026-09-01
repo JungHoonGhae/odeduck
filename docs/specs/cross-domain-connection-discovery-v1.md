@@ -1,6 +1,6 @@
 # 교차 공공데이터 연결 발견 v1
 
-상태: implemented for v0.10.0
+상태: implemented for v0.10.0; broad-catalog option pool extended on 2026-09-01
 
 결정일: 2026-08-31
 
@@ -209,3 +209,17 @@ v0.10.0 출시 기준은 다음이다.
 
 카탈로그가 수십만 건이 되거나 검증된 sample profile이 반복 축적되어 flat scan과 질의 시 확대가 병목이
 될 때만 versioned local relation index/ANN을 별도 ADR로 검토한다.
+
+## 10. 2026-09-01 확장: 더 넓은 선택지와 작은 최종 카드의 분리
+
+v1의 최종 connection 최대 3개 제한은 유지한다. 대신 data.go.kr의 API와 FILE을 한 스냅샷에서
+검색하고, 두 번째 검색 결과에 `connectionOptions`를 추가한다. 이 필드는 유효한 Bridge 역할마다
+최대 3개 노드, 전체 최대 21개를 제공한다. 사용자는 같은 선택지에서 서로 다른 세 개를 골라 여러
+조합을 비교할 수 있지만, 명시적으로 고른 항목만 `connections`의 `candidate`가 된다.
+
+FILE 노드는 `svcType=FILE`, `nextAction=inspect_file_data|inspect_file_api_contract`, 공식 `detailUrl`과 formats를 갖는다.
+후자는 포털의 JSON+XML 자동변환 badge를 보존한 상태이지 현재 call_api 계약은 아니다.
+검색과 조합 후보에는 참여하지만 `describe_api → call_api`가 가능한 것처럼 표시하지 않는다. FILE이
+포함된 후보의 evidenceRequired는 공식 컬럼·갱신일·coverage·다운로드 조건과 bounded 파일 표본을
+먼저 확인하도록 바뀐다. 상세 결정과 하위 호환성은
+[ADR 0004](../adr/0004-broad-catalog-bounded-composition.md)에 기록한다.
