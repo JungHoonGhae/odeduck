@@ -1,9 +1,12 @@
 package main
 
 import (
+	"context"
+	"errors"
 	"fmt"
 
 	"github.com/JungHoonGhae/opendatactl/internal/portal"
+	"github.com/JungHoonGhae/opendatactl/internal/providerauth"
 	"github.com/spf13/cobra"
 )
 
@@ -35,18 +38,30 @@ func logoutCmd() *cobra.Command {
 		Long: `로그인 세션을 완전히 정리합니다. 다음을 모두 삭제합니다:
 
   · 저장된 data.go.kr 세션 쿠키와 캐시된 인증키
+  · SafetyKorea·FoodSafetyKorea·VWorld provider 인증키
   · opendatactl 이 만든 Chrome 프로파일(로그인용·headless용)
     — 로그인 프로파일에는 사람이 로그인에 사용한 SSO 제공자(네이버 등)의
       쿠키도 함께 쌓이므로, 로그아웃 시 같이 지웁니다.
-  · 실행 중이던 세션 브라우저`,
+		  · 실행 중이던 세션 브라우저`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			if err := portal.Logout(cmd.Context()); err != nil {
+			if err := logoutAll(cmd.Context(), portal.Logout, providerauth.ClearAll); err != nil {
 				return err
 			}
-			fmt.Fprintln(cmd.ErrOrStderr(), "세션을 종료했습니다 — 쿠키·인증키·브라우저 프로파일을 삭제했습니다.")
+			fmt.Fprintln(cmd.ErrOrStderr(), "세션을 종료했습니다 — 쿠키·data.go.kr/provider 인증키·브라우저 프로파일을 삭제했습니다.")
 			return nil
 		},
 	}
+}
+
+func logoutAll(ctx context.Context, portalCleanup func(context.Context) error, providerCleanup func() error) error {
+	var cleanupErrors []error
+	if err := portalCleanup(ctx); err != nil {
+		cleanupErrors = append(cleanupErrors, fmt.Errorf("data.go.kr 세션 정리 실패: %w", err))
+	}
+	if err := providerCleanup(); err != nil {
+		cleanupErrors = append(cleanupErrors, fmt.Errorf("provider credential 삭제 실패: %w", err))
+	}
+	return errors.Join(cleanupErrors...)
 }
 
 func statusCmd() *cobra.Command {

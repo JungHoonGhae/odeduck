@@ -67,7 +67,7 @@ type Hit struct {
 	Org        string `json:"org,omitempty"`
 	ApplyCount int    `json:"applyCount,omitempty"`
 	ModifiedAt string `json:"modifiedAt,omitempty"`
-	SvcType    string `json:"svcType,omitempty"` // LINK = no spec on the portal, describe/call will not work
+	SvcType    string `json:"svcType,omitempty"` // LINK = provider contract is resolved at describe time
 	Matched    int    `json:"matched,omitempty"` // terms hit — only meaningful when Result.Relaxed
 	// Planned searches explain which model-inferred data axis surfaced the row.
 	// Preview is deliberately short and opt-in: useful for ideation without
@@ -403,9 +403,9 @@ func queryTerms(query string) []string {
 // Within a tier, ranking is by application count: demand is the best available
 // proxy for "this one is actually usable".
 //
-// restOnly drops everything the portal does not report as REST. For an agent that
-// intends to describe and call, that is the honest default: a LINK dataset has no
-// spec here, so applying for one spends a real application on a dead end.
+// restOnly drops everything the portal does not report as REST. It is an explicit
+// precision filter; product defaults include LINK so provider-backed datasets are
+// discoverable and let describe decide whether a typed caller exists.
 func (c *Catalog) Search(query string, limit int, restOnly bool) Result {
 	return c.search(query, normalizeSearchLimit(limit), restOnly)
 }

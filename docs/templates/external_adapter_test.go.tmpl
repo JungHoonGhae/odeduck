@@ -1,0 +1,46 @@
+package apicall
+
+import (
+	"net/url"
+	"testing"
+)
+
+func Test{{ProviderType}}AdapterContract(t *testing.T) {
+	target, err := url.Parse("https://{{exact.provider.example}}/{{exact/documentation/path}}")
+	if err != nil {
+		t.Fatal(err)
+	}
+	contract, ok := ({{providerType}}Adapter{}).ContractFor(target)
+	if !ok || contract.Provider != "{{Provider Name}}" ||
+		contract.ProviderFamily != "{{family}}" || contract.Auth == nil ||
+		contract.Auth.CredentialScope != "https://{{exact-api-origin}}/{{exact/path/prefix/}}" {
+		t.Fatalf("contract = %+v", contract)
+	}
+}
+
+func Test{{ProviderType}}AdapterRejectsLookalikes(t *testing.T) {
+	for _, raw := range []string{
+		"http://{{exact.provider.example}}/{{exact/documentation/path}}",
+		"https://{{exact.provider.example}}/{{wrong/path}}",
+		"https://{{exact.provider.example}}/{{exact/documentation/path}}?next=other",
+		"https://{{exact.provider.example}}.evil.example/{{exact/documentation/path}}",
+		"https://" + "user:pass@" + "{{exact.provider.example}}/{{exact/documentation/path}}",
+		"https://{{exact.provider.example}}:8443/{{exact/documentation/path}}",
+		"https://{{exact.provider.example}}/{{exact/documentation/path}}#fragment",
+	} {
+		target, err := url.Parse(raw)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if contract, ok := ({{providerType}}Adapter{}).ContractFor(target); ok {
+			t.Errorf("lookalike %q received contract: %+v", raw, contract)
+		}
+	}
+}
+
+// When InvocationState becomes implemented, add public-seam tests that prove:
+//   - every advertised operation builds the exact official HTTPS endpoint;
+//   - unknown operations, parameters, enums and missing required values fail;
+//   - the credential is injected only at its declared scope and never serialized;
+//   - redirects are rejected, bodies are bounded and provider error codes surface;
+//   - transport and response errors redact header/query/path credential variants.

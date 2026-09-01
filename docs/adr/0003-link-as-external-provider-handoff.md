@@ -30,10 +30,11 @@ Keep the compact MCP surface and make `describe_api` branch by contract:
   Obvious local, private, link-local and numeric-literal targets are rejected as
   defence in depth, but this is not a complete fetch-time SSRF boundary: the
   consumer must validate resolved addresses and every redirect hop or stop.
-- A generic LINK handoff is never passed to `call_api`. The agent or a future
-  provider adapter must first establish the external documentation, application,
-  authentication and invocation contract. The data.go.kr credential is never
-  assumed to apply to an external host.
+- A generic LINK handoff is never passed to `call_api`. A registered provider
+  adapter must first establish the external documentation, application,
+  authentication and typed invocation contract. `call_api` dispatches only when
+  that contract reports `invocationState=implemented`. The data.go.kr credential
+  is never assumed to apply to an external host.
 
 `describe_api` remains the only detail-stage tool. We will not create one MCP
 tool per publisher or add a generic "call arbitrary URL" escape hatch. Reusable
@@ -43,8 +44,15 @@ is versioned, its host-and-path match scope is explicit, and the scope is covere
 by fixtures. Provider credentials must use separate namespaces and may be sent
 only to that adapter's validated hosts.
 
-The `doctor` command has a dedicated LINK canary (`15116894`) so the KRDS lookup
-can fail independently of the REST describe canary and still be detected.
+Provider invocation is now implemented behind this boundary for SafetyKorea,
+FoodSafetyKorea and typed VWorld families. Credentials are stored per provider
+and exact HTTPS scope, raw endpoints are not accepted, redirects are rejected,
+request variables are allowlisted and provider-specific HTTP-200 error bodies
+are interpreted. Seoul remains `blocked_insecure_transport` while its official
+credential endpoints are HTTP.
+
+The `doctor` command has a separate LINK provider-canary inventory so the KRDS
+lookup can fail independently of the REST describe canary and still be detected.
 
 ## Provider coverage strategy
 
@@ -91,11 +99,34 @@ page can always change or require manual approval, so "unsupported" and
 - Existing clients retain `linkUrl`; newer clients can branch deterministically
   on `handoff.state` and `handoff.nextAction`.
 - High-value providers can be integrated incrementally without changing the MCP
-  entry points. SafetyKorea is the first documented contract because it exposes
-  KC certification and recall data under a versioned external specification.
-  Its handoff reports the separate manual application and `AuthKey` header but
-  remains `invocationState=not_implemented` until a scoped credential and caller
-  are added.
+  entry points. SafetyKorea exposes five typed certification/recall operations;
+  FoodSafetyKorea inspects each service's official request table; VWorld exposes
+  separate data, address, search and OGC families. Each keeps its own credential
+  namespace and exact HTTPS scope.
 - Full LINK coverage is not promised. Coverage and adapter state must be surfaced
   explicitly, and unsupported providers remain discoverable rather than being
   silently filtered from broad research.
+
+## Reference adapter registry and maintenance
+
+The first provider registry contains SafetyKorea, VWorld, FoodSafetyKorea and
+Seoul Open Data Plaza. Each implementation owns one `ContractFor(URL)` method;
+the registry attaches a stable adapter ID and integer revision. Provider document
+versions and `verifiedAt` remain separate because they change independently from
+our matcher/credential interpretation.
+
+Eleven live canaries cover materially different high-demand URL and credential
+variants. `doctor --adapters-only` fails when a canary leaves its exact matcher or
+when an official contract has not been re-verified for 180 days. A weekly GitHub
+Actions workflow records failures in the canonical issue tracker. Unknown URL
+families and unverified Seoul `OA-...` identifiers continue to fall back to
+`inspection_required`; registration is measured coverage, not a host-wide claim.
+
+The adapters remain in the single Go module while they share one binary and
+release cycle. Independent deployment, another runtime language or a stable
+external SDK would be the trigger to extract `packages/adapter-sdk` and
+`adapters/*` into a monorepo layout; directory shape alone is not that trigger.
+
+Copyable matcher and fail-closed contract-test templates live under
+`docs/templates/`. They standardize the shared shape without pretending that
+provider endpoint families, dynamic schemas or error codes are identical.

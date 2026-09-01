@@ -1,7 +1,8 @@
 #!/bin/sh
 # opendatactl 설치 스크립트 (macOS/Linux)
 #
-#   curl -fsSL https://raw.githubusercontent.com/JungHoonGhae/opendatactl/main/install.sh | sh
+#   gh api -H 'Accept: application/vnd.github.raw+json' \
+#     repos/JungHoonGhae/opendatactl/contents/install.sh | sh
 #
 # 환경변수:
 #   INSTALL_DIR     설치 위치 (기본 /usr/local/bin)
@@ -20,7 +21,7 @@ main() {
 
     if [ "$os" = "windows" ]; then
         echo "Error: this script does not support Windows. Use PowerShell instead:"
-        echo '  irm https://raw.githubusercontent.com/'"$REPO"'/main/install.ps1 | iex'
+        echo '  (& gh api -H "Accept: application/vnd.github.raw+json" repos/'"$REPO"'/contents/install.ps1) | Out-String | Invoke-Expression'
         exit 1
     fi
 
@@ -29,21 +30,19 @@ main() {
     ver_no_v="${version#v}"
 
     asset="${BINARY}_${ver_no_v}_${os}_${arch}.tar.gz"
-    base="https://github.com/${REPO}/releases/download/${version}"
-
     echo "Detected: ${os}/${arch}"
     echo "Installing ${BINARY} ${version}..."
 
     tmpdir=$(mktemp -d)
     trap 'rm -rf "$tmpdir"' EXIT
 
-    if ! curl -fsSL -o "${tmpdir}/${asset}" "${base}/${asset}"; then
+    if ! download_asset "$version" "$asset" "${tmpdir}/${asset}"; then
         # A pinned pre-rename release only has gongctl_* archives. Install that
         # executable under both names so legacy version pins keep working.
         asset="${LEGACY_BINARY}_${ver_no_v}_${os}_${arch}.tar.gz"
-        curl -fsSL -o "${tmpdir}/${asset}" "${base}/${asset}"
+        download_asset "$version" "$asset" "${tmpdir}/${asset}"
     fi
-    curl -fsSL -o "${tmpdir}/checksums.txt" "${base}/checksums.txt"
+    download_asset "$version" "checksums.txt" "${tmpdir}/checksums.txt"
 
     echo "Verifying checksum..."
     (
@@ -61,8 +60,8 @@ main() {
         cp "${tmpdir}/${LEGACY_BINARY}" "${tmpdir}/${BINARY}"
     fi
 
-    # 쓰기 가능하면 그대로, 아니면 sudo. 새 Apple Silicon 맥은 /usr/local/bin 이
-    # 없을 수 있어(홈브루가 /opt/homebrew) mkdir -p 를 먼저 한다.
+    # 쓰기 가능하면 그대로, 아니면 sudo. /usr/local/bin 이 없는 환경도 있으므로
+    # mkdir -p 를 먼저 한다.
     if can_write "$INSTALL_DIR"; then
         SUDO=""
     else
@@ -88,9 +87,24 @@ main() {
 }
 
 latest_version() {
+    if command -v gh >/dev/null 2>&1; then
+        gh release view --repo "$REPO" --json tagName --jq .tagName
+        return
+    fi
     # API 대신 releases/latest 리다이렉트에서 태그 추출 (rate limit 없음)
     curl -fsSLI -o /dev/null -w '%{url_effective}' "https://github.com/${REPO}/releases/latest" \
         | sed 's#.*/tag/##'
+}
+
+download_asset() {
+    release_version="$1"
+    asset_name="$2"
+    destination="$3"
+    if command -v gh >/dev/null 2>&1; then
+        gh release download "$release_version" --repo "$REPO" --pattern "$asset_name" --dir "$(dirname "$destination")" --clobber
+        return
+    fi
+    curl -fsSL -o "$destination" "https://github.com/${REPO}/releases/download/${release_version}/${asset_name}"
 }
 
 detect_os() {

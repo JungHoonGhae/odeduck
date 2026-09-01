@@ -16,6 +16,7 @@ import (
 	"github.com/JungHoonGhae/opendatactl/internal/catalog"
 	"github.com/JungHoonGhae/opendatactl/internal/fetch"
 	"github.com/JungHoonGhae/opendatactl/internal/portal"
+	"github.com/JungHoonGhae/opendatactl/internal/providerauth"
 )
 
 // CanaryPK is a stable, long-lived OpenAPI dataset (중앙선거관리위원회
@@ -23,14 +24,11 @@ import (
 // ever retires it, the describe check will report drift — update this pk then.
 const CanaryPK = "15000908"
 
-// LinkCanaryPK is a LINK dataset whose KRDS detail page resolves the publisher
-// address through selectApiLinkUrl.do. A REST canary cannot exercise that seam:
-// the rest of describe may stay green while all 4,000+ LINK handoffs silently
-// lose their only actionable URL.
+// LinkCanaryPK is retained for compatibility with tests and downstream probes.
+// The live check now gets its full provider/variant inventory from apicall.
 const LinkCanaryPK = "15116894"
 
 const (
-	linkCanaryURL      = "https://www.safetykorea.kr/release/openapi"
 	linkContractMaxAge = 180 * 24 * time.Hour
 	linkClockSkew      = 24 * time.Hour
 )
@@ -156,31 +154,77 @@ func linkCheck(ctx context.Context, fc *fetch.Client, baseURL string) Check {
 	return linkCheckAt(ctx, fc, baseURL, time.Now())
 }
 
+// AdapterCheck runs only the provider registry canaries. It is exported for a
+// lightweight scheduled CI job that should not need a browser, portal session,
+// local catalogue, or data.go.kr API key.
+func AdapterCheck(ctx context.Context, fc *fetch.Client, baseURL string) Check {
+	return linkCheck(ctx, fc, baseURL)
+}
+
 func linkCheckAt(ctx context.Context, fc *fetch.Client, baseURL string, now time.Time) Check {
-	spec, err := apicall.Describe(ctx, fc, baseURL, LinkCanaryPK)
-	switch {
-	case err != nil:
-		return Check{"link", StatusDrift, "요청 실패: " + err.Error()}
-	case !strings.Contains(spec.APIType, "LINK"):
-		return Check{"link", StatusDrift, "LINK 유형을 파싱하지 못함 — 외부 제공기관 인계 여부를 판단할 수 없음 (pk=" + LinkCanaryPK + ")"}
+	adapters := apicall.ExternalProviderAdapters()
+	canaryCount := 0
+	providerStatus := make([]string, 0, len(adapters))
+	for _, adapter := range adapters {
+		for _, canary := range adapter.Canaries {
+			canaryCount++
+			spec, err := apicall.Describe(ctx, fc, baseURL, canary.PK)
+			switch {
+			case err != nil:
+				return Check{"link", StatusDrift, fmt.Sprintf("%s/%s 요청 실패 (pk=%s): %v", adapter.ID, canary.Variant, canary.PK, err)}
+			case !strings.Contains(spec.APIType, "LINK"):
+				return Check{"link", StatusDrift, fmt.Sprintf("%s/%s LINK 유형을 파싱하지 못함 (pk=%s)", adapter.ID, canary.Variant, canary.PK)}
+			case spec.LinkURL != canary.URL:
+				return Check{"link", StatusDrift, fmt.Sprintf(
+					"%s/%s portal URL 변경 — 공식 계약과 fixture를 재검증하세요 (pk=%s, expected=%s, got=%s)",
+					adapter.ID, canary.Variant, canary.PK, canary.URL, spec.LinkURL)}
+			case spec.Handoff == nil || spec.Handoff.URL != spec.LinkURL ||
+				spec.Handoff.Trust != apicall.HandoffPublisherUntrusted ||
+				spec.Handoff.FetchPolicy != apicall.HandoffSafeFetcherRequired ||
+				spec.Handoff.State != apicall.HandoffContractKnown:
+				return Check{"link", StatusDrift, fmt.Sprintf(
+					"%s/%s LINK가 더 이상 확인된 계약으로 해석되지 않음 — URL matcher를 검토하세요 (pk=%s, url=%s)",
+					adapter.ID, canary.Variant, canary.PK, spec.LinkURL)}
+			}
+
+			contract := spec.Handoff.Contract
+			if contract == nil || contract.AdapterID != adapter.ID || contract.AdapterRevision != adapter.Revision ||
+				contract.Provider != adapter.Provider ||
+				contract.DocumentationURL == "" || contract.ApplicationURL == "" ||
+				!validInvocationContract(contract) || contract.Auth == nil ||
+				contract.Auth.Name == "" || contract.Auth.CredentialScope == "" {
+				return Check{"link", StatusDrift, fmt.Sprintf(
+					"%s/%s 문서·신청·인증 metadata가 바뀌었거나 누락됨 (pk=%s)", adapter.ID, canary.Variant, canary.PK)}
+			}
+			verifiedAt, err := time.Parse("2006-01-02", contract.VerifiedAt)
+			age := now.Sub(verifiedAt)
+			if err != nil || age < -linkClockSkew || age > linkContractMaxAge {
+				return Check{"link", StatusDrift, fmt.Sprintf(
+					"%s 외부 계약 검증이 180일 이상 경과했거나 날짜를 해석할 수 없음 — 공식 문서를 다시 확인하세요 (verifiedAt=%s)",
+					adapter.ID, contract.VerifiedAt)}
+			}
+		}
+		providerStatus = append(providerStatus, fmt.Sprintf("%s@r%d", adapter.ID, adapter.Revision))
 	}
-	if spec.LinkURL != linkCanaryURL || spec.Handoff == nil || spec.Handoff.URL != linkCanaryURL ||
-		spec.Handoff.Host != "www.safetykorea.kr" || spec.Handoff.Trust != apicall.HandoffPublisherUntrusted ||
-		spec.Handoff.FetchPolicy != apicall.HandoffSafeFetcherRequired || spec.Handoff.State != apicall.HandoffContractKnown {
-		return Check{"link", StatusDrift, "예상한 SafetyKorea LINK 인계 계약을 복구하지 못함 — URL·host·trust·state를 확인하세요 (pk=" + LinkCanaryPK + ")"}
+	return Check{"link", StatusOK, fmt.Sprintf("provider 어댑터 %d개·canary %d개 정상 (%s)",
+		len(adapters), canaryCount, strings.Join(providerStatus, ", "))}
+}
+
+func validInvocationContract(contract *apicall.ExternalContract) bool {
+	if contract == nil || contract.Auth == nil {
+		return false
 	}
-	contract := spec.Handoff.Contract
-	if contract == nil || contract.Provider != "SafetyKorea" || contract.DocumentationURL == "" ||
-		contract.ApplicationURL == "" || contract.InvocationState != "not_implemented" || contract.Auth == nil ||
-		contract.Auth.Name != "AuthKey" || contract.Auth.CredentialScope != "safetykorea.kr" {
-		return Check{"link", StatusDrift, "SafetyKorea 문서·신청·인증 계약 metadata가 바뀌었거나 누락됨 (pk=" + LinkCanaryPK + ")"}
+	switch contract.InvocationState {
+	case apicall.InvocationImplemented:
+		return len(contract.Operations) > 0 && strings.HasPrefix(contract.Auth.CredentialScope, "https://") &&
+			providerauth.Supports(contract.AdapterID, contract.Auth.CredentialScope)
+	case apicall.InvocationNotImplemented:
+		return len(contract.Operations) == 0
+	case apicall.InvocationBlockedInsecureTransport:
+		return len(contract.Operations) == 0 && strings.HasPrefix(contract.Auth.CredentialScope, "http://")
+	default:
+		return false
 	}
-	verifiedAt, err := time.Parse("2006-01-02", contract.VerifiedAt)
-	age := now.Sub(verifiedAt)
-	if err != nil || age < -linkClockSkew || age > linkContractMaxAge {
-		return Check{"link", StatusDrift, "SafetyKorea 외부 계약 검증이 180일 이상 경과했거나 날짜를 해석할 수 없음 — 공식 문서를 다시 확인하세요"}
-	}
-	return Check{"link", StatusOK, fmt.Sprintf("제공기관 인계·계약 해석 (%s, pk=%s)", spec.LinkURL, LinkCanaryPK)}
 }
 
 // ApplyCanaryPKs are datasets to try opening the 활용신청 form for. There is more

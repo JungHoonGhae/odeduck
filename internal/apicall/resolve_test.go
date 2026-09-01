@@ -75,6 +75,35 @@ func TestMissingRequiredSilentWhenSpecHasNoParams(t *testing.T) {
 	}
 }
 
+func TestValidateDataGoKRApplicationRoutesOnlyREST(t *testing.T) {
+	tests := []struct {
+		name string
+		spec *APISpec
+		want string
+	}{
+		{"nil", nil, "dataset 명세"},
+		{"REST", &APISpec{PublicDataPk: "rest", APIType: "REST"}, ""},
+		{"mixed REST LINK", &APISpec{PublicDataPk: "mixed", APIType: "REST/LINK"}, "LINK 유형"},
+		{"known LINK", &APISpec{PublicDataPk: "link", APIType: "LINK", Handoff: &ExternalHandoff{Contract: &ExternalContract{ApplicationURL: "https://provider.example/apply"}}}, "https://provider.example/apply"},
+		{"LINK without URL", &APISpec{PublicDataPk: "link", APIType: "LINK"}, "handoff.nextAction"},
+		{"unknown", &APISpec{PublicDataPk: "unknown", APIType: "OTHER"}, "REST로 확인"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ValidateDataGoKRApplication(tt.spec)
+			if tt.want == "" {
+				if err != nil {
+					t.Fatalf("REST rejected: %v", err)
+				}
+				return
+			}
+			if err == nil || !strings.Contains(err.Error(), tt.want) {
+				t.Fatalf("error = %v, want %q", err, tt.want)
+			}
+		})
+	}
+}
+
 func TestOperationName(t *testing.T) {
 	for endpoint, want := range map[string]string{
 		"http://apis.data.go.kr/1741000/HeatWaveCasualtiesRegion/getHeatWaveCasualtiesRegionList": "getHeatWaveCasualtiesRegionList",
@@ -227,8 +256,8 @@ func TestLinkURLResolvedFromKRDSLookup(t *testing.T) {
 	contract := spec.Handoff.Contract
 	if contract == nil || contract.Provider != "SafetyKorea" || contract.AccessMode != "manual_approval" ||
 		contract.Auth == nil || contract.Auth.Placement != "header" || contract.Auth.Name != "AuthKey" ||
-		contract.InvocationState != "not_implemented" {
-		t.Fatalf("contract = %+v, want documented but not-yet-callable SafetyKorea contract", contract)
+		contract.InvocationState != InvocationImplemented || len(contract.Operations) != 5 {
+		t.Fatalf("contract = %+v, want documented typed SafetyKorea contract", contract)
 	}
 	if !strings.Contains(spec.Note, spec.LinkURL) {
 		t.Errorf("note should hand over the resolved address, got: %s", spec.Note)
@@ -290,15 +319,15 @@ func TestLegacyPlainTextLinkURLIsSurfaced(t *testing.T) {
 	}
 }
 
-func TestSafetyKoreaContractNormalizesHostAndSurfacesFullMetadata(t *testing.T) {
+func TestSafetyKoreaContractNormalizesWWWHostAndSurfacesFullMetadata(t *testing.T) {
 	spec := describeFromHTML(t, `<table>
 		<tr><th>API 유형</th><td>LINK</td></tr>
-		<tr><th>URL</th><td><a href="https://SafetyKorea.KR./release/openapi">provider</a></td></tr>
+		<tr><th>URL</th><td><a href="https://WWW.SafetyKorea.KR./release/openapi">provider</a></td></tr>
 	</table>`)
 	if spec.Handoff == nil {
 		t.Fatal("normalized SafetyKorea URL did not produce a handoff")
 	}
-	if spec.Handoff.Host != "safetykorea.kr" {
+	if spec.Handoff.Host != "www.safetykorea.kr" {
 		t.Fatalf("normalized handoff host = %q", spec.Handoff.Host)
 	}
 	contract := spec.Handoff.Contract
@@ -308,7 +337,7 @@ func TestSafetyKoreaContractNormalizesHostAndSurfacesFullMetadata(t *testing.T) 
 	if contract.DocumentationURL == "" || contract.DocumentationVersion != "2.0 (2025-06-30)" ||
 		contract.ApplicationURL != "https://www.safetykorea.kr/release/openapi2" ||
 		contract.VerifiedAt != "2026-09-01" || contract.Auth.Type != "api_key" ||
-		contract.Auth.CredentialScope != "safetykorea.kr" {
+		contract.Auth.CredentialScope != "https://www.safetykorea.kr/openapi/api/" {
 		t.Fatalf("contract metadata = %+v", contract)
 	}
 }
@@ -366,7 +395,7 @@ func TestResolveRejectsEndpointLookingMarkupOnLinkDataset(t *testing.T) {
 	}
 
 	_, err = Resolve(context.Background(), fc, srv.URL, pk, "")
-	if err == nil || !strings.Contains(err.Error(), "LINK 유형") || !strings.Contains(err.Error(), "call_api") {
+	if err == nil || !strings.Contains(err.Error(), "LINK 유형") || !strings.Contains(err.Error(), "DatasetCaller") {
 		t.Fatalf("Resolve error = %v, want enforced LINK invocation boundary", err)
 	}
 }
