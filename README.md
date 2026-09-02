@@ -255,6 +255,9 @@ go build ./...
 
 구현 규칙은 [provider adapter guide](docs/provider-adapters.md), 설계 결정은 [ADR](docs/adr/)에서 시작한다.
 
+공개 이름·문구·로고 경로는 [`docs/brand/brand.json`](docs/brand/brand.json)이 기준이다. 값을 바꾼 뒤
+`go run ./scripts/sync-brand.go`를 실행하면 위 브랜드 블록이 갱신되고, CI는 `--check`로 동기화를 확인한다.
+
 ## License
 
 [MIT](LICENSE). 데이터의 짝을 찾는 데 가장 짧은 라이선스.

@@ -3,8 +3,11 @@
 data.go.kr(공공데이터포털)의 OpenAPI **활용신청·인증키 발급·호출을 AI 에이전트가 대신**하게 하는
 Go CLI + MCP. 사람은 정부 SSO 로그인 한 번만 하고 이후 포털 작업을 에이전트가 잇는 것이 핵심.
 
-## 현재 상태 (2026-09-01)
+## 현재 상태 (2026-09-02)
 
+- v0.16은 README의 공개 정체성을 문틈에서 조용히 얼굴을 내민 캐릭터와 한 줄 질문 중심으로 바꿨다.
+  이름·문구·로고 경로의 기준은 `docs/brand/brand.json`이며, `go run ./scripts/sync-brand.go`가 README
+  상단 블록을 갱신하고 CI의 `--check`가 불일치를 막는다.
 - v0.14는 공식 월간 목록 CSV와 포털 제공형을 합친 약 9.6만 건의 prebuilt composite 카탈로그를
   릴리즈에 포함한다. API+FILE 복수 제공형을 보존하고, REST·LINK·FILE을 공통 `inspect_dataset`으로
   검사한 뒤 호출 가능한 계약만 신청·호출 흐름으로 넘긴다. 신규 통합 API+FILE 페이지, 공식 ODCloud
