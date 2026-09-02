@@ -7,6 +7,23 @@ section matching a `vX.Y.Z` tag as the GitHub release notes.
 
 ## [Unreleased]
 
+## [0.16.0] - 2026-09-02
+
+### Changed
+
+- Reframed the README around oddsock's quiet doorway character and a single-line
+  natural-language question, with concise proof points for discovery, inspection,
+  application and first-call workflows.
+- Replaced the meerkat mark with a transparent doorway-character SVG and matching
+  2048px PNG, including a light keyline that stays legible on dark GitHub themes.
+- Restored authenticated private-repository installation, source-install catalogue
+  bootstrap and legacy Homebrew/Windows upgrade guidance.
+
+### Security
+
+- Documented when standalone discovery sends a goal to a logged-in Codex, Claude,
+  Gemini or Cursor process, including sensitive-input and untrusted-metadata bounds.
+
 ## [0.15.0] - 2026-09-02
 
 ### Changed
