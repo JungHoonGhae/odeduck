@@ -8,6 +8,8 @@ Rulesets. After the repository becomes public, apply the default-branch ruleset 
 ```sh
 gh api --method POST repos/JungHoonGhae/oddsock/rulesets \
   --input .github/rulesets/main.json
+gh api --method POST repos/JungHoonGhae/oddsock/rulesets \
+  --input .github/rulesets/release-tags.json
 ```
 
 Then verify the live rule and the two required CI checks:
@@ -17,7 +19,8 @@ gh api repos/JungHoonGhae/oddsock/rulesets
 gh api repos/JungHoonGhae/oddsock/rules/branches/main
 ```
 
-The ruleset requires pull requests, a linear history, resolved review conversations, and the `test-and-build` and
-`windows-installer` checks from the GitHub Actions app. It blocks deletion and force pushes. It intentionally requires
-zero approvals because this is a solo-maintained repository; requiring another person's approval would make routine
+The branch ruleset requires pull requests, a linear history, resolved review conversations, and the `test-and-build`,
+`windows-installer`, and `dependency-review` checks from the GitHub Actions app. It blocks deletion and force pushes.
+The tag ruleset makes published `v*` release references immutable. The branch ruleset intentionally requires zero
+approvals because this is a solo-maintained repository; requiring another person's approval would make routine
 maintenance impossible.
