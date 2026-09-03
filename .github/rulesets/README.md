@@ -12,7 +12,7 @@ gh api --method POST repos/JungHoonGhae/oddsock/rulesets \
   --input .github/rulesets/release-tags.json
 ```
 
-Then verify the live rule and the two required CI checks:
+Then verify the live rules and required CI checks:
 
 ```sh
 gh api repos/JungHoonGhae/oddsock/rulesets
