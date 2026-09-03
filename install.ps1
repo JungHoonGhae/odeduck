@@ -1,6 +1,6 @@
 # oddsock installer (Windows PowerShell)
 #
-#   irm https://raw.githubusercontent.com/JungHoonGhae/oddsock/main/install.ps1 | iex
+#   irm https://github.com/JungHoonGhae/oddsock/releases/download/v0.16.1/install.ps1 | iex
 #
 # Environment variables:
 #   $env:ODDSOCK_VERSION  pin a version (e.g. v0.4.0, default: latest)
@@ -14,6 +14,50 @@ if (Get-Command gh -ErrorAction SilentlyContinue) {
     & gh auth status 2>$null | Out-Null
     $UseGh = $LASTEXITCODE -eq 0
 }
+
+function Get-LatestReleaseVersion {
+    param([string]$Repository)
+
+    if ($UseGh) {
+        try {
+            $Response = (& gh release view --repo $Repository --json tagName 2>$null) | ConvertFrom-Json
+            if ($LASTEXITCODE -eq 0 -and $Response.tagName) { return $Response.tagName }
+        }
+        catch {
+            # A public release remains available over HTTPS when gh is misconfigured.
+        }
+    }
+    # Follow the public release redirect instead of consuming the unauthenticated
+    # REST API quota shared by everyone behind the same NAT address.
+    $Response = Invoke-WebRequest -Uri "https://github.com/$Repository/releases/latest" -UseBasicParsing
+    $FinalUri = $Response.BaseResponse.RequestMessage.RequestUri
+    if (-not $FinalUri) { $FinalUri = $Response.BaseResponse.ResponseUri }
+    if (-not $FinalUri) { throw "Could not resolve the latest release redirect." }
+    return ([System.Uri]$FinalUri).Segments[-1].TrimEnd("/")
+}
+
+function Receive-ReleaseAsset {
+    param(
+        [string]$Repository,
+        [string]$Version,
+        [string]$Asset,
+        [string]$Destination
+    )
+
+    if ($UseGh) {
+        try {
+            & gh release download $Version --repo $Repository --pattern $Asset `
+                --dir (Split-Path -Parent $Destination) --clobber 2>$null
+            if ($LASTEXITCODE -eq 0 -and (Test-Path $Destination)) { return }
+        }
+        catch {
+            # Fall through to the public release URL.
+        }
+    }
+    Invoke-WebRequest -Uri "https://github.com/$Repository/releases/download/$Version/$Asset" `
+        -OutFile $Destination
+}
+
 $CurrentInstallDir = Join-Path $env:LOCALAPPDATA "oddsock"
 $FormerInstallDir = Join-Path $env:LOCALAPPDATA "opendatactl"
 $LegacyInstallDir = Join-Path $env:LOCALAPPDATA "gongctl"
@@ -49,18 +93,12 @@ else {
     $env:GONGCTL_VERSION
 }
 if (-not $Version) {
-    if ($UseGh) {
-        $Version = ((& gh release view --repo $Repo --json tagName) | ConvertFrom-Json).tagName
-    }
-    else {
-        $Version = (Invoke-RestMethod -Uri "https://api.github.com/repos/$Repo/releases/latest").tag_name
-    }
+    $Version = Get-LatestReleaseVersion -Repository $Repo
 }
 if (-not $Version) { throw "Could not resolve latest version." }
 $VerNoV = $Version.TrimStart("v")
 
 $Asset = "oddsock_${VerNoV}_windows_${Arch}.zip"
-$Url = "https://github.com/$Repo/releases/download/$Version/$Asset"
 
 Write-Host "Installing oddsock $Version ($Arch)..."
 $Tmp = Join-Path ([System.IO.Path]::GetTempPath()) ([System.Guid]::NewGuid())
@@ -68,39 +106,19 @@ New-Item -ItemType Directory -Path $Tmp | Out-Null
 try {
     $Zip = Join-Path $Tmp $Asset
     try {
-        if ($UseGh) {
-            & gh release download $Version --repo $Repo --pattern $Asset --dir $Tmp --clobber
-            if ($LASTEXITCODE -ne 0) { throw "gh release download failed" }
-        }
-        else {
-            Invoke-WebRequest -Uri $Url -OutFile $Zip
-        }
+        Receive-ReleaseAsset -Repository $Repo -Version $Version -Asset $Asset -Destination $Zip
     }
     catch {
         try {
             $Asset = "opendatactl_${VerNoV}_windows_${Arch}.zip"
-            $Url = "https://github.com/$Repo/releases/download/$Version/$Asset"
             $Zip = Join-Path $Tmp $Asset
-            if ($UseGh) {
-                & gh release download $Version --repo $Repo --pattern $Asset --dir $Tmp --clobber
-                if ($LASTEXITCODE -ne 0) { throw "gh release download failed" }
-            }
-            else {
-                Invoke-WebRequest -Uri $Url -OutFile $Zip
-            }
+            Receive-ReleaseAsset -Repository $Repo -Version $Version -Asset $Asset -Destination $Zip
         }
         catch {
             # v0.8 and earlier only shipped gongctl_* archives.
             $Asset = "gongctl_${VerNoV}_windows_${Arch}.zip"
-            $Url = "https://github.com/$Repo/releases/download/$Version/$Asset"
             $Zip = Join-Path $Tmp $Asset
-            if ($UseGh) {
-                & gh release download $Version --repo $Repo --pattern $Asset --dir $Tmp --clobber
-                if ($LASTEXITCODE -ne 0) { throw "gh release download failed" }
-            }
-            else {
-                Invoke-WebRequest -Uri $Url -OutFile $Zip
-            }
+            Receive-ReleaseAsset -Repository $Repo -Version $Version -Asset $Asset -Destination $Zip
         }
     }
 
@@ -108,26 +126,14 @@ try {
     $CatalogFile = Join-Path $Tmp $CatalogAsset
     $CatalogAvailable = $false
     try {
-        if ($UseGh) {
-            & gh release download $Version --repo $Repo --pattern $CatalogAsset --dir $Tmp --clobber
-            if ($LASTEXITCODE -ne 0) { throw "gh catalogue download failed" }
-        }
-        else {
-            Invoke-WebRequest -Uri "https://github.com/$Repo/releases/download/$Version/$CatalogAsset" -OutFile $CatalogFile
-        }
+        Receive-ReleaseAsset -Repository $Repo -Version $Version -Asset $CatalogAsset -Destination $CatalogFile
         $CatalogAvailable = $true
     }
     catch {
         $CatalogAsset = "opendatactl-catalog.json.gz"
         $CatalogFile = Join-Path $Tmp $CatalogAsset
         try {
-            if ($UseGh) {
-                & gh release download $Version --repo $Repo --pattern $CatalogAsset --dir $Tmp --clobber
-                if ($LASTEXITCODE -ne 0) { throw "gh catalogue download failed" }
-            }
-            else {
-                Invoke-WebRequest -Uri "https://github.com/$Repo/releases/download/$Version/$CatalogAsset" -OutFile $CatalogFile
-            }
+            Receive-ReleaseAsset -Repository $Repo -Version $Version -Asset $CatalogAsset -Destination $CatalogFile
             $CatalogAvailable = $true
         }
         catch {
@@ -137,13 +143,7 @@ try {
 
     # Verify against checksums.txt from the same release.
     $ChecksumFile = Join-Path $Tmp "checksums.txt"
-    if ($UseGh) {
-        & gh release download $Version --repo $Repo --pattern "checksums.txt" --dir $Tmp --clobber
-        if ($LASTEXITCODE -ne 0) { throw "gh checksum download failed" }
-    }
-    else {
-        Invoke-WebRequest -Uri "https://github.com/$Repo/releases/download/$Version/checksums.txt" -OutFile $ChecksumFile
-    }
+    Receive-ReleaseAsset -Repository $Repo -Version $Version -Asset "checksums.txt" -Destination $ChecksumFile
     $Expected = (Select-String -Path $ChecksumFile -Pattern ([regex]::Escape($Asset))).Line.Split(" ")[0]
     $Actual = (Get-FileHash -Algorithm SHA256 -Path $Zip).Hash.ToLower()
     if ($Expected -ne $Actual) { throw "Checksum mismatch for $Asset" }

@@ -15,7 +15,7 @@
 </p>
 
 <p align="center">
-  <strong>데이터 96,683개 &middot; 실계정 E2E 4종 &middot; provider canary 11개</strong><br>
+  <strong>데이터 96,000+개 &middot; 실계정 E2E 4종 &middot; provider canary 11개</strong><br>
   <sub>REST·LINK·FILE을 함께 찾고, 실제 명세와 파일을 검사해, 활용신청부터 첫 호출까지 잇는다.</sub>
 </p>
 
@@ -74,13 +74,13 @@ FILE은 내려받아 구조를 관찰한다. 지원하지 않는 외부 제공�
 oddsock이 성공할 가게를 대신 골라주지는 않는다. 대신 감으로 끝나던 사업 아이디어를 어떤 데이터로
 검증할 수 있는지 보여주고, 그 데이터를 실제로 쓸 수 있는 곳까지 데려온다.
 
-## 먼저 30초, 그다음 한 문장
+## 먼저 로그인 없이, 그다음 한 문장
 
 데이터포털 계정도 API 키도 필요 없다. 릴리스에 검증된 전체 카탈로그가 함께 들어 있으므로 설치하자마자
 로컬에서 검색할 수 있다.
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/JungHoonGhae/oddsock/main/install.sh | sh
+curl -fsSL https://github.com/JungHoonGhae/oddsock/releases/download/v0.16.1/install.sh | sh
 
 oddsock catalog search \
   "서울에서 작은 가게 후보를 좁힐 자료" \
@@ -124,7 +124,7 @@ oddsock catalog discover \
 | 확인한 것 | 결과 |
 | --- | --- |
 | 통합 카탈로그 | 2026-09-02 릴리스 기준 96,683개 노드. REST·LINK·FILE과 복수 제공형 보존 |
-| 실계정 end-to-end | 온비드 공매·나라장터 입찰·공영도매시장 경매·중소기업 지원사업 신청→승인→호출 |
+| 실계정 end-to-end | 온비드 공매·나라장터 입찰·공영도매시장 경매·중소기업 지원사업 데이터 4종의 활용신청→승인→호출 |
 | 외부 제공기관 | SafetyKorea·FoodSafetyKorea·VWorld typed 호출, 서울 열린데이터광장 계약 검사 |
 | drift 감시 | provider adapter 4개, live canary 11개, 주간 CI |
 | 실패 경계 | 미지원 LINK·불안전한 전송·불충분한 결합 근거에서 멈춤 |
@@ -160,7 +160,7 @@ oddsock은 검색 1위를 정답이라고 부르지 않는다. 다음 단계를 
 
 ```text
 1. 무슨 데이터가 필요한가?     → 질문을 서로 다른 역할의 검색축으로 나눈다
-2. 이름이 틀렸을 수 있나?       → 96,683개 통합 카탈로그를 함께 뒤진다
+2. 이름이 틀렸을 수 있나?       → 96,000+개 통합 카탈로그를 함께 뒤진다
 3. 정말 쓸 수 있나?             → API 명세와 FILE의 실제 컬럼을 본다
 4. 권한이 필요한가?              → 활용신청·승인·provider 키를 처리한다
 5. 서로 연결되는가?              → 필드·범위·값 교집합을 확인한다
@@ -178,17 +178,17 @@ oddsock은 검색 1위를 정답이라고 부르지 않는다. 다음 단계를 
 macOS / Linux:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/JungHoonGhae/oddsock/main/install.sh | sh
+curl -fsSL https://github.com/JungHoonGhae/oddsock/releases/download/v0.16.1/install.sh | sh
 ```
 
 Windows:
 
 ```powershell
-irm https://raw.githubusercontent.com/JungHoonGhae/oddsock/main/install.ps1 | iex
+irm https://github.com/JungHoonGhae/oddsock/releases/download/v0.16.1/install.ps1 | iex
 ```
 
 설치 스크립트는 바이너리와 같은 릴리스의 checksum을 검증하고, 검증된 카탈로그 snapshot도 함께
-설치한다. 또는 Go 1.26 이상이 있다면:
+설치한다. 또는 Go 1.26.6 이상이 있다면:
 
 ```sh
 go install github.com/JungHoonGhae/oddsock/cmd/oddsock@latest

@@ -1,7 +1,7 @@
 #!/bin/sh
 # oddsock 설치 스크립트 (macOS/Linux)
 #
-#   curl -fsSL https://raw.githubusercontent.com/JungHoonGhae/oddsock/main/install.sh | sh
+#   curl -fsSL https://github.com/JungHoonGhae/oddsock/releases/download/v0.16.1/install.sh | sh
 #
 # 환경변수:
 #   INSTALL_DIR     설치 위치 (기본 /usr/local/bin)
@@ -18,15 +18,15 @@ INSTALL_DIR="${INSTALL_DIR:-/usr/local/bin}"
 main() {
     os=$(detect_os)
     arch=$(detect_arch)
+    version="${ODDSOCK_VERSION:-${OPENDATACTL_VERSION:-${GONGCTL_VERSION:-$(latest_version)}}}"
+    [ -n "$version" ] || { echo "Error: could not resolve latest version."; exit 1; }
 
     if [ "$os" = "windows" ]; then
         echo "Error: this script does not support Windows. Use PowerShell instead:"
-        echo '  (& gh api -H "Accept: application/vnd.github.raw+json" repos/'"$REPO"'/contents/install.ps1) | Out-String | Invoke-Expression'
+        echo '  irm https://github.com/'"$REPO"'/releases/download/'"$version"'/install.ps1 | iex'
         exit 1
     fi
 
-    version="${ODDSOCK_VERSION:-${OPENDATACTL_VERSION:-${GONGCTL_VERSION:-$(latest_version)}}}"
-    [ -n "$version" ] || { echo "Error: could not resolve latest version."; exit 1; }
     ver_no_v="${version#v}"
 
     asset="${BINARY}_${ver_no_v}_${os}_${arch}.tar.gz"
@@ -128,8 +128,12 @@ main() {
 
 latest_version() {
     if gh_authenticated; then
-        gh release view --repo "$REPO" --json tagName --jq .tagName
-        return
+        if resolved_version=$(gh release view --repo "$REPO" --json tagName --jq .tagName 2>/dev/null); then
+            if [ -n "$resolved_version" ]; then
+                printf '%s\n' "$resolved_version"
+                return
+            fi
+        fi
     fi
     # API 대신 releases/latest 리다이렉트에서 태그 추출 (rate limit 없음)
     curl -fsSLI -o /dev/null -w '%{url_effective}' "https://github.com/${REPO}/releases/latest" \

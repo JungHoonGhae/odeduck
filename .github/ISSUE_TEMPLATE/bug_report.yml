@@ -18,7 +18,7 @@ body:
     attributes:
       label: oddsock version
       description: Run `oddsock version`.
-      placeholder: oddsock 0.16.1
+      placeholder: Paste the output of `oddsock version`
     validations:
       required: true
   - type: dropdown
@@ -55,4 +55,3 @@ body:
       description: Paste only output that has been checked for credentials and personal data.
     validations:
       required: true
-

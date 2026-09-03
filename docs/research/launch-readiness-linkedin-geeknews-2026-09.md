@@ -65,7 +65,7 @@ oddsock의 런칭 소재는 “공공데이터 9.6만 건” 자체가 아니라
 - 외부 AI 호출: 없음 (`--semantic=false`)
 - 결과: 생활인구, 추정매출, 상권 점포, 상권 개폐업 축에서 273건 발견
 
-대표 명령은 README의 `먼저 30초, 그다음 한 문장`에 기록했다.
+대표 명령은 README의 `먼저 로그인 없이, 그다음 한 문장`에 기록했다.
 
 ## 자연어 한 문장 데모
 
@@ -110,9 +110,11 @@ secret scanning 설정도 public 전환 후 확인한다.
 ## 런칭 순서
 
 1. README·installer·공유 카드 변경을 CI가 통과한 PR로 합친다.
-2. `v0.16.1` 태그 릴리스에서 바이너리·checksum·카탈로그 asset을 확인한다.
+2. immutable releases를 켠 뒤 `v0.16.1` 태그 릴리스에서 바이너리·설치 스크립트·checksum·카탈로그
+   asset을 확인한다.
 3. 저장소를 public으로 전환한다.
-4. 로그아웃 상태에서 README 설치 명령과 저장소 링크를 다시 검증한다.
-5. GitHub social preview를 1280×640 카드로 설정하고 private vulnerability reporting을 켠다.
-6. GitHub 프로필의 `public release in progress`를 실제 저장소 링크로 바꾼다.
-7. GeekNews Show GN과 LinkedIn을 같은 날이 아니라 순차적으로 게시해 유입과 실패를 관찰한다.
+4. 저장소를 public으로 바꾸자마자 `main`에 PR·필수 CI·force-push 차단 ruleset을 적용한다.
+5. 로그아웃 상태에서 README 설치 명령과 저장소 링크를 다시 검증한다.
+6. GitHub social preview를 1280×640 카드로 설정하고 private vulnerability reporting을 켠다.
+7. GitHub 프로필의 `public release in progress`를 실제 저장소 링크로 바꾼다.
+8. GeekNews Show GN과 LinkedIn을 같은 날이 아니라 순차적으로 게시해 유입과 실패를 관찰한다.

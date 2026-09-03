@@ -34,13 +34,13 @@ cardinality를 확인하지 않았으므로 “비 오는 날 잘되는 카페�
 `추정매출`, 가게의 생존은 `점포이력`과 `개폐업`으로 나뉩니다. 데이터가 없는 게 아니라, 먼저 데이터가
 붙인 이름을 알아야 찾을 수 있었습니다.
 
-그래서 oddsock을 만들었습니다. 한국 공공데이터 96,683건의 REST·LINK·FILE을 함께 찾고, 실제 명세와
+그래서 oddsock을 만들었습니다. 한국 공공데이터 9.6만+건의 REST·LINK·FILE을 함께 찾고, 실제 명세와
 파일 컬럼을 검사하고, 필요하면 활용신청부터 첫 API 호출까지 이어주는 오픈소스 CLI/MCP입니다.
 
 첫 검색은 data.go.kr 계정이나 API 키 없이 바로 됩니다.
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/JungHoonGhae/oddsock/main/install.sh | sh
+curl -fsSL https://github.com/JungHoonGhae/oddsock/releases/download/v0.16.1/install.sh | sh
 
 oddsock catalog search \
   "서울에서 작은 가게 후보를 좁힐 자료" \
@@ -96,12 +96,13 @@ GitHub: https://github.com/JungHoonGhae/oddsock
 
 그래서 oddsock을 만들었다.
 
-한 문장을 여러 검색축으로 나눠 한국 공공데이터 96,683건의 REST·LINK·FILE을 함께 찾는다. 실제 파일과
+한 문장을 여러 검색축으로 나눠 한국 공공데이터 9.6만+건의 REST·LINK·FILE을 함께 찾는다. 실제 파일과
 컬럼을 열어 보고, REST가 필요하면 활용신청·승인 확인·키 주입·첫 호출까지 이어준다. 지원하지 않는
 기관은 그럴듯한 API를 만들지 않고 공식 경로에서 멈춘다.
 
-데이터포털 계정과 API 키는 필요 없다. 자연어 검색 계획은 이미 로그인된 Codex·Claude·Gemini·Cursor
-중 하나를 사용한다.
+첫 검색에는 데이터포털 계정과 API 키가 필요 없다. 자연어 검색 계획은 이미 로그인된
+Codex·Claude·Gemini·Cursor 중 하나를 사용한다. 실제 활용신청과 호출 단계에서만 data.go.kr 로그인이
+필요하다.
 
 이번에 공개하는 건 “AI가 사업을 골라주는 도구”가 아니다. 감으로 끝나던 질문을 어떤 데이터로 검증할
 수 있는지 보여주고, 그 데이터를 실제로 쓸 수 있는 곳까지 데려가는 오픈소스다.
@@ -131,6 +132,8 @@ https://github.com/JungHoonGhae/oddsock
 - 기본 카탈로그 검색이 로그인과 외부 AI 없이 재현된다.
 - 자연어 한 문장 데모가 사용할 AI 제공자를 명시하고 연결 후보의 검증 전 경계를 유지한다.
 - 저장소 공개 직후 GitHub social preview에 `docs/assets/oddsock-social-preview.png`를 등록한다.
+- `v0.16.1` 발행 전에 immutable releases를 켜고, 릴리스에서 `install.sh`·`install.ps1`·checksum을 확인한다.
+- 공개 직후 `main`에 PR·필수 CI·force-push 차단 ruleset을 적용한 뒤 외부 링크를 배포한다.
 - GitHub 프로필의 oddsock 항목을 위의 공개 링크 문구로 교체한다.
 - GitHub private vulnerability reporting을 켜고 Security 탭의 비공개 신고 링크를 확인한다.
 - LinkedIn 게시물 공개 범위를 `Anyone`으로 둔다.

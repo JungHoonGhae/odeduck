@@ -24,8 +24,8 @@ jobs:
       - name: Verify generated brand copy
         run: go run ./scripts/sync-brand.go --check
 
-      - name: Parse shell installer
-        run: sh -n ./install.sh
+      - name: Test shell installer
+        run: ./scripts/test-install.sh
 
       - name: go vet
         run: go vet ./...
@@ -100,3 +100,7 @@ jobs:
             $errors | Format-List | Out-String | Write-Error
             exit 1
           }
+
+      - name: Test PowerShell installer
+        shell: pwsh
+        run: ./scripts/test-install.ps1
