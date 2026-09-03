@@ -83,7 +83,10 @@ jobs:
           go-version-file: go.mod
 
       - name: Test Windows build and config migration
-        run: go test ./...
+        # The only short-skipped test launches a real browser. The Linux job
+        # keeps that regression coverage; this job is for Windows build/config
+        # portability and must not depend on hosted-runner Edge startup timing.
+        run: go test -short ./...
 
       - name: Parse PowerShell installer
         shell: pwsh
