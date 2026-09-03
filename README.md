@@ -173,6 +173,8 @@ oddsock은 검색 1위를 정답이라고 부르지 않는다. 다음 단계를 
 전체 계약은 [교차 데이터 연결 발견 명세](docs/specs/cross-domain-connection-discovery-v1.md), 실제 평가는
 [연결 발견 평가](docs/research/connection-discovery-evaluation.md)에 있다.
 
+구성요소, 데이터 흐름, 로컬 상태와 신뢰 경계는 [아키텍처 문서](ARCHITECTURE.md)에 정리했다.
+
 ## Install
 
 macOS / Linux:
@@ -304,7 +306,8 @@ go vet ./...
 go build ./...
 ```
 
-구현 규칙은 [provider adapter guide](docs/provider-adapters.md), 설계 결정은 [ADR](docs/adr/)에서 시작한다.
+전체 구조는 [아키텍처 문서](ARCHITECTURE.md), 구현 규칙은
+[provider adapter guide](docs/provider-adapters.md), 설계 결정은 [ADR](docs/adr/)에서 시작한다.
 처음 기여한다면 [기여 가이드](CONTRIBUTING.md)를, 보안 문제라면 공개 이슈를 만들기 전에
 [보안 정책](SECURITY.md)을 먼저 읽는다.
 사용법 질문과 재현 가능한 공개데이터 질문은 [Discussions](https://github.com/JungHoonGhae/oddsock/discussions)에
