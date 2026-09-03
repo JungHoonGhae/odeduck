@@ -116,7 +116,6 @@ https://github.com/JungHoonGhae/oddsock
 ### 첨부 이미지
 
 - `docs/assets/oddsock-linkedin-demo.png` — 1200×627, 게시물의 실제 데모를 보여주는 기본 이미지
-- `docs/assets/oddsock-linkedin-card.png` — 1200×627, 제품 자체를 소개할 때 쓰는 대안 이미지
 
 ## 공개 직후 프로필 교체 문구
 
