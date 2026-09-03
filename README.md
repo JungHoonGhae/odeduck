@@ -285,6 +285,10 @@ go build ./...
 ```
 
 구현 규칙은 [provider adapter guide](docs/provider-adapters.md), 설계 결정은 [ADR](docs/adr/)에서 시작한다.
+처음 기여한다면 [기여 가이드](CONTRIBUTING.md)를, 보안 문제라면 공개 이슈를 만들기 전에
+[보안 정책](SECURITY.md)을 먼저 읽는다.
+사용법 질문과 재현 가능한 공개데이터 질문은 [Discussions](https://github.com/JungHoonGhae/oddsock/discussions)에
+남길 수 있다.
 
 공개 이름·문구·로고 경로는 [`docs/brand/brand.json`](docs/brand/brand.json)이 기준이다. 값을 바꾼 뒤
 `go run ./scripts/sync-brand.go`를 실행하면 위 브랜드 블록이 갱신되고, CI는 `--check`로 동기화를 확인한다.

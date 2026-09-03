@@ -28,6 +28,13 @@ section matching a `vX.Y.Z` tag as the GitHub release notes.
 - Added a redacted full-history Gitleaks check to CI, with exact-fingerprint ignores
   for reviewed test fixtures and protocol examples so new findings still fail.
 
+### Community
+
+- Added contribution, security and conduct policies, structured issue forms, a
+  pull-request checklist, funding metadata and monthly dependency updates.
+- Removed paused local-tracker scratch documents from the public tree; their history
+  remains recoverable in Git while GitHub Issues stays the canonical tracker.
+
 ## [0.16.0] - 2026-09-02
 
 ### Changed

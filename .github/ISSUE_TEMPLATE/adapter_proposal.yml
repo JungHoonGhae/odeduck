@@ -1,0 +1,46 @@
+name: Provider adapter proposal
+description: Propose a verified external public-data provider integration.
+title: "adapter: "
+labels:
+  - enhancement
+  - needs-triage
+body:
+  - type: input
+    id: provider
+    attributes:
+      label: Provider
+      placeholder: Provider name
+    validations:
+      required: true
+  - type: input
+    id: documentation
+    attributes:
+      label: Official HTTPS documentation
+      placeholder: https://...
+    validations:
+      required: true
+  - type: textarea
+    id: value
+    attributes:
+      label: What becomes possible
+      description: Explain the concrete public-data workflow and why a LINK handoff is insufficient.
+    validations:
+      required: true
+  - type: textarea
+    id: credential
+    attributes:
+      label: Credential contract
+      description: Describe signup, approval, credential placement, and scope. Never paste a real key.
+    validations:
+      required: true
+  - type: checkboxes
+    attributes:
+      label: Contract checks
+      options:
+        - label: The provider has official HTTPS documentation.
+          required: true
+        - label: I did not include a real credential or account identifier.
+          required: true
+        - label: A read-only, bounded canary appears possible.
+          required: true
+

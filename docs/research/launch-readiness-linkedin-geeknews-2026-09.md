@@ -82,7 +82,6 @@ secret scanning 설정도 public 전환 후 확인한다.
 2. `v0.16.1` 태그 릴리스에서 바이너리·checksum·카탈로그 asset을 확인한다.
 3. 저장소를 public으로 전환한다.
 4. 로그아웃 상태에서 README 설치 명령과 저장소 링크를 다시 검증한다.
-5. GitHub social preview를 1280×640 카드로 설정한다.
+5. GitHub social preview를 1280×640 카드로 설정하고 private vulnerability reporting을 켠다.
 6. GitHub 프로필의 `preparing the public release`를 실제 공개 문구로 바꾼다.
 7. GeekNews Show GN과 LinkedIn을 같은 날이 아니라 순차적으로 게시해 유입과 실패를 관찰한다.
-
