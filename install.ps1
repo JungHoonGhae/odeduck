@@ -1,7 +1,6 @@
 # oddsock installer (Windows PowerShell)
 #
-#   (& gh api -H "Accept: application/vnd.github.raw+json" repos/JungHoonGhae/oddsock/contents/install.ps1) |
-#     Out-String | Invoke-Expression
+#   irm https://raw.githubusercontent.com/JungHoonGhae/oddsock/main/install.ps1 | iex
 #
 # Environment variables:
 #   $env:ODDSOCK_VERSION  pin a version (e.g. v0.4.0, default: latest)
@@ -10,6 +9,11 @@
 $ErrorActionPreference = "Stop"
 
 $Repo = "JungHoonGhae/oddsock"
+$UseGh = $false
+if (Get-Command gh -ErrorAction SilentlyContinue) {
+    & gh auth status 2>$null | Out-Null
+    $UseGh = $LASTEXITCODE -eq 0
+}
 $CurrentInstallDir = Join-Path $env:LOCALAPPDATA "oddsock"
 $FormerInstallDir = Join-Path $env:LOCALAPPDATA "opendatactl"
 $LegacyInstallDir = Join-Path $env:LOCALAPPDATA "gongctl"
@@ -45,12 +49,11 @@ else {
     $env:GONGCTL_VERSION
 }
 if (-not $Version) {
-    if (Get-Command gh -ErrorAction SilentlyContinue) {
+    if ($UseGh) {
         $Version = ((& gh release view --repo $Repo --json tagName) | ConvertFrom-Json).tagName
     }
     else {
-        $resp = Invoke-WebRequest -Uri "https://github.com/$Repo/releases/latest" -MaximumRedirection 0 -SkipHttpErrorCheck -ErrorAction SilentlyContinue
-        $Version = ($resp.Headers.Location | Select-Object -First 1) -replace ".*/tag/", ""
+        $Version = (Invoke-RestMethod -Uri "https://api.github.com/repos/$Repo/releases/latest").tag_name
     }
 }
 if (-not $Version) { throw "Could not resolve latest version." }
@@ -65,7 +68,7 @@ New-Item -ItemType Directory -Path $Tmp | Out-Null
 try {
     $Zip = Join-Path $Tmp $Asset
     try {
-        if (Get-Command gh -ErrorAction SilentlyContinue) {
+        if ($UseGh) {
             & gh release download $Version --repo $Repo --pattern $Asset --dir $Tmp --clobber
             if ($LASTEXITCODE -ne 0) { throw "gh release download failed" }
         }
@@ -78,7 +81,7 @@ try {
             $Asset = "opendatactl_${VerNoV}_windows_${Arch}.zip"
             $Url = "https://github.com/$Repo/releases/download/$Version/$Asset"
             $Zip = Join-Path $Tmp $Asset
-            if (Get-Command gh -ErrorAction SilentlyContinue) {
+            if ($UseGh) {
                 & gh release download $Version --repo $Repo --pattern $Asset --dir $Tmp --clobber
                 if ($LASTEXITCODE -ne 0) { throw "gh release download failed" }
             }
@@ -91,7 +94,7 @@ try {
             $Asset = "gongctl_${VerNoV}_windows_${Arch}.zip"
             $Url = "https://github.com/$Repo/releases/download/$Version/$Asset"
             $Zip = Join-Path $Tmp $Asset
-            if (Get-Command gh -ErrorAction SilentlyContinue) {
+            if ($UseGh) {
                 & gh release download $Version --repo $Repo --pattern $Asset --dir $Tmp --clobber
                 if ($LASTEXITCODE -ne 0) { throw "gh release download failed" }
             }
@@ -105,7 +108,7 @@ try {
     $CatalogFile = Join-Path $Tmp $CatalogAsset
     $CatalogAvailable = $false
     try {
-        if (Get-Command gh -ErrorAction SilentlyContinue) {
+        if ($UseGh) {
             & gh release download $Version --repo $Repo --pattern $CatalogAsset --dir $Tmp --clobber
             if ($LASTEXITCODE -ne 0) { throw "gh catalogue download failed" }
         }
@@ -118,7 +121,7 @@ try {
         $CatalogAsset = "opendatactl-catalog.json.gz"
         $CatalogFile = Join-Path $Tmp $CatalogAsset
         try {
-            if (Get-Command gh -ErrorAction SilentlyContinue) {
+            if ($UseGh) {
                 & gh release download $Version --repo $Repo --pattern $CatalogAsset --dir $Tmp --clobber
                 if ($LASTEXITCODE -ne 0) { throw "gh catalogue download failed" }
             }
@@ -134,7 +137,7 @@ try {
 
     # Verify against checksums.txt from the same release.
     $ChecksumFile = Join-Path $Tmp "checksums.txt"
-    if (Get-Command gh -ErrorAction SilentlyContinue) {
+    if ($UseGh) {
         & gh release download $Version --repo $Repo --pattern "checksums.txt" --dir $Tmp --clobber
         if ($LASTEXITCODE -ne 0) { throw "gh checksum download failed" }
     }

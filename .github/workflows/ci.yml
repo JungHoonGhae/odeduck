@@ -22,11 +22,17 @@ jobs:
       - name: Verify generated brand copy
         run: go run ./scripts/sync-brand.go --check
 
+      - name: Parse shell installer
+        run: sh -n ./install.sh
+
       - name: go vet
         run: go vet ./...
 
       - name: Vulnerability scan
         run: go run golang.org/x/vuln/cmd/govulncheck@v1.7.0 ./...
+
+      - name: Secret scan
+        run: go run github.com/zricethezav/gitleaks/v8@v8.30.1 git --redact --no-banner .
 
       - name: Test (네트워크 불필요 — testdata/픽스처)
         run: go test ./...

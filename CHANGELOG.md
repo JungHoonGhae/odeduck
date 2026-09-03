@@ -17,6 +17,16 @@ section matching a `vX.Y.Z` tag as the GitHub release notes.
 - Clarified where existing public-data MCPs still hand work back to people and showed
   the real REST, FILE and LINK paths without implying that oddsock makes the final
   business decision.
+- Added a reproducible, no-login first-run example plus GitHub and LinkedIn launch
+  artwork that preserves the existing character mark.
+- Made the macOS/Linux and Windows installers fall back to public GitHub downloads
+  when the GitHub CLI is absent or unauthenticated, while retaining private-preview
+  support for authenticated contributors.
+
+### Security
+
+- Added a redacted full-history Gitleaks check to CI, with exact-fingerprint ignores
+  for reviewed test fixtures and protocol examples so new findings still fail.
 
 ## [0.16.0] - 2026-09-02
 

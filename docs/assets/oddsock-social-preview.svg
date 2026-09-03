@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="640" viewBox="0 0 1280 640">
+  <rect width="1280" height="640" fill="#F7F3EB"/>
+  <rect x="28" y="28" width="1224" height="584" rx="28" fill="none" stroke="#151513" stroke-width="2"/>
+
+  <g fill="#151513" font-family="'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif">
+    <text x="82" y="105" font-size="17" font-weight="700" letter-spacing="2.4">PUBLIC DATA · CLI + MCP</text>
+    <text x="78" y="211" font-size="82" font-weight="700" letter-spacing="-3">oddsock</text>
+    <text x="82" y="308" font-size="44" font-weight="700" letter-spacing="-1.6">공개돼 있었다.</text>
+    <text x="82" y="366" font-size="44" font-weight="700" letter-spacing="-1.6">찾기 쉽다는 뜻은 아니었다.</text>
+
+    <rect x="82" y="475" width="206" height="54" rx="27" fill="#151513"/>
+    <text x="185" y="509" fill="#F7F3EB" font-size="18" font-weight="700" text-anchor="middle">96,683개 카탈로그</text>
+
+    <rect x="304" y="475" width="188" height="54" rx="27" fill="none" stroke="#151513" stroke-width="2"/>
+    <text x="398" y="509" font-size="18" font-weight="700" text-anchor="middle">REST · LINK · FILE</text>
+
+    <text x="82" y="572" font-size="16" font-weight="400" letter-spacing="0.4">질문에서 발견 · 신청 · 첫 호출까지</text>
+  </g>
+
+  <path d="M650 94v452" stroke="#151513" stroke-width="2" stroke-dasharray="3 12" stroke-linecap="round"/>
+  <image href="brand-symbol.svg" x="682" y="54" width="520" height="520" preserveAspectRatio="xMidYMid meet"/>
+</svg>

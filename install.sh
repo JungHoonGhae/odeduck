@@ -1,8 +1,7 @@
 #!/bin/sh
 # oddsock 설치 스크립트 (macOS/Linux)
 #
-#   gh api -H 'Accept: application/vnd.github.raw+json' \
-#     repos/JungHoonGhae/oddsock/contents/install.sh | sh
+#   curl -fsSL https://raw.githubusercontent.com/JungHoonGhae/oddsock/main/install.sh | sh
 #
 # 환경변수:
 #   INSTALL_DIR     설치 위치 (기본 /usr/local/bin)
@@ -128,7 +127,7 @@ main() {
 }
 
 latest_version() {
-    if command -v gh >/dev/null 2>&1; then
+    if gh_authenticated; then
         gh release view --repo "$REPO" --json tagName --jq .tagName
         return
     fi
@@ -141,11 +140,16 @@ download_asset() {
     release_version="$1"
     asset_name="$2"
     destination="$3"
-    if command -v gh >/dev/null 2>&1; then
-        gh release download "$release_version" --repo "$REPO" --pattern "$asset_name" --dir "$(dirname "$destination")" --clobber
-        return
+    if gh_authenticated; then
+        if gh release download "$release_version" --repo "$REPO" --pattern "$asset_name" --dir "$(dirname "$destination")" --clobber; then
+            return
+        fi
     fi
     curl -fsSL -o "$destination" "https://github.com/${REPO}/releases/download/${release_version}/${asset_name}"
+}
+
+gh_authenticated() {
+    command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1
 }
 
 detect_os() {

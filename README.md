@@ -15,7 +15,7 @@
 </p>
 
 <p align="center">
-  <strong>데이터 96,663개 &middot; 실계정 E2E 4종 &middot; provider canary 11개</strong><br>
+  <strong>데이터 96,683개 &middot; 실계정 E2E 4종 &middot; provider canary 11개</strong><br>
   <sub>REST·LINK·FILE을 함께 찾고, 실제 명세와 파일을 검사해, 활용신청부터 첫 호출까지 잇는다.</sub>
 </p>
 
@@ -74,13 +74,36 @@ FILE은 내려받아 구조를 관찰한다. 지원하지 않는 외부 제공�
 oddsock이 성공할 가게를 대신 골라주지는 않는다. 대신 감으로 끝나던 사업 아이디어를 어떤 데이터로
 검증할 수 있는지 보여주고, 그 데이터를 실제로 쓸 수 있는 곳까지 데려온다.
 
+## 30초 만에 직접 보기
+
+데이터포털 계정도 API 키도 필요 없다. 릴리스에 검증된 전체 카탈로그가 함께 들어 있으므로 설치하자마자
+로컬에서 검색할 수 있다.
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/JungHoonGhae/oddsock/main/install.sh | sh
+
+oddsock catalog search \
+  "서울에서 작은 가게 후보를 좁힐 자료" \
+  --concept 생활인구 \
+  --concept 추정매출 \
+  --concept "상권 점포" \
+  --concept "상권 개폐업" \
+  --limit 8 --semantic=false -f table
+```
+
+현재 릴리스 카탈로그로 실행하면 서울 생활인구·추정매출뿐 아니라 서울의 점포 데이터와 대전의
+상권별 개폐업 데이터까지 한 번에 나타난다. 여기까지는 로그인도, 외부 AI 호출도, 파일 다운로드도 없다.
+
+그다음 `inspect <PK> --observe`로 실제 파일과 컬럼을 확인한다. REST 활용신청과 첫 호출까지 가고 싶을
+때만 `oddsock login`으로 data.go.kr에 한 번 로그인한다.
+
 ## Numbers
 
 그럴듯한 데모 대신 실제 계정과 실제 포털에서 확인했다.
 
 | 확인한 것 | 결과 |
 | --- | --- |
-| 통합 카탈로그 | 2026-09-01 기준 96,663개 노드. REST·LINK·FILE과 복수 제공형 보존 |
+| 통합 카탈로그 | 2026-09-02 릴리스 기준 96,683개 노드. REST·LINK·FILE과 복수 제공형 보존 |
 | 실계정 end-to-end | 온비드 공매·나라장터 입찰·공영도매시장 경매·중소기업 지원사업 신청→승인→호출 |
 | 외부 제공기관 | SafetyKorea·FoodSafetyKorea·VWorld typed 호출, 서울 열린데이터광장 계약 검사 |
 | drift 감시 | provider adapter 4개, live canary 11개, 주간 CI |
@@ -117,7 +140,7 @@ oddsock은 검색 1위를 정답이라고 부르지 않는다. 다음 단계를 
 
 ```text
 1. 무슨 데이터가 필요한가?     → 질문을 서로 다른 역할의 검색축으로 나눈다
-2. 이름이 틀렸을 수 있나?       → 96,663개 통합 카탈로그를 함께 뒤진다
+2. 이름이 틀렸을 수 있나?       → 96,683개 통합 카탈로그를 함께 뒤진다
 3. 정말 쓸 수 있나?             → API 명세와 FILE의 실제 컬럼을 본다
 4. 권한이 필요한가?              → 활용신청·승인·provider 키를 처리한다
 5. 서로 연결되는가?              → 필드·범위·값 교집합을 확인한다
@@ -132,27 +155,23 @@ oddsock은 검색 1위를 정답이라고 부르지 않는다. 다음 단계를 
 
 ## Install
 
-저장소와 릴리스는 현재 비공개다. 먼저 [GitHub CLI](https://cli.github.com/)로 접근 권한이 있는
-계정에 로그인한다.
+macOS / Linux:
 
 ```sh
-gh auth login
-gh api -H 'Accept: application/vnd.github.raw+json' \
-  repos/JungHoonGhae/oddsock/contents/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/JungHoonGhae/oddsock/main/install.sh | sh
 ```
 
 Windows:
 
 ```powershell
-gh auth login
-(& gh api -H "Accept: application/vnd.github.raw+json" repos/JungHoonGhae/oddsock/contents/install.ps1) |
-  Out-String | Invoke-Expression
+irm https://raw.githubusercontent.com/JungHoonGhae/oddsock/main/install.ps1 | iex
 ```
 
-또는 저장소를 clone한 상태에서 Go 1.26 이상이 있다면:
+설치 스크립트는 바이너리와 같은 릴리스의 checksum을 검증하고, 검증된 카탈로그 snapshot도 함께
+설치한다. 또는 Go 1.26 이상이 있다면:
 
 ```sh
-go install ./cmd/oddsock
+go install github.com/JungHoonGhae/oddsock/cmd/oddsock@latest
 oddsock catalog sync
 ```
 
@@ -249,9 +268,9 @@ Cursor는 초기 검색 계획에만 쓰며 실제 카탈로그 metadata를 보�
 `opendatactl`과 `gongctl`은 전환 기간 동안 같은 엔진을 실행한다. 기존 설정·로그인 세션·인증키도
 복사 없이 다시 찾는다. 새 자동화에는 `oddsock` 명령과 `oddsock://guide` MCP 리소스를 쓰면 된다.
 
-비공개 저장소 전환 뒤 공개 Homebrew cask는 더 이상 갱신되지 않는다. v0.12.0 이상은 위의 인증된
-`gh api` 설치 경로를 사용한다. 파일로 저장해 둔 v0.8 Windows 설치 스크립트도 저장소 이름 변경을
-따라가지 못하므로, 위의 최신 PowerShell 명령을 한 번 실행해 기존 설치 폴더의 `oddsock.exe`,
+이전 공개 Homebrew cask는 더 이상 갱신되지 않는다. v0.12.0 이상은 위의 설치 스크립트를 사용한다.
+파일로 저장해 둔 v0.8 Windows 설치 스크립트도 저장소 이름 변경을 따라가지 못하므로, 위의 최신
+PowerShell 명령을 한 번 실행해 기존 설치 폴더의 `oddsock.exe`,
 `opendatactl.exe`, `gongctl.exe`를 함께 갱신한다. 설정과 로그인 상태는 그대로 유지된다.
 
 ## Development

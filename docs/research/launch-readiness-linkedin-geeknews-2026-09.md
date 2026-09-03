@@ -1,0 +1,88 @@
+# LinkedIn·GeekNews 공개 런칭 조사
+
+조사일: 2026-09-03
+
+## 결론
+
+oddsock의 런칭 소재는 “공공데이터 9.6만 건” 자체가 아니라, 일상어로 던진 질문이 공공기관의 데이터
+용어로 바뀌고 서로 다른 자료까지 한 화면에 놓이는 순간이다. 첫 체험은 계정 생성이나 data.go.kr 로그인
+없이 끝나야 한다. 활용신청과 호출은 그 다음 단계로 분리한다.
+
+현재 외부 공개를 막는 가장 큰 요인은 제품 기능이 아니라 저장소 visibility다. 프로필 README의 oddsock
+링크는 올바른 URL을 가리키지만, 저장소가 private라서 비로그인 방문자에게 404를 반환한다.
+
+## 플랫폼이 명시한 조건
+
+### GeekNews
+
+- 직접 만든 서비스나 오픈소스는 일반 뉴스가 아니라 `Show GN`으로 등록해야 한다.
+- 가입이나 이메일 제출 없이 바로 써볼 수 있는 상태가 권장된다.
+- 같은 프로젝트를 너무 자주 다시 올리는 것은 피하고, 큰 변화가 있을 때 다시 소개한다.
+- Show GN 본문 링크로 YouTube를 쓰지 않는다.
+- 과장된 제목보다 무엇을 만들었고 왜 만들었는지 분명한 제목이 맞다.
+
+근거: [GeekNews 커뮤니티 가이드라인](https://news.hada.io/guidelines),
+[Show GN 목록](https://news.hada.io/show), [GeekNews 시작 안내](https://news.hada.io/start)
+
+해석: `catalog search`를 로그인 없는 첫 체험으로 내세우고, data.go.kr SSO가 필요한 `apply`·`call`은
+확장 기능으로 설명해야 한다. “AI가 사업 아이디어를 찾아준다”보다 “일상어와 공공데이터의 용어 차이를
+메운다”가 첫 문장에 더 적합하다.
+
+### LinkedIn
+
+- 일반 게시물 본문은 최대 3,000자다.
+- 링크 미리보기 이미지는 1.91:1 비율, 1200×627이 권장된다.
+- 공개 범위를 `Anyone`으로 둔 게시물은 LinkedIn 밖과 검색엔진에도 노출될 수 있다.
+- 이미지·영상·문서를 붙이거나 게시 시간을 예약할 수 있다.
+
+근거: [LinkedIn 링크 공유 안내](https://www.linkedin.com/help/linkedin/answer/a525301),
+[게시물 작성 안내](https://www.linkedin.com/help/linkedin/answer/a528176),
+[LinkedIn 밖 게시물 노출 안내](https://www.linkedin.com/help/linkedin/answer/a529065)
+
+해석: 기능 목록을 3,000자까지 채우는 것보다, “사람이 늘어나는 동네”라는 일상어가 `생활인구`라는
+공식 용어를 만나기까지의 실패 경험을 짧게 보여주고 저장소 링크로 보낸다. 1200×627 전용 카드를
+첨부하고 공개 범위는 `Anyone`으로 둔다.
+
+### GitHub
+
+- 저장소 social preview는 다른 플랫폼에서 프로젝트를 식별하는 데 쓰인다.
+- 이미지는 PNG/JPG/GIF, 1MB 미만이어야 한다.
+- 최소 640×320, 권장 1280×640이다.
+- 저장소가 public일 때만 social preview가 외부 공유에 쓰인다.
+
+근거: [GitHub 저장소 social preview 문서](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/customizing-your-repositorys-social-media-preview)
+
+## 로컬에서 검증한 첫 체험
+
+격리된 임시 설정 디렉터리에서 v0.16.0 릴리스 바이너리와 `oddsock-catalog.json.gz`만 사용했다.
+
+- snapshot 설치: 96,683건
+- 로그인: 없음
+- API 키: 없음
+- 외부 AI 호출: 없음 (`--semantic=false`)
+- 결과: 생활인구, 추정매출, 상권 점포, 상권 개폐업 축에서 273건 발견
+
+대표 명령은 README의 `30초 만에 직접 보기`에 기록했다.
+
+## 공개 전 안전 점검
+
+Gitleaks v8.30.1로 현재 파일과 Git 전체 이력을 `--redact` 상태에서 검사했다. 탐지된 값은 모두 다음
+세 종류로 분류됐다.
+
+- provider 호출 테스트의 명시적 dummy key
+- Go module checksum이 남은 로컬 비추적 review diff
+- WebSocket RFC 예제 nonce와 영상 프롬프트의 `Style key` 문구
+
+실제 자격증명으로 분류된 항목은 없었다. 공개 직전에는 같은 검사를 한 번 더 수행하고, GitHub의
+secret scanning 설정도 public 전환 후 확인한다.
+
+## 런칭 순서
+
+1. README·installer·공유 카드 변경을 CI가 통과한 PR로 합친다.
+2. `v0.16.1` 태그 릴리스에서 바이너리·checksum·카탈로그 asset을 확인한다.
+3. 저장소를 public으로 전환한다.
+4. 로그아웃 상태에서 README 설치 명령과 저장소 링크를 다시 검증한다.
+5. GitHub social preview를 1280×640 카드로 설정한다.
+6. GitHub 프로필의 `preparing the public release`를 실제 공개 문구로 바꾼다.
+7. GeekNews Show GN과 LinkedIn을 같은 날이 아니라 순차적으로 게시해 유입과 실패를 관찰한다.
+
