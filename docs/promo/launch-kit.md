@@ -130,7 +130,8 @@ https://github.com/JungHoonGhae/oddsock
 - 설치 직후 `catalog info`에 9.6만 건 이상이 나온다.
 - 기본 카탈로그 검색이 로그인과 외부 AI 없이 재현된다.
 - 자연어 한 문장 데모가 사용할 AI 제공자를 명시하고 연결 후보의 검증 전 경계를 유지한다.
-- GitHub social preview에 `docs/assets/oddsock-social-preview.png`를 등록한다.
+- 저장소 공개 직후 GitHub social preview에 `docs/assets/oddsock-social-preview.png`를 등록한다.
+- GitHub 프로필의 oddsock 항목을 위의 공개 링크 문구로 교체한다.
 - GitHub private vulnerability reporting을 켜고 Security 탭의 비공개 신고 링크를 확인한다.
 - LinkedIn 게시물 공개 범위를 `Anyone`으로 둔다.
 - GeekNews는 일반 뉴스가 아니라 Show GN으로 등록한다.

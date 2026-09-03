@@ -8,8 +8,9 @@ oddsock의 런칭 소재는 “공공데이터 9.6만 건” 자체가 아니라
 용어로 바뀌고 서로 다른 자료까지 한 화면에 놓이는 순간이다. 첫 체험은 계정 생성이나 data.go.kr 로그인
 없이 끝나야 한다. 활용신청과 호출은 그 다음 단계로 분리한다.
 
-현재 외부 공개를 막는 가장 큰 요인은 제품 기능이 아니라 저장소 visibility다. 프로필 README의 oddsock
-링크는 올바른 URL을 가리키지만, 저장소가 private라서 비로그인 방문자에게 404를 반환한다.
+현재 외부 공개를 막는 가장 큰 요인은 제품 기능이 아니라 저장소 visibility다. private 저장소 링크가
+비로그인 방문자에게 404를 반환하므로 프로필에서는 oddsock 링크를 잠시 빼고 `public release in progress`로
+표시했다. 공개 전환 직후 같은 자리의 실제 저장소 링크를 복구한다.
 
 ## 플랫폼이 명시한 조건
 
@@ -48,6 +49,8 @@ oddsock의 런칭 소재는 “공공데이터 9.6만 건” 자체가 아니라
 - 저장소 social preview는 다른 플랫폼에서 프로젝트를 식별하는 데 쓰인다.
 - 이미지는 PNG/JPG/GIF, 1MB 미만이어야 한다.
 - 최소 640×320, 권장 1280×640이다.
+- 새 social preview의 첫 업로드는 public 저장소에서만 가능하다. private 저장소는 과거에 이미 이미지를
+  올린 경우에만 다시 업로드할 수 있다.
 - 저장소가 public일 때만 social preview가 외부 공유에 쓰인다.
 
 근거: [GitHub 저장소 social preview 문서](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/customizing-your-repositorys-social-media-preview)
@@ -111,5 +114,5 @@ secret scanning 설정도 public 전환 후 확인한다.
 3. 저장소를 public으로 전환한다.
 4. 로그아웃 상태에서 README 설치 명령과 저장소 링크를 다시 검증한다.
 5. GitHub social preview를 1280×640 카드로 설정하고 private vulnerability reporting을 켠다.
-6. GitHub 프로필의 `preparing the public release`를 실제 공개 문구로 바꾼다.
+6. GitHub 프로필의 `public release in progress`를 실제 저장소 링크로 바꾼다.
 7. GeekNews Show GN과 LinkedIn을 같은 날이 아니라 순차적으로 게시해 유입과 실패를 관찰한다.
