@@ -36,10 +36,12 @@
         "do_not_enforce_on_create": true,
         "required_status_checks": [
           {
-            "context": "test-and-build"
+            "context": "test-and-build",
+            "integration_id": 15368
           },
           {
-            "context": "windows-installer"
+            "context": "windows-installer",
+            "integration_id": 15368
           }
         ],
         "strict_required_status_checks_policy": true

@@ -18,5 +18,6 @@ gh api repos/JungHoonGhae/oddsock/rules/branches/main
 ```
 
 The ruleset requires pull requests, a linear history, resolved review conversations, and the `test-and-build` and
-`windows-installer` checks. It blocks deletion and force pushes. It intentionally requires zero approvals because
-this is a solo-maintained repository; requiring another person's approval would make routine maintenance impossible.
+`windows-installer` checks from the GitHub Actions app. It blocks deletion and force pushes. It intentionally requires
+zero approvals because this is a solo-maintained repository; requiring another person's approval would make routine
+maintenance impossible.
