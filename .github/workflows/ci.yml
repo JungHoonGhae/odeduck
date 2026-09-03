@@ -25,7 +25,10 @@ jobs:
         run: go run ./scripts/sync-brand.go --check
 
       - name: Test shell installer
-        run: ./scripts/test-install.sh
+        run: |
+          sh -n ./scripts/verify-public-release.sh
+          ./scripts/test-install.sh
+          ./scripts/test-public-release.sh
 
       - name: go vet
         run: go vet ./...

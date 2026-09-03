@@ -117,10 +117,10 @@ https://github.com/JungHoonGhae/oddsock
 
 - `docs/assets/oddsock-linkedin-demo.png` — 1200×627, 게시물의 실제 데모를 보여주는 기본 이미지
 
-## 공개 직후 프로필 교체 문구
+## 공개 직후 프로필 최종 문구
 
 ```markdown
-- 🔎 **[oddsock](https://github.com/JungHoonGhae/oddsock)** — ask an everyday question; get the Korean public datasets, files, access applications, and first API calls needed to test it
+- 🔎 **[oddsock](https://github.com/JungHoonGhae/oddsock)** — ask an everyday question; get the Korean public datasets, file schemas, access applications, and first API calls needed to test it
 ```
 
 ## 게시 직전 확인
@@ -131,9 +131,10 @@ https://github.com/JungHoonGhae/oddsock
 - 기본 카탈로그 검색이 로그인과 외부 AI 없이 재현된다.
 - 자연어 한 문장 데모가 사용할 AI 제공자를 명시하고 연결 후보의 검증 전 경계를 유지한다.
 - 저장소 공개 직후 GitHub social preview에 `docs/assets/oddsock-social-preview.png`를 등록한다.
-- `v0.16.1` 발행 전에 immutable releases를 켜고, 릴리스에서 `install.sh`·`install.ps1`·checksum을 확인한다.
+- 이미 켜 둔 immutable releases 설정을 재확인하고, `v0.16.1`에서 `install.sh`·`install.ps1`·checksum을 확인한다.
 - 공개 직후 `main`에 PR·필수 CI·force-push 차단 ruleset을 적용한 뒤 외부 링크를 배포한다.
-- GitHub 프로필의 oddsock 항목을 위의 공개 링크 문구로 교체한다.
+- `Public launch smoke` workflow를 `v0.16.1`로 실행해 비로그인 설치·카탈로그·첫 검색을 확인한다.
+- GitHub 프로필의 oddsock 링크를 비로그인 상태에서 확인하고 `public release in progress` 표기를 제거한다.
 - GitHub private vulnerability reporting을 켜고 Security 탭의 비공개 신고 링크를 확인한다.
 - LinkedIn 게시물 공개 범위를 `Anyone`으로 둔다.
 - GeekNews는 일반 뉴스가 아니라 Show GN으로 등록한다.

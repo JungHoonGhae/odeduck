@@ -22,6 +22,11 @@ section matching a `vX.Y.Z` tag as the GitHub release notes.
 - Made the macOS/Linux and Windows installers fall back to public GitHub downloads
   when the GitHub CLI is absent or unauthenticated, while retaining private-preview
   support for authenticated contributors.
+- Added a current architecture map and a manually dispatched anonymous launch smoke
+  test that verifies the public repository, release assets, installer, catalogue and
+  first no-login search before promotional links are distributed.
+- Replaced the stale pre-rename video brief with the current rainy-season cafe demo
+  and marked its old Higgsfield job IDs and render as non-publishable records.
 
 ### Security
 

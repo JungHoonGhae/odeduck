@@ -8,9 +8,9 @@ oddsock의 런칭 소재는 “공공데이터 9.6만 건” 자체가 아니라
 용어로 바뀌고 서로 다른 자료까지 한 화면에 놓이는 순간이다. 첫 체험은 계정 생성이나 data.go.kr 로그인
 없이 끝나야 한다. 활용신청과 호출은 그 다음 단계로 분리한다.
 
-현재 외부 공개를 막는 가장 큰 요인은 제품 기능이 아니라 저장소 visibility다. private 저장소 링크가
-비로그인 방문자에게 404를 반환하므로 프로필에서는 oddsock 링크를 잠시 빼고 `public release in progress`로
-표시했다. 공개 전환 직후 같은 자리의 실제 저장소 링크를 복구한다.
+현재 외부 공개를 막는 가장 큰 요인은 제품 기능이 아니라 저장소 visibility다. 프로필에는 oddsock의
+실제 URL을 미리 연결하고 `public release in progress`로 표시했다. 소유자에게는 정상 링크지만 비로그인
+방문자에게는 아직 404다. 공개 전환 직후 비로그인 상태에서 링크를 확인하고 진행 중 표기를 제거한다.
 
 ## 플랫폼이 명시한 조건
 
@@ -102,7 +102,9 @@ Gitleaks v8.30.1로 현재 파일과 Git 전체 이력을 `--redact` 상태에�
 
 - provider 호출 테스트의 명시적 dummy key
 - Go module checksum이 남은 로컬 비추적 review diff
-- WebSocket RFC 예제 nonce와 영상 프롬프트의 `Style key` 문구
+- WebSocket RFC 예제 nonce
+
+이후 영상 brief에서 오래된 `Style key` 문구도 제거해 공개 diff의 불필요한 secret-like 문자열을 줄였다.
 
 실제 자격증명으로 분류된 항목은 없었다. 공개 직전에는 같은 검사를 한 번 더 수행하고, GitHub의
 secret scanning 설정도 public 전환 후 확인한다.
@@ -116,5 +118,5 @@ secret scanning 설정도 public 전환 후 확인한다.
 4. 저장소를 public으로 바꾸자마자 `main`에 PR·필수 CI·force-push 차단 ruleset을 적용한다.
 5. 로그아웃 상태에서 README 설치 명령과 저장소 링크를 다시 검증한다.
 6. GitHub social preview를 1280×640 카드로 설정하고 private vulnerability reporting을 켠다.
-7. GitHub 프로필의 `public release in progress`를 실제 저장소 링크로 바꾼다.
+7. GitHub 프로필 링크를 비로그인 상태에서 확인하고 `public release in progress` 표기를 제거한다.
 8. GeekNews Show GN과 LinkedIn을 같은 날이 아니라 순차적으로 게시해 유입과 실패를 관찰한다.

@@ -1,4 +1,7 @@
-[
+{
+  "status": "legacy-pre-rename-do-not-publish",
+  "note": "Remote Higgsfield job IDs for the obsolete 1.19만-entry preview. Regenerate from oddsock-agent-explainer.md before launch.",
+  "blocks": [
   {
     "video": { "id": "e45ff85c-7c0d-4b8e-9033-0a696a11bca2", "type": "video_job" },
     "audio": { "id": "fa1123a8-98ac-4b91-9d16-d8325593e989", "type": "audio_job" }
@@ -23,4 +26,5 @@
     "video": { "id": "0c189af9-2267-4609-8214-d05523cbe161", "type": "video_job" },
     "audio": { "id": "7ab00890-7ab4-4c7a-b7f5-3985df8ff897", "type": "audio_job" }
   }
-]
+  ]
+}
