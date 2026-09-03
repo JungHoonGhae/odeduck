@@ -7,6 +7,17 @@ section matching a `vX.Y.Z` tag as the GitHub release notes.
 
 ## [Unreleased]
 
+## [0.16.1] - 2026-09-03
+
+### Changed
+
+- Reframed the README around the everyday problem of testing a small-business idea
+  without knowing official public-data terms, while preserving the doorway character
+  and existing brand mark.
+- Clarified where existing public-data MCPs still hand work back to people and showed
+  the real REST, FILE and LINK paths without implying that oddsock makes the final
+  business decision.
+
 ## [0.16.0] - 2026-09-02
 
 ### Changed
