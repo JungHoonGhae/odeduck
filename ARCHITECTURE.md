@@ -37,7 +37,14 @@ MCP의 주 경로는 의도적으로 작다.
 
 ```text
 catalog_search → inspect_dataset → (미승인 REST만 apply) → call_api
+                                                               ↓
+                                             record_connection_assessment
 ```
+
+`call_api`가 선택 필드를 profile하면 MCP 세션 메모리의 bounded receipt가 operation, delivery, request
+hash와 집계를 묶는다. `record_connection_assessment`는 이 receipt와 두 dataset의 공식 출처·field
+evidence를 다시 대조한 뒤에만 sample 판정을 저장한다. 저장 장부는 raw 응답 값과 credential 없이
+append-only JSONL로 유지된다.
 
 `search_datasets`와 `list_applications`는 각각 최신 포털 재확인과 계정 상태 확인을 위한 보조 도구다.
 `describe_api`는 기존 클라이언트를 위한 `inspect_dataset`의 API 전용 호환 도구다.
@@ -100,6 +107,7 @@ MCP 도구는 외부 상태를 바꾸는 destructive action으로 표시해 호�
 | [`internal/apicall`](internal/apicall) | 공식 API 계약 해석, REST/LINK dispatch, 검증·호출·profiling | 브라우저 로그인 UI |
 | [`internal/portal`](internal/portal) | data.go.kr 공개 페이지, 로그인 세션, 신청·계정·키 흐름 | 외부 provider credential 재사용 |
 | [`internal/providerauth`](internal/providerauth) | 고정 provider와 HTTPS scope별 자격증명 저장 | 키 목록이나 값을 MCP에 노출 |
+| [`internal/connectionledger`](internal/connectionledger) | 연결 assessment의 provenance·집계·시간을 검증하고 append-only JSONL에 저장 | raw 응답 값, credential, 실세계 entity 병합 |
 | [`internal/fetch`](internal/fetch) | 공통 throttle, timeout, response bound, data.go.kr TLS 정책 | 임의 LINK를 안전하다고 판정 |
 | [`internal/doctor`](internal/doctor) | 포털 markup과 provider adapter drift 점검 | 자동 계약 수정 |
 | [`internal/output`](internal/output) | JSON·JSONL·table 렌더링 | 도메인 결과 생성 |
@@ -120,6 +128,7 @@ MCP 도구는 외부 상태를 바꾸는 destructive action으로 표시해 호�
 | `datagokr-apikey` | config root | data.go.kr API key cache |
 | `config.json` | config root | 자동신청 같은 사용자 설정 |
 | `provider-credentials/*.json` | config root | adapter ID와 exact scope별 외부 provider key, atomic write |
+| `connection-evidence.jsonl` | config root | 검증·차단·기각된 연결 assessment와 해시·집계, append-only |
 
 Unix에서는 민감 파일을 사용자 전용 권한으로 저장한다. 외부 provider credential은 Windows에서도 현재
 사용자와 SYSTEM만 허용하는 보호된 DACL을 적용한다. 파일은 암호화되지 않으므로 공용 머신은 신뢰 경계

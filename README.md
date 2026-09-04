@@ -85,7 +85,7 @@ AI가 질문을 생활인구·업종별 매출·점포 생존·개폐업으로 �
 릴리스에는 검증된 카탈로그가 포함되어 있어 로그인이나 API 키 없이 바로 검색할 수 있다.
 
 ```sh
-curl -fsSL https://github.com/JungHoonGhae/odeduck/releases/download/v0.17.2/install.sh | sh
+curl -fsSL https://github.com/JungHoonGhae/odeduck/releases/download/v0.18.0/install.sh | sh
 
 odeduck catalog search \
   "서울에서 작은 가게 후보를 좁힐 자료" \
@@ -154,6 +154,12 @@ data.go.kr REST는 정부 SSO 로그인 한 번 뒤 신청→승인 확인→키
 전체 계약은 [교차 데이터 연결 발견 명세](docs/specs/cross-domain-connection-discovery-v1.md), 실제 평가는
 [연결 발견 평가](docs/research/connection-discovery-evaluation.md)에 있다.
 
+검증한 연결은 MCP의 `record_connection_assessment`로 로컬 append-only 장부에 남길 수 있다. 장부에는
+공식 출처, field namespace와 grain, 요청·프로필 해시, 표본 집계만 저장하고 API 응답 원문이나 인증정보는
+저장하지 않는다. `sample_verified`는 같은 MCP 세션에서 최근 `call_api`가 만든 두 단일-key profile과
+집계가 정확히 일치할 때만 허용되며, 근거가 부족하면 `structurally_verified`, `blocked` 또는 `rejected`로
+남는다. 자세한 저장·판정 계약은 [연결 근거 장부 명세](docs/specs/connection-evidence-ledger-v1.md)를 본다.
+
 구성요소, 데이터 흐름, 로컬 상태와 신뢰 경계는 [아키텍처 문서](ARCHITECTURE.md)에 정리했다.
 
 ## 설치와 에이전트 연결
@@ -161,7 +167,7 @@ data.go.kr REST는 정부 SSO 로그인 한 번 뒤 신청→승인 확인→키
 Windows:
 
 ```powershell
-irm https://github.com/JungHoonGhae/odeduck/releases/download/v0.17.2/install.ps1 | iex
+irm https://github.com/JungHoonGhae/odeduck/releases/download/v0.18.0/install.ps1 | iex
 ```
 
 macOS·Linux 설치 명령은 위 빠른 시작에 있다. 설치 스크립트는 checksum을 검증하고 같은 릴리스의

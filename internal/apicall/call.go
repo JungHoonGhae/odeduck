@@ -69,6 +69,8 @@ type CallResult struct {
 	Status       int            `json:"status"`
 	ContentType  string         `json:"contentType"`
 	BodyEncoding string         `json:"bodyEncoding,omitempty"`
+	Delivery     string         `json:"delivery,omitempty"`
+	Operation    string         `json:"operation,omitempty"`
 	Body         any            `json:"body"`
 	Profile      *SampleProfile `json:"profile,omitempty"`
 	rawBody      []byte
