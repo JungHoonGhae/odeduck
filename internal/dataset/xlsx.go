@@ -13,9 +13,17 @@ import (
 )
 
 const (
-	maxXLSXColumns     = 256
-	maxXLSXRowsScanned = 64
-	maxXLSXHeaderRows  = 12
+	maxXLSXColumns            = 256
+	maxXLSXRowsScanned        = 64
+	maxXLSXHeaderRows         = 12
+	maxXLSXWorksheets         = 16
+	maxXLSXRelationships      = 128
+	maxXLSXMergeRanges        = 1024
+	maxXLSXExpandedMergeCells = maxXLSXColumns * maxXLSXRowsScanned
+	maxXLSXCellTextBytes      = 64 << 10
+	maxXLSXSharedStringItems  = 1_000_000
+	maxXLSXSharedStringRefs   = maxXLSXWorksheets * maxXLSXRowsScanned * maxXLSXColumns
+	maxXLSXSharedStringBytes  = 8 << 20
 )
 
 type xlsxWorkbook struct {
@@ -37,10 +45,6 @@ type xlsxRelationship struct {
 	Type   string `xml:"Type,attr"`
 }
 
-type xlsxSharedStrings struct {
-	Items []xlsxRichText `xml:"si"`
-}
-
 type xlsxRichText struct {
 	Text string `xml:"t"`
 	Runs []struct {
@@ -60,10 +64,12 @@ func (r xlsxRichText) value() string {
 }
 
 type xlsxWorksheet struct {
-	Rows   []xlsxRow `xml:"sheetData>row"`
-	Merges []struct {
-		Ref string `xml:"ref,attr"`
-	} `xml:"mergeCells>mergeCell"`
+	Rows   []xlsxRow
+	Merges []xlsxMerge
+}
+
+type xlsxMerge struct {
+	Ref string
 }
 
 type xlsxRow struct {
@@ -104,13 +110,14 @@ func inspectXLSX(reader io.ReaderAt, size int64) ([]ObservedFile, []string, erro
 		members[path.Clean(strings.TrimPrefix(member.Name, "/"))] = member
 	}
 
-	var workbook xlsxWorkbook
-	if err := decodeXLSXMember(members["xl/workbook.xml"], &workbook); err != nil {
+	workbook, err := decodeXLSXWorkbook(members["xl/workbook.xml"])
+	if err != nil {
 		return nil, nil, fmt.Errorf("XLSX workbook 해석 실패: %w", err)
 	}
-	var relationships xlsxRelationships
+	relationships := xlsxRelationships{}
 	if member := members["xl/_rels/workbook.xml.rels"]; member != nil {
-		if err := decodeXLSXMember(member, &relationships); err != nil {
+		relationships, err = decodeXLSXRelationships(member)
+		if err != nil {
 			return nil, nil, fmt.Errorf("XLSX workbook 관계 해석 실패: %w", err)
 		}
 	}
@@ -129,18 +136,18 @@ func inspectXLSX(reader io.ReaderAt, size int64) ([]ObservedFile, []string, erro
 		}
 	}
 
-	var shared xlsxSharedStrings
-	if member := members["xl/sharedStrings.xml"]; member != nil {
-		if err := decodeXLSXMember(member, &shared); err != nil {
-			return nil, nil, fmt.Errorf("XLSX shared strings 해석 실패: %w", err)
-		}
+	type worksheetResult struct {
+		worksheet *xlsxWorksheet
+		err       error
 	}
-	sharedValues := make([]string, len(shared.Items))
-	for index, item := range shared.Items {
-		sharedValues[index] = strings.TrimSpace(item.value())
+	type selectedWorksheet struct {
+		sheet     xlsxSheet
+		target    string
+		worksheet *xlsxWorksheet
 	}
-
-	var files []ObservedFile
+	worksheetCache := make(map[string]worksheetResult)
+	selected := make([]selectedWorksheet, 0, len(workbook.Sheets))
+	sharedReferences := make(map[int]struct{})
 	var warnings []string
 	for index, sheet := range workbook.Sheets {
 		target := targets[sheet.RelationshipID]
@@ -149,17 +156,41 @@ func inspectXLSX(reader io.ReaderAt, size int64) ([]ObservedFile, []string, erro
 			// ordinal is deterministic and remains inside xl/worksheets.
 			target = fmt.Sprintf("xl/worksheets/sheet%d.xml", index+1)
 		}
-		member := members[target]
-		if member == nil {
-			warnings = append(warnings, fmt.Sprintf("XLSX worksheet %q 파일을 찾지 못했습니다", sheet.Name))
+		result, cached := worksheetCache[target]
+		if !cached {
+			member := members[target]
+			if member == nil {
+				result.err = fmt.Errorf("파일을 찾지 못했습니다")
+			} else {
+				worksheet, decodeErr := decodeXLSXWorksheet(member)
+				result.worksheet = &worksheet
+				if decodeErr != nil {
+					result.err = fmt.Errorf("해석 실패: %w", decodeErr)
+				}
+			}
+			worksheetCache[target] = result
+		}
+		if result.err != nil {
+			warnings = append(warnings, fmt.Sprintf("XLSX worksheet %q %v", sheet.Name, result.err))
 			continue
 		}
-		var worksheet xlsxWorksheet
-		if err := decodeXLSXMember(member, &worksheet); err != nil {
-			warnings = append(warnings, fmt.Sprintf("XLSX worksheet %q 해석 실패: %v", sheet.Name, err))
-			continue
+		if err := collectXLSXSharedStringReferences(*result.worksheet, sharedReferences); err != nil {
+			return nil, nil, fmt.Errorf("XLSX shared string 참조 해석 실패: %w", err)
 		}
-		observed, ok := observeXLSXWorksheet(sheet.Name, target, worksheet, sharedValues)
+		selected = append(selected, selectedWorksheet{sheet: sheet, target: target, worksheet: result.worksheet})
+	}
+
+	sharedValues := map[int]string{}
+	if member := members["xl/sharedStrings.xml"]; member != nil && len(sharedReferences) > 0 {
+		sharedValues, err = decodeXLSXSharedStrings(member, sharedReferences)
+		if err != nil {
+			return nil, nil, fmt.Errorf("XLSX shared strings 해석 실패: %w", err)
+		}
+	}
+
+	var files []ObservedFile
+	for _, item := range selected {
+		observed, ok := observeXLSXWorksheet(item.sheet.Name, item.target, *item.worksheet, sharedValues)
 		if ok {
 			files = append(files, observed)
 		}
@@ -170,7 +201,134 @@ func inspectXLSX(reader io.ReaderAt, size int64) ([]ObservedFile, []string, erro
 	return files, warnings, nil
 }
 
-func decodeXLSXMember(member *zip.File, target any) error {
+func decodeXLSXWorkbook(member *zip.File) (xlsxWorkbook, error) {
+	workbook := xlsxWorkbook{Sheets: make([]xlsxSheet, 0, maxXLSXWorksheets)}
+	err := streamXLSXMember(member, func(decoder *xml.Decoder) error {
+		for {
+			token, err := decoder.Token()
+			if err == io.EOF {
+				return nil
+			}
+			if err != nil {
+				return err
+			}
+			start, ok := token.(xml.StartElement)
+			if !ok || start.Name.Local != "sheet" {
+				continue
+			}
+			if len(workbook.Sheets) >= maxXLSXWorksheets {
+				return fmt.Errorf("worksheet 개수가 허용 한도 %d개를 초과했습니다", maxXLSXWorksheets)
+			}
+			workbook.Sheets = append(workbook.Sheets, xlsxSheet{
+				Name:           xlsxAttribute(start.Attr, "name"),
+				RelationshipID: xlsxAttribute(start.Attr, "id"),
+			})
+			if err := decoder.Skip(); err != nil {
+				return err
+			}
+		}
+	})
+	return workbook, err
+}
+
+func decodeXLSXRelationships(member *zip.File) (xlsxRelationships, error) {
+	relationships := xlsxRelationships{Items: make([]xlsxRelationship, 0)}
+	err := streamXLSXMember(member, func(decoder *xml.Decoder) error {
+		for {
+			token, err := decoder.Token()
+			if err == io.EOF {
+				return nil
+			}
+			if err != nil {
+				return err
+			}
+			start, ok := token.(xml.StartElement)
+			if !ok || start.Name.Local != "Relationship" {
+				continue
+			}
+			if len(relationships.Items) >= maxXLSXRelationships {
+				return fmt.Errorf("관계 개수가 허용 한도 %d개를 초과했습니다", maxXLSXRelationships)
+			}
+			relationships.Items = append(relationships.Items, xlsxRelationship{
+				ID: xlsxAttribute(start.Attr, "Id"), Target: xlsxAttribute(start.Attr, "Target"),
+				Type: xlsxAttribute(start.Attr, "Type"),
+			})
+			if err := decoder.Skip(); err != nil {
+				return err
+			}
+		}
+	})
+	return relationships, err
+}
+
+func decodeXLSXSharedStrings(member *zip.File, wanted map[int]struct{}) (map[int]string, error) {
+	values := make(map[int]string, len(wanted))
+	if len(wanted) == 0 {
+		return values, nil
+	}
+	retainedBytes := 0
+	itemIndex := 0
+	err := streamXLSXMember(member, func(decoder *xml.Decoder) error {
+		for {
+			token, err := decoder.Token()
+			if err == io.EOF {
+				return nil
+			}
+			if err != nil {
+				return err
+			}
+			start, ok := token.(xml.StartElement)
+			if !ok || start.Name.Local != "si" {
+				continue
+			}
+			if itemIndex >= maxXLSXSharedStringItems {
+				return fmt.Errorf("shared string 개수가 허용 한도 %d개를 초과했습니다", maxXLSXSharedStringItems)
+			}
+			if _, keep := wanted[itemIndex]; keep {
+				value, err := decodeBoundedXLSXInlineString(decoder, start)
+				if err != nil {
+					return err
+				}
+				retainedBytes += len(value)
+				if retainedBytes > maxXLSXSharedStringBytes {
+					return fmt.Errorf("shared string 보관 크기가 허용 한도 %d bytes를 초과했습니다", maxXLSXSharedStringBytes)
+				}
+				values[itemIndex] = strings.TrimSpace(value)
+			} else if err := decoder.Skip(); err != nil {
+				return err
+			}
+			itemIndex++
+		}
+	})
+	return values, err
+}
+
+func collectXLSXSharedStringReferences(worksheet xlsxWorksheet, references map[int]struct{}) error {
+	for _, row := range worksheet.Rows {
+		for _, cell := range row.Cells {
+			if cell.Type != "s" {
+				continue
+			}
+			index, err := strconv.Atoi(strings.TrimSpace(cell.Value))
+			if err != nil || index < 0 {
+				continue
+			}
+			if index >= maxXLSXSharedStringItems {
+				return fmt.Errorf("shared string index %d가 허용 한도를 초과했습니다", index)
+			}
+			if _, exists := references[index]; exists {
+				continue
+			}
+			if len(references) >= maxXLSXSharedStringRefs {
+				return fmt.Errorf("shared string 참조가 허용 한도 %d개를 초과했습니다", maxXLSXSharedStringRefs)
+			}
+			references[index] = struct{}{}
+		}
+	}
+	return nil
+}
+
+func streamXLSXMember(member *zip.File, consume func(*xml.Decoder) error) error {
 	if member == nil {
 		return fmt.Errorf("필수 XML member가 없음")
 	}
@@ -183,7 +341,7 @@ func decodeXLSXMember(member *zip.File, target any) error {
 	}
 	defer rc.Close()
 	limited := &io.LimitedReader{R: rc, N: int64(member.UncompressedSize64) + 1}
-	if err := xml.NewDecoder(limited).Decode(target); err != nil {
+	if err := consume(xml.NewDecoder(limited)); err != nil {
 		return err
 	}
 	if limited.N == 0 {
@@ -192,7 +350,180 @@ func decodeXLSXMember(member *zip.File, target any) error {
 	return nil
 }
 
-func observeXLSXWorksheet(name, memberName string, sheet xlsxWorksheet, shared []string) (ObservedFile, bool) {
+// decodeXLSXWorksheet streams worksheet XML so the observation limits apply
+// while parsing, before untrusted row and cell counts can become heap objects.
+func decodeXLSXWorksheet(member *zip.File) (xlsxWorksheet, error) {
+	worksheet := xlsxWorksheet{
+		Rows:   make([]xlsxRow, 0, maxXLSXRowsScanned),
+		Merges: make([]xlsxMerge, 0),
+	}
+	err := streamXLSXMember(member, func(decoder *xml.Decoder) error {
+		for {
+			token, err := decoder.Token()
+			if err == io.EOF {
+				return nil
+			}
+			if err != nil {
+				return err
+			}
+			start, ok := token.(xml.StartElement)
+			if !ok {
+				continue
+			}
+			switch start.Name.Local {
+			case "row":
+				if len(worksheet.Rows) >= maxXLSXRowsScanned {
+					if err := decoder.Skip(); err != nil {
+						return err
+					}
+					continue
+				}
+				row, err := decodeXLSXRow(decoder, start)
+				if err != nil {
+					return err
+				}
+				worksheet.Rows = append(worksheet.Rows, row)
+			case "mergeCell":
+				if len(worksheet.Merges) < maxXLSXMergeRanges {
+					worksheet.Merges = append(worksheet.Merges, xlsxMerge{Ref: xlsxAttribute(start.Attr, "ref")})
+				}
+				if err := decoder.Skip(); err != nil {
+					return err
+				}
+			}
+		}
+	})
+	return worksheet, err
+}
+
+func decodeXLSXRow(decoder *xml.Decoder, start xml.StartElement) (xlsxRow, error) {
+	row := xlsxRow{}
+	row.Number, _ = strconv.Atoi(xlsxAttribute(start.Attr, "r"))
+	row.Cells = make([]xlsxCell, 0, maxXLSXColumns)
+	for {
+		token, err := decoder.Token()
+		if err != nil {
+			return xlsxRow{}, err
+		}
+		switch typed := token.(type) {
+		case xml.StartElement:
+			if typed.Name.Local != "c" {
+				continue
+			}
+			coordinate, valid := parseXLSXCoordinate(xlsxAttribute(typed.Attr, "r"))
+			if !valid || coordinate.Column >= maxXLSXColumns || len(row.Cells) >= maxXLSXColumns {
+				if err := decoder.Skip(); err != nil {
+					return xlsxRow{}, err
+				}
+				continue
+			}
+			cell, err := decodeXLSXCell(decoder, typed)
+			if err != nil {
+				return xlsxRow{}, err
+			}
+			row.Cells = append(row.Cells, cell)
+		case xml.EndElement:
+			if typed.Name == start.Name {
+				return row, nil
+			}
+		}
+	}
+}
+
+func decodeXLSXCell(decoder *xml.Decoder, start xml.StartElement) (xlsxCell, error) {
+	cell := xlsxCell{Ref: xlsxAttribute(start.Attr, "r"), Type: xlsxAttribute(start.Attr, "t")}
+	for {
+		token, err := decoder.Token()
+		if err != nil {
+			return xlsxCell{}, err
+		}
+		switch typed := token.(type) {
+		case xml.StartElement:
+			switch typed.Name.Local {
+			case "v":
+				cell.Value, err = decodeBoundedXLSXText(decoder, typed)
+				if err != nil {
+					return xlsxCell{}, err
+				}
+			case "is":
+				cell.Inline.Text, err = decodeBoundedXLSXInlineString(decoder, typed)
+				if err != nil {
+					return xlsxCell{}, err
+				}
+			default:
+				if err := decoder.Skip(); err != nil {
+					return xlsxCell{}, err
+				}
+			}
+		case xml.EndElement:
+			if typed.Name == start.Name {
+				return cell, nil
+			}
+		}
+	}
+}
+
+func decodeBoundedXLSXInlineString(decoder *xml.Decoder, start xml.StartElement) (string, error) {
+	var value strings.Builder
+	for {
+		token, err := decoder.Token()
+		if err != nil {
+			return "", err
+		}
+		switch typed := token.(type) {
+		case xml.StartElement:
+			if typed.Name.Local != "t" {
+				continue
+			}
+			part, err := decodeBoundedXLSXText(decoder, typed)
+			if err != nil {
+				return "", err
+			}
+			if value.Len()+len(part) > maxXLSXCellTextBytes {
+				return "", fmt.Errorf("XLSX cell text가 허용 한도 %d bytes를 초과했습니다", maxXLSXCellTextBytes)
+			}
+			value.WriteString(part)
+		case xml.EndElement:
+			if typed.Name == start.Name {
+				return value.String(), nil
+			}
+		}
+	}
+}
+
+func decodeBoundedXLSXText(decoder *xml.Decoder, start xml.StartElement) (string, error) {
+	var value strings.Builder
+	depth := 1
+	for depth > 0 {
+		token, err := decoder.Token()
+		if err != nil {
+			return "", err
+		}
+		switch typed := token.(type) {
+		case xml.StartElement:
+			depth++
+		case xml.EndElement:
+			depth--
+		case xml.CharData:
+			if value.Len()+len(typed) > maxXLSXCellTextBytes {
+				return "", fmt.Errorf("XLSX cell text가 허용 한도 %d bytes를 초과했습니다", maxXLSXCellTextBytes)
+			}
+			value.Write(typed)
+		}
+	}
+	return value.String(), nil
+}
+
+func xlsxAttribute(attributes []xml.Attr, localName string) string {
+	for _, attribute := range attributes {
+		if attribute.Name.Local == localName {
+			return attribute.Value
+		}
+	}
+	return ""
+}
+
+func observeXLSXWorksheet(name, memberName string, sheet xlsxWorksheet, shared map[int]string) (ObservedFile, bool) {
 	raw := map[xlsxCoordinate]string{}
 	rowNumbers := make([]int, 0, len(sheet.Rows))
 	maxColumn := -1
@@ -231,21 +562,27 @@ func observeXLSXWorksheet(name, memberName string, sheet xlsxWorksheet, shared [
 	for coordinate, value := range raw {
 		expanded[coordinate] = value
 	}
+	expandedMergeCells := 0
+mergeLoop:
 	for _, merge := range sheet.Merges {
-		start, end, ok := parseXLSXRange(merge.Ref)
-		if !ok || start.Column >= maxXLSXColumns || start.Row > rowNumbers[len(rowNumbers)-1] {
+		start, end, ok := boundedXLSXMergeRange(merge.Ref, rowNumbers[len(rowNumbers)-1])
+		if !ok {
 			continue
 		}
 		value := raw[start]
 		if value == "" {
 			continue
 		}
-		if end.Column >= maxXLSXColumns {
-			end.Column = maxXLSXColumns - 1
-		}
-		for row := start.Row; row <= end.Row; row++ {
+		for _, row := range rowNumbers {
+			if row < start.Row || row > end.Row {
+				continue
+			}
 			for column := start.Column; column <= end.Column; column++ {
+				if expandedMergeCells >= maxXLSXExpandedMergeCells {
+					break mergeLoop
+				}
 				expanded[xlsxCoordinate{Column: column, Row: row}] = value
+				expandedMergeCells++
 			}
 		}
 		if end.Column > maxColumn {
@@ -310,12 +647,26 @@ func observeXLSXWorksheet(name, memberName string, sheet xlsxWorksheet, shared [
 	return ObservedFile{Name: name, Format: "XLSX", Columns: columns, SampleRows: sampleRows}, true
 }
 
-func xlsxCellValue(cell xlsxCell, shared []string) string {
+func boundedXLSXMergeRange(value string, maxObservedRow int) (xlsxCoordinate, xlsxCoordinate, bool) {
+	start, end, ok := parseXLSXRange(value)
+	if !ok || maxObservedRow <= 0 || start.Column >= maxXLSXColumns || start.Row > maxObservedRow {
+		return xlsxCoordinate{}, xlsxCoordinate{}, false
+	}
+	if end.Column >= maxXLSXColumns {
+		end.Column = maxXLSXColumns - 1
+	}
+	if end.Row > maxObservedRow {
+		end.Row = maxObservedRow
+	}
+	return start, end, true
+}
+
+func xlsxCellValue(cell xlsxCell, shared map[int]string) string {
 	value := strings.TrimSpace(cell.Value)
 	switch cell.Type {
 	case "s":
 		index, err := strconv.Atoi(value)
-		if err == nil && index >= 0 && index < len(shared) {
+		if err == nil && index >= 0 {
 			return shared[index]
 		}
 		return ""
