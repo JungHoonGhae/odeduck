@@ -1,6 +1,6 @@
 # Issue tracker: GitHub Issues
 
-이 저장소의 canonical issue tracker는 [JungHoonGhae/oddsock GitHub Issues](https://github.com/JungHoonGhae/oddsock/issues)다. `.scratch/`의 기존 문서는 이전 local-markdown tracker의 기록이며 새 이슈나 상태 변경을 그곳에 만들지 않는다. 과거 노력을 다시 시작할 때 필요한 항목만 GitHub로 이관한다.
+이 저장소의 canonical issue tracker는 [JungHoonGhae/oddsock GitHub Issues](https://github.com/JungHoonGhae/oddsock/issues)다. 이전 local-markdown tracker의 `.scratch/` 문서는 Git 이력에만 남아 있다. 과거 노력을 다시 시작할 때 필요한 항목만 GitHub로 이관한다.
 
 구현 spec과 장기 문서는 저장소에 versioned Markdown으로 두고, 이를 추적하는 GitHub issue에서 링크한다.
 

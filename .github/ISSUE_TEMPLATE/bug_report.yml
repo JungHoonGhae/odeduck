@@ -1,0 +1,57 @@
+name: Bug report
+description: Report a reproducible oddsock failure without exposing credentials.
+title: "bug: "
+labels:
+  - bug
+  - needs-triage
+body:
+  - type: checkboxes
+    attributes:
+      label: Safety check
+      options:
+        - label: I removed sessions, cookies, API keys, account identifiers, and personal data.
+          required: true
+        - label: This is not a security vulnerability. Security reports use the private Security tab.
+          required: true
+  - type: input
+    id: version
+    attributes:
+      label: oddsock version
+      description: Run `oddsock version`.
+      placeholder: Paste the output of `oddsock version`
+    validations:
+      required: true
+  - type: dropdown
+    id: operating-system
+    attributes:
+      label: Operating system
+      options:
+        - macOS
+        - Linux
+        - Windows
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction
+      description: List the smallest commands or MCP calls that reproduce the problem.
+      placeholder: |
+        1. Run ...
+        2. Observe ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior and redacted output
+      description: Paste only output that has been checked for credentials and personal data.
+    validations:
+      required: true

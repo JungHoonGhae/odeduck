@@ -1,0 +1,40 @@
+name: Public-data discovery request
+description: Share a question that is hard to translate into Korean public-data names.
+title: "discovery: "
+labels:
+  - enhancement
+  - needs-triage
+body:
+  - type: textarea
+    id: question
+    attributes:
+      label: The question in ordinary language
+      description: Write the question as you would ask a person, without guessing official dataset names.
+      placeholder: Which neighborhoods are gaining visitors but still have few late-night food options?
+    validations:
+      required: true
+  - type: textarea
+    id: decision
+    attributes:
+      label: Decision this would inform
+      description: What would become easier to decide if the relevant data were available?
+    validations:
+      required: true
+  - type: textarea
+    id: attempts
+    attributes:
+      label: What you already tried
+      description: Include search terms or dataset links, but no private data or credentials.
+  - type: dropdown
+    id: outcome
+    attributes:
+      label: Useful outcome
+      options:
+        - Find the right datasets
+        - Inspect real file columns or API fields
+        - Connect datasets across domains
+        - Automate an access application and first call
+        - Other
+    validations:
+      required: true
+

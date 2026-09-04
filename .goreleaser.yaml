@@ -1,6 +1,6 @@
 # GoReleaser config — oddsock과 한시적 opendatactl/gongctl 호환 바이너리용.
 # 태그 푸시(vX.Y.Z) 시 GitHub Actions(release.yml)가 실행 → 크로스플랫폼 바이너리 +
-# 체크섬 + private GitHub Release를 생성한다. 인증된 설치 스크립트가 asset을 받는다.
+# 체크섬 + GitHub Release를 생성한다. 공개 설치는 HTTPS로, private preview는 인증된 gh로 asset을 받는다.
 version: 2
 
 project_name: oddsock
@@ -82,6 +82,8 @@ checksum:
   name_template: "checksums.txt"
   extra_files:
     - glob: ./release-assets/oddsock-catalog.json.gz
+    - glob: ./install.sh
+    - glob: ./install.ps1
 
 changelog:
   sort: asc
@@ -96,5 +98,9 @@ release:
   name_template: "oddsock v{{ .Version }}"
   draft: false
   prerelease: auto
+  preflight:
+    fail_on_error: true
   extra_files:
     - glob: ./release-assets/oddsock-catalog.json.gz
+    - glob: ./install.sh
+    - glob: ./install.ps1
