@@ -5,7 +5,7 @@ Go CLI + MCP. 사람은 정부 SSO 로그인 한 번만 하고 이후 포털 작
 
 ## 현재 상태 (2026-09-04)
 
-- v0.16.1은 고신뢰 조사에서 의미 검색이 실제 사용되지 않으면 실패하는 CLI `--require-semantic`과 MCP
+- v0.16.2는 고신뢰 조사에서 의미 검색이 실제 사용되지 않으면 실패하는 CLI `--require-semantic`과 MCP
   `requireSemantic` 계약을 추가하고, FILE 관찰 범위를 bounded XLSX worksheet·다단 헤더까지 넓혔다.
   README에는 로그인 없는 첫 검색과 실제 연결 후보의 검증 경계를 기록했다.
 - v0.16은 README의 공개 정체성을 문틈에서 조용히 얼굴을 내민 캐릭터와 한 줄 질문 중심으로 바꿨다.

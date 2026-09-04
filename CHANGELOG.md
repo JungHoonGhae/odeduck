@@ -7,7 +7,7 @@ section matching a `vX.Y.Z` tag as the GitHub release notes.
 
 ## [Unreleased]
 
-## [0.16.1] - 2026-09-04
+## [0.16.2] - 2026-09-04
 
 ### Added
 
@@ -16,6 +16,23 @@ section matching a `vX.Y.Z` tag as the GitHub release notes.
   fallback results.
 - Added bounded XLSX worksheet inspection, including shared and inline strings,
   merged multi-row headers and schema evidence for FILE datasets.
+
+### Changed
+
+- Made geographic title relevance win over description noise even when results are
+  ranked by recency, improving cross-domain discovery for regional questions.
+- Reframed the product story around finding the missing context across unrelated
+  public-data domains, with a sourced before-and-after workflow diagram and a
+  reproducible four-dataset Jeju example that keeps unverified joins explicit.
+
+### Security
+
+- Stream and bound XLSX workbook, relationship, worksheet, merge and shared-string
+  metadata so crafted public files cannot amplify into unbounded memory or CPU work.
+- Corrected release configuration ownership coverage for the GoReleaser file and
+  repository rulesets.
+
+## [0.16.1] - 2026-09-03
 
 ### Changed
 
@@ -35,11 +52,6 @@ section matching a `vX.Y.Z` tag as the GitHub release notes.
   first no-login search before promotional links are distributed.
 - Replaced the stale pre-rename video brief with the current rainy-season cafe demo
   and marked its old Higgsfield job IDs and render as non-publishable records.
-- Made geographic title relevance win over description noise even when results are
-  ranked by recency, improving cross-domain discovery for regional questions.
-- Reframed the product story around finding the missing context across unrelated
-  public-data domains, with a sourced before-and-after workflow diagram and a
-  reproducible four-dataset Jeju example that keeps unverified joins explicit.
 
 ### Security
 
