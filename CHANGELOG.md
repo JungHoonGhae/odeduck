@@ -7,6 +7,15 @@ section matching a `vX.Y.Z` tag as the GitHub release notes.
 
 ## [Unreleased]
 
+## [0.17.1] - 2026-09-04
+
+### Fixed
+
+- Align the deterministic lexical release gate with its documented contract:
+  retain exact and cross-domain term checks, while leaving broad intent such as
+  “cheap investment property” to agent-planned or semantic discovery instead of
+  assuming an undocumented synonym mapping.
+
 ## [0.17.0] - 2026-09-04
 
 ### Changed
