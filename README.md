@@ -5,8 +5,8 @@
 
 <h1 align="center">오데덕</h1>
 
-<p align="center"><em>한 분야에 답이 없으면, 다른 서랍을 연다.</em></p>
-<p align="center">9만 6천 개의 공공데이터에서 질문의 나머지 짝을 찾는다.</p>
+<p align="center"><em>오픈데이터 덕후, 오데덕.</em></p>
+<p align="center">서로 상관없어 보이는 공공데이터를 연결해, 질문에 필요한 정보를 찾아온다.</p>
 <!-- brand:end -->
 
 <p align="center">
