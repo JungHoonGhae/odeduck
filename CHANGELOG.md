@@ -7,6 +7,21 @@ section matching a `vX.Y.Z` tag as the GitHub release notes.
 
 ## [Unreleased]
 
+## [0.17.2] - 2026-09-04
+
+### Changed
+
+- Adopted the stable black-glasses Odeduck logo and regenerated the social and
+  launch artwork from the same source.
+- Shortened the README around the product problem, a concrete cross-domain
+  example, quick start, measured proof and safety boundaries.
+- Kept the original no-glasses cabinet animation as the README hero and moved
+  experimental video variants out of the public assets.
+
+### Fixed
+
+- Updated the README, launch kit and installer examples to point to v0.17.2.
+
 ## [0.17.1] - 2026-09-04
 
 ### Fixed
