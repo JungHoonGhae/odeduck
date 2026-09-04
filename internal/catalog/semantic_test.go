@@ -496,6 +496,31 @@ func TestHybridSearchMakesEverySemanticFallbackMachineVisible(t *testing.T) {
 	}
 }
 
+func TestSemanticOutcomeWarningIsDeduplicatedAndStrictModeAcceptsUsed(t *testing.T) {
+	result := Result{}
+	fallback := SemanticInfo{Status: SemanticUnavailable, Detail: "Ollama unavailable"}
+	RecordSemanticOutcome(&result, fallback)
+	RecordSemanticOutcome(&result, fallback)
+	if len(result.Warnings) != 1 {
+		t.Fatalf("warnings = %+v, want one deduplicated fallback warning", result.Warnings)
+	}
+	if err := RequireSemantic(result); err == nil || !strings.Contains(err.Error(), SemanticUnavailable) {
+		t.Fatalf("RequireSemantic fallback error = %v", err)
+	}
+
+	RecordSemanticOutcome(&result, SemanticInfo{Status: SemanticUsed, Model: "test"})
+	if err := RequireSemantic(result); err != nil {
+		t.Fatalf("RequireSemantic used = %v", err)
+	}
+	if len(result.Warnings) != 1 {
+		t.Fatalf("used outcome added a warning: %+v", result.Warnings)
+	}
+
+	if err := RequireSemantic(Result{}); err == nil || !strings.Contains(err.Error(), "disabled") {
+		t.Fatalf("RequireSemantic disabled error = %v", err)
+	}
+}
+
 func TestHybridSearchFindsMeaningWithoutLiteralKeywords(t *testing.T) {
 	c := &Catalog{SyncedAt: time.Now(), Entries: []Entry{
 		{PK: "auction", Title: "온비드 부동산", SvcType: SvcREST, Desc: "공공자산 공매 물건"},
