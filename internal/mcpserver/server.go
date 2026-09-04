@@ -184,6 +184,7 @@ func New(deps Deps) *mcp.Server {
 		}
 		return connectionledger.Default()
 	}
+	receipts := newEvidenceReceipts()
 
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "catalog_search",
@@ -304,6 +305,15 @@ func New(deps Deps) *mcp.Server {
 		if err != nil {
 			return errResult(err.Error()), nil, nil
 		}
+		for _, delivery := range out.Deliveries {
+			if delivery == "API" && out.API != nil {
+				delivery = out.API.APIType
+				if delivery == "" {
+					delivery = out.Delivery
+				}
+			}
+			receipts.registerInspection(in.PK, delivery)
+		}
 		return nil, out, nil
 	})
 
@@ -358,6 +368,7 @@ func New(deps Deps) *mcp.Server {
 		}
 		if len(in.ProfileFields) > 0 {
 			res.Profile, _ = apicall.ProfileBody(res.Body, in.ProfileFields)
+			receipts.registerAPI(in.PK, res.Delivery, res.Operation, in.Params, res.Profile)
 		}
 		return nil, res, nil
 	})
@@ -372,9 +383,12 @@ func New(deps Deps) *mcp.Server {
 		},
 		Description: "[4단계: 근거 기록] inspect_dataset과 call_api/FILE 관찰로 직접 확인한 교차 데이터 연결 판정을 로컬 장부에 추가한다. " +
 			"검색의 candidate는 기록할 수 없다. structurally_verified는 양쪽 공식 field의 namespace·type·grain이 필요하고, sample_verified는 " +
-			"양쪽 evidenceHash와 실제 overlap·joined rows·join expansion이 추가로 필요하다. blocked/rejected도 reason과 함께 남겨 같은 실패를 반복하지 않게 한다. " +
+			"같은 세션에서 최근 call_api가 발급한 양쪽 operation·requestHash·evidenceHash와 실제 overlap·joined rows·join expansion이 추가로 필요하다. blocked/rejected도 reason과 함께 남겨 같은 실패를 반복하지 않게 한다. " +
 			"원문 응답 값과 인증키는 저장하지 않는다. 기존 판정을 바꿀 때는 supersedes에 이전 record ID를 넣는다.",
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in connectionledger.Assessment) (*mcp.CallToolResult, *connectionledger.Record, error) {
+		if err := receipts.verify(in); err != nil {
+			return errResult(err.Error()), nil, nil
+		}
 		store, err := ledger()
 		if err != nil {
 			return errResult(err.Error()), nil, nil

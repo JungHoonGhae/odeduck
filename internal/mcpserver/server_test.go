@@ -400,18 +400,10 @@ func TestToolCatalogPresentsProgressiveDiscoveryWorkflow(t *testing.T) {
 
 func TestConnectionAssessmentRoundTripDoesNotStoreRawValues(t *testing.T) {
 	store := connectionledger.New(filepath.Join(t.TempDir(), "connections.jsonl"))
-	sess := connectTestClient(t, New(Deps{Fetch: fetch.New(fetch.WithDelay(0)), Ledger: store}))
-	field := map[string]any{"selector": "lawdCd", "namespace": "법정동코드 10자리", "dataType": "string", "grain": "행정구역"}
-	hash := strings.Repeat("a", 64)
+	sess, args := connectEvidenceTestClient(t, store)
 	res, err := sess.CallTool(context.Background(), &mcp.CallToolParams{
-		Name: "record_connection_assessment",
-		Arguments: map[string]any{
-			"left":     map[string]any{"pk": "15000001", "delivery": "REST", "source": map[string]any{"url": "https://www.data.go.kr/data/15000001/openapi.do"}, "record": map[string]any{"kind": "api_profile", "evidenceHash": hash}, "fields": []any{field}},
-			"right":    map[string]any{"pk": "15000002", "delivery": "FILE", "source": map[string]any{"url": "https://www.data.go.kr/data/15000002/fileData.do"}, "record": map[string]any{"kind": "file_observation", "evidenceHash": hash}, "fields": []any{field}},
-			"relation": "SHARES_LEGAL_DISTRICT", "edgeKinds": []string{"spatial"}, "expectedKeys": []string{"lawdCd"},
-			"matchMethod": "deterministic", "status": "sample_verified", "incrementalValue": "수요와 공급 비교", "reason": "표본 일치",
-			"observedAt": "2026-09-04T00:00:00Z", "sample": map[string]any{"leftDistinct": 10, "rightDistinct": 8, "overlapDistinct": 7, "joinedRows": 12, "leftMaxRowsPerKey": 2, "rightMaxRowsPerKey": 1},
-		},
+		Name:      "record_connection_assessment",
+		Arguments: args,
 	})
 	if err != nil || res.IsError {
 		t.Fatalf("record err=%v result=%+v", err, res)
@@ -423,6 +415,230 @@ func TestConnectionAssessmentRoundTripDoesNotStoreRawValues(t *testing.T) {
 	raw, _ := json.Marshal(listed.StructuredContent)
 	if !bytes.Contains(raw, []byte("sample_verified")) || bytes.Contains(raw, []byte("values")) {
 		t.Fatalf("ledger response = %s", raw)
+	}
+}
+
+func validConnectionAssessmentArguments() map[string]any {
+	leftField := map[string]any{"key": "lawdCd", "selector": "lawdCd", "namespace": "법정동코드 10자리", "dataType": "string", "grain": "행정구역", "count": 12, "distinctCount": 10, "duplicateCount": 2}
+	rightField := map[string]any{"key": "lawdCd", "selector": "lawdCd", "namespace": "법정동코드 10자리", "dataType": "string", "grain": "행정구역", "count": 8, "distinctCount": 8}
+	hash := strings.Repeat("a", 64)
+	return map[string]any{
+		"left":     map[string]any{"pk": "15000001", "delivery": "REST", "source": map[string]any{"url": "https://www.data.go.kr/data/15000001/openapi.do"}, "record": map[string]any{"kind": "api_profile", "requestHash": hash, "evidenceHash": hash}, "fields": []any{leftField}},
+		"right":    map[string]any{"pk": "15000002", "delivery": "REST", "source": map[string]any{"url": "https://www.data.go.kr/data/15000002/openapi.do"}, "record": map[string]any{"kind": "api_profile", "requestHash": hash, "evidenceHash": hash}, "fields": []any{rightField}},
+		"relation": "SHARES_LEGAL_DISTRICT", "edgeKinds": []string{"spatial"}, "expectedKeys": []string{"lawdCd"},
+		"matchMethod": "deterministic", "status": "sample_verified", "incrementalValue": "수요와 공급 비교", "reason": "표본 일치",
+		"observedAt": "2026-09-04T00:00:00Z", "sample": map[string]any{"leftDistinct": 10, "rightDistinct": 8, "overlapDistinct": 7, "joinedRows": 9, "leftMaxRowsPerKey": 2, "rightMaxRowsPerKey": 1},
+	}
+}
+
+func connectEvidenceTestClient(t *testing.T, store *connectionledger.Store) (*mcp.ClientSession, map[string]any) {
+	t.Helper()
+	caller := datasetCallFunc(func(_ context.Context, request apicall.DatasetCallRequest) (*apicall.CallResult, error) {
+		values := []string{"k01", "k02", "k03", "k04", "k05", "k06", "k07", "k11"}
+		if request.PK == "15000001" {
+			values = []string{"k01", "k01", "k02", "k02", "k03", "k04", "k05", "k06", "k07", "k08", "k09", "k10"}
+		}
+		rows := make([]any, 0, len(values))
+		for _, value := range values {
+			rows = append(rows, map[string]any{"lawdCd": value})
+		}
+		return &apicall.CallResult{Status: 200, ContentType: "application/json", Delivery: "REST", Operation: "getRows", Body: rows}, nil
+	})
+	sess := connectTestClient(t, New(Deps{Fetch: fetch.New(fetch.WithDelay(0)), Caller: caller, Ledger: store}))
+	args := validConnectionAssessmentArguments()
+	for _, side := range []string{"left", "right"} {
+		datasetArgs := args[side].(map[string]any)
+		pk := datasetArgs["pk"].(string)
+		res, err := sess.CallTool(context.Background(), &mcp.CallToolParams{Name: "call_api", Arguments: map[string]any{"pk": pk, "profileFields": []string{"lawdCd"}}})
+		if err != nil || res.IsError {
+			t.Fatalf("prime %s profile err=%v result=%+v", side, err, res)
+		}
+		raw, _ := json.Marshal(res.StructuredContent)
+		var result apicall.CallResult
+		if err := json.Unmarshal(raw, &result); err != nil || result.Profile == nil {
+			t.Fatalf("decode %s profile: %v (%s)", side, err, raw)
+		}
+		datasetArgs["record"].(map[string]any)["evidenceHash"] = result.Profile.EvidenceHash
+		datasetArgs["record"].(map[string]any)["operation"] = result.Profile.Operation
+		datasetArgs["record"].(map[string]any)["requestHash"] = result.Profile.RequestHash
+	}
+	args["observedAt"] = time.Now().UTC().Format(time.RFC3339Nano)
+	return sess, args
+}
+
+func TestConnectionAssessmentRejectsUnissuedEvidenceHash(t *testing.T) {
+	store := connectionledger.New(filepath.Join(t.TempDir(), "connections.jsonl"))
+	sess := connectTestClient(t, New(Deps{Fetch: fetch.New(fetch.WithDelay(0)), Ledger: store}))
+	res, err := sess.CallTool(context.Background(), &mcp.CallToolParams{Name: "record_connection_assessment", Arguments: validConnectionAssessmentArguments()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !res.IsError {
+		t.Fatalf("unissued evidence hash was accepted: %+v", res)
+	}
+	raw, _ := json.Marshal(res.Content)
+	if !strings.Contains(string(raw), "발급되지 않았거나 만료됐습니다") {
+		t.Fatalf("error=%s", raw)
+	}
+}
+
+func TestConnectionAssessmentReceiptBindsOperationParamsAndAggregates(t *testing.T) {
+	tests := []struct {
+		name string
+		edit func(map[string]any)
+	}{
+		{name: "operation", edit: func(args map[string]any) {
+			args["left"].(map[string]any)["record"].(map[string]any)["operation"] = "inventedOperation"
+		}},
+		{name: "request hash", edit: func(args map[string]any) {
+			args["left"].(map[string]any)["record"].(map[string]any)["requestHash"] = strings.Repeat("b", 64)
+		}},
+		{name: "sample aggregate", edit: func(args map[string]any) { args["sample"].(map[string]any)["joinedRows"] = 8 }},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			store := connectionledger.New(filepath.Join(t.TempDir(), "connections.jsonl"))
+			sess, args := connectEvidenceTestClient(t, store)
+			tt.edit(args)
+			res, err := sess.CallTool(context.Background(), &mcp.CallToolParams{Name: "record_connection_assessment", Arguments: args})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !res.IsError {
+				t.Fatalf("forged %s was accepted: %+v", tt.name, res)
+			}
+		})
+	}
+}
+
+func TestStructurallyVerifiedRequiresSessionInspection(t *testing.T) {
+	store := connectionledger.New(filepath.Join(t.TempDir(), "connections.jsonl"))
+	sess := connectTestClient(t, New(Deps{Fetch: fetch.New(fetch.WithDelay(0)), Ledger: store}))
+	args := validConnectionAssessmentArguments()
+	args["status"] = "structurally_verified"
+	args["sample"] = nil
+	args["left"].(map[string]any)["record"] = map[string]any{"kind": "official_spec"}
+	args["right"].(map[string]any)["record"] = map[string]any{"kind": "official_spec"}
+	res, err := sess.CallTool(context.Background(), &mcp.CallToolParams{Name: "record_connection_assessment", Arguments: args})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !res.IsError {
+		t.Fatalf("uninspected structural claim was accepted: %+v", res)
+	}
+}
+
+func TestConnectionAssessmentToolsRejectInvalidInputs(t *testing.T) {
+	store := connectionledger.New(filepath.Join(t.TempDir(), "connections.jsonl"))
+	sess := connectTestClient(t, New(Deps{Fetch: fetch.New(fetch.WithDelay(0)), Ledger: store}))
+	tests := []struct {
+		name string
+		tool string
+		args map[string]any
+		want string
+	}{
+		{name: "negative list limit", tool: "list_connection_assessments", args: map[string]any{"limit": -1}, want: "limit"},
+		{name: "list limit above maximum", tool: "list_connection_assessments", args: map[string]any{"limit": 101}, want: "limit"},
+		{name: "invalid PK filter", tool: "list_connection_assessments", args: map[string]any{"pk": "not-a-pk"}, want: "publicDataPk"},
+		{name: "candidate status filter", tool: "list_connection_assessments", args: map[string]any{"status": "candidate"}, want: "status"},
+		{name: "candidate assessment", tool: "record_connection_assessment", args: func() map[string]any {
+			args := validConnectionAssessmentArguments()
+			args["status"] = "candidate"
+			return args
+		}(), want: "candidate"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			res, err := sess.CallTool(context.Background(), &mcp.CallToolParams{Name: tt.tool, Arguments: tt.args})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !res.IsError {
+				t.Fatalf("expected tool error: %+v", res)
+			}
+			raw, _ := json.Marshal(res.Content)
+			if !strings.Contains(string(raw), tt.want) {
+				t.Fatalf("error %s does not contain %q", raw, tt.want)
+			}
+		})
+	}
+}
+
+func TestConnectionAssessmentUsesDefaultStoreInIsolatedConfig(t *testing.T) {
+	isolateConfigHome(t)
+	sess, args := connectEvidenceTestClient(t, nil)
+	res, err := sess.CallTool(context.Background(), &mcp.CallToolParams{
+		Name: "record_connection_assessment", Arguments: args,
+	})
+	if err != nil || res.IsError {
+		t.Fatalf("record err=%v result=%+v", err, res)
+	}
+
+	store, err := connectionledger.Default()
+	if err != nil {
+		t.Fatal(err)
+	}
+	records, err := store.List(context.Background(), connectionledger.Filter{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(records) != 1 || records[0].Status != connectionledger.StatusSampleVerified {
+		t.Fatalf("default ledger records = %+v", records)
+	}
+
+	listed, err := sess.CallTool(context.Background(), &mcp.CallToolParams{
+		Name: "list_connection_assessments", Arguments: map[string]any{},
+	})
+	if err != nil || listed.IsError {
+		t.Fatalf("list err=%v result=%+v", err, listed)
+	}
+	raw, _ := json.Marshal(listed.StructuredContent)
+	var got connectionAssessmentsOut
+	if err := json.Unmarshal(raw, &got); err != nil {
+		t.Fatal(err)
+	}
+	if got.Total != 1 || got.Shown != 1 || len(got.Records) != 1 {
+		t.Fatalf("default ledger response = %+v", got)
+	}
+}
+
+func TestConnectionAssessmentListValidatesInputsAndUsesDefaultStore(t *testing.T) {
+	isolateConfigHome(t)
+	sess := connectTestClient(t, New(Deps{Fetch: fetch.New(fetch.WithDelay(0))}))
+	tests := []struct {
+		name string
+		args map[string]any
+		want string
+	}{
+		{"negative limit", map[string]any{"limit": -1}, "1~100"},
+		{"oversized limit", map[string]any{"limit": 101}, "1~100"},
+		{"invalid pk", map[string]any{"pk": "not-a-pk"}, "publicDataPk"},
+		{"candidate status", map[string]any{"status": "candidate"}, "status"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			res, err := sess.CallTool(context.Background(), &mcp.CallToolParams{Name: "list_connection_assessments", Arguments: tt.args})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !res.IsError {
+				t.Fatalf("expected tool error: %+v", res)
+			}
+			raw, _ := json.Marshal(res.Content)
+			if !strings.Contains(string(raw), tt.want) {
+				t.Fatalf("error %s does not contain %q", raw, tt.want)
+			}
+		})
+	}
+
+	res, err := sess.CallTool(context.Background(), &mcp.CallToolParams{Name: "list_connection_assessments", Arguments: map[string]any{}})
+	if err != nil || res.IsError {
+		t.Fatalf("default empty ledger err=%v result=%+v", err, res)
+	}
+	raw, _ := json.Marshal(res.StructuredContent)
+	var got connectionAssessmentsOut
+	if err := json.Unmarshal(raw, &got); err != nil || got.Total != 0 || got.Shown != 0 || len(got.Records) != 0 {
+		t.Fatalf("empty ledger=%+v err=%v", got, err)
 	}
 }
 

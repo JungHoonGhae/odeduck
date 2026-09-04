@@ -19,8 +19,12 @@ const (
 // intentionally per-response and stateless: callers compare two profiles from
 // two call_api invocations without odeduck retaining public response data.
 type SampleProfile struct {
-	Fields       []FieldProfile `json:"fields"`
-	EvidenceHash string         `json:"evidenceHash"`
+	Fields        []FieldProfile `json:"fields"`
+	EvidenceHash  string         `json:"evidenceHash"`
+	Operation     string         `json:"operation,omitempty"`
+	RequestHash   string         `json:"requestHash,omitempty"`
+	ObservedAt    string         `json:"observedAt,omitempty"`
+	ReceiptStatus string         `json:"receiptStatus,omitempty"`
 }
 
 // FieldProfile preserves raw string values so identifiers such as "00110" do
@@ -39,8 +43,41 @@ type FieldProfile struct {
 	DuplicateCount  int      `json:"duplicateCount,omitempty"`
 	Values          []string `json:"values,omitempty"`
 	ValuesTruncated bool     `json:"valuesTruncated,omitempty"`
-	seen            map[string]struct{}
+	seen            map[string]int
 	pathSet         map[string]struct{}
+}
+
+// ProfileEvidence is the server-side receipt material for a bounded profile.
+// ValueCounts is never serialized to MCP output or durable storage; it lets the
+// MCP server verify submitted overlap and join-expansion aggregates against the
+// exact call it performed.
+type ProfileEvidence struct {
+	Field          string
+	Count          int
+	NullCount      int
+	DistinctCount  int
+	DuplicateCount int
+	ValueCounts    map[string]int
+}
+
+// Evidence returns a defensive copy of the non-serialized aggregate receipt.
+func (p *SampleProfile) Evidence() []ProfileEvidence {
+	if p == nil {
+		return nil
+	}
+	out := make([]ProfileEvidence, 0, len(p.Fields))
+	for _, field := range p.Fields {
+		counts := make(map[string]int, len(field.seen))
+		for value, count := range field.seen {
+			counts[value] = count
+		}
+		out = append(out, ProfileEvidence{
+			Field: field.Field, Count: field.Count, NullCount: field.NullCount,
+			DistinctCount: field.DistinctCount, DuplicateCount: field.DuplicateCount,
+			ValueCounts: counts,
+		})
+	}
+	return out
 }
 
 // ProfileBody finds requested leaf fields recursively in JSON/XML-decoded
@@ -54,7 +91,7 @@ func ProfileBody(body any, fields []string) (*SampleProfile, error) {
 	profile := &SampleProfile{Fields: make([]FieldProfile, len(fields))}
 	for i, field := range fields {
 		profile.Fields[i].Field = field
-		profile.Fields[i].seen = map[string]struct{}{}
+		profile.Fields[i].seen = map[string]int{}
 		profile.Fields[i].pathSet = map[string]struct{}{}
 	}
 	walkProfile(body, "", fields, profile.Fields)
@@ -70,13 +107,24 @@ func ProfileBody(body any, fields []string) (*SampleProfile, error) {
 			// path before treating the values as join evidence.
 			item.Ambiguous = true
 			item.Count, item.NullCount, item.DistinctCount, item.DuplicateCount = 0, 0, 0, 0
+			item.seen = map[string]int{}
 			item.Values = nil
 			item.ValuesTruncated = false
 		}
 	}
 	// The hash lets a durable connection assessment cite the exact bounded
 	// profile without retaining its raw public-data values in the ledger.
-	canonical, _ := json.Marshal(profile.Fields)
+	valueCounts := make([]map[string]int, len(profile.Fields))
+	paths := make([]map[string]struct{}, len(profile.Fields))
+	for i := range profile.Fields {
+		valueCounts[i] = profile.Fields[i].seen
+		paths[i] = profile.Fields[i].pathSet
+	}
+	canonical, _ := json.Marshal(struct {
+		Fields      []FieldProfile        `json:"fields"`
+		ValueCounts []map[string]int      `json:"valueCounts"`
+		Paths       []map[string]struct{} `json:"paths"`
+	}{profile.Fields, valueCounts, paths})
 	profile.EvidenceHash = fmt.Sprintf("%x", sha256.Sum256(canonical))
 	return profile, nil
 }
@@ -162,8 +210,8 @@ func addProfileValue(profile *FieldProfile, path string, value any) {
 	}
 	recordProfilePath(profile, path)
 	profile.Count++
-	if _, exists := profile.seen[scalar]; !exists {
-		profile.seen[scalar] = struct{}{}
+	profile.seen[scalar]++
+	if profile.seen[scalar] == 1 {
 		profile.DistinctCount++
 		if len(profile.Values) < maxProfileValues {
 			profile.Values = append(profile.Values, scalar)
