@@ -55,7 +55,7 @@ jobs:
           version: "~> v2"
           args: check
 
-      # A full release cross-builds three command identities for six targets.
+      # A full release cross-builds the odeduck command for every supported target.
       # PRs only need the runner target; release.yml performs the complete matrix
       # before publishing any tag.
       - name: Build release binaries for CI target
@@ -64,7 +64,7 @@ jobs:
           version: "~> v2"
           args: build --snapshot --clean --single-target
 
-      - name: Verify current and compatibility binaries
+      - name: Verify odeduck binary
         shell: bash
         run: |
           set -euo pipefail
@@ -85,7 +85,7 @@ jobs:
         with:
           go-version-file: go.mod
 
-      - name: Test Windows build and config migration
+      - name: Test Windows build and config paths
         # The only short-skipped test launches a real browser. The Linux job
         # keeps that regression coverage; this job is for Windows build/config
         # portability and must not depend on hosted-runner Edge startup timing.
