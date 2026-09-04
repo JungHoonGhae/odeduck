@@ -18,6 +18,10 @@ section matching a `vX.Y.Z` tag as the GitHub release notes.
 - Kept the original no-glasses cabinet animation as the README hero and moved
   experimental video variants out of the public assets.
 
+### Fixed
+
+- Updated the README, launch kit and installer examples to point to v0.17.2.
+
 ## [0.17.1] - 2026-09-04
 
 ### Fixed
