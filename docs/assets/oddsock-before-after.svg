@@ -1,0 +1,85 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="720" viewBox="0 0 1200 720" role="img" aria-labelledby="title desc">
+  <title id="title">기존 공공데이터 도구와 oddsock의 Before and After 흐름</title>
+  <desc id="desc">기존 도구는 키워드 검색과 상세 확인 뒤 활용신청, 승인 확인, 인증키 복사를 사람에게 돌려보내지만 oddsock은 한 질문에서 분야별 발견, 검사, 신청, 승인 확인, 호출까지 잇는다.</desc>
+  <rect width="1200" height="720" fill="#F7F3EB"/>
+  <rect x="26" y="26" width="1148" height="668" rx="28" fill="none" stroke="#151513" stroke-width="2"/>
+
+  <g fill="#151513" font-family="'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif">
+    <text x="70" y="82" font-size="15" font-weight="700" letter-spacing="2">AUDITED WORKFLOW · BEFORE / AFTER</text>
+    <text x="70" y="130" font-size="32" font-weight="700" letter-spacing="-1">한 질문이 어디에서 끊기는가</text>
+    <text x="70" y="162" font-size="15">2026-08-31 · data.go.kr 관련 공개 MCP·CLI 10개 감사 · 포털 자체와 타 포털 구현 제외</text>
+  </g>
+
+  <g font-family="'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif">
+    <rect x="68" y="196" width="1064" height="176" rx="22" fill="#FFFFFF" stroke="#151513" stroke-width="2"/>
+    <text x="92" y="230" fill="#151513" font-size="13" font-weight="700" letter-spacing="1.4">BEFORE · 조사한 공개 구현의 공통 경계</text>
+    <text x="1096" y="230" fill="#151513" font-size="14" font-weight="700" text-anchor="end">활용신청·승인 자동 처리 0 / 10</text>
+
+    <rect x="92" y="264" width="128" height="62" rx="16" fill="#F7F3EB" stroke="#151513"/>
+    <text x="156" y="301" fill="#151513" font-size="16" font-weight="700" text-anchor="middle">사용자 질문</text>
+    <text x="235" y="302" fill="#151513" font-size="22" font-weight="700">→</text>
+    <rect x="264" y="264" width="148" height="62" rx="16" fill="#F7F3EB" stroke="#151513"/>
+    <text x="338" y="288" fill="#151513" font-size="12" text-anchor="middle">키워드·FTS·고정 도메인</text>
+    <text x="338" y="309" fill="#151513" font-size="16" font-weight="700" text-anchor="middle">도구별 탐색</text>
+    <text x="427" y="302" fill="#151513" font-size="22" font-weight="700">→</text>
+    <rect x="456" y="264" width="150" height="62" rx="16" fill="#F7F3EB" stroke="#151513"/>
+    <text x="531" y="288" fill="#151513" font-size="13" text-anchor="middle">지원 범위까지</text>
+    <text x="531" y="309" fill="#151513" font-size="14" font-weight="700" text-anchor="middle">발견·상세·일부 호출</text>
+    <line x1="620" y1="295" x2="641" y2="295" stroke="#151513" stroke-width="2" stroke-dasharray="3 6"/>
+
+    <rect x="654" y="252" width="334" height="86" rx="18" fill="#151513"/>
+    <text x="678" y="280" fill="#F7F3EB" font-size="13" font-weight="700" letter-spacing="1">사람에게 반환</text>
+    <text x="678" y="306" fill="#FFFFFF" font-size="15" font-weight="700">포털 → 신청 → 승인 확인 → 키 복사</text>
+    <text x="678" y="329" fill="#D9D3C8" font-size="12">데이터가 여러 개면 이 구간을 반복</text>
+    <text x="997" y="302" fill="#151513" font-size="22" font-weight="700">→</text>
+    <rect x="1024" y="264" width="72" height="62" rx="16" fill="#F7F3EB" stroke="#151513"/>
+    <text x="1060" y="291" fill="#151513" font-size="12" text-anchor="middle">지원 시</text>
+    <text x="1060" y="310" fill="#151513" font-size="15" font-weight="700" text-anchor="middle">호출</text>
+
+    <rect x="68" y="394" width="1064" height="222" rx="22" fill="#151513"/>
+    <text x="92" y="430" fill="#F7F3EB" font-size="13" font-weight="700" letter-spacing="1.4">AFTER · oddsock</text>
+    <text x="1096" y="430" fill="#FFFFFF" font-size="14" font-weight="700" text-anchor="end">data.go.kr REST · SSO 1회 뒤 신청·승인·키 구간 자동화</text>
+
+    <rect x="92" y="464" width="112" height="64" rx="16" fill="#F7F3EB"/>
+    <text x="148" y="502" fill="#151513" font-size="16" font-weight="700" text-anchor="middle">질문 하나</text>
+    <text x="214" y="503" fill="#F7F3EB" font-size="22" font-weight="700">→</text>
+
+    <rect x="242" y="452" width="186" height="88" rx="16" fill="#F7F3EB"/>
+    <text x="335" y="480" fill="#151513" font-size="16" font-weight="700" text-anchor="middle">DISCOVER</text>
+    <text x="335" y="502" fill="#151513" font-size="13" text-anchor="middle">질문을 분야별 축으로</text>
+    <text x="335" y="523" fill="#5D5A54" font-size="12" text-anchor="middle">인구 · 매출 · 점포 · 위험</text>
+    <text x="438" y="503" fill="#F7F3EB" font-size="22" font-weight="700">→</text>
+
+    <rect x="466" y="464" width="132" height="64" rx="16" fill="#F7F3EB"/>
+    <text x="532" y="489" fill="#151513" font-size="16" font-weight="700" text-anchor="middle">INSPECT</text>
+    <text x="532" y="511" fill="#151513" font-size="12" text-anchor="middle">명세·실제 컬럼</text>
+    <text x="608" y="503" fill="#F7F3EB" font-size="22" font-weight="700">→</text>
+
+    <rect x="636" y="464" width="116" height="64" rx="16" fill="#F7F3EB"/>
+    <text x="694" y="489" fill="#151513" font-size="16" font-weight="700" text-anchor="middle">APPLY</text>
+    <text x="694" y="511" fill="#151513" font-size="12" text-anchor="middle">REST면 활용신청</text>
+    <text x="762" y="503" fill="#F7F3EB" font-size="22" font-weight="700">→</text>
+
+    <rect x="790" y="464" width="128" height="64" rx="16" fill="#F7F3EB"/>
+    <text x="854" y="489" fill="#151513" font-size="16" font-weight="700" text-anchor="middle">VERIFY</text>
+    <text x="854" y="511" fill="#151513" font-size="12" text-anchor="middle">승인·키 재사용</text>
+    <text x="928" y="503" fill="#F7F3EB" font-size="22" font-weight="700">→</text>
+
+    <rect x="956" y="464" width="140" height="64" rx="16" fill="#FFFFFF"/>
+    <text x="1026" y="489" fill="#151513" font-size="16" font-weight="700" text-anchor="middle">CALL</text>
+    <text x="1026" y="511" fill="#151513" font-size="12" text-anchor="middle">계약 확인 후 호출</text>
+
+    <text x="92" y="579" fill="#FFFFFF" font-size="17" font-weight="700">96,683</text>
+    <text x="162" y="579" fill="#D9D3C8" font-size="14">API · FILE · LINK</text>
+    <text x="348" y="579" fill="#FFFFFF" font-size="17" font-weight="700">4종</text>
+    <text x="389" y="579" fill="#D9D3C8" font-size="14">실계정 신청→승인→호출 E2E</text>
+    <text x="718" y="579" fill="#FFFFFF" font-size="17" font-weight="700">11개</text>
+    <text x="767" y="579" fill="#D9D3C8" font-size="14">provider live canary</text>
+  </g>
+
+  <g fill="#151513" font-family="'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif">
+    <text x="70" y="659" font-size="14" font-weight="700">차이는 검색→호출의 존재가 아니다.</text>
+    <text x="327" y="659" font-size="14">서로 다른 데이터의 발견부터 사람이 하던 신청·승인 구간까지 한 흐름으로 잇는 것이다.</text>
+    <text x="1130" y="659" font-size="17" font-weight="700" text-anchor="end">oddsock</text>
+  </g>
+</svg>

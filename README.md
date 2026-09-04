@@ -5,8 +5,8 @@
 
 <h1 align="center">oddsock</h1>
 
-<p align="center"><em>말은 없다. 질문 하나를 던진다. 데이터와 함께 돌아온다.</em></p>
-<p align="center">공개돼 있었다. 찾기 쉽다는 뜻은 아니었다.</p>
+<p align="center"><em>말은 없다. 흩어진 맥락을 잇는다. 데이터의 짝을 찾아온다.</em></p>
+<p align="center">답이 되는 데이터는 한 분야에만 있지 않았다.</p>
 <!-- brand:end -->
 
 <p align="center">
@@ -21,25 +21,43 @@
 
 ---
 
-가게 하나를 열기 전에 궁금한 건 평범하다.
+회사 살림을 20년간 맡아 온 베테랑은 사라진 영수증을 영수증철에서만 찾지 않는다. 누가 마지막으로
+썼는지, 어느 회의에 들고 갔는지, 평소 어떤 서류와 함께 묶어 두는지까지 기억한다. 잠시 뒤,
+전혀 다른 서류철에서 찾아온다.
 
-사람이 늘고 있는지, 비슷한 가게는 얼마나 버티는지, 평일 낮과 주말 밤 중 언제 돈이 쓰이는지.
-그런데 공공데이터포털에서 `사람이 늘어나는 동네`를 검색하면 답은 잘 나오지 않는다. 포털이 알아듣는
-말은 `생활인구`, `추정매출`, `점포이력`, `상권변화지표`다. 답을 찾으려면 먼저 데이터가 붙인 이름부터
-알아야 한다.
+데이터를 연결하는 일도 똑같다. 답의 나머지 한 짝은 같은 분야가 아니라 전혀 다른 기관이나 주제 아래
+있을 수 있다.
 
-기존 공공데이터 MCP를 연결하면 검색→상세→호출은 한결 편해진다. 그래도 조사한 공개 구현 대부분은
-문자열 검색이나 고정된 카탈로그에서 시작하고, API를 찾은 뒤의 활용신청·승인 확인·키 발급은 다시
-사람에게 돌려준다. 하나의 질문에 API와 엑셀과 외부 링크가 함께 필요하면, AI가 찾아준 링크를 사람이
-하나씩 열어 봐야 한다. 그쯤 되면 데이터보다 탭이 더 많이 열려 있다.
+**oddsock은 당신의 AI 에이전트 안에서 그런 베테랑처럼 일한다.**
 
-문틈에서 빼꼼 얼굴을 내민 이 사람은 서두르지 않는다. 막힌 질문 하나를 건네면 대답 대신 잠시
-사라진다. 포털과 엑셀과 신청 페이지를 한참 뒤적인 뒤, 돌아온 손에는 이상하리만치 가지런한 자료
-묶음과 출처가 들려 있다.
+## 기존 도구는 어디에서 멈췄나
 
-**oddsock은 그 사람을 당신의 AI 에이전트 안에 앉혀 둔다.**
+포털 자체와 타 포털 전용 구현을 제외한 data.go.kr 관련 공개 도구 10개를 README 문구가 아니라 실제
+도구 등록과 호출 코드로 비교했다. 검색→상세→호출을 이미 지원하는 도구도 있었다. 하지만 활용신청
+제출과 승인 확인까지 처리한 구현은 10개 중 0개였다. 데이터가 여러 분야에 걸치면 사람은 포털로 돌아가
+이 구간을 데이터마다 반복해야 했다.
 
-## 질문은 하나인데, 데이터는 흩어져 있다
+<p align="center">
+  <img src="docs/assets/oddsock-before-after.svg" width="900" alt="감사한 기존 도구들은 키워드, FTS, 고정 도메인처럼 서로 다른 탐색과 호출 범위를 가졌지만 활용신청과 승인 확인은 모두 사람에게 돌려보냈다. oddsock은 질문을 인구, 매출, 점포, 위험 같은 분야별 축으로 나눠 발견하고 실제 명세와 컬럼 검사, data.go.kr REST 활용신청, 승인과 키 확인, 인증 호출까지 잇는다.">
+</p>
+
+oddsock의 차이는 검색이나 호출을 처음 만들었다는 데 있지 않다. **다른 분야에 흩어진 데이터를 한
+질문의 후보로 모으고, 기존 도구가 사람에게 돌려보내던 구간까지 이어 간다.** data.go.kr REST라면
+사람은 정부 SSO에 한 번 로그인하고, 이후 에이전트가 발견→검사→신청→승인 확인→호출을 계속한다.
+
+비교 대상·고정 커밋·판정 근거와 한계는
+[공공데이터 MCP·CLI 경쟁 워크플로 감사](docs/research/competitive-workflow-audit.md)에 남겼다.
+
+가게 하나를 열기 전에 알고 싶은 것은 사람이 늘고 있는지, 비슷한 가게는 얼마나 버티는지, 평일 낮과
+주말 밤 중 언제 돈이 쓰이는지다. 생활인구는 사람의 흐름을, 매출은 소비를, 점포와 폐업 이력은 경쟁과
+생존을 보여준다. 어느 하나도 혼자서는 질문에 답하지 못한다. 실제 질문은 분야를 가로지르는데,
+공공데이터는 기관과 주제별로 나뉘어 있기 때문이다.
+
+공공데이터포털에서 `사람이 늘어나는 동네`를 검색해도 답은 잘 나오지 않는다. 포털이 알아듣는 말은
+`생활인구`, `추정매출`, `점포이력`, `상권변화지표`다. 필요한 데이터의 이름을 알아낸 뒤에도 서로 다른
+분야의 조각을 찾아 한 질문에 맞게 다시 모아야 한다.
+
+## 질문은 하나인데, 답은 한 분야에 있지 않다
 
 이 질문에 답하고 싶다고 해보자.
 
@@ -64,12 +82,14 @@ catalog_search → inspect_dataset ─┬─ FILE: 실제 파일과 컬럼 관�
                                   └─ LINK: 검증된 adapter 또는 공식 경로 안내
 ```
 
-AI는 한 문장을 생활인구·업종별 매출·점포 생존·개폐업 같은 서로 다른 질문으로 나눈다.
-oddsock은 약 9.6만 개의 API·파일·외부 링크에서 후보를 찾는다. 에이전트는 고른 후보의 실제 명세와
-파일 컬럼을 검사한다. REST라면 필요할 때 활용신청을 내고 인증키를 보여주지 않은 채 호출하며,
-FILE은 내려받아 구조를 관찰한다. 지원하지 않는 외부 제공기관은 공식 경로를 알려주고 멈춘다.
+AI는 한 문장을 생활인구·업종별 매출·점포 생존·개폐업처럼 서로 다른 분야가 맡을 질문으로 나눈다.
+oddsock은 약 9.6만 개의 API·파일·외부 링크에서 각 질문에 맞는 후보와 함께 볼 짝을 찾는다. 에이전트는
+고른 후보의 실제 명세와 파일 컬럼을 검사한다. REST라면 필요할 때 활용신청을 내고 인증키를 보여주지
+않은 채 호출하며, FILE은 내려받아 구조를 관찰한다. 지원하지 않는 외부 제공기관은 공식 경로를
+알려주고 멈춘다.
 
-질문은 가게 하나였다. 뒤에서는 서로 다른 기관이 만든 사람·매출·점포·폐업 데이터가 나란히 놓인다.
+질문은 가게 하나였다. 답의 조각은 인구·상권·사업체처럼 서로 다른 분야와 기관에 있었다. oddsock은
+혼자서는 반쪽인 데이터를 나란히 놓고, 어디까지 연결해 확인할 수 있는지 보여준다.
 
 oddsock이 성공할 가게를 대신 골라주지는 않는다. 대신 감으로 끝나던 사업 아이디어를 어떤 데이터로
 검증할 수 있는지 보여주고, 그 데이터를 실제로 쓸 수 있는 곳까지 데려온다.
@@ -80,7 +100,7 @@ oddsock이 성공할 가게를 대신 골라주지는 않는다. 대신 감으�
 로컬에서 검색할 수 있다.
 
 ```sh
-curl -fsSL https://github.com/JungHoonGhae/oddsock/releases/download/v0.16.1/install.sh | sh
+curl -fsSL https://github.com/JungHoonGhae/oddsock/releases/download/v0.16.2/install.sh | sh
 
 oddsock catalog search \
   "서울에서 작은 가게 후보를 좁힐 자료" \
@@ -93,6 +113,20 @@ oddsock catalog search \
 
 현재 릴리스 카탈로그로 실행하면 서울 생활인구·추정매출뿐 아니라 서울의 점포 데이터와 대전의
 상권별 개폐업 데이터까지 한 번에 나타난다. 여기까지는 로그인도, 외부 AI 호출도, 파일 다운로드도 없다.
+
+위 예시는 결과를 누구나 그대로 재현하기 위한 lexical 경로다. 의미 유사도까지 반드시 포함해야 하는
+조사라면 로컬 Ollama 인덱스를 만든 뒤 strict mode를 사용한다.
+
+```sh
+oddsock catalog semantic-build
+oddsock catalog search \
+  "제주 성인 실종 신고와 담당 인력 구조를 최대한 정확하게 검토할 데이터" \
+  --require-semantic -f json
+```
+
+일반 검색에서도 `semantic.status`와 `warnings`에 실제 사용 여부가 남는다. `--require-semantic`은
+`status=used`가 아니면 lexical 결과를 출력하지 않고 실패하므로, 인덱스 불일치나 Ollama 장애를
+조용히 넘길 수 없다.
 
 그다음 `inspect <PK> --observe`로 실제 파일과 컬럼을 확인한다. REST 활용신청과 첫 호출까지 가고 싶을
 때만 `oddsock login`으로 data.go.kr에 한 번 로그인한다.
@@ -107,14 +141,17 @@ oddsock catalog discover \
 ```
 
 2026-09-03 Codex 계획기로 실행한 결과, 서대문구의 `강수없음` 자료를 Anchor로 잡고 같은 기관의
-`강수있음` 자료, 시간대별 유동인구, 침수·도로통제 이력을 Bridge 후보로 꺼냈다. 예상 결합키도
+`강수있음` 자료, 시간대별 유동인구, 침수 기록을 Bridge 후보로 꺼냈다. 예상 결합키도
 `상권 + 업종 + 날짜 + 시간대`처럼 함께 보여줬다.
 
 여기서 바로 “비 오는 날 잘되는 카페”라고 결론 내리지는 않았다. 실제 파일의 키·match rate·cardinality를
 확인하기 전까지는 **연결 후보**라고 표시했다. 넓게 찾되, 확인하지 않은 주장은 좁게 멈춘다.
 
 <p align="center">
-  <img src="docs/assets/oddsock-linkedin-demo.png" width="900" alt="장마철 카페 질문에서 우천 비교군, 시간대별 유동인구, 침수와 도로통제 이력을 연결 후보로 찾은 실제 데모 요약">
+  <img src="docs/assets/oddsock-linkedin-demo.svg" width="900" alt="실제 catalog discover 실행에서 강수 비교군, 시간대별 유동인구, 침수 기록을 서로 다른 연결 후보로 찾고 각 데이터의 PK와 예상 결합키, 검증 전 한계를 표시한 결과">
+</p>
+<p align="center">
+  <sub>v0.16.0 · 2026-09-03 · <code>catalog discover --connections</code> · data.go.kr 로그인·API 키·Ollama 없이 실행 · <a href="docs/research/launch-readiness-linkedin-geeknews-2026-09.md">실행 조건과 후보 PK</a></sub>
 </p>
 
 ## Numbers
@@ -180,13 +217,13 @@ oddsock은 검색 1위를 정답이라고 부르지 않는다. 다음 단계를 
 macOS / Linux:
 
 ```sh
-curl -fsSL https://github.com/JungHoonGhae/oddsock/releases/download/v0.16.1/install.sh | sh
+curl -fsSL https://github.com/JungHoonGhae/oddsock/releases/download/v0.16.2/install.sh | sh
 ```
 
 Windows:
 
 ```powershell
-irm https://github.com/JungHoonGhae/oddsock/releases/download/v0.16.1/install.ps1 | iex
+irm https://github.com/JungHoonGhae/oddsock/releases/download/v0.16.2/install.ps1 | iex
 ```
 
 설치 스크립트는 바이너리와 같은 릴리스의 checksum을 검증하고, 검증된 카탈로그 snapshot도 함께
@@ -219,6 +256,12 @@ Cursor·Claude Desktop처럼 JSON 설정을 쓰는 호스트:
   }
 }
 ```
+
+Codex CLI·IDE·ChatGPT 데스크톱은 같은 Codex 호스트의 MCP 설정을 공유한다. 등록 뒤에는 새 세션을
+열거나 클라이언트를 재시작하고 `/mcp` 또는 `codex mcp list`에서 `oddsock`이 enabled인지 확인한다.
+oddsock은 초기화할 때 도구 선택 지침도 함께 제공한다. 사용자가 “최대한 정확하게”, “시맨틱”,
+연구·감사·안전 조사를 요청하면 호스트가 `catalog_search(requireSemantic=true)`를 사용하며,
+의미 검색 실패 시 `semantic=false`로 몰래 재시도하지 않도록 계약되어 있다.
 
 이제 데이터 이름 대신 궁금한 것을 말하면 된다.
 
@@ -253,7 +296,7 @@ oddsock call --pk <PK> --param numOfRows=5
 | --- | --- |
 | `REST` | 포털의 공식 operation과 필수 파라미터를 확인하고 신청·호출 |
 | `LINK` | SafetyKorea·FoodSafetyKorea·VWorld 등 검증된 adapter만 typed 호출 |
-| `FILE` | 다운로드 링크만 보여주지 않고 작은 표본과 실제 스키마를 관찰 |
+| `FILE` | 다운로드 링크만 보여주지 않고 CSV·DBF·XLSX의 작은 표본과 실제 스키마를 관찰 |
 
 API처럼 보이는 링크라고 엔드포인트를 지어내지 않는다. 파일이라고 사람에게 다운로드를 떠넘기지도 않는다.
 검증된 계약이 없는 제공기관은 공식 경로를 알려 주고 멈춘다.

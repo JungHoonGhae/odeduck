@@ -714,6 +714,60 @@ func TestCatalogSearchToolExecutesAndDiversifiesSemanticConcepts(t *testing.T) {
 	}
 }
 
+func TestServerAdvertisesTriggerAndNoSilentSemanticFallbackInstructions(t *testing.T) {
+	sess := connectTestClient(t, New(Deps{Fetch: fetch.New(fetch.WithDelay(0))}))
+	got := sess.InitializeResult().Instructions
+	for _, want := range []string{"catalog_search", "requireSemantic", "semantic=false"} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("server instructions = %q, want %q", got, want)
+		}
+	}
+}
+
+func TestCatalogSearchCanRequireSemanticInsteadOfFallingBack(t *testing.T) {
+	isolateConfigHome(t)
+	cat := &catalog.Catalog{SyncedAt: time.Now(), Type: "FILE", Entries: []catalog.Entry{{
+		PK: "jeju", Title: "제주 실종 데이터", SvcType: catalog.SvcFILE,
+	}}}
+	if err := cat.Save(); err != nil {
+		t.Fatal(err)
+	}
+
+	sess := connectTestClient(t, New(Deps{Fetch: fetch.New(fetch.WithDelay(0))}))
+	res, err := sess.CallTool(context.Background(), &mcp.CallToolParams{
+		Name: "catalog_search",
+		Arguments: map[string]any{
+			"query": "제주 실종", "requireSemantic": true,
+		},
+	})
+	if err != nil {
+		t.Fatalf("catalog_search transport error: %v", err)
+	}
+	if !res.IsError {
+		t.Fatalf("catalog_search silently fell back: %+v", res.StructuredContent)
+	}
+	raw, err := json.Marshal(res.StructuredContent)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var strictOut catalogOut
+	if err := json.Unmarshal(raw, &strictOut); err != nil {
+		t.Fatal(err)
+	}
+	if len(strictOut.Hits) != 0 || strictOut.Semantic != nil {
+		t.Fatalf("strict semantic failure must not expose fallback hits: %+v", res.StructuredContent)
+	}
+	var message string
+	if len(res.Content) > 0 {
+		if content, ok := res.Content[0].(*mcp.TextContent); ok {
+			message = content.Text
+		}
+	}
+	if !strings.Contains(message, "semantic-build") {
+		t.Fatalf("error content = %s, want recovery action", message)
+	}
+}
+
 func containsString(values []any, want string) bool {
 	for _, value := range values {
 		if value == want {

@@ -1,6 +1,7 @@
 # CI/CD and release controls require explicit maintainer review.
 /.github/CODEOWNERS @JungHoonGhae
 /.github/dependabot.yml @JungHoonGhae
+/.github/rulesets/ @JungHoonGhae
 /.github/workflows/ @JungHoonGhae
-/.goreleaser.yml @JungHoonGhae
+/.goreleaser.yaml @JungHoonGhae
 /SECURITY.md @JungHoonGhae

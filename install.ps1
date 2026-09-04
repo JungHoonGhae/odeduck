@@ -1,6 +1,6 @@
 # oddsock installer (Windows PowerShell)
 #
-#   irm https://github.com/JungHoonGhae/oddsock/releases/download/v0.16.1/install.ps1 | iex
+#   irm https://github.com/JungHoonGhae/oddsock/releases/download/v0.16.2/install.ps1 | iex
 #
 # Environment variables:
 #   $env:ODDSOCK_VERSION  pin a version (e.g. v0.4.0, default: latest)

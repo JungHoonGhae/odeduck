@@ -443,6 +443,54 @@ func TestSearchRelaxesWhenNothingMatchesEveryTerm(t *testing.T) {
 	}
 }
 
+// A place named in the user's question is a high-signal title match. Generic
+// prose in another region's description must not outrank the local dataset just
+// because it happens to repeat more workflow words.
+func TestSearchRelaxedKeepsGeographicTitleMatchAheadOfDescriptionNoise(t *testing.T) {
+	c := &Catalog{Entries: []Entry{
+		{
+			PK: "jeju", Title: "제주 실종 접수 해제 현황", SvcType: SvcFILE,
+			Desc: "성인 현황",
+		},
+		{
+			PK: "jeonbuk", Title: "전북 실종 해제 현황", SvcType: SvcFILE,
+			Desc: "성인 신고 접수 처리 미해제 현황",
+		},
+	}}
+
+	r := c.Search("제주 성인 실종 신고 접수 처리 해제 미해제", 2, false)
+	if !r.Relaxed || len(r.Hits) != 2 {
+		t.Fatalf("relaxed result = %+v", r)
+	}
+	if r.Hits[0].PK != "jeju" {
+		t.Fatalf("ranked hits = %+v, want geographic title match first", r.Hits)
+	}
+}
+
+func TestSearchPlanRecentKeepsGeographicTitleMatchAheadOfDescriptionNoise(t *testing.T) {
+	c := &Catalog{Entries: []Entry{
+		{
+			PK: "jeju", Title: "제주 실종 접수 해제 현황", SvcType: SvcFILE,
+			Desc: "성인 현황", ModifiedAt: "2025-01-01",
+		},
+		{
+			PK: "jeonbuk", Title: "전북 실종 해제 현황", SvcType: SvcFILE,
+			Desc: "성인 신고 접수 처리 미해제 현황", ModifiedAt: "2026-12-31",
+		},
+	}}
+
+	r := c.SearchPlan(QueryPlan{
+		Intent: "제주 성인 실종 신고 접수 처리 해제 미해제",
+		Limit:  2, Ranking: RankRecent,
+	})
+	if !r.Relaxed || len(r.Hits) != 2 {
+		t.Fatalf("relaxed recent result = %+v", r)
+	}
+	if r.Hits[0].PK != "jeju" {
+		t.Fatalf("recent-ranked hits = %+v, want geographic relevance before recency", r.Hits)
+	}
+}
+
 // A single unmatchable word is a genuine miss, not something to widen.
 func TestSearchSingleTermMissStaysEmpty(t *testing.T) {
 	if r := sample().Search("존재하지않는말", 10, false); r.Total != 0 || r.Relaxed {

@@ -1,7 +1,7 @@
 #!/bin/sh
 # oddsock 설치 스크립트 (macOS/Linux)
 #
-#   curl -fsSL https://github.com/JungHoonGhae/oddsock/releases/download/v0.16.1/install.sh | sh
+#   curl -fsSL https://github.com/JungHoonGhae/oddsock/releases/download/v0.16.2/install.sh | sh
 #
 # 환경변수:
 #   INSTALL_DIR     설치 위치 (기본 /usr/local/bin)

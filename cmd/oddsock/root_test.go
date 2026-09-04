@@ -44,6 +44,49 @@ func TestCatalogSearchKeepsLinkDatasetsDiscoverableByDefault(t *testing.T) {
 	}
 }
 
+func TestCatalogSearchExposesRequireSemanticFlag(t *testing.T) {
+	cmd := catalogQueryCmd(false)
+	flag := cmd.Flags().Lookup("require-semantic")
+	if flag == nil {
+		t.Fatal("catalog search is missing --require-semantic")
+	}
+	if flag.DefValue != "false" {
+		t.Fatalf("--require-semantic default = %q, want optional strict mode", flag.DefValue)
+	}
+}
+
+func TestCatalogSearchRejectsDisabledRequiredSemanticSearch(t *testing.T) {
+	cmd := catalogQueryCmd(false)
+	cmd.SetArgs([]string{"제주 실종", "--require-semantic", "--semantic=false"})
+	cmd.SetOut(&bytes.Buffer{})
+	cmd.SetErr(&bytes.Buffer{})
+
+	err := cmd.Execute()
+	if err == nil || !strings.Contains(err.Error(), "함께 사용할 수 없습니다") {
+		t.Fatalf("catalog search error = %v, want incompatible semantic flags", err)
+	}
+}
+
+func TestRunCatalogQueryRejectsMissingRequiredSemanticIndex(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, ".config"))
+	t.Setenv("APPDATA", filepath.Join(home, "AppData", "Roaming"))
+	cat := &catalog.Catalog{SyncedAt: time.Now(), Entries: []catalog.Entry{{
+		PK: "jeju", Title: "제주 실종 데이터", SvcType: catalog.SvcFILE,
+	}}}
+	cmd := catalogQueryCmd(false)
+	cmd.SetErr(&bytes.Buffer{})
+
+	result, err := runCatalogQuery(cmd, cat, catalog.QueryPlan{Intent: "제주 실종", Limit: 1}, true, true)
+	if err == nil || !strings.Contains(err.Error(), "semantic-build") {
+		t.Fatalf("strict semantic query error = %v", err)
+	}
+	if result.Semantic == nil || result.Semantic.Status != catalog.SemanticNotIndexed || len(result.Warnings) == 0 {
+		t.Fatalf("strict semantic diagnostic result = %+v", result)
+	}
+}
+
 func TestCatalogSyncDefaultsToAPIAndFileDiscovery(t *testing.T) {
 	cmd := catalogSyncCmd()
 	flag := cmd.Flags().Lookup("type")
