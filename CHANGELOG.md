@@ -7,6 +7,31 @@ section matching a `vX.Y.Z` tag as the GitHub release notes.
 
 ## [Unreleased]
 
+## [0.18.0] - 2026-09-05
+
+### Added
+
+- Record evidence for cross-domain connections in a local, append-only ledger,
+  including the datasets, identifier fields, provenance, sample overlap and join
+  expansion used to support a decision.
+- Verify sample claims against recent `call_api` profiles in the same MCP session,
+  with delivery-, operation- and request-bound receipts that never persist raw
+  response values.
+
+### Changed
+
+- Require explicit expected-key mappings, consistent count aggregates, safe
+  data.go.kr provenance URLs and delivery-compatible evidence records.
+- Keep read-only empty-ledger queries side-effect free and bound receipt memory;
+  preserve ambiguous or damaged JSONL tails instead of deleting evidence.
+
+### Fixed
+
+- Prevent fabricated sample metrics, credential-bearing provenance and
+  whitespace or ordering variants from bypassing validation or idempotency.
+- Make ledger locking, concurrent append, cancellation, cross-platform builds
+  and profile evidence hashing deterministic and test-covered.
+
 ## [0.17.2] - 2026-09-04
 
 ### Changed
