@@ -3,8 +3,11 @@
 data.go.kr(공공데이터포털)의 OpenAPI **활용신청·인증키 발급·호출을 AI 에이전트가 대신**하게 하는
 Go CLI + MCP. 사람은 정부 SSO 로그인 한 번만 하고 이후 포털 작업을 에이전트가 잇는 것이 핵심.
 
-## 현재 상태 (2026-09-02)
+## 현재 상태 (2026-09-04)
 
+- v0.16.1은 고신뢰 조사에서 의미 검색이 실제 사용되지 않으면 실패하는 CLI `--require-semantic`과 MCP
+  `requireSemantic` 계약을 추가하고, FILE 관찰 범위를 bounded XLSX worksheet·다단 헤더까지 넓혔다.
+  README에는 로그인 없는 첫 검색과 실제 연결 후보의 검증 경계를 기록했다.
 - v0.16은 README의 공개 정체성을 문틈에서 조용히 얼굴을 내민 캐릭터와 한 줄 질문 중심으로 바꿨다.
   이름·문구·로고 경로의 기준은 `docs/brand/brand.json`이며, `go run ./scripts/sync-brand.go`가 README
   상단 블록을 갱신하고 CI의 `--check`가 불일치를 막는다.
@@ -68,7 +71,7 @@ Go CLI + MCP. 사람은 정부 SSO 로그인 한 번만 하고 이후 포털 작
 - `internal/agentplan/` — provider별 계획 생성과 검색 결과 기반 확장·조합, 안전한 abstention.
 - `internal/catalog/` — 공식 API·월간 CSV·웹 composite 수집, prebuilt snapshot, 키워드·의미 검색,
   release golden query gate, connection discovery의 제한·중복 제거·증거 경계.
-- `internal/dataset/` — REST/LINK/FILE 공통 검사와 실제 FILE 자산·bounded CSV/DBF schema 관찰.
+- `internal/dataset/` — REST/LINK/FILE 공통 검사와 실제 FILE 자산·bounded CSV/DBF/XLSX schema 관찰.
 - `internal/apicall/profile.go` — 호출 응답의 선택 필드에 대한 경로·고유값 프로파일링.
 
 ## 경쟁 지형
@@ -90,7 +93,8 @@ Go CLI + MCP. 사람은 정부 SSO 로그인 한 번만 하고 이후 포털 작
 - **보안(HIGH, 해결됨)**: `daemon.go`에서 `--remote-allow-origins=*` 제거(스파이크
   `proto/cdp-origin`로 검증 — chromedp는 flag 없이 재부착, 외부 Origin은 Chrome이 403 거부).
   이전 kvote verbatim 이식이 세션탈취 표면을 열어뒀던 것을 닫음.
-- 배포: private GitHub Release + goreleaser + 인증된 `gh` 기반 install.sh/ps1. 공개 Homebrew 배포는 중단.
+- 배포: goreleaser가 바이너리·카탈로그·checksum·install.sh/ps1을 같은 릴리스에 묶는다. 설치기는 공개
+  GitHub HTTPS 다운로드와 인증된 private preview를 모두 지원하며, 공개 Homebrew 배포는 중단했다.
 
 ## Testing
 
