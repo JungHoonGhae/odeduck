@@ -12,6 +12,7 @@ import (
 
 	"github.com/JungHoonGhae/odeduck/internal/apicall"
 	"github.com/JungHoonGhae/odeduck/internal/catalog"
+	"github.com/JungHoonGhae/odeduck/internal/connectionledger"
 	"github.com/JungHoonGhae/odeduck/internal/dataset"
 	"github.com/JungHoonGhae/odeduck/internal/fetch"
 	"github.com/JungHoonGhae/odeduck/internal/portal"
@@ -27,6 +28,7 @@ type Deps struct {
 	SemanticIndex *catalog.SemanticIndex
 	Embedder      catalog.Embedder
 	Caller        datasetCallExecutor
+	Ledger        *connectionledger.Store
 }
 
 type datasetCallExecutor interface {
@@ -124,6 +126,16 @@ type catalogOut struct {
 type appsOut struct {
 	Applications []portal.Application `json:"applications"`
 }
+type listConnectionAssessmentsIn struct {
+	PK     string `json:"pk,omitempty" jsonschema:"optional publicDataPk appearing on either side"`
+	Status string `json:"status,omitempty" jsonschema:"optional exact assessment status"`
+	Limit  int    `json:"limit,omitempty" jsonschema:"maximum records to return; default 20 and maximum 100"`
+}
+type connectionAssessmentsOut struct {
+	Total   int                       `json:"total"`
+	Shown   int                       `json:"shown"`
+	Records []connectionledger.Record `json:"records"`
+}
 
 // maxToolWait caps how long call_api will block. Propagation can take longer than
 // this; the agent is told to call again rather than have a tool hold the session.
@@ -166,6 +178,12 @@ func New(deps Deps) *mcp.Server {
 		Title:   "odeduck — 대한민국 공공데이터 AI 컨트롤 플레인",
 		Version: version.Version,
 	}, &mcp.ServerOptions{Instructions: ServerInstructions})
+	ledger := func() (*connectionledger.Store, error) {
+		if deps.Ledger != nil {
+			return deps.Ledger, nil
+		}
+		return connectionledger.Default()
+	}
 
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "catalog_search",
@@ -342,6 +360,63 @@ func New(deps Deps) *mcp.Server {
 			res.Profile, _ = apicall.ProfileBody(res.Body, in.ProfileFields)
 		}
 		return nil, res, nil
+	})
+
+	mcp.AddTool(s, &mcp.Tool{
+		Name: "record_connection_assessment",
+		Annotations: &mcp.ToolAnnotations{
+			Title:           "4단계 · 연결 근거 기록",
+			DestructiveHint: boolPtr(false),
+			IdempotentHint:  true,
+			OpenWorldHint:   boolPtr(false),
+		},
+		Description: "[4단계: 근거 기록] inspect_dataset과 call_api/FILE 관찰로 직접 확인한 교차 데이터 연결 판정을 로컬 장부에 추가한다. " +
+			"검색의 candidate는 기록할 수 없다. structurally_verified는 양쪽 공식 field의 namespace·type·grain이 필요하고, sample_verified는 " +
+			"양쪽 evidenceHash와 실제 overlap·joined rows·join expansion이 추가로 필요하다. blocked/rejected도 reason과 함께 남겨 같은 실패를 반복하지 않게 한다. " +
+			"원문 응답 값과 인증키는 저장하지 않는다. 기존 판정을 바꿀 때는 supersedes에 이전 record ID를 넣는다.",
+	}, func(ctx context.Context, _ *mcp.CallToolRequest, in connectionledger.Assessment) (*mcp.CallToolResult, *connectionledger.Record, error) {
+		store, err := ledger()
+		if err != nil {
+			return errResult(err.Error()), nil, nil
+		}
+		record, err := store.Record(ctx, in)
+		if err != nil {
+			return errResult(err.Error()), nil, nil
+		}
+		return nil, &record, nil
+	})
+
+	mcp.AddTool(s, &mcp.Tool{
+		Name:        "list_connection_assessments",
+		Annotations: readOnlyAnnotations("보조 · 검증·기각된 연결 근거 조회", false),
+		Description: "로컬 연결 근거 장부를 최신순으로 조회한다. PK나 status로 좁힐 수 있다. 검색 후보가 아니라 출처와 검증 gate를 통과해 기록된 판정만 반환한다.",
+	}, func(ctx context.Context, _ *mcp.CallToolRequest, in listConnectionAssessmentsIn) (*mcp.CallToolResult, *connectionAssessmentsOut, error) {
+		if in.Limit < 0 || in.Limit > 100 {
+			return errResult("limit은 생략하거나 1~100 사이여야 합니다"), nil, nil
+		}
+		if in.PK != "" {
+			if err := portal.ValidatePublicDataPK(in.PK); err != nil {
+				return errResult(err.Error()), nil, nil
+			}
+		}
+		store, err := ledger()
+		if err != nil {
+			return errResult(err.Error()), nil, nil
+		}
+		records, err := store.List(ctx, connectionledger.Filter{PK: in.PK, Status: in.Status})
+		if err != nil {
+			return errResult(err.Error()), nil, nil
+		}
+		limit := in.Limit
+		if limit == 0 {
+			limit = 20
+		}
+		out := &connectionAssessmentsOut{Total: len(records), Records: records}
+		if len(out.Records) > limit {
+			out.Records = out.Records[:limit]
+		}
+		out.Shown = len(out.Records)
+		return nil, out, nil
 	})
 
 	// Fallback discovery reaches the live portal and only sees its current result

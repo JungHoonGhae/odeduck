@@ -1,6 +1,7 @@
 package apicall
 
 import (
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"sort"
@@ -18,7 +19,8 @@ const (
 // intentionally per-response and stateless: callers compare two profiles from
 // two call_api invocations without odeduck retaining public response data.
 type SampleProfile struct {
-	Fields []FieldProfile `json:"fields"`
+	Fields       []FieldProfile `json:"fields"`
+	EvidenceHash string         `json:"evidenceHash"`
 }
 
 // FieldProfile preserves raw string values so identifiers such as "00110" do
@@ -72,6 +74,10 @@ func ProfileBody(body any, fields []string) (*SampleProfile, error) {
 			item.ValuesTruncated = false
 		}
 	}
+	// The hash lets a durable connection assessment cite the exact bounded
+	// profile without retaining its raw public-data values in the ledger.
+	canonical, _ := json.Marshal(profile.Fields)
+	profile.EvidenceHash = fmt.Sprintf("%x", sha256.Sum256(canonical))
 	return profile, nil
 }
 

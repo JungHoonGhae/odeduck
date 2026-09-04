@@ -88,8 +88,8 @@ leaf field 또는 dotted suffix를 재귀적으로 찾아 raw string 값을 보�
 duplicate, 실제 path를 반환한다. 한 응답에서 최대 50개 distinct 값을 보여주되 전체 bounded 응답의
 count는 유지한다. 같은 leaf가 여러 실제 path에 있으면 `ambiguous=true`로 표시하고 합산 수치를
 제공하지 않으므로, 호스트가 surfaced dotted path 중 하나를 다시 지정해야 한다. scalar 배열은 소유
-field 아래 값으로 펼친다. odeduck은 이 public sample을 영구 저장하거나 두 API의 join 결과를 대신
-만들지 않는다.
+field 아래 값으로 펼친다. odeduck은 public sample 원문이나 join 결과를 영구 저장하지 않는다. v1.1의
+연결 근거 장부에는 profile SHA-256과 집계 통계만 선택적으로 기록한다.
 
 ## 4. 검색과 연결 순서
 
@@ -143,7 +143,8 @@ MCP에서는 대화 중인 모델이 계획기이므로 하위 CLI를 실행하�
 | 명세 파싱·필수 파라미터·승인·인증키 주입 | 소유 | 어떤 node/operation을 검토할지 결정 |
 | 응답 field의 bounded profile | 소유 | 양쪽 profile·namespace·grain 비교 |
 | 사업·리서치 타당성, 인과, 최종 판단 | 주장하지 않음 | 증거와 외부 검증을 분리해 설명 |
-| 영구 관계 그래프·사용자 질문 저장 | 소유하지 않음 | 필요 시 별도 제품 범위 |
+| 검증·기각 판정과 집계 근거의 로컬 장부 | 저장·검증 gate 소유 | 직접 확인한 판정과 근거 제공 |
+| 전역 entity graph·사용자 질문·원문 표본 저장 | 소유하지 않음 | 필요 시 별도 제품 범위 |
 
 이 혼합 경계는 provider별 prompt 차이를 작은 JSON 계약 안에 가두고, Windows와 Ollama 없는 환경에서도
 같은 검색 결과 타입을 유지한다. 전역 schema graph가 없어도 질의 시 필요한 node만 확대할 수 있다.
@@ -162,7 +163,7 @@ MCP에서는 대화 중인 모델이 계획기이므로 하위 CLI를 실행하�
   간주하지 않는다.
 - 인증정보: service key는 MCP 출력에 노출하지 않고 공식 HTTPS gateway 요청에만 주입한다.
 - 개인정보: 카탈로그 metadata만 agent CLI에 전달한다. public API 응답은 사용자가 요청한 호출 범위에서만
-  호스트로 반환하며 서버가 관계 index로 축적하지 않는다.
+  호스트로 반환한다. 장부는 PK·공식 출처·field 의미·집계 통계·증거 hash만 저장하고 raw 값을 축적하지 않는다.
 
 ## 7. 검증 gate
 
@@ -203,7 +204,7 @@ v0.10.0 출시 기준은 다음이다.
 
 - 모든 API pair의 all-pairs graph, 전역 inclusion-dependency mining, 영구 vector DB.
 - 자동 schema/column index와 모집단 수준 join 보장.
-- 사용자의 연결 카드 저장·알림·협업 UI.
+- 연결 카드 알림·협업 UI와 raw sample 저장.
 - data.go.kr 밖의 포털 통합.
 - 사업 성과·지불의사·인과관계를 데이터 조합만으로 자동 판정.
 

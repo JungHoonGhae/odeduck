@@ -13,6 +13,7 @@ import (
 
 	"github.com/JungHoonGhae/odeduck/internal/apicall"
 	"github.com/JungHoonGhae/odeduck/internal/catalog"
+	"github.com/JungHoonGhae/odeduck/internal/connectionledger"
 	"github.com/JungHoonGhae/odeduck/internal/dataset"
 	"github.com/JungHoonGhae/odeduck/internal/fetch"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -389,6 +390,39 @@ func TestToolCatalogPresentsProgressiveDiscoveryWorkflow(t *testing.T) {
 	}
 	if byName["get_api_key"] != nil {
 		t.Fatal("MCP must not expose the account-wide serviceKey to model context")
+	}
+	record := byName["record_connection_assessment"]
+	if record == nil || record.Annotations == nil || record.Annotations.ReadOnlyHint ||
+		record.Annotations.DestructiveHint == nil || *record.Annotations.DestructiveHint || !record.Annotations.IdempotentHint {
+		t.Fatal("connection assessment must advertise a local additive idempotent write")
+	}
+}
+
+func TestConnectionAssessmentRoundTripDoesNotStoreRawValues(t *testing.T) {
+	store := connectionledger.New(filepath.Join(t.TempDir(), "connections.jsonl"))
+	sess := connectTestClient(t, New(Deps{Fetch: fetch.New(fetch.WithDelay(0)), Ledger: store}))
+	field := map[string]any{"selector": "lawdCd", "namespace": "법정동코드 10자리", "dataType": "string", "grain": "행정구역"}
+	hash := strings.Repeat("a", 64)
+	res, err := sess.CallTool(context.Background(), &mcp.CallToolParams{
+		Name: "record_connection_assessment",
+		Arguments: map[string]any{
+			"left":     map[string]any{"pk": "15000001", "delivery": "REST", "source": map[string]any{"url": "https://www.data.go.kr/data/15000001/openapi.do"}, "record": map[string]any{"kind": "api_profile", "evidenceHash": hash}, "fields": []any{field}},
+			"right":    map[string]any{"pk": "15000002", "delivery": "FILE", "source": map[string]any{"url": "https://www.data.go.kr/data/15000002/fileData.do"}, "record": map[string]any{"kind": "file_observation", "evidenceHash": hash}, "fields": []any{field}},
+			"relation": "SHARES_LEGAL_DISTRICT", "edgeKinds": []string{"spatial"}, "expectedKeys": []string{"lawdCd"},
+			"matchMethod": "deterministic", "status": "sample_verified", "incrementalValue": "수요와 공급 비교", "reason": "표본 일치",
+			"observedAt": "2026-09-04T00:00:00Z", "sample": map[string]any{"leftDistinct": 10, "rightDistinct": 8, "overlapDistinct": 7, "joinedRows": 12, "leftMaxRowsPerKey": 2, "rightMaxRowsPerKey": 1},
+		},
+	})
+	if err != nil || res.IsError {
+		t.Fatalf("record err=%v result=%+v", err, res)
+	}
+	listed, err := sess.CallTool(context.Background(), &mcp.CallToolParams{Name: "list_connection_assessments", Arguments: map[string]any{"pk": "15000002"}})
+	if err != nil || listed.IsError {
+		t.Fatalf("list err=%v result=%+v", err, listed)
+	}
+	raw, _ := json.Marshal(listed.StructuredContent)
+	if !bytes.Contains(raw, []byte("sample_verified")) || bytes.Contains(raw, []byte("values")) {
+		t.Fatalf("ledger response = %s", raw)
 	}
 }
 

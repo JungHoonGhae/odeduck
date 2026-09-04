@@ -34,6 +34,13 @@ func TestProfileBodyPreservesIdentifiersAndCountsJoinEvidence(t *testing.T) {
 	if profile.Fields[2].Matched {
 		t.Fatalf("missing field = %+v", profile.Fields[2])
 	}
+	if len(profile.EvidenceHash) != 64 {
+		t.Fatalf("evidence hash = %q", profile.EvidenceHash)
+	}
+	again, err := ProfileBody(body, []string{"lawdCd", "dealYm", "missing"})
+	if err != nil || again.EvidenceHash != profile.EvidenceHash {
+		t.Fatalf("evidence hash must be deterministic: first=%q second=%q err=%v", profile.EvidenceHash, again.EvidenceHash, err)
+	}
 }
 
 func TestProfileBodyPreservesWhitespaceInRawStringValues(t *testing.T) {
