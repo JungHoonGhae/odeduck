@@ -824,20 +824,34 @@ func (c *Catalog) searchRanked(query string, limit int, restOnly bool, ranking s
 	}
 
 	betterDemand := func(left, right lexicalScored) bool {
-		if left.matched != right.matched {
-			return left.matched > right.matched
+		// A match in the compact identity fields (title, publisher, category)
+		// carries more intent than prose in a long description. In particular,
+		// this keeps a named place or agency from being displaced by another
+		// region whose description happens to repeat generic workflow words.
+		leftRelevance := left.matched + 2*left.inTitle
+		rightRelevance := right.matched + 2*right.inTitle
+		if leftRelevance != rightRelevance {
+			return leftRelevance > rightRelevance
 		}
 		if left.inTitle != right.inTitle {
 			return left.inTitle > right.inTitle
+		}
+		if left.matched != right.matched {
+			return left.matched > right.matched
 		}
 		return moreDemandedEntry(left.entry, right.entry)
 	}
 	betterRecent := func(left, right lexicalScored) bool {
-		if left.matched != right.matched {
-			return left.matched > right.matched
+		leftRelevance := left.matched + 2*left.inTitle
+		rightRelevance := right.matched + 2*right.inTitle
+		if leftRelevance != rightRelevance {
+			return leftRelevance > rightRelevance
 		}
 		if left.inTitle != right.inTitle {
 			return left.inTitle > right.inTitle
+		}
+		if left.matched != right.matched {
+			return left.matched > right.matched
 		}
 		if left.entry.ModifiedAt != right.entry.ModifiedAt {
 			return left.entry.ModifiedAt > right.entry.ModifiedAt
