@@ -40,7 +40,7 @@ cardinality를 확인하지 않았으므로 “비 오는 날 잘되는 카페�
 첫 검색은 data.go.kr 계정이나 API 키 없이 바로 됩니다.
 
 ```sh
-curl -fsSL https://github.com/JungHoonGhae/oddsock/releases/download/v0.16.1/install.sh | sh
+curl -fsSL https://github.com/JungHoonGhae/oddsock/releases/download/v0.16.2/install.sh | sh
 
 oddsock catalog search \
   "서울에서 작은 가게 후보를 좁힐 자료" \
