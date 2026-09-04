@@ -30,7 +30,6 @@ type brand struct {
 	Proofline       string `json:"proofline"`
 	LogoPath        string `json:"logoPath"`
 	LogoAlt         string `json:"logoAlt"`
-	AccentColor     string `json:"accentColor"`
 	TechnicalName   string `json:"technicalName"`
 	Command         string `json:"command"`
 	Repository      string `json:"repository"`
@@ -92,7 +91,6 @@ func loadBrand(path string) (brand, error) {
 		"proofline":       configuration.Proofline,
 		"logoPath":        configuration.LogoPath,
 		"logoAlt":         configuration.LogoAlt,
-		"accentColor":     configuration.AccentColor,
 		"technicalName":   configuration.TechnicalName,
 		"command":         configuration.Command,
 		"repository":      configuration.Repository,

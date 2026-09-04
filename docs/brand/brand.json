@@ -4,7 +4,6 @@
   "proofline": "서로 상관없어 보이는 공공데이터를 연결해, 질문에 필요한 정보를 찾아온다.",
   "logoPath": "docs/assets/brand-symbol.svg",
   "logoAlt": "흩어진 공공데이터의 연결을 찾는 오데덕 캐릭터",
-  "accentColor": "#A30F1B",
   "technicalName": "odeduck",
   "command": "odeduck",
   "repository": "JungHoonGhae/odeduck",
