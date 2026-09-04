@@ -6,7 +6,7 @@
     <text x="70" y="88" font-size="16" font-weight="700" letter-spacing="2.1">ONE QUESTION → CROSS-DOMAIN DATA</text>
     <text x="68" y="158" font-size="36" font-weight="700" letter-spacing="-1.2">“장마철에도 매출이 덜 흔들릴</text>
     <text x="68" y="207" font-size="36" font-weight="700" letter-spacing="-1.2">동네 카페 후보를 찾고 싶어.”</text>
-    <text x="70" y="242" font-size="15" font-weight="400">약 1분 뒤, 추천 목록 대신 비교할 근거가 돌아왔다.</text>
+    <text x="70" y="242" font-size="15" font-weight="400">v0.16.0 실제 실행 · catalog discover --connections · 62초</text>
   </g>
 
   <image href="brand-symbol.svg" x="955" y="48" width="170" height="170" preserveAspectRatio="xMidYMid meet"/>
@@ -15,23 +15,23 @@
     <rect x="68" y="286" width="326" height="143" rx="22" fill="#151513"/>
     <text x="92" y="326" fill="#F7F3EB" font-size="14" font-weight="700" letter-spacing="1.1">01 · 우천 비교군</text>
     <text x="92" y="375" fill="#FFFFFF" font-size="25" font-weight="700">강수없음 ↔ 강수있음</text>
-    <text x="92" y="402" fill="#F7F3EB" font-size="14">같은 기관 · 같은 구조</text>
+    <text x="92" y="402" fill="#F7F3EB" font-size="14">PK 15097163 ↔ 15097164</text>
 
     <rect x="418" y="286" width="326" height="143" rx="22" fill="none" stroke="#151513" stroke-width="2"/>
     <text x="442" y="326" fill="#151513" font-size="14" font-weight="700" letter-spacing="1.1">02 · 숨은 수요</text>
     <text x="442" y="375" fill="#151513" font-size="25" font-weight="700">시간대별 유동인구</text>
-    <text x="442" y="402" fill="#151513" font-size="14">비 오는 시간에도 남는 수요</text>
+    <text x="442" y="402" fill="#151513" font-size="14">Bridge PK 15097166</text>
 
     <rect x="768" y="286" width="326" height="143" rx="22" fill="none" stroke="#151513" stroke-width="2"/>
     <text x="792" y="326" fill="#151513" font-size="14" font-weight="700" letter-spacing="1.1">03 · 최악의 날</text>
-    <text x="792" y="375" fill="#151513" font-size="25" font-weight="700">침수 · 도로통제 이력</text>
-    <text x="792" y="402" fill="#151513" font-size="14">평소와 집중호우를 분리</text>
+    <text x="792" y="375" fill="#151513" font-size="25" font-weight="700">침수 기록</text>
+    <text x="792" y="402" fill="#151513" font-size="14">Bridge PK 15130537</text>
 
-    <text x="70" y="497" fill="#151513" font-size="17" font-weight="700">예상 결합키</text>
-    <text x="194" y="497" fill="#151513" font-size="17">상권 + 업종 + 날짜 + 시간대</text>
+    <text x="70" y="497" fill="#151513" font-size="17" font-weight="700">후보별 예상 결합키</text>
+    <text x="252" y="497" fill="#151513" font-size="17">상권·업종·날짜·시간대 / 발생일·좌표·상권</text>
     <line x1="70" y1="519" x2="1094" y2="519" stroke="#151513" stroke-width="2" stroke-dasharray="3 10" stroke-linecap="round"/>
     <text x="70" y="561" fill="#151513" font-size="16" font-weight="700">아직 결론이 아니다.</text>
-    <text x="230" y="561" fill="#151513" font-size="16">실제 join을 확인하기 전까지는 연결 후보.</text>
+    <text x="230" y="561" fill="#151513" font-size="16">key · match rate · cardinality 검증 전까지는 연결 후보.</text>
     <text x="1094" y="561" fill="#151513" font-size="18" font-weight="700" text-anchor="end">oddsock</text>
   </g>
 </svg>
