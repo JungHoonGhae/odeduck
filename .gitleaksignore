@@ -1,9 +1,6 @@
 # Reviewed false positives. Fingerprints are exact so new findings in the same
 # files are not suppressed.
 
-# Higgsfield prompt metadata: `Style key`, not a credential.
-1c66959fbe69f94c1252af22d7763c0c9140dbe8:docs/promo/gongctl-agent-explainer.md:generic-api-key:12
-
 # Explicit dummy provider keys in HTTP contract tests.
 639b589d4197a17bf846392354436cc5e79cae12:internal/apicall/external_call_test.go:generic-api-key:226
 639b589d4197a17bf846392354436cc5e79cae12:internal/apicall/external_call_test.go:generic-api-key:243

@@ -8,8 +8,8 @@ import (
 	"os"
 	"strings"
 
-	"github.com/JungHoonGhae/oddsock/internal/output"
-	"github.com/JungHoonGhae/oddsock/internal/providerauth"
+	"github.com/JungHoonGhae/odeduck/internal/output"
+	"github.com/JungHoonGhae/odeduck/internal/providerauth"
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 )

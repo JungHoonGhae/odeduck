@@ -1,4 +1,4 @@
-# oddsock 일상 질문 데모: 60초 홍보 영상
+# 오데덕 일상 질문 데모: 60초 홍보 영상
 
 > Status: 현재 메시지에 맞춘 제작 brief다. 예전 pre-rename 렌더는 카탈로그 숫자와 브랜드가 오래되어
 > 공개하지 않는다. 새 영상은 아래 내레이션과 현재 로고를 기준으로 다시 제작한다.
@@ -25,11 +25,11 @@
 
 ### Block 3
 
-oddsock에 평소 말하듯 질문 한 줄을 던집니다. 데이터 이름을 먼저 배울 필요는 없습니다.
+오데덕에게 평소 말하듯 질문 한 줄을 건넵니다. 데이터 이름을 먼저 배울 필요는 없습니다.
 
 ### Block 4
 
-AI가 질문을 검색축으로 나누고, oddsock이 공공데이터 9만 6천여 건에서 우천 비교군과 유동인구,
+AI가 질문을 검색축으로 나누고, 오데덕이 공공데이터 9만 6천여 건에서 우천 비교군과 유동인구,
 침수 이력을 함께 찾습니다.
 
 ### Block 5
@@ -38,7 +38,7 @@ AI가 질문을 검색축으로 나누고, oddsock이 공공데이터 9만 6천�
 
 ### Block 6
 
-oddsock은 잘될 카페를 지어내지 않습니다. 검증할 데이터와 다음 행동을 가져오고, 근거가 부족하면
+오데덕은 잘될 카페를 지어내지 않습니다. 검증할 데이터와 다음 행동을 가져오고, 근거가 부족하면
 후보에서 멈춥니다.
 
 ## Shared visual style
@@ -66,7 +66,7 @@ NEGATIVE: color drift, photorealism, live action, 3D render, lip-sync, captions,
 ### Block 3
 
 STYLE REFERENCE: Match the attached reference image EXACTLY. Replicate its look precisely: editorial motion graphics, crisp flat vector cutouts, charcoal black, electric cobalt blue, warm ivory, lime accent, strong geometric grids, subtle paper grain, high-contrast editorial composition, clean thin outlines, matte finish, non-photorealistic, illustrated, not a photo, no live-action, no realism. Every element below rendered in that identical style.
-SCENE: The same natural-language question flows into a friendly AI terminal, passes a small oddsock doorway character, and opens the public-data archive. The complex vocabulary stays behind the doorway.
+SCENE: The same natural-language question reaches a friendly AI terminal. A small Odaedeok character moves between distant archive shelves, opens several drawers, and returns with tidy search axes from different public-data domains.
 MOTION: Gentle push-in as the question becomes several tidy search axes and enters the archive.
 AUDIO: One warm question tone, a clean connection chime, subtle data-flow ticks, and reassuring editorial music only; no voice, dialogue, or narration.
 NEGATIVE: color drift, photorealism, live action, 3D render, lip-sync, captions, on-screen text, readable numbers, logos, watermark.
@@ -90,7 +90,7 @@ NEGATIVE: color drift, photorealism, live action, 3D render, lip-sync, captions,
 ### Block 6
 
 STYLE REFERENCE: Match the attached reference image EXACTLY. Replicate its look precisely: editorial motion graphics, crisp flat vector cutouts, charcoal black, electric cobalt blue, warm ivory, lime accent, strong geometric grids, subtle paper grain, high-contrast editorial composition, clean thin outlines, matte finish, non-photorealistic, illustrated, not a photo, no live-action, no realism. Every element below rendered in that identical style.
-SCENE: The cafe question returns with a neat evidence bundle and source labels. A large candidate stamp remains visible while an unchecked join test waits beside it; the oddsock doorway character quietly peeks out.
+SCENE: The cafe question returns with a neat evidence bundle and source labels. A large candidate stamp remains visible while an unchecked join test waits beside it; the odeduck doorway character quietly peeks out.
 MOTION: The evidence cards settle into a tidy stack, the candidate boundary locks into place, and the camera pulls back to the original cafe.
 AUDIO: Layered discovery chimes, a restrained editorial music resolution, and one soft final door click only; no voice, dialogue, or narration.
 NEGATIVE: color drift, photorealism, live action, 3D render, lip-sync, captions, on-screen text, readable letters, brand logos, watermark.
@@ -103,9 +103,3 @@ NEGATIVE: color drift, photorealism, live action, 3D render, lip-sync, captions,
 - [중소기업 지원사업 공고 API](https://www.data.go.kr/data/15157820/openapi.do)
 - [자연어 검색 평가](../research/semantic-search-evaluation.md)
 - [Higgsfield `explainer_video` assembler contract](https://github.com/higgsfield-ai/cli/blob/main/MODELS.md#explainer_video--explainer-video-assembler)
-
-## Output gate
-
-현재 공개 가능한 최신 렌더는 없다. `artifacts/gongctl-v0.8.0-explainer-v2.mp4`는 gitignored 로컬 기록이며
-오래된 1.19만 건 설명과 이전 브랜드를 담고 있으므로 게시하지 않는다. 새 렌더는 위 6개 block, 현재
-로고, `Minji (ko)` 음성, burned Korean subtitles를 사용하고 마지막에 GitHub URL을 별도 end card로 붙인다.

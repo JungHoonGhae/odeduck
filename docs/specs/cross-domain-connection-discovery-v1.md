@@ -6,7 +6,7 @@
 
 ## 1. 목적과 사용자 작업
 
-oddsock은 경매나 수익 기회 전용 서비스가 아니다. 사용자가 정부의 데이터 명칭이나 기관 분류를
+odeduck은 경매나 수익 기회 전용 서비스가 아니다. 사용자가 정부의 데이터 명칭이나 기관 분류를
 몰라도 원하는 API를 찾고, 서로 무관해 보이는 공공데이터 중 실제로 함께 검토할 가치가 있는 소수의
 연결 후보를 발견하는 범용 계층이다.
 
@@ -88,7 +88,7 @@ leaf field 또는 dotted suffix를 재귀적으로 찾아 raw string 값을 보�
 duplicate, 실제 path를 반환한다. 한 응답에서 최대 50개 distinct 값을 보여주되 전체 bounded 응답의
 count는 유지한다. 같은 leaf가 여러 실제 path에 있으면 `ambiguous=true`로 표시하고 합산 수치를
 제공하지 않으므로, 호스트가 surfaced dotted path 중 하나를 다시 지정해야 한다. scalar 배열은 소유
-field 아래 값으로 펼친다. oddsock은 이 public sample을 영구 저장하거나 두 API의 join 결과를 대신
+field 아래 값으로 펼친다. odeduck은 이 public sample을 영구 저장하거나 두 API의 join 결과를 대신
 만들지 않는다.
 
 ## 4. 검색과 연결 순서
@@ -117,7 +117,7 @@ profile을 비교해도 자동 join 증명은 아니며, namespace와 grain을 �
 
 `catalog discover`는 설치되고 로그인된 Codex, Claude Code, Gemini CLI, Cursor Agent 중 하나로 같은
 세 단계를 조정한다. 목표는 stdin으로 전달하고 읽기 전용/질문 모드와 임시 작업 디렉터리를 쓴다.
-oddsock은 호스트의 token을 읽거나 저장하지 않는다. `--agent auto`는 첫 검색 계획 생성에서 실패한
+odeduck은 호스트의 token을 읽거나 저장하지 않는다. `--agent auto`는 첫 검색 계획 생성에서 실패한
 provider 다음의 설치된 provider로 폴백한다. 이후 단계는 일관된 맥락을 위해 처음 성공한 provider를
 계속 사용하며, 실패하면 1차 역할축으로 축소하거나 후보 생성을 중단한다. 특정 provider를 지정하면
 첫 단계 실패를 그대로 반환한다.
@@ -134,7 +134,7 @@ MCP에서는 대화 중인 모델이 계획기이므로 하위 CLI를 실행하�
 
 ## 5. 책임 경계
 
-| 책임 | oddsock 서버/모듈 | MCP 호스트 또는 독립 CLI 계획기 |
+| 책임 | odeduck 서버/모듈 | MCP 호스트 또는 독립 CLI 계획기 |
 | --- | --- | --- |
 | 카탈로그 전체 검색·중복 제거·순위·context bound | 소유 | 검색 목표와 역할 제공 |
 | 의미 해석과 교차 분야 Bridge 역할 발상 | 소유하지 않음 | 소유 |

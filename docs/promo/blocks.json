@@ -1,6 +1,6 @@
 {
   "status": "legacy-pre-rename-do-not-publish",
-  "note": "Remote Higgsfield job IDs for the obsolete 1.19만-entry preview. Regenerate from oddsock-agent-explainer.md before launch.",
+  "note": "Remote Higgsfield job IDs for the obsolete 1.19만-entry preview. Regenerate from odeduck-agent-explainer.md before launch.",
   "blocks": [
   {
     "video": { "id": "e45ff85c-7c0d-4b8e-9033-0a696a11bca2", "type": "video_job" },

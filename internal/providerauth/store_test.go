@@ -171,16 +171,14 @@ func TestClearAllRemovesEveryProviderCredential(t *testing.T) {
 	}
 }
 
-func TestClearAllRemovesCredentialsFromCurrentAndLegacyConfigRoots(t *testing.T) {
+func TestClearAllRemovesCredentialsFromConfigRoot(t *testing.T) {
 	isolateConfigHome(t)
 	configHome, err := os.UserConfigDir()
 	if err != nil {
 		t.Fatal(err)
 	}
 	paths := []string{
-		filepath.Join(configHome, "oddsock", "provider-credentials", "safetykorea.json"),
-		filepath.Join(configHome, "opendatactl", "provider-credentials", "safetykorea.json"),
-		filepath.Join(configHome, "gongctl", "provider-credentials", "safetykorea.json"),
+		filepath.Join(configHome, "odeduck", "provider-credentials", "safetykorea.json"),
 	}
 	for _, path := range paths {
 		if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {

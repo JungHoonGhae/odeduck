@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/JungHoonGhae/oddsock/internal/catalog"
+	"github.com/JungHoonGhae/odeduck/internal/catalog"
 )
 
 func TestDecodePlanProviderShapes(t *testing.T) {
@@ -194,7 +194,7 @@ func TestProviderCommandsAreReadOnly(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.provider, func(t *testing.T) {
-			spec := providerCommand(tt.provider, tt.provider, nil, "/tmp/oddsock-test", "goal")
+			spec := providerCommand(tt.provider, tt.provider, nil, "/tmp/odeduck-test", "goal")
 			joined := strings.Join(spec.args, " ")
 			for _, want := range tt.want {
 				if !strings.Contains(joined, want) {
@@ -206,16 +206,16 @@ func TestProviderCommandsAreReadOnly(t *testing.T) {
 }
 
 func TestProviderCommandsDisableToolsForUntrustedCatalogPrompts(t *testing.T) {
-	codex := providerCommand(ProviderCodex, "codex", nil, "/tmp/oddsock-test", "goal")
+	codex := providerCommand(ProviderCodex, "codex", nil, "/tmp/odeduck-test", "goal")
 	if joined := strings.Join(codex.args, " "); !strings.Contains(joined, "--disable shell_tool") {
 		t.Fatalf("Codex tools not disabled: %s", joined)
 	}
-	claude := providerCommand(ProviderClaude, "claude", nil, "/tmp/oddsock-test", "goal")
+	claude := providerCommand(ProviderClaude, "claude", nil, "/tmp/odeduck-test", "goal")
 	if joined := strings.Join(claude.args, " "); !strings.Contains(joined, "--restricted") || !strings.Contains(joined, "--tools  --strict-mcp-config") {
 		t.Fatalf("Claude tools not disabled: %s", joined)
 	}
-	gemini := providerCommand(ProviderGemini, "gemini", nil, "/tmp/oddsock-test", "goal")
-	wantPolicy := filepath.Join("/tmp/oddsock-test", "deny-tools.toml")
+	gemini := providerCommand(ProviderGemini, "gemini", nil, "/tmp/odeduck-test", "goal")
+	wantPolicy := filepath.Join("/tmp/odeduck-test", "deny-tools.toml")
 	if !containsArgPair(gemini.args, "--policy", wantPolicy) {
 		t.Fatalf("Gemini deny policy missing: %q", gemini.args)
 	}
@@ -231,12 +231,12 @@ func containsArgPair(args []string, flag, value string) bool {
 }
 
 func TestProviderEnvironmentDoesNotForwardUnrelatedSecrets(t *testing.T) {
-	t.Setenv("ODDSOCK_TEST_SECRET", "must-not-leak")
+	t.Setenv("ODEDUCK_TEST_SECRET", "must-not-leak")
 	t.Setenv("CURSOR_API_KEY", "must-not-leak")
 	t.Setenv("PATH", "/usr/bin")
 	t.Setenv("HTTPS_PROXY", "http://proxy.example:8443")
 	env := strings.Join(providerEnvironment(ProviderCursor), "\n")
-	if strings.Contains(env, "must-not-leak") || strings.Contains(env, "ODDSOCK_TEST_SECRET") || strings.Contains(env, "CURSOR_API_KEY") {
+	if strings.Contains(env, "must-not-leak") || strings.Contains(env, "ODEDUCK_TEST_SECRET") || strings.Contains(env, "CURSOR_API_KEY") {
 		t.Fatalf("minimal provider environment leaked a secret: %s", env)
 	}
 	if !strings.Contains(env, "PATH=/usr/bin") || !strings.Contains(env, "NO_COLOR=1") ||
@@ -258,7 +258,7 @@ func TestCursorNeverReceivesUntrustedCatalogMetadata(t *testing.T) {
 func TestProviderCommandsKeepGoalOutOfArgv(t *testing.T) {
 	const sensitive = "미공개 신사업 목표"
 	for _, provider := range providerOrder {
-		spec := providerCommand(provider, provider, nil, "/tmp/oddsock-test", sensitive)
+		spec := providerCommand(provider, provider, nil, "/tmp/odeduck-test", sensitive)
 		if strings.Contains(strings.Join(spec.args, " "), sensitive) {
 			t.Errorf("%s exposes the goal in argv: %q", provider, spec.args)
 		}

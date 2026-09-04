@@ -1,14 +1,13 @@
-# oddsock installer (Windows PowerShell)
+# odeduck installer (Windows PowerShell)
 #
-#   irm https://github.com/JungHoonGhae/oddsock/releases/download/v0.16.2/install.ps1 | iex
+#   irm https://github.com/JungHoonGhae/odeduck/releases/download/v0.17.0/install.ps1 | iex
 #
 # Environment variables:
-#   $env:ODDSOCK_VERSION  pin a version (e.g. v0.4.0, default: latest)
-#   $env:OPENDATACTL_VERSION / $env:GONGCTL_VERSION legacy names (compatibility)
-#   $env:INSTALL_DIR      install location (default: $env:LOCALAPPDATA\oddsock)
+#   $env:ODEDUCK_VERSION  pin a version (e.g. v0.17.0, default: latest)
+#   $env:INSTALL_DIR      install location (default: $env:LOCALAPPDATA\odeduck)
 $ErrorActionPreference = "Stop"
 
-$Repo = "JungHoonGhae/oddsock"
+$Repo = "JungHoonGhae/odeduck"
 $UseGh = $false
 if (Get-Command gh -ErrorAction SilentlyContinue) {
     & gh auth status 2>$null | Out-Null
@@ -58,21 +57,9 @@ function Receive-ReleaseAsset {
         -OutFile $Destination
 }
 
-$CurrentInstallDir = Join-Path $env:LOCALAPPDATA "oddsock"
-$FormerInstallDir = Join-Path $env:LOCALAPPDATA "opendatactl"
-$LegacyInstallDir = Join-Path $env:LOCALAPPDATA "gongctl"
+$CurrentInstallDir = Join-Path $env:LOCALAPPDATA "odeduck"
 $InstallDir = if ($env:INSTALL_DIR) {
     $env:INSTALL_DIR
-}
-elseif (Test-Path $CurrentInstallDir) {
-    $CurrentInstallDir
-}
-elseif (Test-Path $FormerInstallDir) {
-    $FormerInstallDir
-}
-elseif (Test-Path $LegacyInstallDir) {
-    # Upgrade in place so an existing PATH entry cannot keep resolving v0.8.
-    $LegacyInstallDir
 }
 else {
     $CurrentInstallDir
@@ -83,14 +70,8 @@ $Arch = switch ((Get-CimInstance Win32_Processor).Architecture) {
     default { "amd64" }
 }
 
-$Version = if ($env:ODDSOCK_VERSION) {
-    $env:ODDSOCK_VERSION
-}
-elseif ($env:OPENDATACTL_VERSION) {
-    $env:OPENDATACTL_VERSION
-}
-else {
-    $env:GONGCTL_VERSION
+$Version = if ($env:ODEDUCK_VERSION) {
+    $env:ODEDUCK_VERSION
 }
 if (-not $Version) {
     $Version = Get-LatestReleaseVersion -Repository $Repo
@@ -98,31 +79,16 @@ if (-not $Version) {
 if (-not $Version) { throw "Could not resolve latest version." }
 $VerNoV = $Version.TrimStart("v")
 
-$Asset = "oddsock_${VerNoV}_windows_${Arch}.zip"
+$Asset = "odeduck_${VerNoV}_windows_${Arch}.zip"
 
-Write-Host "Installing oddsock $Version ($Arch)..."
+Write-Host "Installing odeduck $Version ($Arch)..."
 $Tmp = Join-Path ([System.IO.Path]::GetTempPath()) ([System.Guid]::NewGuid())
 New-Item -ItemType Directory -Path $Tmp | Out-Null
 try {
     $Zip = Join-Path $Tmp $Asset
-    try {
-        Receive-ReleaseAsset -Repository $Repo -Version $Version -Asset $Asset -Destination $Zip
-    }
-    catch {
-        try {
-            $Asset = "opendatactl_${VerNoV}_windows_${Arch}.zip"
-            $Zip = Join-Path $Tmp $Asset
-            Receive-ReleaseAsset -Repository $Repo -Version $Version -Asset $Asset -Destination $Zip
-        }
-        catch {
-            # v0.8 and earlier only shipped gongctl_* archives.
-            $Asset = "gongctl_${VerNoV}_windows_${Arch}.zip"
-            $Zip = Join-Path $Tmp $Asset
-            Receive-ReleaseAsset -Repository $Repo -Version $Version -Asset $Asset -Destination $Zip
-        }
-    }
+    Receive-ReleaseAsset -Repository $Repo -Version $Version -Asset $Asset -Destination $Zip
 
-    $CatalogAsset = "oddsock-catalog.json.gz"
+    $CatalogAsset = "odeduck-catalog.json.gz"
     $CatalogFile = Join-Path $Tmp $CatalogAsset
     $CatalogAvailable = $false
     try {
@@ -130,15 +96,7 @@ try {
         $CatalogAvailable = $true
     }
     catch {
-        $CatalogAsset = "opendatactl-catalog.json.gz"
-        $CatalogFile = Join-Path $Tmp $CatalogAsset
-        try {
-            Receive-ReleaseAsset -Repository $Repo -Version $Version -Asset $CatalogAsset -Destination $CatalogFile
-            $CatalogAvailable = $true
-        }
-        catch {
-            Write-Host "Prebuilt catalogue is not available for $Version; install will continue without it."
-        }
+        Write-Host "Prebuilt catalogue is not available for $Version; install will continue without it."
     }
 
     # Verify against checksums.txt from the same release.
@@ -154,29 +112,16 @@ try {
     }
 
     Expand-Archive -Path $Zip -DestinationPath $Tmp -Force
-    $PrimaryBinary = Join-Path $Tmp "oddsock.exe"
-    $FormerBinary = Join-Path $Tmp "opendatactl.exe"
-    $LegacyBinary = Join-Path $Tmp "gongctl.exe"
-    if (-not (Test-Path $PrimaryBinary)) {
-        if (Test-Path $FormerBinary) {
-            Copy-Item -Path $FormerBinary -Destination $PrimaryBinary
-        }
-        elseif (Test-Path $LegacyBinary) {
-            Copy-Item -Path $LegacyBinary -Destination $PrimaryBinary
-        }
-    }
-    if (-not (Test-Path $FormerBinary)) { Copy-Item -Path $PrimaryBinary -Destination $FormerBinary }
-    if (-not (Test-Path $LegacyBinary)) { Copy-Item -Path $PrimaryBinary -Destination $LegacyBinary }
+    $PrimaryBinary = Join-Path $Tmp "odeduck.exe"
+    if (-not (Test-Path $PrimaryBinary)) { throw "odeduck.exe missing from $Asset" }
     if ($CatalogAvailable) {
         & $PrimaryBinary catalog install-snapshot $CatalogFile --check-only -f table
         if ($LASTEXITCODE -ne 0) { throw "Prebuilt catalogue validation failed" }
     }
     New-Item -ItemType Directory -Path $InstallDir -Force | Out-Null
-    Move-Item -Path $PrimaryBinary -Destination (Join-Path $InstallDir "oddsock.exe") -Force
-    Move-Item -Path $FormerBinary -Destination (Join-Path $InstallDir "opendatactl.exe") -Force
-    Move-Item -Path $LegacyBinary -Destination (Join-Path $InstallDir "gongctl.exe") -Force
+    Move-Item -Path $PrimaryBinary -Destination (Join-Path $InstallDir "odeduck.exe") -Force
     if ($CatalogAvailable) {
-        & (Join-Path $InstallDir "oddsock.exe") catalog install-snapshot $CatalogFile -f table
+        & (Join-Path $InstallDir "odeduck.exe") catalog install-snapshot $CatalogFile -f table
         if ($LASTEXITCODE -ne 0) { throw "Prebuilt catalogue install failed" }
     }
 }
@@ -184,8 +129,7 @@ finally {
     Remove-Item -Recurse -Force $Tmp -ErrorAction SilentlyContinue
 }
 
-# Put the selected directory first. This also fixes existing installs where the
-# legacy directory appeared before a newly appended oddsock directory.
+# Put the selected directory first in the user PATH.
 $UserPath = [Environment]::GetEnvironmentVariable("Path", "User")
 $NormalizedInstallDir = $InstallDir.TrimEnd("\")
 $OtherPathEntries = @($UserPath -split ";" | Where-Object {
@@ -194,10 +138,9 @@ $OtherPathEntries = @($UserPath -split ";" | Where-Object {
 $NewUserPath = (@($InstallDir) + $OtherPathEntries) -join ";"
 if ($NewUserPath -ne $UserPath) {
     [Environment]::SetEnvironmentVariable("Path", $NewUserPath, "User")
-    Write-Host "Placed $InstallDir first in your user PATH. Restart the terminal to use 'oddsock'."
+    Write-Host "Placed $InstallDir first in your user PATH. Restart the terminal to use 'odeduck'."
 }
 
 Write-Host ""
-Write-Host "Installed to $InstallDir\oddsock.exe"
-Write-Host "Compatibility aliases: $InstallDir\opendatactl.exe, $InstallDir\gongctl.exe"
-Write-Host "Next: oddsock login"
+Write-Host "Installed to $InstallDir\odeduck.exe"
+Write-Host "Next: odeduck login"

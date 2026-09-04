@@ -68,16 +68,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          oddsock_bin="$(find dist -type f -name oddsock -print -quit)"
-          opendatactl_bin="$(find dist -type f -name opendatactl -print -quit)"
-          gongctl_bin="$(find dist -type f -name gongctl -print -quit)"
-          test -n "$oddsock_bin" -a -n "$opendatactl_bin" -a -n "$gongctl_bin"
-          "$oddsock_bin" version | grep -q '^oddsock '
-          "$opendatactl_bin" version | grep -q '^opendatactl '
-          "$gongctl_bin" version | grep -q '^gongctl '
-          "$oddsock_bin" --help | grep -q '^  oddsock '
-          "$opendatactl_bin" --help | grep -q '^  opendatactl '
-          "$gongctl_bin" --help | grep -q '^  gongctl '
+          odeduck_bin="$(find dist -type f -name odeduck -print -quit)"
+          test -n "$odeduck_bin"
+          "$odeduck_bin" version | grep -q '^odeduck '
+          "$odeduck_bin" --help | grep -q '^  odeduck '
 
   windows-installer:
     runs-on: windows-latest

@@ -15,7 +15,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/JungHoonGhae/oddsock/internal/fetch"
+	"github.com/JungHoonGhae/odeduck/internal/fetch"
 )
 
 const (
@@ -30,9 +30,10 @@ var officialFileDownload = regexp.MustCompile(`fileDetailObj\.fn_fileDataDown\(\
 // the no-credential machine-readable fallback for the restricted bulk API: one
 // streamed download replaces roughly a thousand HTML search pages.
 type OfficialFileSource struct {
-	http     *fetch.Client
-	base     string
-	maxBytes int64
+	http       *fetch.Client
+	base       string
+	maxBytes   int64
+	retryDelay time.Duration
 }
 
 type combinedSource struct {
@@ -110,7 +111,10 @@ func transientSyncError(err error) bool {
 }
 
 func NewOfficialFileSource(transport *fetch.Client, baseURL string) *OfficialFileSource {
-	return &OfficialFileSource{http: transport, base: strings.TrimRight(baseURL, "/"), maxBytes: maxOfficialFileBytes}
+	return &OfficialFileSource{
+		http: transport, base: strings.TrimRight(baseURL, "/"),
+		maxBytes: maxOfficialFileBytes, retryDelay: time.Second,
+	}
 }
 
 func (s *OfficialFileSource) Sync(ctx context.Context, rawScope string, _ int, progress func(int)) (*Catalog, error) {
@@ -204,9 +208,23 @@ type officialFileResolution struct {
 
 func (s *OfficialFileSource) resolveDownloadURL(ctx context.Context) (string, error) {
 	detailURL := s.base + "/data/" + officialFileDatasetPK + "/fileData.do"
-	page, err := s.http.Get(ctx, detailURL)
-	if err != nil {
-		return "", err
+	var page *fetch.Response
+	var err error
+	for attempt := 0; attempt < 3; attempt++ {
+		page, err = s.http.Get(ctx, detailURL)
+		if err == nil {
+			break
+		}
+		if attempt == 2 {
+			return "", err
+		}
+		timer := time.NewTimer(s.retryDelay)
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			return "", ctx.Err()
+		case <-timer.C:
+		}
 	}
 	if page.Status != http.StatusOK {
 		return "", fmt.Errorf("공식 목록 snapshot 상세가 HTTP %d를 반환했습니다", page.Status)

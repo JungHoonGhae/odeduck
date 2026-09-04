@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1200" height="720" viewBox="0 0 1200 720" role="img" aria-labelledby="title desc">
-  <title id="title">기존 공공데이터 도구와 oddsock의 Before and After 흐름</title>
-  <desc id="desc">기존 도구는 키워드 검색과 상세 확인 뒤 활용신청, 승인 확인, 인증키 복사를 사람에게 돌려보내지만 oddsock은 한 질문에서 분야별 발견, 검사, 신청, 승인 확인, 호출까지 잇는다.</desc>
+  <title id="title">기존 공공데이터 도구와 odeduck의 Before and After 흐름</title>
+  <desc id="desc">기존 도구는 키워드 검색과 상세 확인 뒤 활용신청, 승인 확인, 인증키 복사를 사람에게 돌려보내지만 odeduck은 한 질문에서 분야별 발견, 검사, 신청, 승인 확인, 호출까지 잇는다.</desc>
   <rect width="1200" height="720" fill="#F7F3EB"/>
   <rect x="26" y="26" width="1148" height="668" rx="28" fill="none" stroke="#151513" stroke-width="2"/>
 
@@ -37,7 +37,7 @@
     <text x="1060" y="310" fill="#151513" font-size="15" font-weight="700" text-anchor="middle">호출</text>
 
     <rect x="68" y="394" width="1064" height="222" rx="22" fill="#151513"/>
-    <text x="92" y="430" fill="#F7F3EB" font-size="13" font-weight="700" letter-spacing="1.4">AFTER · oddsock</text>
+    <text x="92" y="430" fill="#F7F3EB" font-size="13" font-weight="700" letter-spacing="1.4">AFTER · odeduck</text>
     <text x="1096" y="430" fill="#FFFFFF" font-size="14" font-weight="700" text-anchor="end">data.go.kr REST · SSO 1회 뒤 신청·승인·키 구간 자동화</text>
 
     <rect x="92" y="464" width="112" height="64" rx="16" fill="#F7F3EB"/>
@@ -80,6 +80,6 @@
   <g fill="#151513" font-family="'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif">
     <text x="70" y="659" font-size="14" font-weight="700">차이는 검색→호출의 존재가 아니다.</text>
     <text x="327" y="659" font-size="14">서로 다른 데이터의 발견부터 사람이 하던 신청·승인 구간까지 한 흐름으로 잇는 것이다.</text>
-    <text x="1130" y="659" font-size="17" font-weight="700" text-anchor="end">oddsock</text>
+    <text x="1130" y="659" font-size="17" font-weight="700" text-anchor="end">odeduck</text>
   </g>
 </svg>

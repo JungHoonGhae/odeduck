@@ -1,9 +1,12 @@
 {
-  "displayName": "oddsock",
-  "tagline": "말은 없다. 흩어진 맥락을 잇는다. 데이터의 짝을 찾아온다.",
-  "proofline": "답이 되는 데이터는 한 분야에만 있지 않았다.",
+  "displayName": "오데덕",
+  "tagline": "한 분야에 답이 없으면, 다른 서랍을 연다.",
+  "proofline": "9만 6천 개의 공공데이터에서 질문의 나머지 짝을 찾는다.",
   "logoPath": "docs/assets/brand-symbol.svg",
-  "logoAlt": "문틈에서 조용히 얼굴을 내민 oddsock 캐릭터",
-  "technicalName": "oddsock",
-  "command": "oddsock"
+  "logoAlt": "흩어진 공공데이터의 연결을 찾는 오데덕 캐릭터",
+  "technicalName": "odeduck",
+  "command": "odeduck",
+  "repository": "JungHoonGhae/odeduck",
+  "modulePath": "github.com/JungHoonGhae/odeduck",
+  "configDirectory": "odeduck"
 }

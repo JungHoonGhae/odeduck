@@ -194,7 +194,7 @@ GET http://swopenapi.seoul.go.kr/api/subway/{KEY}/{TYPE}/{SERVICE}/...
 ### 최소 구현과 판단
 
 두 key를 별도 namespace/scope로 저장하고 OA dataset을 service name·추가 path schema에 연결하는
-inspector가 필요하다. 그러나 그보다 앞선 차단 조건은 transport다. **oddsock 기본 invoker는
+inspector가 필요하다. 그러나 그보다 앞선 차단 조건은 transport다. **odeduck 기본 invoker는
 HTTP credential 전송을 허용하면 안 되므로 현재 일반·지하철 모두 no-go다.** 사용자가 명시적으로
 허용하는 insecure mode도 agent가 비밀을 평문 전송하게 만들어 기본 제품의 신뢰 경계를 약화시키므로
 권장하지 않는다. 공식 HTTPS가 확인된 뒤 다시 검토한다.

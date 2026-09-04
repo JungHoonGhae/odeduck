@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 
-	"github.com/JungHoonGhae/oddsock/internal/version"
+	"github.com/JungHoonGhae/odeduck/internal/version"
 	"github.com/spf13/cobra"
 )
 

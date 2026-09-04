@@ -1,5 +1,5 @@
 name: Bug report
-description: Report a reproducible oddsock failure without exposing credentials.
+description: Report a reproducible odeduck failure without exposing credentials.
 title: "bug: "
 labels:
   - bug
@@ -16,9 +16,9 @@ body:
   - type: input
     id: version
     attributes:
-      label: oddsock version
-      description: Run `oddsock version`.
-      placeholder: Paste the output of `oddsock version`
+      label: odeduck version
+      description: Run `odeduck version`.
+      placeholder: Paste the output of `odeduck version`
     validations:
       required: true
   - type: dropdown

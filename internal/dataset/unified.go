@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/JungHoonGhae/oddsock/internal/apicall"
-	"github.com/JungHoonGhae/oddsock/internal/catalog"
-	"github.com/JungHoonGhae/oddsock/internal/fetch"
-	"github.com/JungHoonGhae/oddsock/internal/portal"
+	"github.com/JungHoonGhae/odeduck/internal/apicall"
+	"github.com/JungHoonGhae/odeduck/internal/catalog"
+	"github.com/JungHoonGhae/odeduck/internal/fetch"
+	"github.com/JungHoonGhae/odeduck/internal/portal"
 )
 
 // InspectionRequest is the one delivery-neutral request used by CLI and MCP.
@@ -63,7 +63,7 @@ func (i *UnifiedInspector) Inspect(ctx context.Context, request InspectionReques
 	}
 	entry, ok := cat.Find(request.PK)
 	if !ok {
-		return nil, fmt.Errorf("현재 카탈로그에 없는 pk입니다 — `oddsock catalog sync` 후 다시 검색하세요")
+		return nil, fmt.Errorf("현재 카탈로그에 없는 pk입니다 — `odeduck catalog sync` 후 다시 검색하세요")
 	}
 	wantAPI, wantFile, err := selectedDeliveries(entry, request.Delivery)
 	if err != nil {

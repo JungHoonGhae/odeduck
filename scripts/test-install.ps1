@@ -7,7 +7,7 @@ $FixtureRoot = Join-Path $TestRoot "fixtures"
 $InstallRoot = Join-Path $TestRoot "install"
 $OriginalPath = $env:PATH
 $OriginalInstallDir = $env:INSTALL_DIR
-$OriginalVersion = $env:ODDSOCK_VERSION
+$OriginalVersion = $env:ODEDUCK_VERSION
 $OriginalUserPath = [Environment]::GetEnvironmentVariable("Path", "User")
 
 function Invoke-WebRequest {
@@ -17,14 +17,14 @@ function Invoke-WebRequest {
         return [PSCustomObject]@{
             BaseResponse = [PSCustomObject]@{
                 RequestMessage = [PSCustomObject]@{
-                    RequestUri = [System.Uri]"https://github.com/JungHoonGhae/oddsock/releases/tag/v9.9.9"
+                    RequestUri = [System.Uri]"https://github.com/JungHoonGhae/odeduck/releases/tag/v9.9.9"
                 }
             }
         }
     }
 
     $Asset = ([System.Uri]$Uri).Segments[-1]
-    if ($Asset -in @("oddsock-catalog.json.gz", "opendatactl-catalog.json.gz")) {
+    if ($Asset -eq "odeduck-catalog.json.gz") {
         throw "fixture not found: $Asset"
     }
     $Source = Join-Path $FixtureRoot $Asset
@@ -34,36 +34,34 @@ function Invoke-WebRequest {
 
 try {
     New-Item -ItemType Directory -Path $FixtureRoot, $InstallRoot -Force | Out-Null
-    $Binary = Join-Path $FixtureRoot "oddsock.exe"
-    & go build -o $Binary ./cmd/oddsock
+    $Binary = Join-Path $FixtureRoot "odeduck.exe"
+    & go build -o $Binary ./cmd/odeduck
     if ($LASTEXITCODE -ne 0) { throw "failed to build Windows test binary" }
 
-    $Archive = Join-Path $FixtureRoot "oddsock_9.9.9_windows_amd64.zip"
+    $Archive = Join-Path $FixtureRoot "odeduck_9.9.9_windows_amd64.zip"
     Compress-Archive -Path $Binary -DestinationPath $Archive
     $Hash = (Get-FileHash -Algorithm SHA256 -Path $Archive).Hash.ToLower()
     Set-Content -Path (Join-Path $FixtureRoot "checksums.txt") `
-        -Value "$Hash  oddsock_9.9.9_windows_amd64.zip" -Encoding utf8
+        -Value "$Hash  odeduck_9.9.9_windows_amd64.zip" -Encoding utf8
 
     # Force the public HTTPS path even on GitHub-hosted runners where gh exists.
     $env:PATH = ""
     $env:INSTALL_DIR = $InstallRoot
-    $env:ODDSOCK_VERSION = $null
+    $env:ODEDUCK_VERSION = $null
     & $Installer
 
-    foreach ($Name in @("oddsock.exe", "opendatactl.exe", "gongctl.exe")) {
-        if (-not (Test-Path (Join-Path $InstallRoot $Name))) {
-            throw "installer did not create $Name"
-        }
+    if (-not (Test-Path (Join-Path $InstallRoot "odeduck.exe"))) {
+        throw "installer did not create odeduck.exe"
     }
-    $VersionOutput = & (Join-Path $InstallRoot "oddsock.exe") version
-    if ($LASTEXITCODE -ne 0 -or $VersionOutput -notmatch '^oddsock ') {
+    $VersionOutput = & (Join-Path $InstallRoot "odeduck.exe") version
+    if ($LASTEXITCODE -ne 0 -or $VersionOutput -notmatch '^odeduck ') {
         throw "installed binary did not run"
     }
 
     $MismatchRoot = Join-Path $TestRoot "mismatch"
     New-Item -ItemType Directory -Path $MismatchRoot -Force | Out-Null
     Set-Content -Path (Join-Path $FixtureRoot "checksums.txt") `
-        -Value "$('0' * 64)  oddsock_9.9.9_windows_amd64.zip" -Encoding utf8
+        -Value "$('0' * 64)  odeduck_9.9.9_windows_amd64.zip" -Encoding utf8
     $env:INSTALL_DIR = $MismatchRoot
     $Rejected = $false
     try {
@@ -73,7 +71,7 @@ try {
         if ($_.Exception.Message -match 'Checksum mismatch') { $Rejected = $true }
     }
     if (-not $Rejected) { throw "checksum mismatch was accepted" }
-    if (Test-Path (Join-Path $MismatchRoot "oddsock.exe")) {
+    if (Test-Path (Join-Path $MismatchRoot "odeduck.exe")) {
         throw "installer wrote a binary after checksum failure"
     }
 
@@ -82,7 +80,7 @@ try {
 finally {
     $env:PATH = $OriginalPath
     $env:INSTALL_DIR = $OriginalInstallDir
-    $env:ODDSOCK_VERSION = $OriginalVersion
+    $env:ODEDUCK_VERSION = $OriginalVersion
     [Environment]::SetEnvironmentVariable("Path", $OriginalUserPath, "User")
     Remove-Item -Recurse -Force $TestRoot -ErrorAction SilentlyContinue
 }

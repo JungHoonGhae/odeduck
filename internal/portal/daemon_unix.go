@@ -9,7 +9,7 @@ import (
 )
 
 // setDetached puts the launched browser in its own process group so it outlives
-// oddsock's exit (Unix).
+// odeduck's exit (Unix).
 func setDetached(cmd *exec.Cmd) {
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 }

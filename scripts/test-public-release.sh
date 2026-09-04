@@ -8,11 +8,11 @@ FIXTURES="$TEST_ROOT/fixtures"
 FAKE_BIN="$TEST_ROOT/fake-bin"
 mkdir -p "$FIXTURES/payload" "$FAKE_BIN"
 
-cat > "$FIXTURES/payload/oddsock" <<'EOF'
+cat > "$FIXTURES/payload/odeduck" <<'EOF'
 #!/bin/sh
 case "$*" in
     version)
-        echo "oddsock 9.9.9 (commit test, built test)"
+        echo "odeduck 9.9.9 (commit test, built test)"
         ;;
     "catalog install-snapshot"*)
         exit 0
@@ -24,21 +24,21 @@ case "$*" in
         echo '{"total":4,"hits":[{"pk":"fixture"}]}'
         ;;
     *)
-        echo "unexpected fake oddsock arguments: $*" >&2
+        echo "unexpected fake odeduck arguments: $*" >&2
         exit 1
         ;;
 esac
 EOF
-chmod +x "$FIXTURES/payload/oddsock"
-tar -czf "$FIXTURES/oddsock_9.9.9_linux_amd64.tar.gz" -C "$FIXTURES/payload" oddsock
+chmod +x "$FIXTURES/payload/odeduck"
+tar -czf "$FIXTURES/odeduck_9.9.9_linux_amd64.tar.gz" -C "$FIXTURES/payload" odeduck
 cp "$ROOT/install.sh" "$FIXTURES/install.sh"
 cp "$ROOT/install.ps1" "$FIXTURES/install.ps1"
-printf 'catalog fixture\n' | gzip > "$FIXTURES/oddsock-catalog.json.gz"
+printf 'catalog fixture\n' | gzip > "$FIXTURES/odeduck-catalog.json.gz"
 
 (
     cd "$FIXTURES"
     : > checksums.txt
-    for asset in install.sh install.ps1 oddsock-catalog.json.gz oddsock_9.9.9_linux_amd64.tar.gz; do
+    for asset in install.sh install.ps1 odeduck-catalog.json.gz odeduck_9.9.9_linux_amd64.tar.gz; do
         if command -v shasum >/dev/null 2>&1; then
             shasum -a 256 "$asset"
         else
@@ -72,7 +72,7 @@ done
 [ -n "$destination" ] || exit 2
 asset=${url##*/}
 case "$asset" in
-    oddsock | v9.9.9)
+    odeduck | v9.9.9)
         : > "$destination"
         ;;
     *)
@@ -83,14 +83,14 @@ EOF
 chmod +x "$FAKE_BIN/curl"
 
 FIXTURE_DIR="$FIXTURES" PATH="$FAKE_BIN:$PATH" \
-    ODDSOCK_WEB_BASE="https://example.invalid/oddsock" \
+    ODEDUCK_WEB_BASE="https://example.invalid/odeduck" \
     "$ROOT/scripts/verify-public-release.sh" v9.9.9 \
     > "$TEST_ROOT/success.log"
 grep -q '^public release smoke passed:' "$TEST_ROOT/success.log"
 
-printf 'tampered\n' >> "$FIXTURES/oddsock_9.9.9_linux_amd64.tar.gz"
+printf 'tampered\n' >> "$FIXTURES/odeduck_9.9.9_linux_amd64.tar.gz"
 if FIXTURE_DIR="$FIXTURES" PATH="$FAKE_BIN:$PATH" \
-    ODDSOCK_WEB_BASE="https://example.invalid/oddsock" \
+    ODEDUCK_WEB_BASE="https://example.invalid/odeduck" \
     "$ROOT/scripts/verify-public-release.sh" v9.9.9 \
     > "$TEST_ROOT/mismatch.log" 2>&1; then
     echo "public release smoke accepted a checksum mismatch" >&2

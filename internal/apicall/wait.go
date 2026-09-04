@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/JungHoonGhae/oddsock/internal/fetch"
+	"github.com/JungHoonGhae/odeduck/internal/fetch"
 )
 
 // propagationPoll is how often CallWaiting retries. Observed propagation runs 7–10

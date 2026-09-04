@@ -39,34 +39,6 @@ func TestSessionFileLockSerializesIndependentHandles(t *testing.T) {
 	releaseAgain()
 }
 
-func TestAllSessionLocksWaitForLegacyProcess(t *testing.T) {
-	configHome := isolatedUserConfigDir(t)
-	current := filepath.Join(configHome, configDirName)
-	legacy := filepath.Join(configHome, compatibilityConfigDirNames[0])
-	for _, dir := range []string{current, legacy} {
-		if err := os.MkdirAll(dir, 0o700); err != nil {
-			t.Fatal(err)
-		}
-	}
-
-	releaseLegacy, err := acquireSessionFileLockIn(context.Background(), legacy)
-	if err != nil {
-		t.Fatal(err)
-	}
-	waitCtx, cancel := context.WithTimeout(context.Background(), 120*time.Millisecond)
-	defer cancel()
-	if _, err := acquireAllSessionOperations(waitCtx); !errors.Is(err, context.DeadlineExceeded) {
-		t.Fatalf("all-directory lock error = %v, want deadline exceeded", err)
-	}
-	releaseLegacy()
-
-	releaseAll, err := acquireAllSessionOperations(context.Background())
-	if err != nil {
-		t.Fatalf("all-directory lock after legacy release: %v", err)
-	}
-	releaseAll()
-}
-
 func TestSessionWithCookiesCapturesRotationWithoutMutatingOriginal(t *testing.T) {
 	originalTime := time.Date(2026, 8, 30, 10, 0, 0, 0, time.UTC)
 	refreshTime := originalTime.Add(time.Hour)
@@ -119,9 +91,9 @@ func TestClearSessionRemovesCrashLeftHeadlessProfiles(t *testing.T) {
 	}
 }
 
-func TestClearSessionRemovesCredentialsFromCurrentAndLegacyDirectories(t *testing.T) {
+func TestClearSessionRemovesCredentialsFromConfigDirectory(t *testing.T) {
 	configHome := isolatedUserConfigDir(t)
-	for _, name := range append([]string{configDirName}, compatibilityConfigDirNames...) {
+	for _, name := range []string{configDirName} {
 		dir := filepath.Join(configHome, name)
 		for _, profile := range []string{"chrome-profile", "chrome-headless", "chrome-headless-crash"} {
 			if err := os.MkdirAll(filepath.Join(dir, profile), 0o700); err != nil {
@@ -141,7 +113,7 @@ func TestClearSessionRemovesCredentialsFromCurrentAndLegacyDirectories(t *testin
 	if err := clearSession(); err != nil {
 		t.Fatal(err)
 	}
-	for _, name := range append([]string{configDirName}, compatibilityConfigDirNames...) {
+	for _, name := range []string{configDirName} {
 		dir := filepath.Join(configHome, name)
 		for _, path := range []string{
 			filepath.Join(dir, "datagokr-session.json"),

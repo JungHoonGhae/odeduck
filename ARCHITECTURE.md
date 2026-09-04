@@ -1,6 +1,6 @@
 # Architecture
 
-oddsock은 대한민국 공공데이터를 **찾고 → 실제 계약을 확인하고 → 필요한 권한을 신청하고 → 첫 호출까지
+odeduck은 대한민국 공공데이터를 **찾고 → 실제 계약을 확인하고 → 필요한 권한을 신청하고 → 첫 호출까지
 검증하는** 로컬 컨트롤 플레인이다. CLI와 MCP가 같은 도메인 모듈을 사용하며, 모델은 검색 계획을
 도울 수 있지만 카탈로그 순위·자격증명·API 호출의 최종 경계는 결정론적인 Go 코드가 맡는다.
 
@@ -46,7 +46,7 @@ catalog_search → inspect_dataset → (미승인 REST만 apply) → call_api
 
 ### 1. Discover
 
-`catalog_search`와 `oddsock catalog search`는 릴리스에 포함되거나 `catalog sync`로 갱신된 로컬
+`catalog_search`와 `odeduck catalog search`는 릴리스에 포함되거나 `catalog sync`로 갱신된 로컬
 `catalog.json`을 검색한다. 엄격한 어휘 검색부터 시작하고, 선택적 Ollama 인덱스가 있으면 로컬 의미 검색
 결과를 합친다. 일반 검색은 인덱스가 없거나 오래됐거나 Ollama가 실패하면 어휘 검색으로 돌아가고
 저하 상태를 `semantic.status`와 `warnings`에 남긴다. 고신뢰 조사에서 `--require-semantic` 또는 MCP
@@ -92,7 +92,7 @@ MCP 도구는 외부 상태를 바꾸는 destructive action으로 표시해 호�
 
 | 경로 | 책임 | 맡지 않는 것 |
 | --- | --- | --- |
-| [`cmd/oddsock`](cmd/oddsock) | Cobra 명령, 플래그, 출력 연결, dependency composition | 검색·신청·호출 규칙 |
+| [`cmd/odeduck`](cmd/odeduck) | Cobra 명령, 플래그, 출력 연결, dependency composition | 검색·신청·호출 규칙 |
 | [`internal/mcpserver`](internal/mcpserver) | stdio MCP 도구·리소스, 입력 제한, tool annotation | 별도 비즈니스 로직 |
 | [`internal/catalog`](internal/catalog) | snapshot 동기화, 어휘·hybrid 검색, bounded connection 후보 | 모델 실행, 자격증명, API 호출 |
 | [`internal/agentplan`](internal/agentplan) | 자연어 목표를 검색축으로 변환하고 실제 후보 중 Bridge PK 선택 | 카탈로그 ranking, 신청, 호출 |
@@ -110,7 +110,7 @@ MCP 도구는 외부 상태를 바꾸는 destructive action으로 표시해 호�
 
 ## State and trust boundaries
 
-기본 로컬 상태는 운영체제의 사용자 설정 디렉터리 아래 `oddsock`에 저장된다.
+기본 로컬 상태는 운영체제의 사용자 설정 디렉터리 아래 `odeduck`에 저장된다.
 
 | 상태 | 저장 위치 | 성격 |
 | --- | --- | --- |
@@ -123,8 +123,7 @@ MCP 도구는 외부 상태를 바꾸는 destructive action으로 표시해 호�
 
 Unix에서는 민감 파일을 사용자 전용 권한으로 저장한다. 외부 provider credential은 Windows에서도 현재
 사용자와 SYSTEM만 허용하는 보호된 DACL을 적용한다. 파일은 암호화되지 않으므로 공용 머신은 신뢰 경계
-밖이다. `oddsock logout`은 현재 이름과 이전 `opendatactl`·`gongctl` 설정 루트에 남은 세션, 키,
-브라우저 profile까지 정리한다.
+밖이다. `odeduck logout`은 현재 설정 루트에 남은 세션, 키, 브라우저 profile까지 정리한다.
 
 중요한 경계는 다음과 같다.
 
@@ -132,13 +131,13 @@ Unix에서는 민감 파일을 사용자 전용 권한으로 저장한다. 외�
 - 일반 LINK는 publisher가 준 untrusted handoff다. 검토된 adapter가 없으면 호출하지 않는다.
 - credential을 쓰는 외부 호출은 고정된 HTTPS host·path·scope에만 보내고 redirect를 따르지 않는다.
 - data.go.kr 공개 HTTP는 공통 throttle과 timeout을 거치며, 일반 응답은 크기가 제한된다.
-- `catalog discover`는 목표를 선택된 모델 provider에 보내지만 oddsock이 provider 로그인 토큰을 읽지는
+- `catalog discover`는 목표를 선택된 모델 provider에 보내지만 odeduck이 provider 로그인 토큰을 읽지는
   않는다. 후속 metadata 선택은 tool-free 격리를 지원하는 provider에서만 수행한다.
 - 원격 상태를 바꾸는 핵심 동작은 활용신청이다. 검색·검사·호출은 읽기 경계에 머문다.
 
 ## Failure and drift behavior
 
-oddsock은 지원 범위를 넓히는 것보다 실패를 명시하는 쪽을 택한다.
+odeduck은 지원 범위를 넓히는 것보다 실패를 명시하는 쪽을 택한다.
 
 - 로컬 snapshot이 오래되면 `stale`을 반환하고, 최신 항목은 보조 live search로 재확인한다.
 - 의미 인덱스가 없거나 snapshot과 맞지 않으면 어휘 검색은 계속 동작한다.
@@ -148,11 +147,9 @@ oddsock은 지원 범위를 넓히는 것보다 실패를 명시하는 쪽을 �
 - data.go.kr 세션 회전은 프로세스 내부 slot과 OS별 file lock으로 직렬화한다.
 - 네트워크 응답과 FILE 관찰은 크기·형식·archive shape를 제한한다.
 
-## Distribution and compatibility
+## Distribution
 
-[`.goreleaser.yaml`](.goreleaser.yaml)은 `oddsock`, `opendatactl`, `gongctl` 세 이름을 macOS·Linux·Windows의
-amd64/arm64로 빌드한다. 새 사용자는 `oddsock`을 쓰고, 이전 두 이름은 같은 엔진과 기존 설정을 찾는
-호환 표면이다.
+[`.goreleaser.yaml`](.goreleaser.yaml)은 `odeduck`을 macOS·Linux·Windows의 amd64/arm64로 빌드한다.
 
 릴리스 checksum에는 각 archive뿐 아니라 `install.sh`, `install.ps1`, 검증된 catalog snapshot도 포함된다.
 설치기는 같은 버전의 release asset과 checksum을 사용한다. PR CI는 모듈 상태, 브랜드 동기화, 설치기,
@@ -183,4 +180,4 @@ go build ./...
 ```
 
 Windows installer 변경은 PowerShell에서 `./scripts/test-install.ps1`도 실행한다. 실계정 포털과 외부
-provider 점검은 일반 PR 테스트와 분리된 `oddsock doctor` 및 scheduled canary가 맡는다.
+provider 점검은 일반 PR 테스트와 분리된 `odeduck doctor` 및 scheduled canary가 맡는다.

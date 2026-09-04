@@ -167,30 +167,15 @@ func TestOllamaEmbedderUsesBatchAPI(t *testing.T) {
 	}
 }
 
-func TestOllamaURLFromEnvPrefersOddsockAndFallsBackToFormerNames(t *testing.T) {
-	t.Setenv("ODDSOCK_OLLAMA_URL", "")
-	t.Setenv("OPENDATACTL_OLLAMA_URL", "http://former.example")
-	t.Setenv("GONGCTL_OLLAMA_URL", "http://legacy.example")
-	if got := OllamaURLFromEnv(); got != "http://former.example" {
-		t.Fatalf("former Ollama URL = %q", got)
-	}
-
-	t.Setenv("ODDSOCK_OLLAMA_URL", "http://current.example")
+func TestOllamaURLFromEnvUsesOdeduckVariable(t *testing.T) {
+	t.Setenv("ODEDUCK_OLLAMA_URL", "http://current.example")
 	if got := OllamaURLFromEnv(); got != "http://current.example" {
 		t.Fatalf("current Ollama URL = %q", got)
-	}
-
-	t.Setenv("ODDSOCK_OLLAMA_URL", "")
-	t.Setenv("OPENDATACTL_OLLAMA_URL", "")
-	if got := OllamaURLFromEnv(); got != "http://legacy.example" {
-		t.Fatalf("legacy Ollama URL = %q", got)
 	}
 }
 
 func TestOllamaURLFromEnvUsesDefaultWhenNeitherVariableIsSet(t *testing.T) {
-	t.Setenv("ODDSOCK_OLLAMA_URL", "")
-	t.Setenv("OPENDATACTL_OLLAMA_URL", "")
-	t.Setenv("GONGCTL_OLLAMA_URL", "")
+	t.Setenv("ODEDUCK_OLLAMA_URL", "")
 
 	embedder := NewOllamaEmbedder(OllamaURLFromEnv(), "")
 	if embedder.baseURL != DefaultOllamaURL {

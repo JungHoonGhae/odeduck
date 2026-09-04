@@ -6,7 +6,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/JungHoonGhae/oddsock/internal/fetch"
+	"github.com/JungHoonGhae/odeduck/internal/fetch"
 )
 
 // OperationName is the last path segment of an operation's endpoint — the part a
@@ -107,7 +107,7 @@ func resolveOperation(spec *APISpec, pk, name string) (*Operation, error) {
 	return nil, fmt.Errorf("pk=%s 에 %q 상세기능이 없습니다 — 있는 것: %s", pk, name, strings.Join(names, ", "))
 }
 
-// injectedParams are supplied by oddsock itself (Call appends serviceKey), so a
+// injectedParams are supplied by odeduck itself (Call appends serviceKey), so a
 // caller omitting them is not omitting anything. Specs spell it with either case.
 var injectedParams = map[string]bool{"servicekey": true}
 
@@ -129,7 +129,7 @@ func isRequired(v string) bool {
 }
 
 // MissingRequired lists the operation's required request variables that params
-// does not supply, ignoring the serviceKey oddsock injects. An empty result from
+// does not supply, ignoring the serviceKey odeduck injects. An empty result from
 // data.go.kr often means a missing parameter rather than no data, and the response
 // says nothing about which — so this is checked before spending the request.
 //

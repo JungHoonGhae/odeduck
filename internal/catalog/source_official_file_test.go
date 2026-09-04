@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/JungHoonGhae/oddsock/internal/fetch"
+	"github.com/JungHoonGhae/odeduck/internal/fetch"
 )
 
 func TestOfficialFileSourceStreamsPublicMonthlySnapshot(t *testing.T) {
@@ -63,6 +63,41 @@ func TestOfficialFileSourceStreamsPublicMonthlySnapshot(t *testing.T) {
 	standard, ok := got.Find("300")
 	if !ok || standard.SvcType != "" || len(standard.DataTypes) != 0 {
 		t.Fatalf("standard entry = %+v", standard)
+	}
+}
+
+func TestOfficialFileSourceRetriesTransientDetailTransportFailure(t *testing.T) {
+	var detailAttempts int
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/data/" + officialFileDatasetPK + "/fileData.do":
+			detailAttempts++
+			if detailAttempts < 3 {
+				connection, _, err := w.(http.Hijacker).Hijack()
+				if err != nil {
+					t.Fatal(err)
+				}
+				_ = connection.Close()
+				return
+			}
+			_, _ = w.Write([]byte(`<button onclick="fileDetailObj.fn_fileDataDown('15062804','uddi:snapshot','','1','3')">download</button>`))
+		case "/tcs/dss/selectFileDataDownload.do":
+			_, _ = w.Write([]byte(`{"status":true,"atchFileId":"FILE","fileDetailSn":"1","fileDataRegistVO":{"dataNm":"catalog.csv"}}`))
+		case "/cmm/cmm/fileDownload.do":
+			_, _ = w.Write([]byte("목록키,목록유형,목록명,제공기관,수정일,설명,목록 URL\n100,FILE,자료,기관,2026-09-04,설명,https://example.com\n"))
+		default:
+			t.Fatalf("unexpected request: %s", r.URL)
+		}
+	}))
+	defer server.Close()
+
+	source := NewOfficialFileSource(fetch.New(fetch.WithDelay(0)), server.URL)
+	source.retryDelay = 0
+	if _, err := source.Sync(context.Background(), "ALL", 0, nil); err != nil {
+		t.Fatal(err)
+	}
+	if detailAttempts != 3 {
+		t.Fatalf("detail attempts = %d, want 3", detailAttempts)
 	}
 }
 

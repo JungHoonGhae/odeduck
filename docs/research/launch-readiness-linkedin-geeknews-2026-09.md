@@ -4,11 +4,11 @@
 
 ## 결론
 
-oddsock의 런칭 소재는 “공공데이터 9.6만 건” 자체가 아니라, 일상어로 던진 질문이 공공기관의 데이터
+odeduck의 런칭 소재는 “공공데이터 9.6만 건” 자체가 아니라, 일상어로 던진 질문이 공공기관의 데이터
 용어로 바뀌고 서로 다른 자료까지 한 화면에 놓이는 순간이다. 첫 체험은 계정 생성이나 data.go.kr 로그인
 없이 끝나야 한다. 활용신청과 호출은 그 다음 단계로 분리한다.
 
-현재 외부 공개를 막는 가장 큰 요인은 제품 기능이 아니라 저장소 visibility다. 프로필에는 oddsock의
+현재 외부 공개를 막는 가장 큰 요인은 제품 기능이 아니라 저장소 visibility다. 프로필에는 odeduck의
 실제 URL을 미리 연결하고 `public release in progress`로 표시했다. 소유자에게는 정상 링크지만 비로그인
 방문자에게는 아직 404다. 공개 전환 직후 비로그인 상태에서 링크를 확인하고 진행 중 표기를 제거한다.
 
@@ -57,7 +57,7 @@ oddsock의 런칭 소재는 “공공데이터 9.6만 건” 자체가 아니라
 
 ## 로컬에서 검증한 첫 체험
 
-격리된 임시 설정 디렉터리에서 v0.16.0 릴리스 바이너리와 `oddsock-catalog.json.gz`만 사용했다.
+격리된 임시 설정 디렉터리에서 v0.16.0 릴리스 바이너리와 `odeduck-catalog.json.gz`만 사용했다.
 
 - snapshot 설치: 96,683건
 - 로그인: 없음
@@ -73,7 +73,7 @@ oddsock의 런칭 소재는 “공공데이터 9.6만 건” 자체가 아니라
 provider key, Ollama semantic index는 사용하지 않았다.
 
 ```sh
-oddsock catalog discover \
+odeduck catalog discover \
   "장마철에도 매출이 덜 흔들릴 동네 카페 후보를 찾고 싶어. 어떤 데이터를 같이 봐야 하는지 찾아줘." \
   --agent codex --connections=true --max-connections 3 \
   --limit 12 --semantic=false -f table
