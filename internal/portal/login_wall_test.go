@@ -4,7 +4,7 @@ import "testing"
 
 // The portal's authenticated pages carry the string "통합 로그인" inside a script
 // comment. Matching it anywhere in the document made every authenticated read
-// look like the login wall, so `oddsock login` polled for its full 5 minutes and
+// look like the login wall, so `odeduck login` polled for its full 5 minutes and
 // exited 1 while the browser was in fact logged in.
 func TestIsLoginWallIgnoresTheWordInScriptComments(t *testing.T) {
 	authed := `<html><head><title>활용신청 현황 | 공공데이터포털</title></head><body>

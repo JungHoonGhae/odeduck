@@ -1,11 +1,32 @@
 # Changelog
 
-All notable changes to oddsock are documented here. Format follows
+All notable changes to odeduck are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); versions follow
 [SemVer](https://semver.org/). The release workflow uses the `## [X.Y.Z]`
 section matching a `vX.Y.Z` tag as the GitHub release notes.
 
 ## [Unreleased]
+
+## [0.17.0] - 2026-09-04
+
+### Changed
+
+- Introduced 오데덕 as the product character and renamed the CLI, MCP server,
+  repository, Go module, configuration root and release assets to `odeduck`.
+- Removed unreleased compatibility binaries and legacy identity fallbacks so
+  installations expose one unambiguous command.
+- Extended `docs/brand/brand.json` as the canonical source for the display name,
+  command, repository, module path and configuration directory, with CI checks
+  for identity drift.
+- Retry transient transport failures while resolving the official monthly
+  catalogue download contract, preventing a single portal dial timeout from
+  aborting an otherwise valid release.
+- Rewrote the opening story around finding a missing sock by looking across
+  everyday contexts, then carried that behavior into cross-domain public-data
+  discovery and evidence notes.
+- Credited Steve Jobs's 2005 Stanford commencement address for the
+  “connecting the dots” framing and separated that source from 오데덕's
+  evidence-first application of it.
 
 ## [0.16.2] - 2026-09-04
 

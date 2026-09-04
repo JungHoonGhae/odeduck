@@ -9,8 +9,8 @@ func TestStringUsesBuildCommandName(t *testing.T) {
 	originalName := CommandName
 	t.Cleanup(func() { CommandName = originalName })
 
-	CommandName = "gongctl"
-	if got := String(); !strings.HasPrefix(got, "gongctl ") {
-		t.Fatalf("compatibility version = %q, want gongctl prefix", got)
+	CommandName = "odeduck-test"
+	if got := String(); !strings.HasPrefix(got, "odeduck-test ") {
+		t.Fatalf("version = %q, want injected command prefix", got)
 	}
 }

@@ -32,6 +32,6 @@
     <line x1="70" y1="519" x2="1094" y2="519" stroke="#151513" stroke-width="2" stroke-dasharray="3 10" stroke-linecap="round"/>
     <text x="70" y="561" fill="#151513" font-size="16" font-weight="700">아직 결론이 아니다.</text>
     <text x="230" y="561" fill="#151513" font-size="16">key · match rate · cardinality 검증 전까지는 연결 후보.</text>
-    <text x="1094" y="561" fill="#151513" font-size="18" font-weight="700" text-anchor="end">oddsock</text>
+    <text x="1094" y="561" fill="#151513" font-size="18" font-weight="700" text-anchor="end">odeduck</text>
   </g>
 </svg>

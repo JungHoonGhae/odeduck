@@ -1,4 +1,4 @@
-// Package doctor is a liveness check for oddsock's fragile scraping. data.go.kr
+// Package doctor is a liveness check for odeduck's fragile scraping. data.go.kr
 // can redesign its HTML at any time, and the parsers degrade to *empty* results
 // rather than crashing — so drift is otherwise silent. doctor drives each
 // scraping seam against the live portal and reports whether it still yields data,
@@ -12,12 +12,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/JungHoonGhae/oddsock/internal/apicall"
-	"github.com/JungHoonGhae/oddsock/internal/catalog"
-	"github.com/JungHoonGhae/oddsock/internal/dataset"
-	"github.com/JungHoonGhae/oddsock/internal/fetch"
-	"github.com/JungHoonGhae/oddsock/internal/portal"
-	"github.com/JungHoonGhae/oddsock/internal/providerauth"
+	"github.com/JungHoonGhae/odeduck/internal/apicall"
+	"github.com/JungHoonGhae/odeduck/internal/catalog"
+	"github.com/JungHoonGhae/odeduck/internal/dataset"
+	"github.com/JungHoonGhae/odeduck/internal/fetch"
+	"github.com/JungHoonGhae/odeduck/internal/portal"
+	"github.com/JungHoonGhae/odeduck/internal/providerauth"
 )
 
 // CanaryPK is a stable, long-lived OpenAPI dataset (중앙선거관리위원회
@@ -144,7 +144,7 @@ func fileAssetCheck(ctx context.Context, transport dataset.Transport, baseURL, p
 func catalogCheck() Check {
 	cat, err := catalog.Load()
 	if errors.Is(err, catalog.ErrNotSynced) {
-		return Check{"catalog", StatusSkipped, "카탈로그 없음 — `oddsock catalog sync` 로 만들면 검색이 즉시 처리됩니다"}
+		return Check{"catalog", StatusSkipped, "카탈로그 없음 — `odeduck catalog sync` 로 만들면 검색이 즉시 처리됩니다"}
 	}
 	if err != nil {
 		return Check{"catalog", StatusDrift, "카탈로그를 읽지 못했습니다: " + err.Error()}
@@ -152,7 +152,7 @@ func catalogCheck() Check {
 	days := cat.Age().Hours() / 24
 	if cat.Stale() {
 		return Check{"catalog", StatusDrift, fmt.Sprintf(
-			"%.0f일 전 스냅샷 (%d건) — 그 이후 신설된 API 가 검색에서 누락됩니다. `oddsock catalog sync`",
+			"%.0f일 전 스냅샷 (%d건) — 그 이후 신설된 API 가 검색에서 누락됩니다. `odeduck catalog sync`",
 			days, len(cat.Entries))}
 	}
 	return Check{"catalog", StatusOK, fmt.Sprintf("%.1f일 전 수집 (%d건)", days, len(cat.Entries))}
@@ -175,7 +175,7 @@ func semanticCheck() Check {
 		}
 		return Check{"semantic", StatusOK, fmt.Sprintf("%d건 × %d차원 · %s", len(idx.PKs), dim, idx.Model)}
 	case errors.Is(err, catalog.ErrSemanticIndexNotBuilt):
-		return Check{"semantic", StatusSkipped, "선택 기능 미설치 — `oddsock catalog semantic-build` 로 활성화"}
+		return Check{"semantic", StatusSkipped, "선택 기능 미설치 — `odeduck catalog semantic-build` 로 활성화"}
 	case errors.Is(err, catalog.ErrSemanticIndexStale):
 		return Check{"semantic", StatusSkipped, "카탈로그 갱신 후 의미 인덱스 갱신 필요 — 호환 벡터는 재사용됨"}
 	default:
@@ -337,7 +337,7 @@ func ApplyCheck(ctx context.Context, pk string) Check {
 		probe, err := portal.ProbeApplyForm(ctx, c)
 		switch {
 		case errors.Is(err, portal.ErrNotLoggedIn):
-			return Check{"apply", StatusSkipped, "세션 없음 — `oddsock login` 후 재점검"}
+			return Check{"apply", StatusSkipped, "세션 없음 — `odeduck login` 후 재점검"}
 		case errors.Is(err, portal.ErrFormUnreachable):
 			// Ambiguous on its own: either this account already applied, or the
 			// form moved. Try the next candidate rather than guess.
@@ -378,7 +378,7 @@ func APIKeyCheck(ctx context.Context) Check {
 	case err == nil:
 		return Check{"api-key", StatusOK, "활성 인증키 필드 확인 (값은 출력하지 않음)"}
 	case errors.Is(err, portal.ErrNotLoggedIn):
-		return Check{"api-key", StatusSkipped, "세션 없음 — `oddsock login` 후 재점검"}
+		return Check{"api-key", StatusSkipped, "세션 없음 — `odeduck login` 후 재점검"}
 	case errors.Is(err, portal.ErrAPIKeyNotIssued):
 		return Check{"api-key", StatusSkipped, "활성 인증키 필드는 있으나 아직 발급된 키 없음"}
 	default:

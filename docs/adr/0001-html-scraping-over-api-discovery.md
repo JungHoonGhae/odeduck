@@ -4,7 +4,7 @@ status: accepted
 
 # API-first discovery with deterministic HTML fallback and loud drift detection
 
-oddsock originally read data.go.kr by scraping HTML, which looks fragile enough that
+odeduck originally read data.go.kr by scraping HTML, which looks fragile enough that
 "surely there's a better way" keeps coming up — an adaptive-selector library
 (Scrapling), a crawler framework (goscrapy), an AI browser agent (Browser Use
 et al), or discovering the JSON APIs beneath the pages (Unbrowse's approach). We
@@ -70,7 +70,7 @@ documented `SearchOpenDataServiceList` API identifies that `OA-15572` is offered
 as SHEET, FILE and OPENAPI and gives the canonical URLs. Only the final versioned
 file list is read from the HTTPS provider page because the catalogue response
 does not include file sequence IDs. Seoul's credentialed data API remains HTTP
-only and allows at most 1,000 rows per request, so oddsock does not send a
+only and allows at most 1,000 rows per request, so odeduck does not send a
 user key over that transport; the complete HTTPS file archive is the safe path
 for full local analysis.
 
@@ -116,7 +116,7 @@ Page XHR inspection alone cannot establish that no official API exists.
 Some generated OpenAPIs no longer have a working `/openapi.do` route. Their
 `/fileData.do` page combines FILE assets and an OpenAPI tab and references a
 documented `https://infuser.odcloud.kr/oas/docs?namespace={pk}/v1` Swagger
-document. oddsock now falls back to that combined first-party page, fetches
+document. odeduck now falls back to that combined first-party page, fetches
 only the exact allowlisted Swagger reference for the same PK, and treats the
 resulting `api.odcloud.kr` operations as REST evidence. Service keys may be sent
 only to `apis.data.go.kr` or `api.odcloud.kr`, always over HTTPS and never to an
@@ -144,9 +144,9 @@ silently described as generally applicable.
   applications when a field changes.
 - **Adaptive/self-healing selectors (Scrapling)** — rejected: Python (breaks the
   single-binary distribution) and *probabilistic* — relocating an element by
-  similarity can silently match the wrong thing. oddsock's contract is
+  similarity can silently match the wrong thing. odeduck's contract is
   surface-only: fail loudly, never fabricate.
-- **Crawler framework (goscrapy)** — rejected: oddsock hits three known
+- **Crawler framework (goscrapy)** — rejected: odeduck hits three known
   endpoints; it is not a crawler, and a framework wouldn't make selectors any
   less brittle.
 - **AI browser agents (Browser Use, Stagehand, agent-browser)** — rejected: an
@@ -160,14 +160,14 @@ silently described as generally applicable.
 ## Consequences
 
 - Markup drift is inevitable, so it must be *detected*, not absorbed: parsers
-  degrade to empty results, and `oddsock doctor` drives each seam live and exits
+  degrade to empty results, and `odeduck doctor` drives each seam live and exits
   non-zero on drift (CI-friendly).
 - A zero-row authenticated application parse is ambiguous, not healthy. Doctor
   reports it as skipped, while non-empty lists report the parsed count. The
   API-key selector has a value-free probe so layout drift can be detected without
   exposing the credential.
 - CDP stays for the one-time human SSO login and short-lived form submission.
-  oddsock extracts a reusable cookie session, closes the login browser, uses
+  odeduck extracts a reusable cookie session, closes the login browser, uses
   plain HTTP for authenticated reads, and starts an isolated headless browser only
   when `apply` must drive the portal's own form.
 - Inspection responses carry evidence entries such as `official_api`,

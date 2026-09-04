@@ -11,8 +11,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/JungHoonGhae/oddsock/internal/apicall"
-	"github.com/JungHoonGhae/oddsock/internal/fetch"
+	"github.com/JungHoonGhae/odeduck/internal/apicall"
+	"github.com/JungHoonGhae/odeduck/internal/fetch"
 )
 
 // fixtureServer serves the real captured search + openapi.do markup (reused from

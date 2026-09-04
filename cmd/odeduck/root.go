@@ -3,10 +3,10 @@ package main
 import (
 	"time"
 
-	"github.com/JungHoonGhae/oddsock/internal/fetch"
-	"github.com/JungHoonGhae/oddsock/internal/output"
-	"github.com/JungHoonGhae/oddsock/internal/portal"
-	"github.com/JungHoonGhae/oddsock/internal/version"
+	"github.com/JungHoonGhae/odeduck/internal/fetch"
+	"github.com/JungHoonGhae/odeduck/internal/output"
+	"github.com/JungHoonGhae/odeduck/internal/portal"
+	"github.com/JungHoonGhae/odeduck/internal/version"
 	"github.com/spf13/cobra"
 )
 
@@ -19,9 +19,9 @@ var (
 var rootCmd = &cobra.Command{
 	Use:   version.CommandName,
 	Short: "data.go.kr(공공데이터포털) 자동화 — 검색·활용신청·API 호출 (CLI + MCP)",
-	Long: `oddsock — 공공데이터를 찾고, 신청하고, 호출하는 AI 컨트롤 플레인입니다.
+	Long: `odeduck — 공공데이터를 찾고, 신청하고, 호출하는 AI 컨트롤 플레인입니다.
 
-사람은 브라우저에서 한 번만 로그인(oddsock login)하면, 이후 검색·활용신청·호출을
+사람은 브라우저에서 한 번만 로그인(odeduck login)하면, 이후 검색·활용신청·호출을
 CLI 또는 MCP(에이전트)로 처리합니다. 포털 UI를 다시 건드릴 필요가 없습니다.`,
 	SilenceUsage:  true,
 	SilenceErrors: true,

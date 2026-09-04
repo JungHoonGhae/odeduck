@@ -70,10 +70,10 @@ type ApplyResult struct {
 // Apply fills and submits a data.go.kr OpenAPI 활용신청 (auto-approved dev
 // account) for one publicDataPk, using the live browser session. It is
 // deliberately single-pk and purpose-required: applications are account-scoped,
-// account-mutating actions, so oddsock never bulk-applies speculatively. confirm
+// account-mutating actions, so odeduck never bulk-applies speculatively. confirm
 // is called with the filled summary; submission happens only if it returns true.
 //
-// The form's own fn_save() performs validation and POSTs — oddsock drives the
+// The form's own fn_save() performs validation and POSTs — odeduck drives the
 // portal's real logic rather than re-implementing the request, so it stays
 // robust to field changes. Any validation alert() is captured as the failure.
 func Apply(ctx context.Context, pk, purpose, category string, confirm func(ApplySummary) bool) (*ApplyResult, error) {
@@ -129,7 +129,7 @@ func onApplyForm(ctx context.Context, pk string, body func(tctx context.Context,
 		return ctx.Err()
 	}
 
-	// Submission has to run in a browser: oddsock drives the portal's own
+	// Submission has to run in a browser: odeduck drives the portal's own
 	// fn_save() so the page builds and validates the payload (see
 	// docs/adr/0001). Reuse a live browser if there is one; otherwise start a
 	// headless one and inject the saved session, so no window appears.
@@ -260,7 +260,7 @@ func fillAndSubmit(tctx context.Context, pk, purpose, category string,
 	// Refuse to submit a form we could not fill. fn_save() on a page whose fields
 	// moved would post whatever the page happens to hold, against a real account.
 	if missing := filled.Missing(); len(missing) > 0 {
-		return nil, fmt.Errorf("신청 폼 구조가 예상과 다릅니다 — 없는 요소: %s (포털 마크업 변경 가능성, `oddsock doctor` 로 확인)",
+		return nil, fmt.Errorf("신청 폼 구조가 예상과 다릅니다 — 없는 요소: %s (포털 마크업 변경 가능성, `odeduck doctor` 로 확인)",
 			strings.Join(missing, ", "))
 	}
 

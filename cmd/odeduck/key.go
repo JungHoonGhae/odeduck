@@ -4,8 +4,8 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/JungHoonGhae/oddsock/internal/output"
-	"github.com/JungHoonGhae/oddsock/internal/portal"
+	"github.com/JungHoonGhae/odeduck/internal/output"
+	"github.com/JungHoonGhae/odeduck/internal/portal"
 	"github.com/spf13/cobra"
 )
 
@@ -16,7 +16,7 @@ func keyCmd() *cobra.Command {
 		Long: `data.go.kr 계정의 일반 인증키를 가져옵니다. 계정당 키는 하나이며 첫 활용신청이
 승인될 때 발급되어 모든 승인 API에 공통으로 쓰입니다.
 
-` + "`oddsock call`" + ` 은 --key 를 생략하면 이 키를 자동으로 사용합니다.`,
+` + "`odeduck call`" + ` 은 --key 를 생략하면 이 키를 자동으로 사용합니다.`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			format, err := resolveFormat()
 			if err != nil {

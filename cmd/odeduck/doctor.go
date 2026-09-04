@@ -4,9 +4,9 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/JungHoonGhae/oddsock/internal/doctor"
-	"github.com/JungHoonGhae/oddsock/internal/output"
-	"github.com/JungHoonGhae/oddsock/internal/portal"
+	"github.com/JungHoonGhae/odeduck/internal/doctor"
+	"github.com/JungHoonGhae/odeduck/internal/output"
+	"github.com/JungHoonGhae/odeduck/internal/portal"
 	"github.com/spf13/cobra"
 )
 
@@ -17,7 +17,7 @@ func doctorCmd() *cobra.Command {
 	c := &cobra.Command{
 		Use:   "doctor",
 		Short: "스크래핑 상태 점검 — data.go.kr 마크업 변경(drift) 감지",
-		Long: `oddsock 의 fragile scraping 이 아직 동작하는지 라이브로 점검합니다.
+		Long: `odeduck 의 fragile scraping 이 아직 동작하는지 라이브로 점검합니다.
 data.go.kr 이 HTML 을 바꾸면 파서가 조용히 빈 결과를 내므로, doctor 가 각 seam
 (검색·REST describe·ODCloud Swagger·FILE/서울 자산·LINK 인계·활용신청 현황)을
 실제로 호출해 데이터가 나오는지 확인합니다.
@@ -72,7 +72,7 @@ func sessionCheck(cmd *cobra.Command) doctor.Check {
 	apps, err := portal.Applications(cmd.Context())
 	switch {
 	case errors.Is(err, portal.ErrNotLoggedIn):
-		return doctor.Check{Name: "applications", Status: doctor.StatusSkipped, Detail: "세션 없음 — `oddsock login` 후 재점검"}
+		return doctor.Check{Name: "applications", Status: doctor.StatusSkipped, Detail: "세션 없음 — `odeduck login` 후 재점검"}
 	case err != nil:
 		return doctor.Check{Name: "applications", Status: doctor.StatusDrift, Detail: "요청 실패: " + err.Error()}
 	case len(apps) == 0:

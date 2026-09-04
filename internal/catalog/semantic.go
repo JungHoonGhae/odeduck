@@ -19,7 +19,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/JungHoonGhae/oddsock/internal/portal"
+	"github.com/JungHoonGhae/odeduck/internal/portal"
 )
 
 const (
@@ -34,16 +34,9 @@ const (
 	maxSemanticDimensions = 8_192
 )
 
-// OllamaURLFromEnv returns the canonical setting while preserving both former
-// names during the command compatibility window.
+// OllamaURLFromEnv returns the configured Ollama endpoint.
 func OllamaURLFromEnv() string {
-	if current := strings.TrimSpace(os.Getenv("ODDSOCK_OLLAMA_URL")); current != "" {
-		return current
-	}
-	if former := strings.TrimSpace(os.Getenv("OPENDATACTL_OLLAMA_URL")); former != "" {
-		return former
-	}
-	return strings.TrimSpace(os.Getenv("GONGCTL_OLLAMA_URL"))
+	return strings.TrimSpace(os.Getenv("ODEDUCK_OLLAMA_URL"))
 }
 
 var (
@@ -100,7 +93,7 @@ func RequireSemantic(result Result) error {
 	if strings.TrimSpace(detail) != "" {
 		detail = ": " + detail
 	}
-	return fmt.Errorf("semantic 검색이 필수지만 status=%s%s; `oddsock catalog semantic-build` 후 다시 시도하세요", status, detail)
+	return fmt.Errorf("semantic 검색이 필수지만 status=%s%s; `odeduck catalog semantic-build` 후 다시 시도하세요", status, detail)
 }
 
 // Embedder is the deliberately small provider boundary. Ollama is the built-in

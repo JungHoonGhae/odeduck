@@ -1,6 +1,6 @@
-# Contributing to oddsock
+# Contributing to odeduck
 
-oddsock welcomes fixes, reproducible public-data questions, documentation improvements, and carefully scoped
+odeduck welcomes fixes, reproducible public-data questions, documentation improvements, and carefully scoped
 provider adapters. A contribution is most useful when another person can verify it without access to your account.
 
 ## Before opening a pull request
@@ -12,7 +12,7 @@ provider adapters. A contribution is most useful when another person can verify 
 
 ## Development
 
-oddsock uses Go 1.26.6 or newer.
+odeduck uses Go 1.26.6 or newer.
 
 ```sh
 go mod tidy -diff

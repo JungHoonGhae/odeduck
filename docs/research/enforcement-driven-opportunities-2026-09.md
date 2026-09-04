@@ -10,7 +10,7 @@ portfolio regulatory-event radar**다. 토스증권 보유종목을 상장사 �
 한 타임라인으로 돌려준다. 모든 알림에는 `공식 원문 → 사건 주체 → 시설/계열사 → 보유종목` 연결 경로와
 신뢰도를 남긴다. “악재 점수”나 매매 신호를 먼저 만들지 않는다.
 
-이 후보가 앞서는 이유는 enforcement가 가장 세서가 아니다. oddsock의 공식 데이터 계약 정규화와
+이 후보가 앞서는 이유는 enforcement가 가장 세서가 아니다. odeduck의 공식 데이터 계약 정규화와
 출처 보존, tossinvest-cli의 실제 포트폴리오 라우팅이 그대로 제품의 두 반쪽이기 때문이다. 내부 준수
 SaaS는 고객의 센서·로그·ERP·작업허가를 받아야 가치가 생기지만, 사건 레이더는 공개 자료만으로 첫
 결과물을 만들고 배포할 수 있다. 다만 결론의 확신은 **중간 이하**다. 상장사 연결 정밀도, 누락률,
@@ -21,13 +21,13 @@ SaaS는 고객의 센서·로그·ERP·작업허가를 받아야 가치가 생�
 
 ## 지금 가진 자산에서 출발한 결론
 
-이 추천은 `oddsock`만 보고 고른 것이 아니다. 공개 GitHub와 같은 워크스페이스의 프로젝트를 함께 보면
+이 추천은 `odeduck`만 보고 고른 것이 아니다. 공개 GitHub와 같은 워크스페이스의 프로젝트를 함께 보면
 반복되는 창업자 강점은 **한국의 닫히고 파편화된 데이터·서비스를 CLI/MCP와 검증 가능한 계약으로
 에이전트에게 열어 주는 것**이다.
 
 | 자산 | 현재 기능·신호 | 새 사업에서 맡을 역할 |
 | --- | --- | --- |
-| oddsock | 공공데이터 96,663건 검색, 목표 기반 discovery, 계약 inspect, 활용신청, 호출, 4개 외부 provider adapter와 11개 live canary | 공식 사건 원천 탐색, adapter 계약, provenance와 source health |
+| odeduck | 공공데이터 96,663건 검색, 목표 기반 discovery, 계약 inspect, 활용신청, 호출, 4개 외부 provider adapter와 11개 live canary | 공식 사건 원천 탐색, adapter 계약, provenance와 source health |
 | tossinvest-cli | 2026-09-02 공개 기준 488 stars, 85 forks, 88 releases, checksum을 뺀 실행파일 3,181 downloads | 보유·관심종목 입력, 금융 사용자 배포 채널, 공식 Toss API/CSV 연결 |
 | dart-disclosure-skill | DART 공시 알림·분석 | 공시 사건과 상장사 앵커 보완 |
 | zeronews | 사건 최초 관측 시각, 출처, 수집 건전성 검증 | 뉴스에서 사건 후보 발견, 공식 원문과 대조 |
@@ -43,7 +43,7 @@ SaaS는 고객의 센서·로그·ERP·작업허가를 받아야 가치가 생�
 현재 자산과 목표 제품은 다음처럼 이어진다. 각 저장소를 합치는 것이 아니라, 검증된 경계를 재사용한다.
 
 ```text
-공식 기관·공공데이터 ── oddsock adapters/health ──┐
+공식 기관·공공데이터 ── odeduck adapters/health ──┐
 뉴스·공시 후보 ─────── zeronews + DART ───────────┤
 OpenDART·공정위 ────── 기업/계열/시설 entity graph ├─ 공식 사건 원장
 고객 종목·업체 목록 ── Toss 공식 API 또는 CSV ─────┘
@@ -64,7 +64,7 @@ OpenDART·공정위 ────── 기업/계열/시설 entity graph ├─ 
 | ---: | --- | ---: | --- |
 | 1 | 한국 기업 공식 사건 그래프 — 금융 실사 wedge | 4.4/5 | 가장 강한 기존 pull·배포 채널과, 금융 데이터에 이미 돈 쓰는 B2B 구매자가 겹친다 |
 | 2 | 같은 그래프의 공급업체·거래처 위험 실사 | 3.9/5 | 구매·보험·여신의 고통과 예산은 크지만 현재 직접 고객 접근 신호는 금융보다 약하다 |
-| 3 | 한국 공식 API용 managed connector/control plane | 3.7/5 | oddsock의 자연스러운 확장이나 Nango·Pipedream과 플랫폼 경쟁이 되고, 누가 먼저 큰돈을 낼지 덜 선명하다 |
+| 3 | 한국 공식 API용 managed connector/control plane | 3.7/5 | odeduck의 자연스러운 확장이나 Nango·Pipedream과 플랫폼 경쟁이 되고, 누가 먼저 큰돈을 낼지 덜 선명하다 |
 | 4 | AI agent tool portfolio governance | 3.5/5 | CISO·플랫폼팀 예산은 있지만 Proofpoint·MintMCP 등 경쟁이 빠르고 cleanmyagent의 pull은 아직 없다 |
 | 5 | 유해화학 주간점검·조치 증빙 | 3.4/5 | 연중 반복 의무와 EHS 예산이 있으나 고객 내부 시설원장·전문가 접근이 필요하다 |
 | 6 | 판매자 리콜·마진누수·정산 손실 방지 | 3.1/5 | 고통은 직접적이지만 저가 ERP가 많고 비공식 판매자센터 의존은 사업 기반으로 위험하다 |
@@ -147,7 +147,7 @@ OpenDART 회사개황 API는 상장 종목코드, 법인등록번호, 사업자�
 - 조달 수주·제재·계약 변동
 - 사건을 먼저 발견한 뉴스와 최종 공식 원문. 뉴스는 발견 경로일 뿐 사실의 최종 출처가 아니다.
 
-구조는 `tossinvest-cli 보유종목 → OpenDART·공정위 entity graph → oddsock 공식 데이터 adapter →
+구조는 `tossinvest-cli 보유종목 → OpenDART·공정위 entity graph → odeduck 공식 데이터 adapter →
 zeronews 발견·provenance → 사건 정규화·entity matching → portfolio projection → CLI/MCP/digest` 순이다.
 `zeronews`가 포착한 뉴스는 발견 시각과 원문 경로를 보존하되, 최종 사실과 법적 상태는 공식 기관 URL로
 확정한다.
@@ -473,7 +473,7 @@ zeronews 발견·provenance → 사건 정규화·entity matching → portfolio 
 
 ## 공공데이터가 해주는 일과 못 하는 일
 
-2026-09-01 oddsock `official-file+web` 카탈로그 96,663건에서 PK별 `inspect`로 전달방식·공식 URL·
+2026-09-01 odeduck `official-file+web` 카탈로그 96,663건에서 PK별 `inspect`로 전달방식·공식 URL·
 오퍼레이션·승인방식을 확인했다. 예를 들어 `15156661`은 업체명·처분일로 사업장폐기물 행정처분을
 검색하는 REST, `15090011`은 연간 CSV와 odcloud API를 함께 가진 중대산업사고 사업장, `15149420`은
 CAS번호·영문명으로 화학물질을 찾는 REST다. 계약이 확인됐다는 것은 데이터가 제품에 충분하거나
@@ -496,7 +496,7 @@ CAS번호·영문명으로 화학물질을 찾는 REST다. 계약이 확인됐�
 
 ### 필요한 adapter와 구현 순서
 
-현재 `oddsock inspect 15139209 --observe`는 `svcType="" dataTypes=[]`라 전국표준데이터의 제공형을
+현재 `odeduck inspect 15139209 --observe`는 `svcType="" dataTypes=[]`라 전국표준데이터의 제공형을
 자동 검사하지 못한다. 사건 그래프가 결제되면 이 표준데이터 계약 adapter가 첫 보강 대상이다. 그다음은
 OpenDART 법인·사업자번호 entity map, 공정위·개인정보위·고용노동부의 의결/PDF adapter, 마지막으로
 source별 freshness·coverage·latency health다.

@@ -7,11 +7,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/JungHoonGhae/oddsock/internal/apicall"
-	"github.com/JungHoonGhae/oddsock/internal/dataset"
-	"github.com/JungHoonGhae/oddsock/internal/output"
-	"github.com/JungHoonGhae/oddsock/internal/portal"
-	"github.com/JungHoonGhae/oddsock/internal/providerauth"
+	"github.com/JungHoonGhae/odeduck/internal/apicall"
+	"github.com/JungHoonGhae/odeduck/internal/dataset"
+	"github.com/JungHoonGhae/odeduck/internal/output"
+	"github.com/JungHoonGhae/odeduck/internal/portal"
+	"github.com/JungHoonGhae/odeduck/internal/providerauth"
 	"github.com/spf13/cobra"
 )
 
@@ -155,10 +155,10 @@ count, distinct, null, duplicate 수를 함께 반환합니다. 두 API를 같�
 확인해야 합니다. 같은 leaf 이름이 여러 경로에 있으면 값을 합치지 않고 ambiguous=true와 실제 paths를
 반환하므로 dotted path로 다시 지정하세요.
 
-예) oddsock call --pk 15077974 --param numOfRows=10
-    oddsock call --pk 15077974 --wait 15m --param numOfRows=10   # 방금 신청한 API
-    oddsock call --pk 15116894 --op certificationList --param conditionKey=productName --param conditionValue=완구
-    oddsock call https://apis.data.go.kr/9760000/.../getX --param numOfRows=10`,
+예) odeduck call --pk 15077974 --param numOfRows=10
+    odeduck call --pk 15077974 --wait 15m --param numOfRows=10   # 방금 신청한 API
+    odeduck call --pk 15116894 --op certificationList --param conditionKey=productName --param conditionValue=완구
+    odeduck call https://apis.data.go.kr/9760000/.../getX --param numOfRows=10`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if _, err := apicall.ProfileBody(nil, profileFields); err != nil {
@@ -208,7 +208,7 @@ count, distinct, null, duplicate 수를 함께 반환합니다. 두 API를 같�
 			if key == "" {
 				k, keyErr := portal.APIKey(cmd.Context())
 				if keyErr != nil {
-					return fmt.Errorf("인증키를 얻지 못했습니다 (--key 로 직접 지정하거나 `oddsock login` 후 재시도): %w", keyErr)
+					return fmt.Errorf("인증키를 얻지 못했습니다 (--key 로 직접 지정하거나 `odeduck login` 후 재시도): %w", keyErr)
 				}
 				key = k
 			}

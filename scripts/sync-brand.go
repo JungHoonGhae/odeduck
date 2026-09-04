@@ -1,7 +1,7 @@
 //go:build ignore
 
-// Command sync-brand keeps the generated README brand block in sync with
-// docs/brand/brand.json. Run it from any directory inside the repository:
+// Command sync-brand keeps the README brand block and technical identity in
+// sync with docs/brand/brand.json. Run it from any directory in the repository:
 //
 //	go run ./scripts/sync-brand.go
 //	go run ./scripts/sync-brand.go --check
@@ -25,13 +25,16 @@ const (
 )
 
 type brand struct {
-	DisplayName   string `json:"displayName"`
-	Tagline       string `json:"tagline"`
-	Proofline     string `json:"proofline"`
-	LogoPath      string `json:"logoPath"`
-	LogoAlt       string `json:"logoAlt"`
-	TechnicalName string `json:"technicalName"`
-	Command       string `json:"command"`
+	DisplayName     string `json:"displayName"`
+	Tagline         string `json:"tagline"`
+	Proofline       string `json:"proofline"`
+	LogoPath        string `json:"logoPath"`
+	LogoAlt         string `json:"logoAlt"`
+	TechnicalName   string `json:"technicalName"`
+	Command         string `json:"command"`
+	Repository      string `json:"repository"`
+	ModulePath      string `json:"modulePath"`
+	ConfigDirectory string `json:"configDirectory"`
 }
 
 func main() {
@@ -48,21 +51,10 @@ func main() {
 	}
 
 	readmePath := filepath.Join(root, "README.md")
-	current, err := os.ReadFile(readmePath)
-	if err != nil {
+	if err := syncBlock(readmePath, startMarker, endMarker, render(configuration), *check); err != nil {
 		fatal(err)
 	}
-	updated, err := replaceBlock(current, render(configuration))
-	if err != nil {
-		fatal(err)
-	}
-	if bytes.Equal(current, updated) {
-		return
-	}
-	if *check {
-		fatal(errors.New("README.md brand block is stale; run go run ./scripts/sync-brand.go"))
-	}
-	if err := os.WriteFile(readmePath, updated, 0o644); err != nil {
+	if err := validateProjectIdentity(root, configuration); err != nil {
 		fatal(err)
 	}
 }
@@ -94,13 +86,16 @@ func loadBrand(path string) (brand, error) {
 		return brand{}, fmt.Errorf("decode %s: %w", path, err)
 	}
 	fields := map[string]string{
-		"displayName":   configuration.DisplayName,
-		"tagline":       configuration.Tagline,
-		"proofline":     configuration.Proofline,
-		"logoPath":      configuration.LogoPath,
-		"logoAlt":       configuration.LogoAlt,
-		"technicalName": configuration.TechnicalName,
-		"command":       configuration.Command,
+		"displayName":     configuration.DisplayName,
+		"tagline":         configuration.Tagline,
+		"proofline":       configuration.Proofline,
+		"logoPath":        configuration.LogoPath,
+		"logoAlt":         configuration.LogoAlt,
+		"technicalName":   configuration.TechnicalName,
+		"command":         configuration.Command,
+		"repository":      configuration.Repository,
+		"modulePath":      configuration.ModulePath,
+		"configDirectory": configuration.ConfigDirectory,
 	}
 	for name, value := range fields {
 		if strings.TrimSpace(value) == "" {
@@ -108,6 +103,48 @@ func loadBrand(path string) (brand, error) {
 		}
 	}
 	return configuration, nil
+}
+
+func validateProjectIdentity(root string, configuration brand) error {
+	checks := map[string][]string{
+		"go.mod":                      {"module " + configuration.ModulePath},
+		".goreleaser.yaml":            {"project_name: " + configuration.TechnicalName, "binary: " + configuration.Command},
+		"install.sh":                  {`REPO="` + configuration.Repository + `"`, `BINARY="` + configuration.Command + `"`},
+		"install.ps1":                 {`$Repo = "` + configuration.Repository + `"`},
+		"README.md":                   {"https://github.com/" + configuration.Repository, "`" + configuration.Command + "`"},
+		"internal/portal/daemon.go":   {"configDirName", `= "` + configuration.ConfigDirectory + `"`},
+		"internal/version/version.go": {`CommandName = "` + configuration.Command + `"`},
+	}
+	for relative, required := range checks {
+		content, err := os.ReadFile(filepath.Join(root, relative))
+		if err != nil {
+			return err
+		}
+		for _, needle := range required {
+			if !bytes.Contains(content, []byte(needle)) {
+				return fmt.Errorf("%s is stale: missing %q from docs/brand/brand.json", relative, needle)
+			}
+		}
+	}
+	return nil
+}
+
+func syncBlock(path, start, end string, generated []byte, check bool) error {
+	current, err := os.ReadFile(path)
+	if err != nil {
+		return err
+	}
+	updated, err := replaceMarkedBlock(current, []byte(start), []byte(end), generated)
+	if err != nil {
+		return err
+	}
+	if bytes.Equal(current, updated) {
+		return nil
+	}
+	if check {
+		return fmt.Errorf("%s is stale; run go run ./scripts/sync-brand.go", filepath.Base(path))
+	}
+	return os.WriteFile(path, updated, 0o644)
 }
 
 func render(configuration brand) []byte {
@@ -133,14 +170,18 @@ func render(configuration brand) []byte {
 }
 
 func replaceBlock(current, generated []byte) ([]byte, error) {
-	start := bytes.Index(current, []byte(startMarker))
-	end := bytes.Index(current, []byte(endMarker))
+	return replaceMarkedBlock(current, []byte(startMarker), []byte(endMarker), generated)
+}
+
+func replaceMarkedBlock(current, startMarkerBytes, endMarkerBytes, generated []byte) ([]byte, error) {
+	start := bytes.Index(current, startMarkerBytes)
+	end := bytes.Index(current, endMarkerBytes)
 	if start < 0 || end < 0 || end < start {
-		return nil, fmt.Errorf("README.md must contain one ordered %s / %s block", startMarker, endMarker)
+		return nil, errors.New("document must contain one ordered generated block")
 	}
-	end += len(endMarker)
-	if bytes.Contains(current[end:], []byte(startMarker)) || bytes.Contains(current[end:], []byte(endMarker)) {
-		return nil, errors.New("README.md contains duplicate brand markers")
+	end += len(endMarkerBytes)
+	if bytes.Contains(current[end:], startMarkerBytes) || bytes.Contains(current[end:], endMarkerBytes) {
+		return nil, errors.New("document contains duplicate generated markers")
 	}
 
 	updated := make([]byte, 0, len(current)-end+start+len(generated))

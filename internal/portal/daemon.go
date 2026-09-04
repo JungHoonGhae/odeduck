@@ -14,14 +14,14 @@ import (
 )
 
 // Browser lifecycle. The human logs in once in a visible Chrome (government SSO
-// is not automated); oddsock then copies the session cookies out (session.go) and
+// is not automated); odeduck then copies the session cookies out (session.go) and
 // closes that window, so nothing stays on screen. Reads go over plain HTTP with
 // those cookies, and the one flow that still needs a browser — driving the
 // 활용신청 form's own JS — starts a short-lived headless Chrome and injects them.
 // A visible browser is only kept alive as a fallback, when the cookies alone turn
 // out not to authenticate.
 
-// debugPort is the fixed CDP remote-debugging port for oddsock's login browser.
+// debugPort is the fixed CDP remote-debugging port for odeduck's login browser.
 const debugPort = 9333
 
 // The browser is dedicated to data.go.kr. Its TLS 1.3 endpoint returned corrupt
@@ -31,14 +31,10 @@ const debugPort = 9333
 const portalTLSMaxArg = "--ssl-version-max=tls1.2"
 
 const (
-	configDirName   = "oddsock"
-	daemonStateFile = "datagokr-cdp.json"
-	// Keep the marker name through the compatibility window so logout can reap
-	// a headless browser left by a v0.8 process.
-	headlessStateFile = "gongctl-headless.json"
+	configDirName     = "odeduck"
+	daemonStateFile   = "datagokr-cdp.json"
+	headlessStateFile = "odeduck-headless.json"
 )
-
-var compatibilityConfigDirNames = []string{"opendatactl", "gongctl"}
 
 var localCDPClient = &http.Client{Timeout: 2 * time.Second}
 
@@ -50,13 +46,13 @@ type daemonState struct {
 	ProfileDir   string `json:"profileDir,omitempty"`
 }
 
-// ConfigDir is oddsock's config directory, exported so sibling packages (the
+// ConfigDir is odeduck's config directory, exported so sibling packages (the
 // catalogue) can store their own state beside the session files.
 func ConfigDir() (string, error) { return configDir() }
 
-// ConfigDirsForCleanup returns every existing current or compatibility config
-// root without creating one. Packages that store credentials beneath the same
-// roots use this only for exhaustive logout cleanup.
+// ConfigDirsForCleanup returns the existing product config root without
+// creating it. Packages that store credentials beneath it use this only for
+// exhaustive logout cleanup.
 func ConfigDirsForCleanup() ([]string, error) { return configDirsForCleanup() }
 
 func configDir() (string, error) {
@@ -65,116 +61,28 @@ func configDir() (string, error) {
 		return "", err
 	}
 	current := filepath.Join(base, configDirName)
-	bestPath := ""
-	bestPriority := -1
-	for _, name := range append([]string{configDirName}, compatibilityConfigDirNames...) {
-		candidate := filepath.Join(base, name)
-		info, statErr := os.Stat(candidate)
-		if os.IsNotExist(statErr) {
-			continue
-		}
-		if statErr != nil {
-			return "", statErr
-		}
-		if !info.IsDir() {
-			return "", fmt.Errorf("설정 경로가 디렉터리가 아닙니다: %s", candidate)
-		}
-		priority, err := configDirPriority(candidate)
-		if err != nil {
-			return "", err
-		}
-		// Canonical oddsock wins ties because it is visited first. A populated
-		// former root still wins over an empty new directory, so upgrades retain
-		// login state and keys without copying account credentials.
-		if priority > bestPriority {
-			bestPath = candidate
-			bestPriority = priority
-		}
-	}
-	if bestPath != "" {
-		return bestPath, nil
-	}
 	return current, os.MkdirAll(current, 0o700)
 }
 
-func configDirPriority(dir string) (int, error) {
-	for _, group := range []struct {
-		priority int
-		names    []string
-	}{
-		{4, []string{"datagokr-session.json"}},
-		{3, []string{keyCacheFile}},
-		{2, []string{daemonStateFile, "chrome-profile", "chrome-headless"}},
-		{1, []string{"config.json", "catalog.json", "catalog-semantic.gob"}},
-	} {
-		for _, name := range group.names {
-			hasData, err := configPathHasData(filepath.Join(dir, name))
-			if err != nil {
-				return 0, err
-			}
-			if hasData {
-				return group.priority, nil
-			}
-		}
-	}
-	profiles, err := filepath.Glob(filepath.Join(dir, "chrome-headless-*"))
-	if err != nil {
-		return 0, err
-	}
-	for _, profile := range profiles {
-		hasData, err := configPathHasData(profile)
-		if err != nil {
-			return 0, err
-		}
-		if hasData {
-			return 2, nil
-		}
-	}
-	return 0, nil
-}
-
-func configPathHasData(path string) (bool, error) {
-	info, err := os.Stat(path)
-	if os.IsNotExist(err) {
-		return false, nil
-	}
-	if err != nil {
-		return false, err
-	}
-	if !info.IsDir() {
-		return true, nil
-	}
-	entries, err := os.ReadDir(path)
-	if err != nil {
-		return false, err
-	}
-	return len(entries) > 0, nil
-}
-
-// configDirsForCleanup returns every existing product config root without
-// creating one. Logout uses it so an old binary cannot keep using credentials
-// left behind in the legacy directory after a rename.
+// configDirsForCleanup returns the existing product config root without
+// creating it.
 func configDirsForCleanup() ([]string, error) {
 	base, err := os.UserConfigDir()
 	if err != nil {
 		return nil, err
 	}
-	dirs := make([]string, 0, 1+len(compatibilityConfigDirNames))
-	for _, name := range append([]string{configDirName}, compatibilityConfigDirNames...) {
-		dir := filepath.Join(base, name)
-		info, statErr := os.Stat(dir)
-		if os.IsNotExist(statErr) {
-			continue
-		}
-		if statErr != nil {
-			return nil, statErr
-		}
-		if !info.IsDir() {
-			return nil, fmt.Errorf("설정 경로가 디렉터리가 아닙니다: %s", dir)
-		}
-		dirs = append(dirs, dir)
+	dir := filepath.Join(base, configDirName)
+	info, statErr := os.Stat(dir)
+	if os.IsNotExist(statErr) {
+		return nil, nil
 	}
-	return dirs, nil
+	if statErr != nil {
+		return nil, statErr
+	}
+	if !info.IsDir() {
+		return nil, fmt.Errorf("설정 경로가 디렉터리가 아닙니다: %s", dir)
+	}
+	return []string{dir}, nil
 }
 
 func statePath() (string, error) {
@@ -237,8 +145,8 @@ func loadStateFrom(path string) (*daemonState, error) {
 	return &s, nil
 }
 
-// ErrNotLoggedIn means no live browser session is available; run `oddsock login`.
-var ErrNotLoggedIn = fmt.Errorf("data.go.kr 세션이 없습니다 — 먼저 `oddsock login` 을 실행하세요")
+// ErrNotLoggedIn means no live browser session is available; run `odeduck login`.
+var ErrNotLoggedIn = fmt.Errorf("data.go.kr 세션이 없습니다 — 먼저 `odeduck login` 을 실행하세요")
 
 // findChrome locates a Chrome-family browser executable.
 func findChrome() (string, error) {
@@ -272,7 +180,7 @@ func findChrome() (string, error) {
 }
 
 // launchBrowser starts a detached Chrome with the remote-debugging port and
-// oddsock's persistent profile. The process outlives oddsock (Setpgid + Release) so
+// odeduck's persistent profile. The process outlives odeduck (Setpgid + Release) so
 // the session stays alive between commands. startURL is the initial page.
 func launchBrowser(startURL string) (*exec.Cmd, error) {
 	chrome, err := findChrome()
@@ -285,7 +193,7 @@ func launchBrowser(startURL string) (*exec.Cmd, error) {
 	}
 	args := loginBrowserArgs(profile, startURL)
 	cmd := exec.Command(chrome, args...)
-	setDetached(cmd) // oddsock 프로세스 그룹에서 분리해 browser가 CLI 종료 후에도 생존
+	setDetached(cmd) // odeduck 프로세스 그룹에서 분리해 browser가 CLI 종료 후에도 생존
 	if err := cmd.Start(); err != nil {
 		return nil, fmt.Errorf("브라우저 실행 실패: %w", err)
 	}

@@ -11,10 +11,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/JungHoonGhae/oddsock/internal/apicall"
-	"github.com/JungHoonGhae/oddsock/internal/catalog"
-	"github.com/JungHoonGhae/oddsock/internal/dataset"
-	"github.com/JungHoonGhae/oddsock/internal/fetch"
+	"github.com/JungHoonGhae/odeduck/internal/apicall"
+	"github.com/JungHoonGhae/odeduck/internal/catalog"
+	"github.com/JungHoonGhae/odeduck/internal/dataset"
+	"github.com/JungHoonGhae/odeduck/internal/fetch"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -392,7 +392,7 @@ func TestToolCatalogPresentsProgressiveDiscoveryWorkflow(t *testing.T) {
 	}
 }
 
-func TestGuideResourceUsesOddsockAndKeepsCompatibilityURIs(t *testing.T) {
+func TestGuideResourceUsesOdeduckURI(t *testing.T) {
 	sess := connectTestClient(t, New(Deps{Fetch: fetch.New(fetch.WithDelay(0))}))
 	res, err := sess.ListResources(context.Background(), nil)
 	if err != nil {
@@ -402,17 +402,16 @@ func TestGuideResourceUsesOddsockAndKeepsCompatibilityURIs(t *testing.T) {
 	for _, resource := range res.Resources {
 		seen[resource.URI] = true
 	}
-	for _, uri := range []string{"oddsock://guide", "opendatactl://guide", "gongctl://guide"} {
-		if !seen[uri] {
-			t.Fatalf("missing guide resource %q; resources = %+v", uri, res.Resources)
-		}
-		read, err := sess.ReadResource(context.Background(), &mcp.ReadResourceParams{URI: uri})
-		if err != nil {
-			t.Fatalf("read %s: %v", uri, err)
-		}
-		if len(read.Contents) != 1 || !strings.Contains(read.Contents[0].Text, "oddsock") {
-			t.Fatalf("guide %s content = %+v", uri, read.Contents)
-		}
+	const uri = "odeduck://guide"
+	if !seen[uri] {
+		t.Fatalf("missing guide resource %q; resources = %+v", uri, res.Resources)
+	}
+	read, err := sess.ReadResource(context.Background(), &mcp.ReadResourceParams{URI: uri})
+	if err != nil {
+		t.Fatalf("read %s: %v", uri, err)
+	}
+	if len(read.Contents) != 1 || !strings.Contains(read.Contents[0].Text, "odeduck") {
+		t.Fatalf("guide %s content = %+v", uri, read.Contents)
 	}
 }
 

@@ -20,10 +20,10 @@ synonym/opportunity dictionary could only encode opportunities we already knew.
    not a hard-coded industry taxonomy. For standalone use, `catalog discover`
    obtains the same small plan from an already-authenticated Codex, Claude Code,
    Gemini CLI or Cursor Agent process. It does not read agent credentials.
-2. oddsock searches every axis deterministically across title, organisation,
+2. odeduck searches every axis deterministically across title, organisation,
    category and official description, then round-robins the axes so a prolific
    publisher cannot occupy the whole first page.
-3. When an optional Ollama index exists, oddsock embeds the intent and axes,
+3. When an optional Ollama index exists, odeduck embeds the intent and axes,
    performs local cosine retrieval, and fuses it with lexical ranks. Failure or
    absence falls back to layers 1–2 and is reported in `semantic.status`.
 4. Hybrid ranking protects the leading strict lexical match for each explicit
@@ -37,8 +37,8 @@ Official description previews are returned only for exploratory/planned search,
 so known-item lookup stays compact.
 
 ACP is not used as the planner boundary. ACP connects an editor/client to an
-agent session, while MCP connects that agent to oddsock's tools. Codex, Claude,
-Gemini and Cursor can therefore host `oddsock mcp` directly. The CLI adapters
+agent session, while MCP connects that agent to odeduck's tools. Codex, Claude,
+Gemini and Cursor can therefore host `odeduck mcp` directly. The CLI adapters
 exist only for standalone `catalog discover`, where no host agent is present.
 
 ## Why no vector database yet
@@ -62,8 +62,8 @@ metadata filtering is needed. That future change must not alter the MCP
   deterministic; only explicit `catalog discover` sends the stated goal to the
   selected agent CLI using that CLI's configured authentication and billing.
 - Ollama is optional and free/local; no catalogue text or query leaves the
-  machine through oddsock's default semantic provider.
-- `oddsock catalog semantic-build` downloads the model and builds the cache in
+  machine through odeduck's default semantic provider.
+- `odeduck catalog semantic-build` downloads the model and builds the cache in
   one command. After a re-sync, version 2 reuses vectors whose model, recipe and
   document hash still match, then atomically saves an index for the new snapshot.
 - Search results expose `matchedQuery`, short previews and semantic status so an

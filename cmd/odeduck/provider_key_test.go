@@ -11,7 +11,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/JungHoonGhae/oddsock/internal/providerauth"
+	"github.com/JungHoonGhae/odeduck/internal/providerauth"
 )
 
 func TestProviderKeyCommandReadsSecretFromStdinAndNeverPrintsIt(t *testing.T) {

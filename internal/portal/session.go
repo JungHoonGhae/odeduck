@@ -13,7 +13,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/JungHoonGhae/oddsock/internal/fetch"
+	"github.com/JungHoonGhae/odeduck/internal/fetch"
 	"github.com/chromedp/cdproto/network"
 	"github.com/chromedp/chromedp"
 )
@@ -23,7 +23,7 @@ import (
 //
 // The portal's auth cookies are session-scoped — Chrome discards them when it
 // exits — but the values stay valid server-side until the session expires. So
-// oddsock copies them out after login and closes the browser, instead of keeping
+// odeduck copies them out after login and closes the browser, instead of keeping
 // a window open for the rest of the day. Authenticated HTTP reads capture and
 // persist rotated cookies, extending a sliding session while the portal permits
 // it. The one flow that still needs a browser (활용신청 submit, which drives the
@@ -121,8 +121,8 @@ func loadSessionUnlocked() (*Session, error) {
 //
 // The profiles matter as much as the files. The login profile accumulates the
 // cookies of whatever the human logged in WITH — an SSO provider's session, for
-// instance — and the headless profile holds the cookies oddsock injected into it.
-// Removing only oddsock's own two files would leave those on disk after the user
+// instance — and the headless profile holds the cookies odeduck injected into it.
+// Removing only odeduck's own two files would leave those on disk after the user
 // asked to be logged out.
 func clearSession() error {
 	dirs, err := configDirsForCleanup()

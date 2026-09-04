@@ -16,7 +16,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/JungHoonGhae/oddsock/internal/fetch"
+	"github.com/JungHoonGhae/odeduck/internal/fetch"
 	"github.com/PuerkitoBio/goquery"
 )
 
@@ -228,7 +228,7 @@ func buildVWorldRequest(ctx context.Context, contract *ExternalContract, operati
 	}
 	for name, value := range params {
 		if name == "key" || name == "domain" || name == "service" || name == "request" || name == "data" {
-			return nil, fmt.Errorf("%s는 oddsock이 주입하므로 params에 넣지 마세요", name)
+			return nil, fmt.Errorf("%s는 odeduck이 주입하므로 params에 넣지 마세요", name)
 		}
 		if !allowed[name] {
 			return nil, fmt.Errorf("%s는 VWorld %s의 공식 요청변수가 아닙니다", name, operation)
@@ -359,7 +359,7 @@ func buildFoodSafetyKoreaRequest(ctx context.Context, contract *ExternalContract
 			continue
 		}
 		if name == "keyId" || name == "serviceId" {
-			return nil, fmt.Errorf("%s는 oddsock이 주입하므로 params에 넣지 마세요", name)
+			return nil, fmt.Errorf("%s는 odeduck이 주입하므로 params에 넣지 마세요", name)
 		}
 		if _, ok := schema[name]; !ok {
 			return nil, fmt.Errorf("%s는 공식 요청인자 표에 없는 filter입니다", name)

@@ -22,7 +22,7 @@ browser-only 화면, 빠진 API, 반복 클릭에 갇혀 있으면 실제로 다
 | 빌더 | 현재 프로필·철학에서 확인한 패턴 | JungHoon에게 가져올 것 | 피할 것 |
 | --- | --- | --- | --- |
 | **Peter Steinberger** | OpenClaw를 시작한 빌더이며, 현재 profile README는 짧은 정체성 → `Start Here` → 분야별 프로젝트 → 활동·철학 순서다. 반복 수작업을 루프를 닫을 기회로 보고 CLI부터 만들어 에이전트가 호출·검증하게 한다. [OpenClaw README](https://github.com/openclaw/openclaw), [프로필](https://github.com/steipete/steipete/blob/main/README.md), [작업기, 2025-12-28](https://steipete.me/posts/2025/shipping-at-inference-speed) | 가장 강한 3–5개를 `막힌 작업 → 작동하는 결과`로 설명하고 하나의 세계관으로 묶기 | 긴 프로젝트 백과사전, badge·별명·농담의 과잉, 그의 ship 구호를 변형한 문구 |
-| **Matt Pocock** | GitHub README는 현재 AI Hero 배너 하나로 집중됐고 pins가 현재 AI 작업을 증명한다. AI Hero는 코드 생성이 싸질수록 공학적 기본기의 가치가 커진다는 한 주장을 반복한다. [프로필](https://github.com/mattpocock/mattpocock/blob/main/readme.md), [AI Hero](https://www.aihero.dev/), [skills](https://github.com/mattpocock/skills) | 방문자가 “지금 거는 한 가지 베팅”을 기억하게 하고, 공개 후 oddsock을 flagship으로 올리기 | 기존 청중이 필요한 배너-only 프로필, 추상적인 AI 전문가 포지셔닝 |
+| **Matt Pocock** | GitHub README는 현재 AI Hero 배너 하나로 집중됐고 pins가 현재 AI 작업을 증명한다. AI Hero는 코드 생성이 싸질수록 공학적 기본기의 가치가 커진다는 한 주장을 반복한다. [프로필](https://github.com/mattpocock/mattpocock/blob/main/readme.md), [AI Hero](https://www.aihero.dev/), [skills](https://github.com/mattpocock/skills) | 방문자가 “지금 거는 한 가지 베팅”을 기억하게 하고, 공개 후 odeduck을 flagship으로 올리기 | 기존 청중이 필요한 배너-only 프로필, 추상적인 AI 전문가 포지셔닝 |
 | **DHH** | GitHub는 극도로 비워 두지만 개인 사이트는 Rails·Omarchy·37signals 등 만든 결과를 한 문장에 쌓는다. 최근에는 AI와 오픈소스가 고정된 시스템을 사용자가 바꿀 수 있게 한다는 세계관을 펴고, Basecamp에는 챗봇 대신 API+CLI+skill로 전체 작업을 열었다. [프로필](https://github.com/dhh), [사이트](https://dhh.dk/), [malleable computer, 2026-04-15](https://world.hey.com/dhh/the-malleable-computer-7c187a9b), [agent accessibility, 2026-03-25](https://world.hey.com/dhh/basecamp-becomes-agent-accessible-3ae6b949) | 서로 다른 도구를 기억 가능한 하나의 철학으로 묶고 곧바로 실제 작품으로 증명하기 | 긴 경력의 권위 없이 선언적 자신감만 흉내 내기 |
 | **Armin Ronacher** | profile은 Flask, Earendil, Pallets·Sentry라는 현재·과거 증거를 짧게 잇는다. 그의 도구 기준은 빠른 응답, 명확한 오류, 오용을 견디는 경계, 관찰 가능성이다. CLI로 충분하면 CLI를 쓰고 MCP는 대안이 불안정할 때 쓴다. [프로필](https://github.com/mitsuhiko), [Agentic Coding, 2025-06-12](https://lucumr.pocoo.org/2025/6/12/agentic-coding/), [Earendil Purpose](https://earendil.com/purpose/) | 비공식 통합을 `local-first, inspectable, bounded, reversible, verified`라는 신뢰 기준으로 차별화하기 | MCP 자체를 목적이나 정체성으로 만들기 |
 | **Simon Willison** | 한 문장 현재 focus 뒤에 최근 release·글·TIL이 자동 갱신된다. 형용사 대신 실제 shipping이 현재성을 증명한다. [프로필](https://github.com/simonw/simonw/blob/main/README.md), [구현 설명, 2020-07-10](https://simonwillison.net/2020/Jul/10/self-updating-profile-readme/) | 기존 별 수 자동 갱신에 `Recently shipped` 3개를 더해 살아 있는 증거 만들기 | 꾸준한 글 채널 없이 세 개 feed를 그대로 복제하기 |
@@ -39,15 +39,15 @@ public data` 세 예가 강하다. 별 수 자동 갱신도 유효하다. 다만
 - `git diff ~/.philosophy`의 빠른 출시·완벽보다 반복 같은 문장은 흔한 빌더 격언이다.
 - `Start Here` 뒤 일곱 분야에서 프로젝트를 다시 모두 나열해 대표작을 희석한다.
 - 방문자 badge, 경고문과 여러 숨은 농담은 금융·메시징 비공식 통합에 필요한 신뢰보다 연출을 앞세운다.
-- oddsock은 공개 검증 전까지 외부 링크가 404이므로, 공개 후에만 `Currently building` 첫 자리로 올린다.
+- odeduck은 공개 검증 전까지 외부 링크가 404이므로, 공개 후에만 `Currently building` 첫 자리로 올린다.
 
 권장 구조는 아래 한 화면이다.
 
 ```text
 builder thesis
 3문장 philosophy: 문제 → 접근 → 품질 기준
-Currently building: oddsock + 실제 demo
-Selected work 4개: oddsock / tossinvest-cli / openkakao-cli / agent tool 1개
+Currently building: odeduck + 실제 demo
+Selected work 4개: odeduck / tossinvest-cli / openkakao-cli / agent tool 1개
 Operating principles 4줄
 Recently shipped 3개 (자동 갱신)
 인간적인 한 문장 + contact

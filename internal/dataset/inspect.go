@@ -21,8 +21,8 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/JungHoonGhae/oddsock/internal/fetch"
-	"github.com/JungHoonGhae/oddsock/internal/portal"
+	"github.com/JungHoonGhae/odeduck/internal/fetch"
+	"github.com/JungHoonGhae/odeduck/internal/portal"
 	"github.com/PuerkitoBio/goquery"
 	"golang.org/x/text/encoding/korean"
 	"golang.org/x/text/transform"
@@ -69,7 +69,7 @@ type Contract struct {
 }
 
 // Alternative is a provider-advertised representation of the same logical
-// dataset. It is discovery evidence, not a promise that oddsock can safely
+// dataset. It is discovery evidence, not a promise that odeduck can safely
 // invoke that representation with a credential.
 type Alternative struct {
 	Delivery string `json:"delivery"`
@@ -327,7 +327,7 @@ func (i *Inspector) Observe(ctx context.Context, asset Asset) (*Observation, err
 		return nil, fmt.Errorf("asset download가 허용 크기 %d bytes를 초과했습니다", maxObservationDownloadBytes)
 	}
 
-	temporary, err := os.CreateTemp("", "oddsock-observe-*")
+	temporary, err := os.CreateTemp("", "odeduck-observe-*")
 	if err != nil {
 		return nil, err
 	}

@@ -11,7 +11,7 @@ import (
 var (
 	// CommandName is the invocation identity. Compatibility builds override it
 	// so help, completions, and version parsers keep their former contracts.
-	CommandName = "oddsock"
+	CommandName = "odeduck"
 	// Version is the semantic version, set at build time.
 	Version = "dev"
 	// Commit is the short git SHA, set at build time.

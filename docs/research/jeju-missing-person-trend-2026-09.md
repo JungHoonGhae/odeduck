@@ -312,9 +312,9 @@ A 경찰관 사례에는 `235/564 = 41.7%`의 집중과 `63/298 = 21.1%`의 시�
 
 세 연간 점의 상관계수나 뉴스 건수로는 이 질문에 답할 수 없다. 국적 집단의 총량 관계를 개인 사건의 원인으로 옮기는 생태학적 오류도 피해야 한다.
 
-## 10. oddsock 실행 영수증
+## 10. odeduck 실행 영수증
 
-이 조사는 웹 검색으로 공공데이터 링크를 먼저 정한 뒤 oddsock에 끼워 맞춘 것이 아니다. oddsock의 전체 카탈로그에서 후보를 찾고 실제 파일 계약을 검사한 뒤, 카탈로그에 없는 최신 사건·법령·내부 인력 수치만 브라우저 리서치로 보완했다.
+이 조사는 웹 검색으로 공공데이터 링크를 먼저 정한 뒤 odeduck에 끼워 맞춘 것이 아니다. odeduck의 전체 카탈로그에서 후보를 찾고 실제 파일 계약을 검사한 뒤, 카탈로그에 없는 최신 사건·법령·내부 인력 수치만 브라우저 리서치로 보완했다.
 
 ### 검색 상태와 경로
 
@@ -323,12 +323,12 @@ A 경찰관 사례에는 `235/564 = 41.7%`의 집중과 `63/298 = 21.1%`의 시�
 | 카탈로그 | `catalog info`: 96,683건, `official-file+web`, 2026-09-02 동기화, stale=false | FILE 84,390 · LINK 4,780 · REST 7,207 · 미확인 306 | 목록 발견 근거이며 개별 데이터 내용의 진실성은 아님 |
 | semantic 상태 | 첫 실행에서 카탈로그보다 인덱스가 오래됐다는 `unavailable` 경고 확인 | 예전 구현은 lexical 결과도 함께 반환 | 이 조사에서는 해당 결과를 최종 근거로 사용하지 않고 인덱스를 갱신 |
 | semantic 갱신 | `catalog semantic-build`: 96,683건, 96,626 벡터 재사용, 57건 신규 임베딩 | `embeddinggemma:300m-qat-q4_0` 인덱스가 현재 카탈로그와 일치 | 이후 고신뢰 검색은 `requireSemantic=true`로 `status=used`를 요구 |
-| 자연어 MCP 검증 | 새 Codex 세션에 등록된 oddsock MCP가 `catalog_search` → `inspect_dataset(observe=true)`를 자발 호출 | `requireSemantic=true`, PK `15135001`, 실제 CSV 13개 컬럼과 해시 확인 | 셸·웹 없이 MCP만 허용한 블랙박스 실행 |
+| 자연어 MCP 검증 | 새 Codex 세션에 등록된 odeduck MCP가 `catalog_search` → `inspect_dataset(observe=true)`를 자발 호출 | `requireSemantic=true`, PK `15135001`, 실제 CSV 13개 컬럼과 해시 확인 | 셸·웹 없이 MCP만 허용한 블랙박스 실행 |
 | 실패 경로 검증 | Ollama 주소를 의도적으로 끊고 같은 MCP 요청 실행 | 도구 상태 `failed`, 모델은 lexical 후보를 쓰지 않고 `semantic-build`만 안내 | strict 실패에서는 fallback hit 자체를 노출하지 않도록 회귀 테스트 추가 |
 
 ### 데이터 노드별 provenance
 
-| 역할 | oddsock 발견·검사 | 실제 관찰 증거 | 이 문서에서 사용 |
+| 역할 | odeduck 발견·검사 | 실제 관찰 증거 | 이 문서에서 사용 |
 |---|---|---|---|
 | 제주 실종 Anchor | PK `15135001` | CSV 454 bytes, SHA-256 `c776043e52f252f03a06c70d51bdb15dde582d4a7c62763633e5b2b2d6074d36`, 13개 컬럼·5행 | 2020~2024 유형별 접수, 성인/아동 비교, 공개 해제 필드 품질 경고 |
 | 전국 실종 비교 | PK `15129413` | CSV 575 bytes, SHA-256 `ba68d834ca0bf0f751faa15c5798df85ac626fd0e5c092e382ff8c6394ebe347`, 13개 컬럼·5행 | 2021~2025 전국 성인·취약대상 시계열 |
