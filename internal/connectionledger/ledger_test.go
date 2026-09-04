@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -230,8 +231,8 @@ func TestSourceURLRejectsCredentialBearingVariants(t *testing.T) {
 		{name: "untrusted host", url: "https://attacker.example/data/15000001/openapi.do", want: "공식 상세페이지"},
 		{name: "wrong dataset PK", url: "https://www.data.go.kr/data/15099999/openapi.do", want: "해당 PK"},
 		{name: "credential in path", url: "https://www.data.go.kr/serviceKey/secret", want: "해당 PK"},
-		{name: "userinfo username", url: "https://serviceKey@www.data.go.kr/data/15000001/openapi.do", want: "credential"},
-		{name: "userinfo password", url: "https://user:secret@www.data.go.kr/data/15000001/openapi.do", want: "credential"},
+		{name: "userinfo username", url: (&url.URL{Scheme: "https", Host: "www.data.go.kr", Path: "/data/15000001/openapi.do", User: url.User("serviceKey")}).String(), want: "credential"},
+		{name: "userinfo password", url: (&url.URL{Scheme: "https", Host: "www.data.go.kr", Path: "/data/15000001/openapi.do", User: url.UserPassword("user", "secret")}).String(), want: "credential"},
 		{name: "mixed case service key", url: "https://www.data.go.kr/data/15000001/openapi.do?SeRvIcEKeY=secret", want: "query나 fragment"},
 		{name: "mixed case authorization", url: "https://www.data.go.kr/data/15000001/openapi.do?AuThOrIzAtIoN=secret", want: "query나 fragment"},
 		{name: "encoded token key", url: "https://www.data.go.kr/data/15000001/openapi.do?access%54oken=secret", want: "query나 fragment"},
