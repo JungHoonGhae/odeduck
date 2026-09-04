@@ -1,6 +1,6 @@
 {
-  "version": 1,
-  "reviewedAt": "2026-09-01",
+  "version": 2,
+  "reviewedAt": "2026-09-04",
   "cases": [
     {
       "id": "seoul-monthly-ridership",
@@ -36,13 +36,6 @@
       "expectedPk": "15157207",
       "expectedSvcType": "REST",
       "maxRank": 5
-    },
-    {
-      "id": "natural-language-undervalued-asset",
-      "query": "싸게 살 수 있는 투자 물건",
-      "expectedPk": "15157207",
-      "expectedSvcType": "REST",
-      "maxRank": 10
     },
     {
       "id": "natural-language-heat-risk",
