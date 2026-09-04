@@ -3,7 +3,7 @@ package mcpserver
 // ServerInstructions is delivered during MCP initialization, before a model
 // chooses a tool. Keep the opening self-contained because some hosts weigh only
 // the first part of server instructions during tool routing.
-const ServerInstructions = `대한민국 공공데이터를 찾거나 서로 다른 데이터를 조합하고, 실제 API·파일 스키마를 검사하거나 활용신청·호출할 때 odeduck을 사용한다. 모든 데이터 탐색은 catalog_search로 시작하고 선택한 pk는 inspect_dataset으로 확인한다. 사용자가 "최대한", "가장 정확하게", "semantic/시맨틱", 연구·감사·안전처럼 높은 재현성을 요구하면 catalog_search에 requireSemantic=true를 넣는다. 이 호출이 오류면 semantic=false로 조용히 재시도하지 말고 오류와 semantic-build 복구 방법을 사용자에게 알린다. 일반 탐색에서 semantic.status가 used가 아니면 warnings와 저하 상태를 반드시 답변에 밝힌다. FILE은 observe=true로 실제 컬럼과 해시를 확인하고, 검색 결과만으로 인과·결합 가능성을 단정하지 않는다. 세부 워크플로는 odeduck://guide 리소스를 읽는다.`
+const ServerInstructions = `대한민국 공공데이터를 찾거나 서로 다른 데이터를 조합하고, 실제 API·파일 스키마를 검사하거나 활용신청·호출할 때 odeduck을 사용한다. 모든 데이터 탐색은 catalog_search로 시작하고 선택한 pk는 inspect_dataset으로 확인한다. 사용자가 "최대한", "가장 정확하게", "semantic/시맨틱", 연구·감사·안전처럼 높은 재현성을 요구하면 catalog_search에 requireSemantic=true를 넣는다. 이 호출이 오류면 semantic=false로 조용히 재시도하지 말고 오류와 semantic-build 복구 방법을 사용자에게 알린다. 일반 탐색에서 semantic.status가 used가 아니면 warnings와 저하 상태를 반드시 답변에 밝힌다. FILE은 observe=true로 실제 컬럼과 해시를 확인하고, 검색 결과만으로 인과·결합 가능성을 단정하지 않는다. 검증을 마친 연결은 record_connection_assessment에 출처와 집계 근거만 기록하고 원문 값은 저장하지 않는다. 세부 워크플로는 odeduck://guide 리소스를 읽는다.`
 
 // GuideDoc is the odeduck://guide resource. It keeps the normal path deliberately
 // small: thousands of portal endpoints stay behind three generic MCP tools, and
@@ -58,7 +58,7 @@ const GuideDoc = `# odeduck — data.go.kr 사용 가이드
 
 ### 서로 다른 데이터 연결: 같은 catalog_search를 세 번 사용
 
-도구 종류를 늘리지 않는다. 첫 catalog_search는 Anchor Node를 찾고, 두 번째 catalog_search는
+후보를 찾는 동안에는 같은 catalog_search를 반복한다. 첫 호출은 Anchor Node를 찾고, 두 번째 호출은
 실제 결과를 본 뒤 Bridge Node를 찾는다.
 
 1. 첫 호출의 axes에 role=anchor와 서로 다른 역할을 넣는다. concepts와 axes를 함께 보낼 필요는 없다.
@@ -151,11 +151,31 @@ API와 결합할 때 evidenceRequired에 나온 동일한 key/grain 검사를 �
 - 양쪽 profile의 값 교집합, 양방향 match rate, uniqueness와 예상 join expansion을 계산한다.
   profile field가 없거나 grain·code namespace가 다르면 candidate를 승격하지 않는다.
 
+### 4. record_connection_assessment(...)
+
+검증이 끝난 판정만 로컬 연결 근거 장부에 기록한다. candidate와 structurally_plausible은 저장하지 않는다.
+
+- structurally_verified: 양쪽 공식 명세에서 selector, identifier namespace/version, type, grain과 변환을 확인했다.
+- sample_verified: 위 조건에 더해 같은 slice의 실제 distinct overlap, joined rows, 좌우 최대 expansion과
+  양쪽 profile/file SHA-256을 기록한다. call_api profile의 evidenceHash는 raw 표본을 장부에 넣지 않고도
+  어떤 bounded profile을 사용했는지 식별한다. 각 field의 key에는 대응하는 expectedKeys 값을 넣고,
+  source URL은 credential 유출을 막기 위해 query와 fragment가 없는 해당 PK의 data.go.kr 공식
+  상세페이지 주소만 사용한다. 현재는 같은 MCP 서버 세션에서 call_api로 만든 단일-key API profile 두
+  개의 operation·requestHash·전체 value frequency와 집계가 정확히 일치할 때만 기록할 수 있다. 영수증은
+  15분 동안 세션 메모리에 유지되므로 두 call_api 뒤 바로 기록한다. 복합 key와 FILE 표본은
+  structurally_verified로 남긴다.
+- blocked와 rejected: reason을 남겨 같은 접근 실패나 잘못된 key 가설을 반복하지 않는다.
+- 판정이 바뀌면 이전 ID를 지우지 않고 supersedes로 새 기록에서 대체한다. 유효시간과 관측시간을 구분한다.
+
+기존 근거는 list_connection_assessments로 PK/status를 좁혀 읽는다. 이 장부는 Data Node 사이의 검증 이력이며,
+서로 다른 원천 record를 같은 실세계 entity로 자동 병합하는 전역 지식 그래프가 아니다.
+
 ## 보조 도구
 
 - search_datasets(keyword): 카탈로그가 stale이거나 최신 신설 항목을 라이브로 재확인할 때만 쓴다.
   포털의 현재 결과 페이지만 보므로 catalog_search를 대신하지 못한다.
 - list_applications(): 이미 활용신청한 API와 상태를 확인한다.
+- list_connection_assessments(pk?, status?, limit?): 검증·차단·기각된 연결 근거를 최신순으로 확인한다.
 
 ## 인증키와 승인 전파
 

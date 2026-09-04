@@ -34,6 +34,17 @@ func TestProfileBodyPreservesIdentifiersAndCountsJoinEvidence(t *testing.T) {
 	if profile.Fields[2].Matched {
 		t.Fatalf("missing field = %+v", profile.Fields[2])
 	}
+	if len(profile.EvidenceHash) != 64 {
+		t.Fatalf("evidence hash = %q", profile.EvidenceHash)
+	}
+	again, err := ProfileBody(body, []string{"lawdCd", "dealYm", "missing"})
+	if err != nil || again.EvidenceHash != profile.EvidenceHash {
+		t.Fatalf("evidence hash must be deterministic: first=%q second=%q err=%v", profile.EvidenceHash, again.EvidenceHash, err)
+	}
+	changed, err := ProfileBody(map[string]any{"lawdCd": "99999"}, []string{"lawdCd", "dealYm", "missing"})
+	if err != nil || changed.EvidenceHash == profile.EvidenceHash {
+		t.Fatalf("different bounded evidence must produce a different hash: first=%q changed=%q err=%v", profile.EvidenceHash, changed.EvidenceHash, err)
+	}
 }
 
 func TestProfileBodyPreservesWhitespaceInRawStringValues(t *testing.T) {
@@ -111,6 +122,34 @@ func TestProfileBodyBoundsFieldsAndValueSamples(t *testing.T) {
 	got := profile.Fields[0]
 	if got.DistinctCount != maxProfileValues+5 || len(got.Values) != maxProfileValues || !got.ValuesTruncated {
 		t.Fatalf("bounded values = %+v", got)
+	}
+}
+
+func TestProfileEvidenceHashCoversValuesBeyondReturnedPreviewAndFrequencies(t *testing.T) {
+	firstRows, secondRows := make([]any, 0, maxProfileValues+1), make([]any, 0, maxProfileValues+1)
+	for i := 0; i < maxProfileValues; i++ {
+		row := map[string]any{"id": fmt.Sprintf("%03d", i)}
+		firstRows = append(firstRows, row)
+		secondRows = append(secondRows, row)
+	}
+	firstRows = append(firstRows, map[string]any{"id": "tail-a"})
+	secondRows = append(secondRows, map[string]any{"id": "tail-b"})
+	first, err := ProfileBody(firstRows, []string{"id"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := ProfileBody(secondRows, []string{"id"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first.EvidenceHash == second.EvidenceHash {
+		t.Fatal("different values beyond the returned preview shared an evidence hash")
+	}
+
+	left, _ := ProfileBody([]any{map[string]any{"id": "A"}, map[string]any{"id": "A"}, map[string]any{"id": "B"}}, []string{"id"})
+	right, _ := ProfileBody([]any{map[string]any{"id": "A"}, map[string]any{"id": "B"}, map[string]any{"id": "B"}}, []string{"id"})
+	if left.EvidenceHash == right.EvidenceHash {
+		t.Fatal("different value frequencies shared an evidence hash")
 	}
 }
 

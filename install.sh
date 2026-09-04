@@ -1,11 +1,11 @@
 #!/bin/sh
 # odeduck 설치 스크립트 (macOS/Linux)
 #
-#   curl -fsSL https://github.com/JungHoonGhae/odeduck/releases/download/v0.17.2/install.sh | sh
+#   curl -fsSL https://github.com/JungHoonGhae/odeduck/releases/download/v0.18.0/install.sh | sh
 #
 # 환경변수:
 #   INSTALL_DIR     설치 위치 (기본 /usr/local/bin)
-#   ODEDUCK_VERSION 특정 버전 고정 (예: v0.17.2, 기본 latest)
+#   ODEDUCK_VERSION 특정 버전 고정 (예: v0.18.0, 기본 latest)
 set -e
 
 REPO="JungHoonGhae/odeduck"

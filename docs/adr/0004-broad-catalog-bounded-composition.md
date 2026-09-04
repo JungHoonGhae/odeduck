@@ -87,3 +87,20 @@ Keep one deep catalogue module and the existing three-stage MCP interface.
   the final selected card remains subject to the existing server gates.
 - MCP tests prove that `connectionOptions` is returned before explicit Bridge
   selection and that `connections` remains empty at that stage.
+
+## 2026-09-04 graph database reassessment
+
+The catalogue now contains 96,866 API and FILE entries, but the decision still
+holds. A graph database would traverse already verified relationships; it would
+not replace lexical/planned/semantic retrieval or prove metadata-only edge
+hypotheses. The measured bottleneck and the explicit transition gates are
+recorded in the
+[graph database fit evaluation](../research/graph-database-fit-evaluation-2026-09.md).
+
+Instead of a graph database, odeduck now keeps a bounded local connection
+evidence ledger. Only `structurally_verified`, `sample_verified`, `blocked`, and
+`rejected` assessments enter it; search `candidate` rows cannot. Records retain
+dataset PKs, official provenance, field semantics, aggregate join evidence,
+valid/observed time, and supersession links, but not raw response values. This
+creates a measured corpus for the graph transition gates without changing the
+catalogue retrieval architecture.

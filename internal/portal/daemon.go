@@ -50,6 +50,16 @@ type daemonState struct {
 // catalogue) can store their own state beside the session files.
 func ConfigDir() (string, error) { return configDir() }
 
+// ConfigDirPath resolves odeduck's config directory without creating it. It is
+// for read-only tools that must not mutate the filesystem on an empty profile.
+func ConfigDirPath() (string, error) {
+	base, err := os.UserConfigDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(base, configDirName), nil
+}
+
 // ConfigDirsForCleanup returns the existing product config root without
 // creating it. Packages that store credentials beneath it use this only for
 // exhaustive logout cleanup.

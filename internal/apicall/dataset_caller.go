@@ -93,6 +93,10 @@ func (c *DatasetCaller) Call(ctx context.Context, request DatasetCallRequest) (*
 			result, callErr = doCall(fresh)
 		}
 	}
+	if result != nil {
+		result.Delivery = "REST"
+		result.Operation = operation.Name
+	}
 	return result, callErr
 }
 
@@ -152,7 +156,12 @@ func (c *DatasetCaller) callExternal(ctx context.Context, spec *APISpec, request
 	if err != nil {
 		return nil, fmt.Errorf("%s credential을 얻지 못했습니다: %w (신청: %s)", contract.Provider, err, contract.ApplicationURL)
 	}
-	return c.external.Call(ctx, contract, operation, request.Params, ExternalCredential{Key: key, Domain: domain})
+	result, callErr := c.external.Call(ctx, contract, operation, request.Params, ExternalCredential{Key: key, Domain: domain})
+	if result != nil {
+		result.Delivery = "LINK"
+		result.Operation = operation
+	}
+	return result, callErr
 }
 
 func resolveExternalOperation(contract *ExternalContract, requested string) (string, error) {

@@ -5,6 +5,9 @@ Go CLI + MCP. 사람은 정부 SSO 로그인 한 번만 하고 이후 포털 작
 
 ## 현재 상태 (2026-09-04)
 
+- v0.18.0은 교차 데이터 연결 판정을 append-only 연결 근거 장부에 기록하고, MCP 세션의 최근 `call_api`
+  profile 영수증과 요청·operation·delivery를 대조해 `sample_verified`를 제한한다. credential material,
+  조작된 집계, 잘못된 data.go.kr 출처 URL은 거부하며 손상된 JSONL tail은 삭제하지 않고 오류로 알린다.
 - v0.17.1은 한국어 공개 브랜드와 캐릭터 이름을 `오데덕`으로 정하고, 서로 무관해 보이는 분야에서
   질문의 나머지 짝을 찾는 인물로 README와 홍보 문구를 통일했다. CLI·MCP·저장소·Go module의 기술
   이름도 `odeduck`으로 통일했다.
@@ -41,8 +44,9 @@ Go CLI + MCP. 사람은 정부 SSO 로그인 한 번만 하고 이후 포털 작
   typed 호출. 포털 명세를 임의로 추론하지 않으며, 외부 provider는 공식 계약·exact credential scope·
   typed operation registry가 있을 때만 호출한다. (kvote 국정수행 PDF 교훈.)
 - **인터페이스**: CLI(사람) + MCP(에이전트), 같은 백엔드. kvote 패턴.
-- **MCP tools**: catalog_search → inspect_dataset → apply(필요시) → call_api. `describe_api`는 API-only
-  호환 surface이고 search_datasets와 list_applications는 보조 도구다. 인증키는 call_api 내부에서만
+- **MCP tools**: catalog_search → inspect_dataset → apply(필요시) → call_api →
+  record_connection_assessment. `describe_api`는 API-only 호환 surface이고 search_datasets,
+  list_applications, list_connection_assessments는 보조 도구다. 인증키는 call_api 내부에서만
   사용하며 모델 컨텍스트로 반환하지 않는다.
   `call_api`는 key 생략 시 세션에서 자동 조회 → **검색→신청→승인확인→키→호출이 사람 개입 0**
   (로그인 1회 제외). 인증키는 `/iim/api/selectApiKeyList.do`의 `#pblisrCrtfcKeyPlain`에서 파싱.
@@ -74,6 +78,9 @@ Go CLI + MCP. 사람은 정부 SSO 로그인 한 번만 하고 이후 포털 작
   release golden query gate, connection discovery의 제한·중복 제거·증거 경계.
 - `internal/dataset/` — REST/LINK/FILE 공통 검사와 실제 FILE 자산·bounded CSV/DBF/XLSX schema 관찰.
 - `internal/apicall/profile.go` — 호출 응답의 선택 필드에 대한 경로·고유값 프로파일링.
+- `internal/connectionledger/` — 검증·차단·기각된 연결의 provenance, 시간, 집계 근거를 raw 값 없이 보존하고
+  append-only JSONL 잠금·tail 복구·멱등성을 관리한다. `internal/mcpserver/evidence_receipts.go`가
+  세션에 묶인 API profile 영수증을 발급해 sample 검증 gate를 적용한다.
 
 ## 경쟁 지형
 
@@ -107,6 +114,18 @@ Go CLI + MCP. 사람은 정부 SSO 로그인 한 번만 하고 이후 포털 작
   격리되지 않으므로 테스트에서는 `HOME`, `XDG_CONFIG_HOME`, `APPDATA`를 모두 임시 경로로 지정한다.
 
 ## Agent skills
+
+### Business opportunity research
+
+수익화, 사업 후보, 구매자 문제, 시장 선택, 경쟁 또는 GTM을 조사할 때는
+`.agents/skills/odeduck-business-harness/SKILL.md`를 따른다. 공공데이터의 연결 가능성만으로 결론내리지
+않고, 현재 대안·정확한 식별 edge·지불 증거·날짜가 있는 중단 조건까지 하나의 결정 기록으로 남긴다.
+
+### Graph engineering
+
+entity resolution, graph 모델, 식별자, provenance, 시간 유효성 또는 연결 신뢰도를 설계·검토할 때는
+`.agents/skills/odeduck-graph-engineering/SKILL.md`를 따른다. 저장 기술보다 source record·canonical
+entity·claim의 경계와 행동별 오탐 통과선을 먼저 고정한다.
 
 ### Issue tracker
 
