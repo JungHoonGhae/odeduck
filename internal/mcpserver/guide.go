@@ -39,7 +39,7 @@ const GuideDoc = `# oddsock — data.go.kr 사용 가이드
   implemented면 같은 call_api로 호출하고, blocked/not_implemented/inspection_required면 nextAction을 따른다.
 - FILE 데이터셋은 svcType=FILE, 공식 detailUrl과 formats를 반환한다. inspect_dataset(pk)는 포털 직접
   다운로드 또는 검증된 provider Adapter를 통해 실제 파일 자산을 구조화한다. observe=true면 첫 번째 최신
-  자산을 bounded 다운로드하고 ZIP 내부 CSV 또는 SHP의 DBF 컬럼과 원본 SHA-256을 반환한다. 특정 과거
+  자산을 bounded 다운로드하고 CSV, ZIP 내부 CSV 또는 SHP의 DBF, XLSX worksheet 컬럼과 원본 SHA-256을 반환한다. 특정 과거
   파일은 asset에 inspect 결과의 정확한 자산명을 넣는다. metadata 설명을 실제 컬럼으로 간주하지 않는다.
   evidence는 사실의 출처와 안정성을 나타낸다. official_api/documented와 standard_metadata/documented를
   우선하고, first_party_web_contract/fallback은 공식 machine interface에 빠진 자산 식별자를 보완한 것이다.

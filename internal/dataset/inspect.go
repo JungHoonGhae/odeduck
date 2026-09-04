@@ -347,6 +347,14 @@ func (i *Inspector) Observe(ctx context.Context, asset Asset) (*Observation, err
 		return nil, err
 	}
 	observation := &Observation{SHA256: fmt.Sprintf("%x", hash.Sum(nil)), Bytes: written}
+	if strings.EqualFold(path.Ext(asset.Name), ".xlsx") || strings.EqualFold(strings.TrimSpace(asset.Format), "XLSX") {
+		files, warnings, err := inspectXLSX(temporary, written)
+		if err != nil {
+			return nil, err
+		}
+		observation.Files, observation.Warnings = files, warnings
+		return observation, nil
+	}
 	if isZIPFile(asset.Name, temporary) {
 		files, warnings, err := inspectZIP(temporary, written)
 		if err != nil {

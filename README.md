@@ -273,7 +273,7 @@ oddsock call --pk <PK> --param numOfRows=5
 | --- | --- |
 | `REST` | 포털의 공식 operation과 필수 파라미터를 확인하고 신청·호출 |
 | `LINK` | SafetyKorea·FoodSafetyKorea·VWorld 등 검증된 adapter만 typed 호출 |
-| `FILE` | 다운로드 링크만 보여주지 않고 작은 표본과 실제 스키마를 관찰 |
+| `FILE` | 다운로드 링크만 보여주지 않고 CSV·DBF·XLSX의 작은 표본과 실제 스키마를 관찰 |
 
 API처럼 보이는 링크라고 엔드포인트를 지어내지 않는다. 파일이라고 사람에게 다운로드를 떠넘기지도 않는다.
 검증된 계약이 없는 제공기관은 공식 경로를 알려 주고 멈춘다.
