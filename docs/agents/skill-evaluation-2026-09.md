@@ -45,13 +45,12 @@
 | Progressive disclosure | 14 | 15 | 150줄 미만 self-contained skill이며 외부 runtime reference가 없음 |
 | Freedom calibration | 14 | 15 | 모델링 판단은 열어두고 고비용 자동 행동의 식별 규칙은 엄격함 |
 | Pattern | 9 | 10 | 완료 기준과 branch가 있는 Process 패턴 |
-| Practical usability | 14 | 15 | 평가셋과 결과 계약은 명확하나 실제 verified ledger schema는 후속 과제 |
+| Practical usability | 15 | 15 | 평가셋과 결과 계약에 실제 verified ledger schema와 exact/deterministic fixture가 반영됨 |
 
 ### 남은 개선
 
-1. 첫 verified connection ledger가 생기면 exact/deterministic match fixture를 reference로 추가한다.
-2. 실제 자동 행동별 허용 오탐이 정해지면 현재의 정성 gate를 수치 계약으로 바꾼다.
-3. graph 저장 후보를 비교하는 날에는 동일 gold query를 실행하는 benchmark script를 함께 추가한다.
+1. 실제 자동 행동별 허용 오탐이 정해지면 현재의 정성 gate를 수치 계약으로 바꾼다.
+2. graph 저장 후보를 비교하는 날에는 동일 gold query를 실행하는 benchmark script를 함께 추가한다.
 
 ## 종합
 
