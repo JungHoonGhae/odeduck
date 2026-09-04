@@ -100,7 +100,7 @@ oddsock이 성공할 가게를 대신 골라주지는 않는다. 대신 감으�
 로컬에서 검색할 수 있다.
 
 ```sh
-curl -fsSL https://github.com/JungHoonGhae/oddsock/releases/download/v0.16.1/install.sh | sh
+curl -fsSL https://github.com/JungHoonGhae/oddsock/releases/download/v0.16.2/install.sh | sh
 
 oddsock catalog search \
   "서울에서 작은 가게 후보를 좁힐 자료" \
@@ -217,13 +217,13 @@ oddsock은 검색 1위를 정답이라고 부르지 않는다. 다음 단계를 
 macOS / Linux:
 
 ```sh
-curl -fsSL https://github.com/JungHoonGhae/oddsock/releases/download/v0.16.1/install.sh | sh
+curl -fsSL https://github.com/JungHoonGhae/oddsock/releases/download/v0.16.2/install.sh | sh
 ```
 
 Windows:
 
 ```powershell
-irm https://github.com/JungHoonGhae/oddsock/releases/download/v0.16.1/install.ps1 | iex
+irm https://github.com/JungHoonGhae/oddsock/releases/download/v0.16.2/install.ps1 | iex
 ```
 
 설치 스크립트는 바이너리와 같은 릴리스의 checksum을 검증하고, 검증된 카탈로그 snapshot도 함께
