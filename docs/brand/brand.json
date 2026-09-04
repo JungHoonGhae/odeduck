@@ -1,7 +1,7 @@
 {
   "displayName": "오데덕",
-  "tagline": "한 분야에 답이 없으면, 다른 서랍을 연다.",
-  "proofline": "9만 6천 개의 공공데이터에서 질문의 나머지 짝을 찾는다.",
+  "tagline": "오픈데이터 덕후, 오데덕.",
+  "proofline": "서로 상관없어 보이는 공공데이터를 연결해, 질문에 필요한 정보를 찾아온다.",
   "logoPath": "docs/assets/brand-symbol.svg",
   "logoAlt": "흩어진 공공데이터의 연결을 찾는 오데덕 캐릭터",
   "technicalName": "odeduck",
