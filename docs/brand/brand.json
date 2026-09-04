@@ -1,7 +1,7 @@
 {
   "displayName": "oddsock",
-  "tagline": "말은 없다. 질문 하나를 던진다. 데이터와 함께 돌아온다.",
-  "proofline": "공개돼 있었다. 찾기 쉽다는 뜻은 아니었다.",
+  "tagline": "질문 하나를 던진다. 흩어진 데이터의 짝을 찾아 돌아온다.",
+  "proofline": "답이 되는 데이터는 한 분야에만 있지 않았다.",
   "logoPath": "docs/assets/brand-symbol.svg",
   "logoAlt": "문틈에서 조용히 얼굴을 내민 oddsock 캐릭터",
   "technicalName": "oddsock",
