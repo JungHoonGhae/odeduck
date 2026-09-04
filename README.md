@@ -10,7 +10,7 @@
 <!-- brand:end -->
 
 <p align="center">
-  <a href="docs/assets/odeduck-hero.mp4"><img src="docs/assets/odeduck-hero.gif" width="800" alt="오데덕이 서로 떨어진 공공데이터 문서를 찾아 모으고 하나의 연결망으로 잇는 애니메이션"></a>
+  <a href="docs/assets/odeduck-hero.mp4"><img src="docs/assets/odeduck-hero.gif" width="800" alt="아주 작아진 오데덕이 거대한 캐비닛 사이를 뛰어다니며 서로 떨어진 공공데이터를 찾아 하나의 연결망으로 잇는 애니메이션"></a>
 </p>
 <p align="center">
   <sub>서로 상관없어 보이는 조각도, 함께 보면 질문의 나머지가 된다. · <a href="docs/assets/odeduck-hero.mp4">원본 영상</a></sub>
@@ -115,7 +115,7 @@ AI는 한 문장을 생활인구·업종별 매출·점포 생존·개폐업처�
 로컬에서 검색할 수 있다. 캐릭터는 한글로 `오데덕`, 설치하는 CLI와 MCP 명령은 로마자로 `odeduck`이다.
 
 ```sh
-curl -fsSL https://github.com/JungHoonGhae/odeduck/releases/download/v0.17.0/install.sh | sh
+curl -fsSL https://github.com/JungHoonGhae/odeduck/releases/download/v0.17.1/install.sh | sh
 
 odeduck catalog search \
   "서울에서 작은 가게 후보를 좁힐 자료" \
@@ -232,13 +232,13 @@ data.go.kr REST라면 사람은 정부 SSO에 한 번 로그인한다. 그다음
 macOS / Linux:
 
 ```sh
-curl -fsSL https://github.com/JungHoonGhae/odeduck/releases/download/v0.17.0/install.sh | sh
+curl -fsSL https://github.com/JungHoonGhae/odeduck/releases/download/v0.17.1/install.sh | sh
 ```
 
 Windows:
 
 ```powershell
-irm https://github.com/JungHoonGhae/odeduck/releases/download/v0.17.0/install.ps1 | iex
+irm https://github.com/JungHoonGhae/odeduck/releases/download/v0.17.1/install.ps1 | iex
 ```
 
 설치 스크립트는 바이너리와 같은 릴리스의 checksum을 검증하고, 검증된 카탈로그 snapshot도 함께
