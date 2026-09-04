@@ -66,6 +66,43 @@ type SemanticInfo struct {
 	Detail string `json:"detail,omitempty"`
 }
 
+// RecordSemanticOutcome keeps degraded retrieval visible in both human and
+// machine-readable outputs. A caller may still choose lexical/planned recall,
+// but it cannot mistake those candidates for a completed hybrid search.
+func RecordSemanticOutcome(result *Result, info SemanticInfo) {
+	result.Semantic = &info
+	if info.Status == SemanticUsed {
+		return
+	}
+	warning := fmt.Sprintf("semantic 폴백: status=%s", info.Status)
+	if strings.TrimSpace(info.Detail) != "" {
+		warning += " · " + info.Detail
+	}
+	warning += " · 결과는 의미 벡터 없이 lexical/planned 검색으로 생성됨"
+	for _, existing := range result.Warnings {
+		if existing == warning {
+			return
+		}
+	}
+	result.Warnings = append(result.Warnings, warning)
+}
+
+// RequireSemantic rejects a degraded result for research where vector recall
+// is part of the requested evidence standard.
+func RequireSemantic(result Result) error {
+	if result.Semantic != nil && result.Semantic.Status == SemanticUsed {
+		return nil
+	}
+	status, detail := "disabled", "semantic 검색이 비활성화됨"
+	if result.Semantic != nil {
+		status, detail = result.Semantic.Status, result.Semantic.Detail
+	}
+	if strings.TrimSpace(detail) != "" {
+		detail = ": " + detail
+	}
+	return fmt.Errorf("semantic 검색이 필수지만 status=%s%s; `oddsock catalog semantic-build` 후 다시 시도하세요", status, detail)
+}
+
 // Embedder is the deliberately small provider boundary. Ollama is the built-in
 // free/local provider; a hosted service or another local runtime can implement
 // the same two methods without changing catalogue storage or ranking.
@@ -540,7 +577,7 @@ func (c *Catalog) SearchHybrid(ctx context.Context, plan QueryPlan, index *Seman
 	if index == nil || embedder == nil {
 		base.Hits = trimHits(base.Hits, want)
 		finalizeConnectionCandidates(normalizedPlan, &base, entries)
-		base.Semantic = &SemanticInfo{Status: SemanticNotIndexed}
+		RecordSemanticOutcome(&base, SemanticInfo{Status: SemanticNotIndexed, Detail: "의미 인덱스가 준비되지 않음"})
 		return base
 	}
 
@@ -558,7 +595,7 @@ func (c *Catalog) SearchHybrid(ctx context.Context, plan QueryPlan, index *Seman
 	if len(queries) == 0 {
 		base.Hits = trimHits(base.Hits, want)
 		finalizeConnectionCandidates(normalizedPlan, &base, entries)
-		base.Semantic = &SemanticInfo{Status: SemanticUnavailable, Model: index.Model, Detail: "검색할 문장이 비어 있음"}
+		RecordSemanticOutcome(&base, SemanticInfo{Status: SemanticUnavailable, Model: index.Model, Detail: "검색할 문장이 비어 있음"})
 		return base
 	}
 	inputs := make([]string, len(queries))
@@ -569,7 +606,7 @@ func (c *Catalog) SearchHybrid(ctx context.Context, plan QueryPlan, index *Seman
 	if err != nil {
 		base.Hits = trimHits(base.Hits, want)
 		finalizeConnectionCandidates(normalizedPlan, &base, entries)
-		base.Semantic = &SemanticInfo{Status: SemanticUnavailable, Model: index.Model, Detail: err.Error()}
+		RecordSemanticOutcome(&base, SemanticInfo{Status: SemanticUnavailable, Model: index.Model, Detail: err.Error()})
 		return base
 	}
 	expectedDimensions := index.Dimensions
@@ -584,14 +621,14 @@ func (c *Catalog) SearchHybrid(ctx context.Context, plan QueryPlan, index *Seman
 	if len(vectors) != len(inputs) {
 		base.Hits = trimHits(base.Hits, want)
 		finalizeConnectionCandidates(normalizedPlan, &base, entries)
-		base.Semantic = &SemanticInfo{Status: SemanticUnavailable, Model: index.Model, Detail: "query embedding count does not match inputs"}
+		RecordSemanticOutcome(&base, SemanticInfo{Status: SemanticUnavailable, Model: index.Model, Detail: "query embedding count does not match inputs"})
 		return base
 	}
 	for _, vector := range vectors {
 		if !validSemanticVector(vector, expectedDimensions) {
 			base.Hits = trimHits(base.Hits, want)
 			finalizeConnectionCandidates(normalizedPlan, &base, entries)
-			base.Semantic = &SemanticInfo{Status: SemanticUnavailable, Model: index.Model, Detail: "query embedding dimensions or values are invalid"}
+			RecordSemanticOutcome(&base, SemanticInfo{Status: SemanticUnavailable, Model: index.Model, Detail: "query embedding dimensions or values are invalid"})
 			return base
 		}
 	}
@@ -629,7 +666,7 @@ func (c *Catalog) SearchHybrid(ctx context.Context, plan QueryPlan, index *Seman
 	base.ConnectionOptions = buildConnectionOptionsFromHits(fused, normalizedPlan.AnchorPKs, MaxOptionsPerRole)
 	finalizeConnectionCandidates(normalizedPlan, &base, entries)
 	base.Mode = SearchModeHybrid
-	base.Semantic = &SemanticInfo{Status: SemanticUsed, Model: index.Model}
+	RecordSemanticOutcome(&base, SemanticInfo{Status: SemanticUsed, Model: index.Model})
 	if len(base.Queries) == 0 {
 		base.Intent = strings.TrimSpace(plan.Intent)
 	}

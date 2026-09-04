@@ -48,7 +48,9 @@ catalog_search → inspect_dataset → (미승인 REST만 apply) → call_api
 
 `catalog_search`와 `oddsock catalog search`는 릴리스에 포함되거나 `catalog sync`로 갱신된 로컬
 `catalog.json`을 검색한다. 엄격한 어휘 검색부터 시작하고, 선택적 Ollama 인덱스가 있으면 로컬 의미 검색
-결과를 합친다. 인덱스가 없거나 오래됐거나 Ollama가 실패해도 어휘 검색으로 돌아간다.
+결과를 합친다. 일반 검색은 인덱스가 없거나 오래됐거나 Ollama가 실패하면 어휘 검색으로 돌아가고
+저하 상태를 `semantic.status`와 `warnings`에 남긴다. 고신뢰 조사에서 `--require-semantic` 또는 MCP
+`requireSemantic=true`를 사용하면 의미 검색이 실제로 쓰이지 않은 경우 어휘 결과를 반환하지 않고 실패한다.
 
 독립 CLI의 `catalog discover`만 설치되어 이미 로그인된 Codex·Claude·Gemini·Cursor 중 하나를 별도
 프로세스로 실행한다. [`internal/agentplan`](internal/agentplan)은 자연어 목표를 작은 `QueryPlan`으로 바꾸고,
@@ -67,7 +69,7 @@ catalog_search → inspect_dataset → (미승인 REST만 apply) → call_api
 | --- | --- | --- |
 | `REST` | 포털이 게시한 operation, endpoint, 필수 파라미터, 심의 유형 | 필요하면 `apply`, 이후 `call_api` |
 | `LINK` | 공식 시작점과 검토된 provider adapter 계약 | 구현된 typed adapter만 `call_api` |
-| `FILE` | 실제 다운로드 자산, 기간, 수정일 | bounded 표본에서 CSV/DBF 컬럼과 SHA-256 관찰 |
+| `FILE` | 실제 다운로드 자산, 기간, 수정일 | bounded 표본에서 CSV/DBF/XLSX worksheet 컬럼과 SHA-256 관찰 |
 
 API와 FILE을 함께 제공하는 항목은 두 계약을 모두 보존한다. 알 수 없는 LINK를 임의의 API endpoint로
 해석하거나, FILE을 API처럼 호출하지 않는다.

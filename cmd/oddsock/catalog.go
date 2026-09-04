@@ -232,6 +232,7 @@ func catalogQueryCmd(discover bool) *cobra.Command {
 	var limit int
 	var restOnly bool
 	var semantic bool
+	var requireSemantic bool
 	var concepts []string
 	var ranking string
 	var previews bool
@@ -256,6 +257,9 @@ func catalogQueryCmd(discover bool) *cobra.Command {
 			}
 			if maxConnections < 1 || maxConnections > catalog.MaxConnectionCandidates {
 				return fmt.Errorf("--max-connections는 1~%d 사이여야 합니다", catalog.MaxConnectionCandidates)
+			}
+			if requireSemantic && !semantic {
+				return fmt.Errorf("--require-semantic과 --semantic=false는 함께 사용할 수 없습니다")
 			}
 			format, err := resolveFormat()
 			if err != nil {
@@ -295,7 +299,10 @@ func catalogQueryCmd(discover bool) *cobra.Command {
 			if planner != nil && len(planner.Axes) > 0 {
 				queryPlan.Axes = planner.Axes
 			}
-			res := runCatalogQuery(cmd, cat, queryPlan, semantic)
+			res, err := runCatalogQuery(cmd, cat, queryPlan, semantic, requireSemantic)
+			if err != nil {
+				return err
+			}
 
 			// Structured discovery is progressive: plan and retrieve an Anchor,
 			// inspect results to retrieve Bridges, then select explicit PKs.
@@ -329,7 +336,10 @@ func catalogQueryCmd(discover bool) *cobra.Command {
 							Limit: limit, RESTOnly: restOnly, IncludePreviews: previews,
 							Ranking: ranking, MaxConnections: maxConnections,
 						}
-						res = runCatalogQuery(cmd, cat, bridgePlan, semantic)
+						res, err = runCatalogQuery(cmd, cat, bridgePlan, semantic, requireSemantic)
+						if err != nil {
+							return err
+						}
 						optionHits := connectionOptionHits(res.ConnectionOptions)
 						if len(optionHits) == 0 {
 							optionHits = res.Hits
@@ -344,7 +354,10 @@ func catalogQueryCmd(discover bool) *cobra.Command {
 								res.Abstention = &catalog.Abstention{Reason: selected.AbstentionReason}
 							} else {
 								bridgePlan.BridgeSelections = selected.Selections
-								res = runCatalogQuery(cmd, cat, bridgePlan, semantic)
+								res, err = runCatalogQuery(cmd, cat, bridgePlan, semantic, requireSemantic)
+								if err != nil {
+									return err
+								}
 							}
 						}
 					}
@@ -439,6 +452,7 @@ func catalogQueryCmd(discover bool) *cobra.Command {
 	c.Flags().IntVar(&limit, "limit", 20, "표시할 최대 건수")
 	c.Flags().BoolVar(&restOnly, "rest-only", false, "포털 명세가 있는 REST만 검색 (기본은 LINK까지 발견)")
 	c.Flags().BoolVar(&semantic, "semantic", true, "준비된 Ollama 의미 인덱스를 자동 사용 (--semantic=false 로 비활성화)")
+	c.Flags().BoolVar(&requireSemantic, "require-semantic", false, "의미 검색이 실제 사용되지 않으면 폴백하지 않고 실패 (고신뢰 조사·평가용)")
 	c.Flags().StringArrayVar(&concepts, "concept", nil, "자연어 목표에서 추론한 구체적 검색축 (반복 가능, MCP 의미 분해 재현용)")
 	c.Flags().StringVar(&agent, "agent", defaultAgent, "검색 계획기: none | auto | codex | claude | gemini | cursor (CLI의 기존 로그인 사용)")
 	c.Flags().StringVar(&ranking, "ranking", catalog.RankBalanced, "검색축 내 순위: balanced | demand | recent")
@@ -448,28 +462,35 @@ func catalogQueryCmd(discover bool) *cobra.Command {
 	return c
 }
 
-func runCatalogQuery(cmd *cobra.Command, cat *catalog.Catalog, plan catalog.QueryPlan, semantic bool) catalog.Result {
+func runCatalogQuery(cmd *cobra.Command, cat *catalog.Catalog, plan catalog.QueryPlan, semantic, requireSemantic bool) (catalog.Result, error) {
+	var res catalog.Result
 	if !semantic {
-		return cat.SearchPlan(plan)
+		res = cat.SearchPlan(plan)
+		if requireSemantic {
+			return res, catalog.RequireSemantic(res)
+		}
+		return res, nil
 	}
 	idx, indexErr := catalog.LoadSemanticIndex(cat)
 	switch {
 	case indexErr == nil:
 		embedder := catalog.NewOllamaEmbedder(catalog.OllamaURLFromEnv(), idx.Model)
-		return cat.SearchHybrid(cmd.Context(), plan, idx, embedder)
+		res = cat.SearchHybrid(cmd.Context(), plan, idx, embedder)
 	case errors.Is(indexErr, catalog.ErrSemanticIndexStale):
-		res := cat.SearchPlan(plan)
-		res.Semantic = &catalog.SemanticInfo{Status: catalog.SemanticUnavailable, Detail: "카탈로그 갱신 후 semantic-build 필요"}
+		res = cat.SearchPlan(plan)
+		catalog.RecordSemanticOutcome(&res, catalog.SemanticInfo{Status: catalog.SemanticUnavailable, Detail: "카탈로그 갱신 후 semantic-build 필요"})
 		fmt.Fprintln(cmd.ErrOrStderr(), "⚠ 의미 인덱스가 현재 카탈로그와 다릅니다 — `oddsock catalog semantic-build` 로 갱신하세요.")
-		return res
 	case errors.Is(indexErr, catalog.ErrSemanticIndexNotBuilt):
-		return cat.SearchHybrid(cmd.Context(), plan, nil, nil)
+		res = cat.SearchHybrid(cmd.Context(), plan, nil, nil)
 	default:
-		res := cat.SearchPlan(plan)
-		res.Semantic = &catalog.SemanticInfo{Status: catalog.SemanticUnavailable, Detail: "의미 인덱스 로드 실패"}
+		res = cat.SearchPlan(plan)
+		catalog.RecordSemanticOutcome(&res, catalog.SemanticInfo{Status: catalog.SemanticUnavailable, Detail: "의미 인덱스 로드 실패: " + indexErr.Error()})
 		fmt.Fprintf(cmd.ErrOrStderr(), "⚠ 의미 인덱스를 읽지 못해 키워드 검색으로 폴백합니다: %v\n", indexErr)
-		return res
 	}
+	if requireSemantic {
+		return res, catalog.RequireSemantic(res)
+	}
+	return res, nil
 }
 
 func selectAnchorHits(hits []catalog.Hit, limit int) []catalog.Hit {

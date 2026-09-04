@@ -246,6 +246,59 @@ func TestInspectorObservesCSVColumnsInsideZIPWithoutExtractingFiles(t *testing.T
 	}
 }
 
+func TestInspectorObservesXLSXWorksheetColumns(t *testing.T) {
+	var workbook bytes.Buffer
+	writer := zip.NewWriter(&workbook)
+	writeMember := func(name, body string) {
+		t.Helper()
+		entry, err := writer.Create(name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := entry.Write([]byte(body)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	writeMember("xl/workbook.xml", `<?xml version="1.0" encoding="UTF-8"?>
+<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <sheets><sheet name="입도통계" sheetId="1" r:id="rId1"/></sheets>
+</workbook>`)
+	writeMember("xl/_rels/workbook.xml.rels", `<?xml version="1.0" encoding="UTF-8"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>
+</Relationships>`)
+	writeMember("xl/sharedStrings.xml", `<?xml version="1.0" encoding="UTF-8"?>
+<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+  <si><t>기준연월</t></si><si><t>국적</t></si><si><t>입도객수</t></si><si><t>중국</t></si>
+</sst>`)
+	writeMember("xl/worksheets/sheet1.xml", `<?xml version="1.0" encoding="UTF-8"?>
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>
+  <row r="1"><c r="A1" t="s"><v>0</v></c><c r="B1" t="s"><v>1</v></c><c r="C1" t="s"><v>2</v></c></row>
+  <row r="2"><c r="A2"><v>202501</v></c><c r="B2" t="s"><v>3</v></c><c r="C2"><v>121132</v></c></row>
+</sheetData></worksheet>`)
+	if err := writer.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	const downloadURL = "https://files.test/visitors.xlsx"
+	transport := fixtureTransport{gets: map[string]*fetch.Response{
+		downloadURL: {Status: http.StatusOK, ContentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", Body: workbook.Bytes()},
+	}}
+	observed, err := NewInspector(transport, "https://portal.test").Observe(context.Background(), Asset{
+		Name: "visitors.xlsx", Format: "XLSX", Request: Request{Method: http.MethodGet, URL: downloadURL},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(observed.Files) != 1 {
+		t.Fatalf("XLSX observation = %+v", observed)
+	}
+	file := observed.Files[0]
+	if file.Name != "입도통계" || file.Format != "XLSX" || strings.Join(file.Columns, ",") != "기준연월,국적,입도객수" || file.SampleRows != 1 {
+		t.Fatalf("XLSX worksheet = %+v", file)
+	}
+}
+
 func TestInspectorObservesDBFColumnsInsideShapefileZIP(t *testing.T) {
 	dbf := minimalDBF([]string{"CRTR_YM", "MJR_BZZNNO", "AREA"})
 	var archive bytes.Buffer

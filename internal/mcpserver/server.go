@@ -50,7 +50,7 @@ type describeIn struct {
 type inspectDatasetIn struct {
 	PK       string `json:"pk" jsonschema:"publicDataPk returned by catalog_search"`
 	Delivery string `json:"delivery,omitempty" jsonschema:"representation to inspect: auto (default, returns API and FILE when both exist), api, or file"`
-	Observe  bool   `json:"observe,omitempty" jsonschema:"for FILE data, download the newest or selected asset within safety limits and return its observed CSV/DBF columns and content hash"`
+	Observe  bool   `json:"observe,omitempty" jsonschema:"for FILE data, download the newest or selected asset within safety limits and return its observed CSV/DBF/XLSX worksheet columns and content hash"`
 	Asset    string `json:"asset,omitempty" jsonschema:"exact FILE asset name to observe; omit to use the newest asset listed first"`
 }
 
@@ -81,6 +81,7 @@ type catalogIn struct {
 	// search defaults previews on; a concrete lookup stays compact by default.
 	IncludePreviews *bool `json:"includePreviews,omitempty" jsonschema:"include a short official-description preview. Defaults true when concepts are provided and false for a concrete lexical lookup"`
 	Semantic        *bool `json:"semantic,omitempty" jsonschema:"default true: use the optional local Ollama vector index when it is built; false forces deterministic lexical/planned retrieval"`
+	RequireSemantic bool  `json:"requireSemantic,omitempty" jsonschema:"fail instead of falling back unless semantic.status=used. Set true for requests asking for maximum recall, semantic search, or high-trust research/audit/safety evidence; never retry the error with semantic=false"`
 	// Pointer distinguishes omission (broad discovery, including LINK) from an
 	// explicit REST-only request. inspect_dataset is the capability boundary: search
 	// must not hide a useful LINK dataset merely because only some providers have
@@ -164,14 +165,14 @@ func New(deps Deps) *mcp.Server {
 		Name:    "oddsock",
 		Title:   "oddsock — 대한민국 공공데이터 AI 컨트롤 플레인",
 		Version: version.Version,
-	}, nil)
+	}, &mcp.ServerOptions{Instructions: ServerInstructions})
 
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "catalog_search",
 		Annotations: readOnlyAnnotations("1단계 · 공공데이터 카탈로그 검색", false),
 		Description: "[1단계: 검색] 자연어 요청으로 로컬 카탈로그에서 OpenAPI와 파일데이터 후보를 찾는다. 포털 검색과 달리 전체 목록을 한 번에 " +
 			"훑으므로 '이런 데이터가 있나?'를 키워드를 추측해가며 여러 번 물을 필요가 없다. " +
-			"구체적인 데이터명을 찾을 때는 query 만 쓴다. 하지만 '돈 될 만한 것', '새 서비스를 기획하고 싶다', " +
+			"구체적인 데이터명을 찾을 때는 query 만 쓴다. '최대한', '가장 정확하게', 'semantic/시맨틱' 또는 연구·감사·안전처럼 검색 재현성이 중요한 요청은 requireSemantic=true를 넣고, 오류 시 semantic=false로 재시도하지 않는다. 하지만 '돈 될 만한 것', '새 서비스를 기획하고 싶다', " +
 			"'대한민국이 어떻게 변하고 있나'처럼 의미 해석이 필요한 목표는 원문을 query 에 보존하고, **호출하기 전에 " +
 			"스스로 2~8개의 구체적인 데이터 축을 추론해 concepts 에 넣어라**. concepts 는 동의어 나열이 아니라 직접 대상, " +
 			"인접 시장, 선행지표, 제약·위험, 다른 기관 관점을 포함해야 한다. oddsock 은 각 축을 전체 카탈로그에서 독립 검색해 " +
@@ -191,7 +192,7 @@ func New(deps Deps) *mcp.Server {
 			"svcType 이 LINK 면 포털에 명세가 없다(전체의 약 40%가 LINK다). 기본 검색은 이 후보도 숨기지 않는다. " +
 			"inspect_dataset 으로 공식 외부 handoff와 typed 호출 가능 여부를 확인하라. provider adapter가 invocationState=implemented이면 " +
 			"call_api로 호출하고, 그 외에는 nextAction을 따른다. svcType=FILE이면 호출 가능한 API라고 말하지 말고 inspect_dataset을 호출한다. " +
-			"observe=true는 검증된 Adapter로 bounded 파일을 내려받아 실제 CSV/DBF 컬럼과 SHA-256을 반환한다. 모든 hit의 nextAction=inspect_dataset이며 " +
+			"observe=true는 검증된 Adapter로 bounded 파일을 내려받아 실제 CSV/DBF/XLSX worksheet 컬럼과 SHA-256을 반환한다. 모든 hit의 nextAction=inspect_dataset이며 " +
 			"FILE도 연결 후보가 될 수 있지만 call_api 대상은 아니다. REST만 원할 때만 restOnly=true로 둬라. " +
 			"svcType 이 비어 있으면 유형이 확인되지 않은 것이다. " +
 			"relaxed=true 면 모든 단어를 포함하는 데이터가 없어 일부만 일치하는 것까지 보여준 것이므로 " +
@@ -236,12 +237,12 @@ func New(deps Deps) *mcp.Server {
 					index = loaded
 				case errors.Is(loadErr, catalog.ErrSemanticIndexStale):
 					res = cat.SearchPlan(plan)
-					res.Semantic = &catalog.SemanticInfo{Status: catalog.SemanticUnavailable, Detail: "카탈로그 갱신 후 semantic-build 가 필요함"}
+					catalog.RecordSemanticOutcome(&res, catalog.SemanticInfo{Status: catalog.SemanticUnavailable, Detail: "카탈로그 갱신 후 semantic-build 가 필요함"})
 				case errors.Is(loadErr, catalog.ErrSemanticIndexNotBuilt):
 					res = cat.SearchHybrid(ctx, plan, nil, nil)
 				default:
 					res = cat.SearchPlan(plan)
-					res.Semantic = &catalog.SemanticInfo{Status: catalog.SemanticUnavailable, Detail: "의미 인덱스 로드 실패: " + loadErr.Error()}
+					catalog.RecordSemanticOutcome(&res, catalog.SemanticInfo{Status: catalog.SemanticUnavailable, Detail: "의미 인덱스 로드 실패: " + loadErr.Error()})
 				}
 			}
 			if index != nil {
@@ -252,7 +253,7 @@ func New(deps Deps) *mcp.Server {
 			}
 		}
 		hits := res.Hits
-		return nil, &catalogOut{
+		out := &catalogOut{
 			Mode: res.Mode, Intent: res.Intent, Queries: res.Queries,
 			Terms: res.Terms, Relaxed: res.Relaxed,
 			Total: res.Total, Shown: len(hits),
@@ -260,13 +261,21 @@ func New(deps Deps) *mcp.Server {
 			Hits: hits, Semantic: res.Semantic, Anchors: res.Anchors,
 			ConnectionOptions: res.ConnectionOptions, Connections: res.Connections,
 			Warnings: res.Warnings, Abstention: res.Abstention,
-		}, nil
+		}
+		if in.RequireSemantic {
+			if err := catalog.RequireSemantic(res); err != nil {
+				// Strict callers must not accidentally consume the lexical candidates
+				// that were computed only to diagnose the degraded semantic path.
+				return errResult(err.Error()), nil, nil
+			}
+		}
+		return nil, out, nil
 	})
 
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "inspect_dataset",
 		Annotations: readOnlyAnnotations("2단계 · 데이터 계약 및 실제 스키마 검사", true),
-		Description: "[2단계: 검사] catalog_search에서 고른 pk의 delivery 계약을 확인한다. API+FILE 복수 제공형은 기본적으로 두 계약을 모두 반환하며 delivery=api 또는 file로 하나만 선택할 수 있다. REST/LINK는 상세기능·필수 요청변수·승인 및 provider handoff를 반환한다. FILE은 공식 상세페이지와 검증된 provider Adapter를 통해 다운로드 자산·기간·수정일을 반환한다. FILE의 실제 컬럼이 필요하면 observe=true를 사용한다. 이 경우 bounded 다운로드 후 CSV 또는 SHP의 DBF 컬럼과 원본 SHA-256을 반환하므로 메타데이터 설명과 실제 스키마를 구분할 수 있다. 검사되지 않은 URL이나 파라미터는 추측하지 않는다.",
+		Description: "[2단계: 검사] catalog_search에서 고른 pk의 delivery 계약을 확인한다. API+FILE 복수 제공형은 기본적으로 두 계약을 모두 반환하며 delivery=api 또는 file로 하나만 선택할 수 있다. REST/LINK는 상세기능·필수 요청변수·승인 및 provider handoff를 반환한다. FILE은 공식 상세페이지와 검증된 provider Adapter를 통해 다운로드 자산·기간·수정일을 반환한다. FILE의 실제 컬럼이 필요하면 observe=true를 사용한다. 이 경우 bounded 다운로드 후 CSV, SHP의 DBF, XLSX worksheet 컬럼과 원본 SHA-256을 반환하므로 메타데이터 설명과 실제 스키마를 구분할 수 있다. 검사되지 않은 URL이나 파라미터는 추측하지 않는다.",
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in inspectDatasetIn) (*mcp.CallToolResult, *inspectDatasetOut, error) {
 		if strings.TrimSpace(in.PK) == "" {
 			return errResult("pk 가 필요합니다 — catalog_search에서 Data Node를 먼저 고르세요"), nil, nil
