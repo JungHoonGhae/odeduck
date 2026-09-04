@@ -7,6 +7,41 @@ section matching a `vX.Y.Z` tag as the GitHub release notes.
 
 ## [Unreleased]
 
+## [0.16.1] - 2026-09-03
+
+### Changed
+
+- Reframed the README around the everyday problem of testing a small-business idea
+  without knowing official public-data terms, while preserving the doorway character
+  and existing brand mark.
+- Clarified where existing public-data MCPs still hand work back to people and showed
+  the real REST, FILE and LINK paths without implying that oddsock makes the final
+  business decision.
+- Added a reproducible, no-login first-run example plus GitHub and LinkedIn launch
+  artwork that preserves the existing character mark.
+- Made the macOS/Linux and Windows installers fall back to public GitHub downloads
+  when the GitHub CLI is absent or unauthenticated, while retaining private-preview
+  support for authenticated contributors.
+- Added a current architecture map and a manually dispatched anonymous launch smoke
+  test that verifies the public repository, release assets, installer, catalogue and
+  first no-login search before promotional links are distributed.
+- Replaced the stale pre-rename video brief with the current rainy-season cafe demo
+  and marked its old Higgsfield job IDs and render as non-publishable records.
+
+### Security
+
+- Added a redacted full-history Gitleaks check to CI, with exact-fingerprint ignores
+  for reviewed test fixtures and protocol examples so new findings still fail.
+- Ship checksummed installer scripts as versioned release assets, with hermetic
+  fallback and checksum-rejection tests on Linux and Windows.
+
+### Community
+
+- Added contribution, security and conduct policies, structured issue forms, a
+  pull-request checklist, funding metadata and monthly dependency updates.
+- Removed paused local-tracker scratch documents from the public tree; their history
+  remains recoverable in Git while GitHub Issues stays the canonical tracker.
+
 ## [0.16.0] - 2026-09-02
 
 ### Changed

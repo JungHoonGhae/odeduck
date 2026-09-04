@@ -1,0 +1,82 @@
+name: Public launch smoke
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Published version to verify
+        required: true
+        default: v0.16.1
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  anonymous-install-unix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Verify public repository, release, install, catalogue and first search
+        shell: bash
+        env:
+          GH_TOKEN: ""
+          RELEASE_VERSION: ${{ inputs.version }}
+        run: ./scripts/verify-public-release.sh "$RELEASE_VERSION"
+
+  anonymous-install-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Verify public PowerShell install, catalogue and first search
+        shell: pwsh
+        env:
+          GH_TOKEN: ""
+          RELEASE_VERSION: ${{ inputs.version }}
+        run: |
+          $ErrorActionPreference = "Stop"
+          if ($env:RELEASE_VERSION -notmatch '^v[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$') {
+            throw "version must look like v0.16.1"
+          }
+
+          $repo = "https://github.com/JungHoonGhae/oddsock"
+          Invoke-WebRequest -Uri $repo -UseBasicParsing | Out-Null
+          Invoke-WebRequest -Uri "$repo/releases/tag/$env:RELEASE_VERSION" -UseBasicParsing | Out-Null
+
+          $smokeRoot = Join-Path $env:RUNNER_TEMP "oddsock-public-smoke"
+          $installDir = Join-Path $smokeRoot "bin"
+          $env:LOCALAPPDATA = Join-Path $smokeRoot "local-app-data"
+          $env:INSTALL_DIR = $installDir
+          $env:ODDSOCK_VERSION = $env:RELEASE_VERSION
+          New-Item -ItemType Directory -Path $smokeRoot -Force | Out-Null
+
+          $installer = Join-Path $smokeRoot "install.ps1"
+          Invoke-WebRequest -Uri "$repo/releases/download/$env:RELEASE_VERSION/install.ps1" `
+            -OutFile $installer -UseBasicParsing
+          & $installer
+
+          $binary = Join-Path $installDir "oddsock.exe"
+          $versionOutput = & $binary version
+          if ($versionOutput -notmatch [regex]::Escape($env:RELEASE_VERSION.TrimStart("v"))) {
+            throw "installed binary version mismatch: $versionOutput"
+          }
+
+          $info = (& $binary catalog info -f json | Out-String) | ConvertFrom-Json
+          if ($info.entries -lt 90000 -or $info.svcTypes.REST -lt 6000 -or $info.svcTypes.FILE -lt 80000) {
+            throw "installed catalogue coverage is below the launch floor"
+          }
+
+          $search = (& $binary catalog search `
+            "서울에서 작은 가게 후보를 좁힐 자료" `
+            --concept 생활인구 --concept 추정매출 `
+            --concept "상권 점포" --concept "상권 개폐업" `
+            --limit 8 --semantic=false -f json | Out-String) | ConvertFrom-Json
+          if ($search.total -le 0 -or $search.hits.Count -le 0) {
+            throw "no-login launch search returned no results"
+          }

@@ -2,5 +2,6 @@
 /dist/
 /artifacts/
 /release-assets/
+/.scratch/
 *.db
 .DS_Store

@@ -1,0 +1,28 @@
+# Reviewed false positives. Fingerprints are exact so new findings in the same
+# files are not suppressed.
+
+# Higgsfield prompt metadata: `Style key`, not a credential.
+1c66959fbe69f94c1252af22d7763c0c9140dbe8:docs/promo/gongctl-agent-explainer.md:generic-api-key:12
+
+# Explicit dummy provider keys in HTTP contract tests.
+639b589d4197a17bf846392354436cc5e79cae12:internal/apicall/external_call_test.go:generic-api-key:226
+639b589d4197a17bf846392354436cc5e79cae12:internal/apicall/external_call_test.go:generic-api-key:243
+639b589d4197a17bf846392354436cc5e79cae12:internal/apicall/external_call_test.go:generic-api-key:319
+639b589d4197a17bf846392354436cc5e79cae12:internal/apicall/external_call_test.go:generic-api-key:466
+639b589d4197a17bf846392354436cc5e79cae12:internal/apicall/external_call_test.go:generic-api-key:467
+639b589d4197a17bf846392354436cc5e79cae12:internal/apicall/external_call_test.go:generic-api-key:509
+639b589d4197a17bf846392354436cc5e79cae12:internal/apicall/external_call_test.go:generic-api-key:518
+639b589d4197a17bf846392354436cc5e79cae12:internal/apicall/external_call_test.go:generic-api-key:563
+639b589d4197a17bf846392354436cc5e79cae12:internal/apicall/external_call_test.go:generic-api-key:630
+b7d9ccf08a414349fa759a251997df882ae45f8b:internal/apicall/external_call_test.go:generic-api-key:226
+b7d9ccf08a414349fa759a251997df882ae45f8b:internal/apicall/external_call_test.go:generic-api-key:243
+b7d9ccf08a414349fa759a251997df882ae45f8b:internal/apicall/external_call_test.go:generic-api-key:319
+b7d9ccf08a414349fa759a251997df882ae45f8b:internal/apicall/external_call_test.go:generic-api-key:466
+b7d9ccf08a414349fa759a251997df882ae45f8b:internal/apicall/external_call_test.go:generic-api-key:467
+b7d9ccf08a414349fa759a251997df882ae45f8b:internal/apicall/external_call_test.go:generic-api-key:509
+b7d9ccf08a414349fa759a251997df882ae45f8b:internal/apicall/external_call_test.go:generic-api-key:518
+b7d9ccf08a414349fa759a251997df882ae45f8b:internal/apicall/external_call_test.go:generic-api-key:563
+b7d9ccf08a414349fa759a251997df882ae45f8b:internal/apicall/external_call_test.go:generic-api-key:630
+
+# RFC 6455 WebSocket handshake nonce in a removed prototype.
+b596cc84d51b2189a7ed5aa7339ff56e24ea9c66:proto-cdp-origin/main.go:generic-api-key:188

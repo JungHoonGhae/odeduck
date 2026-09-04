@@ -5,14 +5,20 @@ on:
     branches: [main]
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
   test-and-build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
 
       - name: Set up Go
-        uses: actions/setup-go@v6
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
 
@@ -22,11 +28,20 @@ jobs:
       - name: Verify generated brand copy
         run: go run ./scripts/sync-brand.go --check
 
+      - name: Test shell installer
+        run: |
+          sh -n ./scripts/verify-public-release.sh
+          ./scripts/test-install.sh
+          ./scripts/test-public-release.sh
+
       - name: go vet
         run: go vet ./...
 
       - name: Vulnerability scan
         run: go run golang.org/x/vuln/cmd/govulncheck@v1.7.0 ./...
+
+      - name: Secret scan
+        run: go run github.com/zricethezav/gitleaks/v8@v8.30.1 git --redact --no-banner .
 
       - name: Test (네트워크 불필요 — testdata/픽스처)
         run: go test ./...
@@ -35,7 +50,7 @@ jobs:
         run: go build ./...
 
       - name: Verify release configuration
-        uses: goreleaser/goreleaser-action@v7
+        uses: goreleaser/goreleaser-action@f06c13b6b1a9625abc9e6e439d9c05a8f2190e94 # v7.2.3
         with:
           version: "~> v2"
           args: check
@@ -44,7 +59,7 @@ jobs:
       # PRs only need the runner target; release.yml performs the complete matrix
       # before publishing any tag.
       - name: Build release binaries for CI target
-        uses: goreleaser/goreleaser-action@v7
+        uses: goreleaser/goreleaser-action@f06c13b6b1a9625abc9e6e439d9c05a8f2190e94 # v7.2.3
         with:
           version: "~> v2"
           args: build --snapshot --clean --single-target
@@ -67,15 +82,20 @@ jobs:
   windows-installer:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Set up Go
-        uses: actions/setup-go@v6
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
 
       - name: Test Windows build and config migration
-        run: go test ./...
+        # The only short-skipped test launches a real browser. The Linux job
+        # keeps that regression coverage; this job is for Windows build/config
+        # portability and must not depend on hosted-runner Edge startup timing.
+        run: go test -short ./...
 
       - name: Parse PowerShell installer
         shell: pwsh
@@ -89,3 +109,7 @@ jobs:
             $errors | Format-List | Out-String | Write-Error
             exit 1
           }
+
+      - name: Test PowerShell installer
+        shell: pwsh
+        run: ./scripts/test-install.ps1
