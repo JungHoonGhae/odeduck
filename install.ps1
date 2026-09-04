@@ -1,9 +1,9 @@
 # odeduck installer (Windows PowerShell)
 #
-#   irm https://github.com/JungHoonGhae/odeduck/releases/download/v0.17.1/install.ps1 | iex
+#   irm https://github.com/JungHoonGhae/odeduck/releases/download/v0.17.2/install.ps1 | iex
 #
 # Environment variables:
-#   $env:ODEDUCK_VERSION  pin a version (e.g. v0.17.1, default: latest)
+#   $env:ODEDUCK_VERSION  pin a version (e.g. v0.17.2, default: latest)
 #   $env:INSTALL_DIR      install location (default: $env:LOCALAPPDATA\odeduck)
 $ErrorActionPreference = "Stop"
 
