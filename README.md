@@ -94,6 +94,20 @@ oddsock catalog search \
 현재 릴리스 카탈로그로 실행하면 서울 생활인구·추정매출뿐 아니라 서울의 점포 데이터와 대전의
 상권별 개폐업 데이터까지 한 번에 나타난다. 여기까지는 로그인도, 외부 AI 호출도, 파일 다운로드도 없다.
 
+위 예시는 결과를 누구나 그대로 재현하기 위한 lexical 경로다. 의미 유사도까지 반드시 포함해야 하는
+조사라면 로컬 Ollama 인덱스를 만든 뒤 strict mode를 사용한다.
+
+```sh
+oddsock catalog semantic-build
+oddsock catalog search \
+  "제주 성인 실종 신고와 담당 인력 구조를 최대한 정확하게 검토할 데이터" \
+  --require-semantic -f json
+```
+
+일반 검색에서도 `semantic.status`와 `warnings`에 실제 사용 여부가 남는다. `--require-semantic`은
+`status=used`가 아니면 lexical 결과를 출력하지 않고 실패하므로, 인덱스 불일치나 Ollama 장애를
+조용히 넘길 수 없다.
+
 그다음 `inspect <PK> --observe`로 실제 파일과 컬럼을 확인한다. REST 활용신청과 첫 호출까지 가고 싶을
 때만 `oddsock login`으로 data.go.kr에 한 번 로그인한다.
 
@@ -219,6 +233,12 @@ Cursor·Claude Desktop처럼 JSON 설정을 쓰는 호스트:
   }
 }
 ```
+
+Codex CLI·IDE·ChatGPT 데스크톱은 같은 Codex 호스트의 MCP 설정을 공유한다. 등록 뒤에는 새 세션을
+열거나 클라이언트를 재시작하고 `/mcp` 또는 `codex mcp list`에서 `oddsock`이 enabled인지 확인한다.
+oddsock은 초기화할 때 도구 선택 지침도 함께 제공한다. 사용자가 “최대한 정확하게”, “시맨틱”,
+연구·감사·안전 조사를 요청하면 호스트가 `catalog_search(requireSemantic=true)`를 사용하며,
+의미 검색 실패 시 `semantic=false`로 몰래 재시도하지 않도록 계약되어 있다.
 
 이제 데이터 이름 대신 궁금한 것을 말하면 된다.
 

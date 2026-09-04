@@ -81,6 +81,7 @@ type catalogIn struct {
 	// search defaults previews on; a concrete lookup stays compact by default.
 	IncludePreviews *bool `json:"includePreviews,omitempty" jsonschema:"include a short official-description preview. Defaults true when concepts are provided and false for a concrete lexical lookup"`
 	Semantic        *bool `json:"semantic,omitempty" jsonschema:"default true: use the optional local Ollama vector index when it is built; false forces deterministic lexical/planned retrieval"`
+	RequireSemantic bool  `json:"requireSemantic,omitempty" jsonschema:"fail instead of falling back unless semantic.status=used. Set true for requests asking for maximum recall, semantic search, or high-trust research/audit/safety evidence; never retry the error with semantic=false"`
 	// Pointer distinguishes omission (broad discovery, including LINK) from an
 	// explicit REST-only request. inspect_dataset is the capability boundary: search
 	// must not hide a useful LINK dataset merely because only some providers have
@@ -164,14 +165,14 @@ func New(deps Deps) *mcp.Server {
 		Name:    "oddsock",
 		Title:   "oddsock — 대한민국 공공데이터 AI 컨트롤 플레인",
 		Version: version.Version,
-	}, nil)
+	}, &mcp.ServerOptions{Instructions: ServerInstructions})
 
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "catalog_search",
 		Annotations: readOnlyAnnotations("1단계 · 공공데이터 카탈로그 검색", false),
 		Description: "[1단계: 검색] 자연어 요청으로 로컬 카탈로그에서 OpenAPI와 파일데이터 후보를 찾는다. 포털 검색과 달리 전체 목록을 한 번에 " +
 			"훑으므로 '이런 데이터가 있나?'를 키워드를 추측해가며 여러 번 물을 필요가 없다. " +
-			"구체적인 데이터명을 찾을 때는 query 만 쓴다. 하지만 '돈 될 만한 것', '새 서비스를 기획하고 싶다', " +
+			"구체적인 데이터명을 찾을 때는 query 만 쓴다. '최대한', '가장 정확하게', 'semantic/시맨틱' 또는 연구·감사·안전처럼 검색 재현성이 중요한 요청은 requireSemantic=true를 넣고, 오류 시 semantic=false로 재시도하지 않는다. 하지만 '돈 될 만한 것', '새 서비스를 기획하고 싶다', " +
 			"'대한민국이 어떻게 변하고 있나'처럼 의미 해석이 필요한 목표는 원문을 query 에 보존하고, **호출하기 전에 " +
 			"스스로 2~8개의 구체적인 데이터 축을 추론해 concepts 에 넣어라**. concepts 는 동의어 나열이 아니라 직접 대상, " +
 			"인접 시장, 선행지표, 제약·위험, 다른 기관 관점을 포함해야 한다. oddsock 은 각 축을 전체 카탈로그에서 독립 검색해 " +
@@ -236,12 +237,12 @@ func New(deps Deps) *mcp.Server {
 					index = loaded
 				case errors.Is(loadErr, catalog.ErrSemanticIndexStale):
 					res = cat.SearchPlan(plan)
-					res.Semantic = &catalog.SemanticInfo{Status: catalog.SemanticUnavailable, Detail: "카탈로그 갱신 후 semantic-build 가 필요함"}
+					catalog.RecordSemanticOutcome(&res, catalog.SemanticInfo{Status: catalog.SemanticUnavailable, Detail: "카탈로그 갱신 후 semantic-build 가 필요함"})
 				case errors.Is(loadErr, catalog.ErrSemanticIndexNotBuilt):
 					res = cat.SearchHybrid(ctx, plan, nil, nil)
 				default:
 					res = cat.SearchPlan(plan)
-					res.Semantic = &catalog.SemanticInfo{Status: catalog.SemanticUnavailable, Detail: "의미 인덱스 로드 실패: " + loadErr.Error()}
+					catalog.RecordSemanticOutcome(&res, catalog.SemanticInfo{Status: catalog.SemanticUnavailable, Detail: "의미 인덱스 로드 실패: " + loadErr.Error()})
 				}
 			}
 			if index != nil {
@@ -252,7 +253,7 @@ func New(deps Deps) *mcp.Server {
 			}
 		}
 		hits := res.Hits
-		return nil, &catalogOut{
+		out := &catalogOut{
 			Mode: res.Mode, Intent: res.Intent, Queries: res.Queries,
 			Terms: res.Terms, Relaxed: res.Relaxed,
 			Total: res.Total, Shown: len(hits),
@@ -260,7 +261,15 @@ func New(deps Deps) *mcp.Server {
 			Hits: hits, Semantic: res.Semantic, Anchors: res.Anchors,
 			ConnectionOptions: res.ConnectionOptions, Connections: res.Connections,
 			Warnings: res.Warnings, Abstention: res.Abstention,
-		}, nil
+		}
+		if in.RequireSemantic {
+			if err := catalog.RequireSemantic(res); err != nil {
+				// Strict callers must not accidentally consume the lexical candidates
+				// that were computed only to diagnose the degraded semantic path.
+				return errResult(err.Error()), nil, nil
+			}
+		}
+		return nil, out, nil
 	})
 
 	mcp.AddTool(s, &mcp.Tool{

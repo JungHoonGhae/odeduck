@@ -44,6 +44,17 @@ func TestCatalogSearchKeepsLinkDatasetsDiscoverableByDefault(t *testing.T) {
 	}
 }
 
+func TestCatalogSearchExposesRequireSemanticFlag(t *testing.T) {
+	cmd := catalogQueryCmd(false)
+	flag := cmd.Flags().Lookup("require-semantic")
+	if flag == nil {
+		t.Fatal("catalog search is missing --require-semantic")
+	}
+	if flag.DefValue != "false" {
+		t.Fatalf("--require-semantic default = %q, want optional strict mode", flag.DefValue)
+	}
+}
+
 func TestCatalogSyncDefaultsToAPIAndFileDiscovery(t *testing.T) {
 	cmd := catalogSyncCmd()
 	flag := cmd.Flags().Lookup("type")

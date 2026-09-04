@@ -484,6 +484,18 @@ func TestHybridSearchRejectsInvalidQueryEmbeddings(t *testing.T) {
 	}
 }
 
+func TestHybridSearchMakesEverySemanticFallbackMachineVisible(t *testing.T) {
+	c := &Catalog{Entries: []Entry{{PK: "one", Title: "제주 실종 데이터", SvcType: SvcFILE}}}
+
+	result := c.SearchHybrid(context.Background(), QueryPlan{Intent: "제주 실종", Limit: 1}, nil, nil)
+	if result.Semantic == nil || result.Semantic.Status != SemanticNotIndexed {
+		t.Fatalf("semantic = %+v", result.Semantic)
+	}
+	if len(result.Warnings) == 0 || !strings.Contains(strings.Join(result.Warnings, " "), "semantic") {
+		t.Fatalf("warnings = %+v, want machine-visible semantic fallback", result.Warnings)
+	}
+}
+
 func TestHybridSearchFindsMeaningWithoutLiteralKeywords(t *testing.T) {
 	c := &Catalog{SyncedAt: time.Now(), Entries: []Entry{
 		{PK: "auction", Title: "온비드 부동산", SvcType: SvcREST, Desc: "공공자산 공매 물건"},

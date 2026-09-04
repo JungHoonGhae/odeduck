@@ -1,5 +1,10 @@
 package mcpserver
 
+// ServerInstructions is delivered during MCP initialization, before a model
+// chooses a tool. Keep the opening self-contained because some hosts weigh only
+// the first part of server instructions during tool routing.
+const ServerInstructions = `대한민국 공공데이터를 찾거나 서로 다른 데이터를 조합하고, 실제 API·파일 스키마를 검사하거나 활용신청·호출할 때 oddsock을 사용한다. 모든 데이터 탐색은 catalog_search로 시작하고 선택한 pk는 inspect_dataset으로 확인한다. 사용자가 "최대한", "가장 정확하게", "semantic/시맨틱", 연구·감사·안전처럼 높은 재현성을 요구하면 catalog_search에 requireSemantic=true를 넣는다. 이 호출이 오류면 semantic=false로 조용히 재시도하지 말고 오류와 semantic-build 복구 방법을 사용자에게 알린다. 일반 탐색에서 semantic.status가 used가 아니면 warnings와 저하 상태를 반드시 답변에 밝힌다. FILE은 observe=true로 실제 컬럼과 해시를 확인하고, 검색 결과만으로 인과·결합 가능성을 단정하지 않는다. 세부 워크플로는 oddsock://guide 리소스를 읽는다.`
+
 // GuideDoc is the oddsock://guide resource. It keeps the normal path deliberately
 // small: thousands of portal endpoints stay behind three generic MCP tools, and
 // only one compact candidate list and one selected specification enter context.
@@ -23,7 +28,10 @@ const GuideDoc = `# oddsock — data.go.kr 사용 가이드
 - concepts가 있는 탐색은 공식 설명의 짧은 preview를 기본 반환한다. 제목만으로 용도를 단정하지 말고
   preview로 후보를 이해한 뒤 pk 하나를 상세 조회한다.
 - semantic.status=used면 선택 설치된 Ollama 벡터 인덱스까지 결합한 것이다. not-indexed/unavailable이면
-  의미 분해 concepts + 결정적 로컬 검색으로 폴백한 것이며 검색 자체는 계속 유효하다.
+  의미 분해 concepts + 결정적 로컬 검색으로 폴백한 것이며 warnings에 저하가 기록된다. 사용자가 "최대한",
+  "가장 정확하게", "semantic/시맨틱" 또는 연구·감사·안전 수준의 재현성을 요구하면
+  requireSemantic=true를 사용한다. 오류가 나면 semantic=false로 조용히 재시도하지 말고
+  ` + "`oddsock catalog semantic-build`" + ` 복구 방법과 미완료 상태를 사용자에게 알린다.
 
 - restOnly는 생략하면 false다. 기본 결과는 REST, LINK, FILE을 모두 포함하므로 호출 방식이 다르다는
   이유로 유용한 데이터가 자연어 검색에서 사라지지 않는다. REST만 명시적으로 원할 때 restOnly=true를 사용한다.
