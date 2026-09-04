@@ -6,7 +6,7 @@ TEST_ROOT=$(mktemp -d)
 trap 'rm -rf "$TEST_ROOT"' EXIT
 
 project_version=$(tr -d '\r\n' < "$ROOT/VERSION")
-release_base="https://github.com/JungHoonGhae/oddsock/releases/download/v${project_version}"
+release_base="https://github.com/JungHoonGhae/odeduck/releases/download/v${project_version}"
 grep -Fq "$release_base/install.sh" "$ROOT/README.md"
 grep -Fq "$release_base/install.ps1" "$ROOT/README.md"
 grep -Fq "$release_base/install.sh" "$ROOT/docs/promo/launch-kit.md"
@@ -20,7 +20,7 @@ make_binary() {
     cat > "$destination/payload/$name" <<'EOF'
 #!/bin/sh
 if [ "${1:-}" = "version" ]; then
-    echo "oddsock test"
+    echo "odeduck test"
 fi
 exit 0
 EOF
@@ -73,7 +73,7 @@ done
 asset=${url##*/}
 printf 'curl %s\n' "$asset" >> "$TEST_LOG"
 if [ "$asset" = "latest" ]; then
-    printf 'https://github.com/JungHoonGhae/oddsock/releases/tag/v9.9.9'
+    printf 'https://github.com/JungHoonGhae/odeduck/releases/tag/v9.9.9'
     exit 0
 fi
 [ -n "$destination" ] || exit 1
@@ -122,11 +122,9 @@ run_installer() {
     mkdir -p "$install_dir"
     : > "$log_file"
     FIXTURE_DIR="$fixture_dir" TEST_LOG="$log_file" INSTALL_DIR="$install_dir" \
-        ODDSOCK_VERSION="$pinned_version" PATH="$fake_bin:/usr/bin:/bin" \
-        sh "$ROOT/install.sh" > "$TEST_ROOT/$case_name/output.log" 2>&1
-    "$install_dir/oddsock" version | grep -q '^oddsock test$'
-    test -x "$install_dir/opendatactl"
-    test -x "$install_dir/gongctl"
+        ODEDUCK_VERSION="$pinned_version" PATH="$fake_bin:/usr/bin:/bin" \
+    sh "$ROOT/install.sh" > "$TEST_ROOT/$case_name/output.log" 2>&1
+    "$install_dir/odeduck" version | grep -q '^odeduck test$'
 }
 
 setup_case() {
@@ -140,21 +138,21 @@ setup_case() {
 
 public_root=$(setup_case public_https)
 make_fake_gh "$public_root/bin" 1 1
-make_binary "$public_root/fixtures" oddsock
-mv "$public_root/fixtures/oddsock.tar.gz" "$public_root/fixtures/oddsock_9.9.9_linux_amd64.tar.gz"
-write_checksums "$public_root/fixtures" oddsock_9.9.9_linux_amd64.tar.gz
+make_binary "$public_root/fixtures" odeduck
+mv "$public_root/fixtures/odeduck.tar.gz" "$public_root/fixtures/odeduck_9.9.9_linux_amd64.tar.gz"
+write_checksums "$public_root/fixtures" odeduck_9.9.9_linux_amd64.tar.gz
 run_installer public_https "$public_root/fixtures" "$public_root/bin" ""
 grep -q '^curl latest$' "$public_root/downloads.log"
-grep -q '^curl oddsock_9.9.9_linux_amd64.tar.gz$' "$public_root/downloads.log"
+grep -q '^curl odeduck_9.9.9_linux_amd64.tar.gz$' "$public_root/downloads.log"
 
 gh_root=$(setup_case authenticated_gh)
 make_fake_gh "$gh_root/bin" 0 0
-make_binary "$gh_root/fixtures" oddsock
-mv "$gh_root/fixtures/oddsock.tar.gz" "$gh_root/fixtures/oddsock_9.9.9_linux_amd64.tar.gz"
-printf 'catalog fixture\n' | gzip > "$gh_root/fixtures/oddsock-catalog.json.gz"
-write_checksums "$gh_root/fixtures" oddsock_9.9.9_linux_amd64.tar.gz oddsock-catalog.json.gz
+make_binary "$gh_root/fixtures" odeduck
+mv "$gh_root/fixtures/odeduck.tar.gz" "$gh_root/fixtures/odeduck_9.9.9_linux_amd64.tar.gz"
+printf 'catalog fixture\n' | gzip > "$gh_root/fixtures/odeduck-catalog.json.gz"
+write_checksums "$gh_root/fixtures" odeduck_9.9.9_linux_amd64.tar.gz odeduck-catalog.json.gz
 run_installer authenticated_gh "$gh_root/fixtures" "$gh_root/bin"
-grep -q '^gh oddsock_9.9.9_linux_amd64.tar.gz$' "$gh_root/downloads.log"
+grep -q '^gh odeduck_9.9.9_linux_amd64.tar.gz$' "$gh_root/downloads.log"
 if grep -q '^curl ' "$gh_root/downloads.log"; then
     echo "authenticated gh case unexpectedly used curl" >&2
     exit 1
@@ -162,44 +160,36 @@ fi
 
 fallback_root=$(setup_case gh_https_fallback)
 make_fake_gh "$fallback_root/bin" 0 1
-make_binary "$fallback_root/fixtures" oddsock
-mv "$fallback_root/fixtures/oddsock.tar.gz" "$fallback_root/fixtures/oddsock_9.9.9_linux_amd64.tar.gz"
-write_checksums "$fallback_root/fixtures" oddsock_9.9.9_linux_amd64.tar.gz
+make_binary "$fallback_root/fixtures" odeduck
+mv "$fallback_root/fixtures/odeduck.tar.gz" "$fallback_root/fixtures/odeduck_9.9.9_linux_amd64.tar.gz"
+write_checksums "$fallback_root/fixtures" odeduck_9.9.9_linux_amd64.tar.gz
 run_installer gh_https_fallback "$fallback_root/fixtures" "$fallback_root/bin"
-grep -q '^gh oddsock_9.9.9_linux_amd64.tar.gz$' "$fallback_root/downloads.log"
-grep -q '^curl oddsock_9.9.9_linux_amd64.tar.gz$' "$fallback_root/downloads.log"
+grep -q '^gh odeduck_9.9.9_linux_amd64.tar.gz$' "$fallback_root/downloads.log"
+grep -q '^curl odeduck_9.9.9_linux_amd64.tar.gz$' "$fallback_root/downloads.log"
 
 latest_fallback_root=$(setup_case gh_latest_https_fallback)
 make_fake_gh "$latest_fallback_root/bin" 0 0
-make_binary "$latest_fallback_root/fixtures" oddsock
-mv "$latest_fallback_root/fixtures/oddsock.tar.gz" "$latest_fallback_root/fixtures/oddsock_9.9.9_linux_amd64.tar.gz"
-write_checksums "$latest_fallback_root/fixtures" oddsock_9.9.9_linux_amd64.tar.gz
+make_binary "$latest_fallback_root/fixtures" odeduck
+mv "$latest_fallback_root/fixtures/odeduck.tar.gz" "$latest_fallback_root/fixtures/odeduck_9.9.9_linux_amd64.tar.gz"
+write_checksums "$latest_fallback_root/fixtures" odeduck_9.9.9_linux_amd64.tar.gz
 run_installer gh_latest_https_fallback "$latest_fallback_root/fixtures" "$latest_fallback_root/bin" ""
 grep -q '^curl latest$' "$latest_fallback_root/downloads.log"
-grep -q '^gh oddsock_9.9.9_linux_amd64.tar.gz$' "$latest_fallback_root/downloads.log"
-
-legacy_root=$(setup_case legacy_asset)
-make_fake_gh "$legacy_root/bin" 1 1
-make_binary "$legacy_root/fixtures" gongctl
-mv "$legacy_root/fixtures/gongctl.tar.gz" "$legacy_root/fixtures/gongctl_9.9.9_linux_amd64.tar.gz"
-write_checksums "$legacy_root/fixtures" gongctl_9.9.9_linux_amd64.tar.gz
-run_installer legacy_asset "$legacy_root/fixtures" "$legacy_root/bin"
-grep -q '^curl gongctl_9.9.9_linux_amd64.tar.gz$' "$legacy_root/downloads.log"
+grep -q '^gh odeduck_9.9.9_linux_amd64.tar.gz$' "$latest_fallback_root/downloads.log"
 
 mismatch_root=$(setup_case checksum_mismatch)
 make_fake_gh "$mismatch_root/bin" 1 1
-make_binary "$mismatch_root/fixtures" oddsock
-mv "$mismatch_root/fixtures/oddsock.tar.gz" "$mismatch_root/fixtures/oddsock_9.9.9_linux_amd64.tar.gz"
-printf '%064d  oddsock_9.9.9_linux_amd64.tar.gz\n' 0 > "$mismatch_root/fixtures/checksums.txt"
+make_binary "$mismatch_root/fixtures" odeduck
+mv "$mismatch_root/fixtures/odeduck.tar.gz" "$mismatch_root/fixtures/odeduck_9.9.9_linux_amd64.tar.gz"
+printf '%064d  odeduck_9.9.9_linux_amd64.tar.gz\n' 0 > "$mismatch_root/fixtures/checksums.txt"
 mismatch_install="$mismatch_root/install"
 mkdir -p "$mismatch_install"
 if FIXTURE_DIR="$mismatch_root/fixtures" TEST_LOG="$mismatch_root/downloads.log" \
-    INSTALL_DIR="$mismatch_install" ODDSOCK_VERSION=v9.9.9 \
+    INSTALL_DIR="$mismatch_install" ODEDUCK_VERSION=v9.9.9 \
     PATH="$mismatch_root/bin:/usr/bin:/bin" sh "$ROOT/install.sh" \
     > "$mismatch_root/output.log" 2>&1; then
     echo "checksum mismatch was accepted" >&2
     exit 1
 fi
-test ! -e "$mismatch_install/oddsock"
+test ! -e "$mismatch_install/odeduck"
 
 echo "shell installer tests passed"

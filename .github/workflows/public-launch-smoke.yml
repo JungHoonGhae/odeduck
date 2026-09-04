@@ -45,15 +45,15 @@ jobs:
             throw "version must look like v0.16.1"
           }
 
-          $repo = "https://github.com/JungHoonGhae/oddsock"
+          $repo = "https://github.com/JungHoonGhae/odeduck"
           Invoke-WebRequest -Uri $repo -UseBasicParsing | Out-Null
           Invoke-WebRequest -Uri "$repo/releases/tag/$env:RELEASE_VERSION" -UseBasicParsing | Out-Null
 
-          $smokeRoot = Join-Path $env:RUNNER_TEMP "oddsock-public-smoke"
+          $smokeRoot = Join-Path $env:RUNNER_TEMP "odeduck-public-smoke"
           $installDir = Join-Path $smokeRoot "bin"
           $env:LOCALAPPDATA = Join-Path $smokeRoot "local-app-data"
           $env:INSTALL_DIR = $installDir
-          $env:ODDSOCK_VERSION = $env:RELEASE_VERSION
+          $env:ODEDUCK_VERSION = $env:RELEASE_VERSION
           New-Item -ItemType Directory -Path $smokeRoot -Force | Out-Null
 
           $installer = Join-Path $smokeRoot "install.ps1"
@@ -61,7 +61,7 @@ jobs:
             -OutFile $installer -UseBasicParsing
           & $installer
 
-          $binary = Join-Path $installDir "oddsock.exe"
+          $binary = Join-Path $installDir "odeduck.exe"
           $versionOutput = & $binary version
           if ($versionOutput -notmatch [regex]::Escape($env:RELEASE_VERSION.TrimStart("v"))) {
             throw "installed binary version mismatch: $versionOutput"

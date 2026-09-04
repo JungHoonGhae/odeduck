@@ -1,6 +1,6 @@
 # Code of Conduct
 
-oddsock is a small open-source project, but the standard is simple: make it easier for another person to understand,
+odeduck is a small open-source project, but the standard is simple: make it easier for another person to understand,
 verify, and improve the work.
 
 ## Expected behavior

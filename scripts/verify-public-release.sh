@@ -3,9 +3,9 @@ set -eu
 
 ROOT=$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)
 VERSION=${1:-v$(tr -d '\r\n' < "$ROOT/VERSION")}
-REPOSITORY=${ODDSOCK_REPOSITORY:-JungHoonGhae/oddsock}
-WEB_BASE=${ODDSOCK_WEB_BASE:-https://github.com/$REPOSITORY}
-RELEASE_BASE=${ODDSOCK_RELEASE_BASE:-$WEB_BASE/releases/download/$VERSION}
+REPOSITORY=${ODEDUCK_REPOSITORY:-JungHoonGhae/odeduck}
+WEB_BASE=${ODEDUCK_WEB_BASE:-https://github.com/$REPOSITORY}
+RELEASE_BASE=${ODEDUCK_RELEASE_BASE:-$WEB_BASE/releases/download/$VERSION}
 
 printf '%s\n' "$VERSION" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$' || {
     echo "error: version must look like v0.16.1" >&2
@@ -69,11 +69,11 @@ echo "Checking anonymous repository and release access..."
 curl -fsSL "$WEB_BASE" -o /dev/null
 curl -fsSL "$WEB_BASE/releases/tag/$VERSION" -o /dev/null
 
-archive="oddsock_${VERSION#v}_${platform}_${architecture}.tar.gz"
-for asset in checksums.txt install.sh install.ps1 oddsock-catalog.json.gz "$archive"; do
+archive="odeduck_${VERSION#v}_${platform}_${architecture}.tar.gz"
+for asset in checksums.txt install.sh install.ps1 odeduck-catalog.json.gz "$archive"; do
     download "$asset"
 done
-for asset in install.sh install.ps1 oddsock-catalog.json.gz "$archive"; do
+for asset in install.sh install.ps1 odeduck-catalog.json.gz "$archive"; do
     verify_asset "$asset"
 done
 
@@ -82,20 +82,20 @@ mkdir -p "$SMOKE_ROOT/no-gh" "$SMOKE_ROOT/bin" "$SMOKE_ROOT/home" "$SMOKE_ROOT/c
 printf '#!/bin/sh\nexit 1\n' > "$SMOKE_ROOT/no-gh/gh"
 chmod +x "$SMOKE_ROOT/no-gh/gh"
 HOME="$SMOKE_ROOT/home" XDG_CONFIG_HOME="$SMOKE_ROOT/config" \
-    INSTALL_DIR="$SMOKE_ROOT/bin" ODDSOCK_VERSION="$VERSION" \
+    INSTALL_DIR="$SMOKE_ROOT/bin" ODEDUCK_VERSION="$VERSION" \
     PATH="$SMOKE_ROOT/no-gh:$PATH" sh "$SMOKE_ROOT/install.sh"
 
 version_output=$(HOME="$SMOKE_ROOT/home" XDG_CONFIG_HOME="$SMOKE_ROOT/config" \
-    "$SMOKE_ROOT/bin/oddsock" version)
+    "$SMOKE_ROOT/bin/odeduck" version)
 printf '%s\n' "$version_output" | grep -F "${VERSION#v}" >/dev/null
 
 HOME="$SMOKE_ROOT/home" XDG_CONFIG_HOME="$SMOKE_ROOT/config" \
-    "$SMOKE_ROOT/bin/oddsock" catalog info -f json > "$SMOKE_ROOT/catalog-info.json"
+    "$SMOKE_ROOT/bin/odeduck" catalog info -f json > "$SMOKE_ROOT/catalog-info.json"
 jq -e '.entries >= 90000 and .svcTypes.REST > 6000 and .svcTypes.FILE > 80000' \
     "$SMOKE_ROOT/catalog-info.json" >/dev/null
 
 HOME="$SMOKE_ROOT/home" XDG_CONFIG_HOME="$SMOKE_ROOT/config" \
-    "$SMOKE_ROOT/bin/oddsock" catalog search \
+    "$SMOKE_ROOT/bin/odeduck" catalog search \
     "서울에서 작은 가게 후보를 좁힐 자료" \
     --concept 생활인구 --concept 추정매출 \
     --concept "상권 점포" --concept "상권 개폐업" \

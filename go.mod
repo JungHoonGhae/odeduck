@@ -1,4 +1,4 @@
-module github.com/JungHoonGhae/oddsock
+module github.com/JungHoonGhae/odeduck
 
 go 1.26.6
 

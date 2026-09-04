@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/JungHoonGhae/oddsock/internal/fetch"
+	"github.com/JungHoonGhae/odeduck/internal/fetch"
 )
 
 func xlsxFixture(t *testing.T, members map[string]string) []byte {

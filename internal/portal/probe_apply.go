@@ -101,7 +101,7 @@ func (p *FormProbe) OK() bool { return len(p.Missing()) == 0 }
 // ProbeApplyForm opens the real 활용신청 form for pk and reports which of the elements
 // apply drives are still present, without filling or submitting anything.
 //
-// This is the only automated check that covers 활용신청 — the one thing oddsock does
+// This is the only automated check that covers 활용신청 — the one thing odeduck does
 // that nothing else does, and the seam most likely to break silently, since a
 // changed form id degrades into an error only a human running a real application
 // would ever see. It runs the same navigation and reads the same selectors as apply.

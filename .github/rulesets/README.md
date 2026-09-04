@@ -6,17 +6,17 @@ The repository is currently private on a GitHub Free personal account, where Git
 Rulesets. After the repository becomes public, apply the default-branch ruleset from a clean `main` checkout:
 
 ```sh
-gh api --method POST repos/JungHoonGhae/oddsock/rulesets \
+gh api --method POST repos/JungHoonGhae/odeduck/rulesets \
   --input .github/rulesets/main.json
-gh api --method POST repos/JungHoonGhae/oddsock/rulesets \
+gh api --method POST repos/JungHoonGhae/odeduck/rulesets \
   --input .github/rulesets/release-tags.json
 ```
 
 Then verify the live rules and required CI checks:
 
 ```sh
-gh api repos/JungHoonGhae/oddsock/rulesets
-gh api repos/JungHoonGhae/oddsock/rules/branches/main
+gh api repos/JungHoonGhae/odeduck/rulesets
+gh api repos/JungHoonGhae/odeduck/rules/branches/main
 ```
 
 The branch ruleset requires pull requests, a linear history, resolved review conversations, and the `test-and-build`,

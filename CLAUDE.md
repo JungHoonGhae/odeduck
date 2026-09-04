@@ -1,10 +1,13 @@
-# CLAUDE.md — oddsock
+# CLAUDE.md — odeduck
 
 data.go.kr(공공데이터포털)의 OpenAPI **활용신청·인증키 발급·호출을 AI 에이전트가 대신**하게 하는
 Go CLI + MCP. 사람은 정부 SSO 로그인 한 번만 하고 이후 포털 작업을 에이전트가 잇는 것이 핵심.
 
 ## 현재 상태 (2026-09-04)
 
+- v0.17.0은 한국어 공개 브랜드와 캐릭터 이름을 `오데덕`으로 정하고, 서로 무관해 보이는 분야에서
+  질문의 나머지 짝을 찾는 인물로 README와 홍보 문구를 통일했다. CLI·MCP·저장소·Go module의 기술
+  이름도 `odeduck`으로 통일했다.
 - v0.16.2는 고신뢰 조사에서 의미 검색이 실제 사용되지 않으면 실패하는 CLI `--require-semantic`과 MCP
   `requireSemantic` 계약을 추가하고, FILE 관찰 범위를 bounded XLSX worksheet·다단 헤더까지 넓혔다.
   README에는 로그인 없는 첫 검색과 실제 연결 후보의 검증 경계를 기록했다.
@@ -17,9 +20,7 @@ Go CLI + MCP. 사람은 정부 SSO 로그인 한 번만 하고 이후 포털 작
   Swagger, `multiCloudApiRequestForm` 신청 폼과 `api.odcloud.kr` HTTPS 호출을 지원한다.
 - v0.12의 SafetyKorea, VWorld, FoodSafetyKorea, 서울 열린데이터광장 adapter와 11개 live canary를
   유지한다. SafetyKorea·FoodSafetyKorea·typed VWorld family는 provider-scoped key로 자동 호출하고,
-  서울은 HTTPS 부재로 차단한다. v0.10의 connection discovery와 응답 필드 프로파일링, v0.9에서 도입한
-  `oddsock` 이름을 저장소·Go module·기본 CLI·MCP에 사용한다. 이전 `opendatactl`과 `gongctl`
-  바이너리·설정 경로·환경변수·MCP 가이드 URI는 전환 호환으로 유지한다.
+  서울은 HTTPS 부재로 차단한다. v0.10의 connection discovery와 응답 필드 프로파일링을 유지한다.
 - 목표 기반 카탈로그 검색, 선택형 Ollama 의미 검색, 검색→검사→활용신청→호출 MCP 흐름을 제공한다.
   discovery는 Generate→Search→Expand→Search→Compose→Search의 세 단계 검색으로 동작하며,
   Codex·Claude·Gemini는 전체 계획을, Cursor는 안전한 초기 검색 계획을 지원한다.
@@ -31,7 +32,7 @@ Go CLI + MCP. 사람은 정부 SSO 로그인 한 번만 하고 이후 포털 작
   `docs/research/competitor-and-demand-cross-validation-2026.md`, 포털 경계는
   `docs/reverse-engineering/portal-catalog.md`가 단일 소스다. `docs/superpowers/specs/`와
   `docs/superpowers/plans/`는 최초 구현의 역사적 기록이고, 홍보 영상 제작 기록은
-  `docs/promo/oddsock-agent-explainer.md`에 있다.
+  `docs/promo/odeduck-agent-explainer.md`에 있다.
 
 ## 확정된 핵심 결정 (스펙 요약)
 
@@ -47,7 +48,7 @@ Go CLI + MCP. 사람은 정부 SSO 로그인 한 번만 하고 이후 포털 작
   (로그인 1회 제외). 인증키는 `/iim/api/selectApiKeyList.do`의 `#pblisrCrtfcKeyPlain`에서 파싱.
 - **인증키**: data.go.kr은 **계정당 일반 인증키 하나**(첫 신청 시 발급). 엔드포인트별 매칭 불필요.
   Encoding/Decoding 키 함정 있음 — 잘못 쓰면 조용히 실패, 에러 힌트로 surface.
-- **로그인**: 정부 SSO는 자동화 안 함. 사람이 브라우저 1회(`oddsock login`) → **쿠키 추출 후 브라우저 종료**.
+- **로그인**: 정부 SSO는 자동화 안 함. 사람이 브라우저 1회(`odeduck login`) → **쿠키 추출 후 브라우저 종료**.
   읽기는 순수 HTTP(`internal/portal/session.go`), `apply`만 headless Chrome에 쿠키 주입해 폼 구동.
   tossinvest-cli의 storage-state 패턴을 이식(단, Python helper 없이 chromedp in-process).
 
@@ -76,7 +77,7 @@ Go CLI + MCP. 사람은 정부 SSO 로그인 한 번만 하고 이후 포털 작
 
 ## 경쟁 지형
 
-검색→상세→호출 MCP와 9.6만 건 한국 카탈로그 검색기는 이미 존재한다. oddsock의 검증된 차이는
+검색→상세→호출 MCP와 9.6만 건 한국 카탈로그 검색기는 이미 존재한다. odeduck의 검증된 차이는
 목표 기반 전체 카탈로그 탐색, API/FILE/LINK 실제 계약 검사, data.go.kr 활용신청·승인·키 재사용·
 실호출을 하나로 연결하는 조합이다. 경쟁·수요 주장은
 `docs/research/competitive-workflow-audit.md`와
@@ -85,7 +86,7 @@ Go CLI + MCP. 사람은 정부 SSO 로그인 한 번만 하고 이후 포털 작
 ## 주의
 
 - `.github/workflows/` 커밋은 git 토큰 **workflow 스코프** 필요(kvote에서 겪음, 해결됨).
-- 이건 fragile scraping — data.go.kr HTML 바뀌면 파서가 조용히 빈 결과. `oddsock doctor`가
+- 이건 fragile scraping — data.go.kr HTML 바뀌면 파서가 조용히 빈 결과. `odeduck doctor`가
   각 seam(search·REST describe·LINK handoff·applications)을 라이브 호출해 drift를 시끄럽게 감지(CI용 exit 1).
   `doctor --adapters-only`는 4개 provider의 11개 canary와 180일 freshness만 점검하며 주간 workflow가
   실패 시 canonical GitHub issue를 생성·갱신한다. LINK matcher, invocation, provider key 또는 revision을
@@ -101,7 +102,7 @@ Go CLI + MCP. 사람은 정부 SSO 로그인 한 번만 하고 이후 포털 작
 - 기본 검증: `go test ./...`
 - 릴리즈 전: `go mod tidy -diff && go vet ./... && go test ./... && go build ./...`
 - 기능·버그 수정은 같은 package의 `*_test.go`에서 public seam을 먼저 실패시키고 구현한다.
-- 외부 provider 성공 응답은 fixture transport로, 계약 drift는 `oddsock doctor --adapters-only`로 나눠 검증한다.
+- 외부 provider 성공 응답은 fixture transport로, 계약 drift는 `odeduck doctor --adapters-only`로 나눠 검증한다.
 - 인증·로그아웃 테스트는 실제 명령을 수동 실행하지 않는다. macOS의 `os.UserConfigDir`는 `XDG_CONFIG_HOME`만으로
   격리되지 않으므로 테스트에서는 `HOME`, `XDG_CONFIG_HOME`, `APPDATA`를 모두 임시 경로로 지정한다.
 
@@ -109,7 +110,7 @@ Go CLI + MCP. 사람은 정부 SSO 로그인 한 번만 하고 이후 포털 작
 
 ### Issue tracker
 
-canonical tracker는 `JungHoonGhae/oddsock`의 GitHub Issues다. 구현 spec과 장기 문서는 저장소에
+canonical tracker는 `JungHoonGhae/odeduck`의 GitHub Issues다. 구현 spec과 장기 문서는 저장소에
 versioned Markdown으로 두고, 추적 이슈에서 링크한다. See `docs/agents/issue-tracker.md`.
 
 ### Triage labels

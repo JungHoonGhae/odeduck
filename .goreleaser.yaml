@@ -1,18 +1,18 @@
-# GoReleaser config — oddsock과 한시적 opendatactl/gongctl 호환 바이너리용.
+# GoReleaser config — odeduck 공식 바이너리용.
 # 태그 푸시(vX.Y.Z) 시 GitHub Actions(release.yml)가 실행 → 크로스플랫폼 바이너리 +
 # 체크섬 + GitHub Release를 생성한다. 공개 설치는 HTTPS로, private preview는 인증된 gh로 asset을 받는다.
 version: 2
 
-project_name: oddsock
+project_name: odeduck
 
 before:
   hooks:
     - go mod tidy
 
 builds:
-  - id: oddsock
-    main: ./cmd/oddsock
-    binary: oddsock
+  - id: odeduck
+    main: ./cmd/odeduck
+    binary: odeduck
     env:
       - CGO_ENABLED=0
     goos: [darwin, linux, windows]
@@ -21,67 +21,21 @@ builds:
       - -trimpath
     ldflags:
       - -s -w
-      - -X github.com/JungHoonGhae/oddsock/internal/version.CommandName=oddsock
-      - -X github.com/JungHoonGhae/oddsock/internal/version.Version={{ .Version }}
-      - -X github.com/JungHoonGhae/oddsock/internal/version.Commit={{ .ShortCommit }}
-      - -X github.com/JungHoonGhae/oddsock/internal/version.Date={{ .Date }}
-  - id: opendatactl-compat
-    main: ./cmd/oddsock
-    binary: opendatactl
-    env:
-      - CGO_ENABLED=0
-    goos: [darwin, linux, windows]
-    goarch: [amd64, arm64]
-    flags:
-      - -trimpath
-    ldflags:
-      - -s -w
-      - -X github.com/JungHoonGhae/oddsock/internal/version.CommandName=opendatactl
-      - -X github.com/JungHoonGhae/oddsock/internal/version.Version={{ .Version }}
-      - -X github.com/JungHoonGhae/oddsock/internal/version.Commit={{ .ShortCommit }}
-      - -X github.com/JungHoonGhae/oddsock/internal/version.Date={{ .Date }}
-  - id: gongctl-compat
-    main: ./cmd/oddsock
-    binary: gongctl
-    env:
-      - CGO_ENABLED=0
-    goos: [darwin, linux, windows]
-    goarch: [amd64, arm64]
-    flags:
-      - -trimpath
-    ldflags:
-      - -s -w
-      - -X github.com/JungHoonGhae/oddsock/internal/version.CommandName=gongctl
-      - -X github.com/JungHoonGhae/oddsock/internal/version.Version={{ .Version }}
-      - -X github.com/JungHoonGhae/oddsock/internal/version.Commit={{ .ShortCommit }}
-      - -X github.com/JungHoonGhae/oddsock/internal/version.Date={{ .Date }}
-
+      - -X github.com/JungHoonGhae/odeduck/internal/version.CommandName=odeduck
+      - -X github.com/JungHoonGhae/odeduck/internal/version.Version={{ .Version }}
+      - -X github.com/JungHoonGhae/odeduck/internal/version.Commit={{ .ShortCommit }}
+      - -X github.com/JungHoonGhae/odeduck/internal/version.Date={{ .Date }}
 archives:
-  - id: oddsock
-    ids: [oddsock, opendatactl-compat, gongctl-compat]
-    name_template: "oddsock_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+  - id: odeduck
+    ids: [odeduck]
+    name_template: "odeduck_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
     format_overrides:
       - goos: windows
         formats: ["zip"]
-  - id: opendatactl
-    ids: [opendatactl-compat, gongctl-compat]
-    name_template: "opendatactl_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
-    format_overrides:
-      - goos: windows
-        formats: ["zip"]
-  # Keep both former asset names while saved installers and pinned automation
-  # migrate to oddsock.
-  - id: gongctl
-    ids: [gongctl-compat]
-    name_template: "gongctl_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
-    format_overrides:
-      - goos: windows
-        formats: ["zip"]
-
 checksum:
   name_template: "checksums.txt"
   extra_files:
-    - glob: ./release-assets/oddsock-catalog.json.gz
+    - glob: ./release-assets/odeduck-catalog.json.gz
     - glob: ./install.sh
     - glob: ./install.ps1
 
@@ -95,12 +49,12 @@ changelog:
       - "Merge "
 
 release:
-  name_template: "oddsock v{{ .Version }}"
+  name_template: "오데덕 (odeduck) v{{ .Version }}"
   draft: false
   prerelease: auto
   preflight:
     fail_on_error: true
   extra_files:
-    - glob: ./release-assets/oddsock-catalog.json.gz
+    - glob: ./release-assets/odeduck-catalog.json.gz
     - glob: ./install.sh
     - glob: ./install.ps1

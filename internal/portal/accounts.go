@@ -10,7 +10,7 @@ import (
 
 // Application is one OpenAPI 활용신청 (dev-account) the user holds, as listed on
 // the 활용신청 현황 page. ExpiresAt (만료예정일) is the field the user most cares
-// about — oddsock surfaces it so renewals can be tracked.
+// about — odeduck surfaces it so renewals can be tracked.
 type Application struct {
 	Title     string `json:"title"`     // 데이터명 (상태 접두사 제거)
 	Status    string `json:"status"`    // 승인 / 신청 등 ([..] 접두사에서)

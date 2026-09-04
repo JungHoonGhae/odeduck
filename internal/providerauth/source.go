@@ -3,7 +3,7 @@ package providerauth
 import (
 	"context"
 
-	"github.com/JungHoonGhae/oddsock/internal/portal"
+	"github.com/JungHoonGhae/odeduck/internal/portal"
 )
 
 // Source adapts the two credential lifecycles to apicall.CredentialSource.

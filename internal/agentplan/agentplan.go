@@ -17,7 +17,7 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/JungHoonGhae/oddsock/internal/catalog"
+	"github.com/JungHoonGhae/odeduck/internal/catalog"
 )
 
 const (
@@ -78,7 +78,7 @@ const geminiDenyToolsPolicy = `[[rule]]
 toolName = "*"
 decision = "deny"
 priority = 999
-deny_message = "oddsock planning runs without tools. Return only the requested JSON."
+deny_message = "odeduck planning runs without tools. Return only the requested JSON."
 `
 
 type resolvedProvider struct {
@@ -89,7 +89,7 @@ type resolvedProvider struct {
 
 // Generate invokes one installed CLI in a non-interactive, read-only mode.
 // Authentication and billing remain entirely under that CLI's configuration;
-// oddsock never reads or stores its credentials.
+// odeduck never reads or stores its credentials.
 func Generate(ctx context.Context, goal, requested string) (Plan, error) {
 	goal = strings.TrimSpace(goal)
 	if goal == "" {
@@ -187,7 +187,7 @@ func generateWithProvider(ctx context.Context, prompt string, candidate resolved
 }
 
 func invokeProvider(ctx context.Context, prompt string, candidate resolvedProvider) ([]byte, error) {
-	workDir, err := os.MkdirTemp("", "oddsock-agent-")
+	workDir, err := os.MkdirTemp("", "odeduck-agent-")
 	if err != nil {
 		return nil, fmt.Errorf("agent 임시 작업공간 생성 실패: %w", err)
 	}

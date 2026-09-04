@@ -9,7 +9,7 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/JungHoonGhae/oddsock/internal/fetch"
+	"github.com/JungHoonGhae/odeduck/internal/fetch"
 )
 
 // describeFromHTML runs Describe against a page body, for assertions about a single
@@ -45,7 +45,7 @@ func TestIsRequiredAcceptsBothVocabularies(t *testing.T) {
 
 func TestMissingRequired(t *testing.T) {
 	op := &Operation{Params: []Param{
-		{Name: "ServiceKey", Required: "필"}, // oddsock injects this one
+		{Name: "ServiceKey", Required: "필"}, // odeduck injects this one
 		{Name: "pageNo", Required: "필"},
 		{Name: "numOfRows", Required: "필수"},
 		{Name: "bas_yy", Required: "옵"},
@@ -137,7 +137,7 @@ func TestDedupeOperationsCollapsesIdenticalDuplicates(t *testing.T) {
 	}
 }
 
-// oddsock applies for a development account, and the portal grades the two stages
+// odeduck applies for a development account, and the portal grades the two stages
 // separately: every sampled dataset auto-approves at 개발단계 while a third of them
 // require review at 운영단계. Conflating the two would either promise a key that
 // needs a human or warn about review that never applies here.

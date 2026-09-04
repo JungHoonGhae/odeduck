@@ -3,12 +3,12 @@ package mcpserver
 // ServerInstructions is delivered during MCP initialization, before a model
 // chooses a tool. Keep the opening self-contained because some hosts weigh only
 // the first part of server instructions during tool routing.
-const ServerInstructions = `대한민국 공공데이터를 찾거나 서로 다른 데이터를 조합하고, 실제 API·파일 스키마를 검사하거나 활용신청·호출할 때 oddsock을 사용한다. 모든 데이터 탐색은 catalog_search로 시작하고 선택한 pk는 inspect_dataset으로 확인한다. 사용자가 "최대한", "가장 정확하게", "semantic/시맨틱", 연구·감사·안전처럼 높은 재현성을 요구하면 catalog_search에 requireSemantic=true를 넣는다. 이 호출이 오류면 semantic=false로 조용히 재시도하지 말고 오류와 semantic-build 복구 방법을 사용자에게 알린다. 일반 탐색에서 semantic.status가 used가 아니면 warnings와 저하 상태를 반드시 답변에 밝힌다. FILE은 observe=true로 실제 컬럼과 해시를 확인하고, 검색 결과만으로 인과·결합 가능성을 단정하지 않는다. 세부 워크플로는 oddsock://guide 리소스를 읽는다.`
+const ServerInstructions = `대한민국 공공데이터를 찾거나 서로 다른 데이터를 조합하고, 실제 API·파일 스키마를 검사하거나 활용신청·호출할 때 odeduck을 사용한다. 모든 데이터 탐색은 catalog_search로 시작하고 선택한 pk는 inspect_dataset으로 확인한다. 사용자가 "최대한", "가장 정확하게", "semantic/시맨틱", 연구·감사·안전처럼 높은 재현성을 요구하면 catalog_search에 requireSemantic=true를 넣는다. 이 호출이 오류면 semantic=false로 조용히 재시도하지 말고 오류와 semantic-build 복구 방법을 사용자에게 알린다. 일반 탐색에서 semantic.status가 used가 아니면 warnings와 저하 상태를 반드시 답변에 밝힌다. FILE은 observe=true로 실제 컬럼과 해시를 확인하고, 검색 결과만으로 인과·결합 가능성을 단정하지 않는다. 세부 워크플로는 odeduck://guide 리소스를 읽는다.`
 
-// GuideDoc is the oddsock://guide resource. It keeps the normal path deliberately
+// GuideDoc is the odeduck://guide resource. It keeps the normal path deliberately
 // small: thousands of portal endpoints stay behind three generic MCP tools, and
 // only one compact candidate list and one selected specification enter context.
-const GuideDoc = `# oddsock — data.go.kr 사용 가이드
+const GuideDoc = `# odeduck — data.go.kr 사용 가이드
 
 ## 기본 경로: 넓게 검색 → 실제 계약 검사 → 호출 가능한 데이터만 필요시 신청·호출
 
@@ -31,7 +31,7 @@ const GuideDoc = `# oddsock — data.go.kr 사용 가이드
   의미 분해 concepts + 결정적 로컬 검색으로 폴백한 것이며 warnings에 저하가 기록된다. 사용자가 "최대한",
   "가장 정확하게", "semantic/시맨틱" 또는 연구·감사·안전 수준의 재현성을 요구하면
   requireSemantic=true를 사용한다. 오류가 나면 semantic=false로 조용히 재시도하지 말고
-  ` + "`oddsock catalog semantic-build`" + ` 복구 방법과 미완료 상태를 사용자에게 알린다.
+  ` + "`odeduck catalog semantic-build`" + ` 복구 방법과 미완료 상태를 사용자에게 알린다.
 
 - restOnly는 생략하면 false다. 기본 결과는 REST, LINK, FILE을 모두 포함하므로 호출 방식이 다르다는
   이유로 유용한 데이터가 자연어 검색에서 사라지지 않는다. REST만 명시적으로 원할 때 restOnly=true를 사용한다.
@@ -51,7 +51,7 @@ const GuideDoc = `# oddsock — data.go.kr 사용 가이드
   source=official-file+web은 월간 CSV의 정확한 분류에 포털의 복수 제공형을 보강한 릴리즈 snapshot이다.
   source=web은 나머지 원천 장애 시의 명시적 호환 fallback이다. 검색 결과의 사실 수준은 각 데이터셋을
   inspect_dataset해 별도로 확인한다.
-- stale=true면 최근 신설 API가 빠졌을 수 있다. ` + "`oddsock catalog sync`" + `로 갱신한다.
+- stale=true면 최근 신설 API가 빠졌을 수 있다. ` + "`odeduck catalog sync`" + `로 갱신한다.
 
 후보를 하나 고른 뒤 그 hit의 pk를 inspect_dataset에 넘긴다. 검색 결과만 보고 엔드포인트나
 파라미터를 추측하지 않는다.
@@ -128,12 +128,12 @@ AI가 선택한 OpenAPI의 활용신청을 실제 제출한다. purpose에는 �
   API 유형을 다시 확인해 LINK 신청을 차단한다.
 - 이미 신청한 API는 다시 신청하지 말고 list_applications로 승인 상태를 확인한다.
 - 개발단계 자동승인이면 신청 결과를 확인한 뒤 3단계 call_api로 바로 이어간다.
-- 로그인 세션이 없으면 사람에게 ` + "`oddsock login`" + `을 안내한다. 로그인 이후에는 브라우저 조작,
+- 로그인 세션이 없으면 사람에게 ` + "`odeduck login`" + `을 안내한다. 로그인 이후에는 브라우저 조작,
   인증키 복사, 신청 폼 입력을 AI가 대신한다.
 
 ### 3. call_api(pk, op, params, profileFields?)
 inspect_dataset에서 확인한 REST/LINK pk·op·params로 승인된 API를 호출한다. MCP 입력에는 raw endpoint와
-serviceKey가 없다. oddsock이 pk로 REST 명세 또는 LINK contract를 다시 읽고 endpoint를 결정하며
+serviceKey가 없다. odeduck이 pk로 REST 명세 또는 LINK contract를 다시 읽고 endpoint를 결정하며
 필수 파라미터 누락을 검사한 뒤 data.go.kr 세션 키 또는 provider scope별 저장 키를 주입한다.
 XML 응답은 JSON으로 변환한다.
 
@@ -160,7 +160,7 @@ API와 결합할 때 evidenceRequired에 나온 동일한 key/grain 검사를 �
 ## 인증키와 승인 전파
 
 data.go.kr은 같은 serviceKey를 Encoding/Decoding 두 형태로 표시한다. 외부 LINK provider key는
-` + "`oddsock provider-key set <provider>`" + `로 한 번 저장한다. 어떤 인증키도 MCP 도구나 모델
+` + "`odeduck provider-key set <provider>`" + `로 한 번 저장한다. 어떤 인증키도 MCP 도구나 모델
 컨텍스트에 노출되지 않으며, call_api가 scope에 맞는 키를 내부적으로 읽고 전송에 맞게 처리한다. 포털의 활용신청 상태가
 승인이어도 게이트웨이 반영에는 보통 수 분, 안내상 최대 1시간이 걸릴 수 있다.
 

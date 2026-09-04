@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/JungHoonGhae/oddsock/internal/catalog"
-	"github.com/JungHoonGhae/oddsock/internal/fetch"
+	"github.com/JungHoonGhae/odeduck/internal/catalog"
+	"github.com/JungHoonGhae/odeduck/internal/fetch"
 )
 
 func TestUnifiedInspectorOwnsFileDispatchAndAssetObservation(t *testing.T) {

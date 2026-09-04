@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/JungHoonGhae/oddsock/internal/fetch"
+	"github.com/JungHoonGhae/odeduck/internal/fetch"
 )
 
 func TestSearchDatasets(t *testing.T) {
