@@ -1,7 +1,7 @@
 {
   "displayName": "오데덕",
   "tagline": "오픈데이터 덕후, 오데덕.",
-  "proofline": "서로 상관없어 보이는 공공데이터를 연결하고 질문에 필요한 정보를 찾아온다.",
+  "proofline": "흩어진 9만 6천 개 공공데이터를 가로질러 서로 무관해 보이던 단서를 연결하고, 신청·인증·호출까지 대신해 필요한 답을 찾아주는 오픈데이터 덕후입니다.",
   "logoPath": "docs/assets/brand-symbol.svg",
   "logoAlt": "흩어진 공공데이터의 연결을 찾는 오데덕 캐릭터",
   "technicalName": "odeduck",
