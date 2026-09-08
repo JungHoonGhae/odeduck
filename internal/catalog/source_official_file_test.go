@@ -61,8 +61,11 @@ func TestOfficialFileSourceStreamsPublicMonthlySnapshot(t *testing.T) {
 		t.Fatalf("FILE entry = %+v", file)
 	}
 	standard, ok := got.Find("300")
-	if !ok || standard.SvcType != "" || len(standard.DataTypes) != 0 {
+	if !ok || standard.SvcType != "STD" || strings.Join(standard.DataTypes, ",") != "STD" {
 		t.Fatalf("standard entry = %+v", standard)
+	}
+	if hit := hitFromEntry(&standard); hit.DetailURL != "https://www.data.go.kr/data/300/standard.do" {
+		t.Fatalf("standard detail = %+v", hit)
 	}
 }
 

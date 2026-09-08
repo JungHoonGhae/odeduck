@@ -17,6 +17,26 @@ import (
 	"golang.org/x/text/transform"
 )
 
+func TestCoverageDeclarationsDoNotGuessStructuredValuesOrLoseOtherMetadata(t *testing.T) {
+	for _, coverage := range []string{`"공식 지역"`, `{"name":"do not infer this region"}`, `null`} {
+		transport := fixtureTransport{gets: map[string]*fetch.Response{
+			"https://data.test/catalog/123/fileData.json": jsonResponse(`{"name":"official name","encodingFormat":"CSV","spatialCoverage":` + coverage + `,"temporalCoverage":"2024/2025"}`),
+			"https://data.test/data/123/fileData.do":      htmlResponse(`<h1>HTML name</h1>`),
+		}}
+		c, err := NewInspector(transport, "https://data.test").Inspect(context.Background(), Ref{PK: "123", Delivery: DeliveryFile})
+		if err != nil || c.Name != "official name" || c.Metadata["temporalCoverage"] != "2024/2025" {
+			t.Fatalf("coverage broke other metadata: %+v %v", c, err)
+		}
+		want := ""
+		if coverage == `"공식 지역"` {
+			want = "공식 지역"
+		}
+		if c.Metadata["spatialCoverage"] != want {
+			t.Fatalf("structured scope guessed: %v", c.Metadata)
+		}
+	}
+}
+
 type fixtureTransport struct {
 	gets  map[string]*fetch.Response
 	posts map[string]*fetch.Response

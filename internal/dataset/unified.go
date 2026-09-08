@@ -16,9 +16,10 @@ import (
 type DeliverySelection string
 
 const (
-	DeliverySelectionAuto DeliverySelection = "auto"
-	DeliverySelectionAPI  DeliverySelection = "api"
-	DeliverySelectionFile DeliverySelection = "file"
+	DeliverySelectionAuto     DeliverySelection = "auto"
+	DeliverySelectionAPI      DeliverySelection = "api"
+	DeliverySelectionFile     DeliverySelection = "file"
+	DeliverySelectionStandard DeliverySelection = "standard"
 )
 
 type InspectionRequest struct {
@@ -29,11 +30,12 @@ type InspectionRequest struct {
 }
 
 type InspectionResult struct {
-	Delivery    string           `json:"delivery"` // primary service type, retained for compatibility
-	Deliveries  []string         `json:"deliveries,omitempty"`
-	API         *apicall.APISpec `json:"api,omitempty"`
-	File        *Contract        `json:"file,omitempty"`
-	Observation *Observation     `json:"observation,omitempty"`
+	Delivery    string            `json:"delivery"` // primary service type, retained for compatibility
+	Deliveries  []string          `json:"deliveries,omitempty"`
+	API         *apicall.APISpec  `json:"api,omitempty"`
+	File        *Contract         `json:"file,omitempty"`
+	Standard    *StandardContract `json:"standard,omitempty"`
+	Observation *Observation      `json:"observation,omitempty"`
 }
 
 // UnifiedInspector owns catalogue lookup, delivery dispatch, file asset
@@ -65,7 +67,40 @@ func (i *UnifiedInspector) Inspect(ctx context.Context, request InspectionReques
 	if !ok {
 		return nil, fmt.Errorf("현재 카탈로그에 없는 pk입니다 — `odeduck catalog sync` 후 다시 검색하세요")
 	}
-	wantAPI, wantFile, err := selectedDeliveries(entry, request.Delivery)
+	selection := DeliverySelection(strings.ToLower(strings.TrimSpace(string(request.Delivery))))
+	isStandard := entry.SvcType == catalog.SvcSTD || containsFold(entry.DataTypes, "STD")
+	legacyUnknown := entry.SvcType == "" && len(entry.DataTypes) == 0
+	if (selection == "" || selection == DeliverySelectionAuto || selection == "all" || selection == DeliverySelectionStandard) && (isStandard || legacyUnknown) {
+		contract, err := i.files.inspectStandard(ctx, request.PK)
+		if err != nil {
+			return nil, fmt.Errorf("pk %s의 제공형을 자동 검사할 수 없습니다 — STD 계약 검증: %w", request.PK, err)
+		}
+		result := &InspectionResult{Delivery: catalog.SvcSTD, Deliveries: []string{"STD"}, Standard: contract}
+		if request.Asset != "" {
+			return nil, fmt.Errorf("STD는 FILE asset 선택을 지원하지 않습니다")
+		}
+		if request.Observe {
+			sample, err := i.SampleStandard(ctx, contract, 5)
+			if err != nil {
+				return nil, err
+			}
+			var columns []string
+			observed := map[string]bool{}
+			for _, row := range sample.Rows {
+				for column := range row {
+					observed[column] = true
+				}
+			}
+			for _, c := range contract.Columns {
+				if observed[c.Code] {
+					columns = append(columns, c.Code)
+				}
+			}
+			result.Observation = &Observation{SHA256: sample.SHA256, Bytes: sample.Bytes, Files: []ObservedFile{{Name: contract.Name, Format: "JSON", Columns: columns, SampleRows: len(sample.Rows)}}, Warnings: []string{"STD first page only; columns are observed record keys, not proof that every row has a value. Population coverage is not verified."}}
+		}
+		return result, nil
+	}
+	wantAPI, wantFile, err := selectedDeliveries(entry, selection)
 	if err != nil {
 		return nil, err
 	}
@@ -130,8 +165,10 @@ func selectedDeliveries(entry catalog.Entry, requested DeliverySelection) (bool,
 			return false, false, fmt.Errorf("pk %s에는 FILE 제공형이 없습니다", entry.PK)
 		}
 		return false, true, nil
+	case DeliverySelectionStandard:
+		return false, false, fmt.Errorf("pk %s에는 STD 제공형이 없습니다", entry.PK)
 	default:
-		return false, false, fmt.Errorf("delivery는 auto, api, file 중 하나여야 합니다")
+		return false, false, fmt.Errorf("delivery는 auto, api, file, standard 중 하나여야 합니다")
 	}
 }
 

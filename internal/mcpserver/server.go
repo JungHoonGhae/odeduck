@@ -50,8 +50,8 @@ type describeIn struct {
 }
 type inspectDatasetIn struct {
 	PK       string `json:"pk" jsonschema:"publicDataPk returned by catalog_search"`
-	Delivery string `json:"delivery,omitempty" jsonschema:"representation to inspect: auto (default, returns API and FILE when both exist), api, or file"`
-	Observe  bool   `json:"observe,omitempty" jsonschema:"for FILE data, download the newest or selected asset within safety limits and return its observed CSV/DBF/XLSX worksheet columns and content hash"`
+	Delivery string `json:"delivery,omitempty" jsonschema:"representation to inspect: auto (default, returns API and FILE when both exist), api, file, or standard. STD returns first-party schema and optionally a bounded first-page observation"`
+	Observe  bool   `json:"observe,omitempty" jsonschema:"for FILE data, download the newest or selected asset within safety limits and return observed CSV/DBF/XLSX worksheet columns and content hash; for STD, observe only the bounded first page"`
 	Asset    string `json:"asset,omitempty" jsonschema:"exact FILE asset name to observe; omit to use the newest asset listed first"`
 }
 
@@ -265,7 +265,7 @@ func New(deps Deps) *mcp.Server {
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "inspect_dataset",
 		Annotations: readOnlyAnnotations("2단계 · 데이터 계약 및 실제 스키마 검사", true),
-		Description: "[2단계: 검사] catalog_search에서 고른 pk의 delivery 계약을 확인한다. API+FILE 복수 제공형은 기본적으로 두 계약을 모두 반환하며 delivery=api 또는 file로 하나만 선택할 수 있다. REST/LINK는 상세기능·필수 요청변수·승인 및 provider handoff를 반환한다. FILE은 공식 상세페이지와 검증된 provider Adapter를 통해 다운로드 자산·기간·수정일을 반환한다. FILE의 실제 컬럼이 필요하면 observe=true를 사용한다. 이 경우 bounded 다운로드 후 CSV, SHP의 DBF, XLSX worksheet 컬럼과 원본 SHA-256을 반환하므로 메타데이터 설명과 실제 스키마를 구분할 수 있다. 검사되지 않은 URL이나 파라미터는 추측하지 않는다.",
+		Description: "[2단계: 검사] catalog_search에서 고른 pk의 delivery 계약을 확인한다. API+FILE 복수 제공형은 기본적으로 두 계약을 모두 반환하며 delivery=api 또는 file로 하나만 선택할 수 있다. REST/LINK는 상세기능·필수 요청변수·승인 및 provider handoff를 반환한다. FILE은 공식 상세페이지와 검증된 provider Adapter를 통해 다운로드 자산·기간·수정일을 반환한다. FILE의 실제 컬럼이 필요하면 observe=true를 사용한다. 이 경우 bounded 다운로드 후 CSV, SHP의 DBF, XLSX worksheet 컬럼과 원본 SHA-256을 반환하므로 메타데이터 설명과 실제 스키마를 구분할 수 있다. STD(delivery=standard)는 공식 포털 JSON 계약·컬럼 표시명·선언 건수와 observe=true일 때 실제 첫 페이지를 관찰한다. 선언 건수는 모집단 검증이 아니며 카탈로그 수정일은 레코드 기준일이 아니다. 검사되지 않은 URL이나 파라미터는 추측하지 않는다.",
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in inspectDatasetIn) (*mcp.CallToolResult, *inspectDatasetOut, error) {
 		if strings.TrimSpace(in.PK) == "" {
 			return errResult("pk 가 필요합니다 — catalog_search에서 Data Node를 먼저 고르세요"), nil, nil

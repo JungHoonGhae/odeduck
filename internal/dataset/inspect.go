@@ -256,6 +256,8 @@ type schemaDataset struct {
 	DateModified        string `json:"dateModified"`
 	DatasetTimeInterval string `json:"datasetTimeInterval"`
 	EncodingFormat      string `json:"encodingFormat"`
+	SpatialCoverage     any    `json:"spatialCoverage"`
+	TemporalCoverage    any    `json:"temporalCoverage"`
 	Creator             struct {
 		Name string `json:"name"`
 	} `json:"creator"`
@@ -291,6 +293,13 @@ func (i *Inspector) standardMetadata(ctx context.Context, pk string) (standardCo
 		name = strings.TrimSpace(schema.Name)
 	}
 	metadata := map[string]string{}
+	// Schema.org also permits structured coverage. Preserve plain declarations
+	// without guessing a label from an object or failing unrelated metadata.
+	for key, value := range map[string]any{"spatialCoverage": schema.SpatialCoverage, "temporalCoverage": schema.TemporalCoverage} {
+		if text, ok := value.(string); ok && strings.TrimSpace(text) != "" {
+			metadata[key] = strings.TrimSpace(text)
+		}
+	}
 	for key, value := range map[string]string{
 		"name": schema.Name, "alternateName": schema.AlternateName,
 		"description": schema.Description, "license": schema.License,

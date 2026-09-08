@@ -1,6 +1,6 @@
 # 공통 탐색·원천 읽기·목표 실행 통합
 
-상태: 검색 통합 검증 완료; 원천 읽기·목표 실행 통합 대기.
+상태: 검색·원천 읽기 통합 검증 완료; 목표 실행 통합 대기.
 [교체·삭제 순서 결정](https://github.com/JungHoonGhae/odeduck/issues/43).
 사용자가 설계와 구현 판단을 위임했다. 이는 기존 worktree 중 목표와 관련된 변경의 통합이며,
 전체 INTENT의 완료나 모든 현재 동작의 의미 승인을 뜻하지 않는다.
@@ -98,6 +98,20 @@ CLI의 실제 카탈로그/검색 경로로 세 계획 진단·최종 선택 카
 전체 test/build와 catalog·discovery·MCP·CLI race 검사 통과. 같은 전체 검사는 원래 worktree에서도
 통과했다. 독립 Spec/Standards 검토 지적 사항은 각각 0건이다. 이 검증은 fixture 기반 검색 경로이며
 실제 모델의 자율 탐색이나 I1–I10 완료 증거가 아니다.
+
+원천 읽기 단계는 CSV의 빈 문자열을 null로 치환하지 않는다. STD는 private inspection handle의
+원래 포털 응답만 사용하며, bounded no-redirect streaming과 모호하지 않은 JSON 원문을 요구한다.
+기존 buffered STD fallback은 실제 사용자가 없어 제거한다. XLSX/ZIP 구조와 원본 위치 회귀는
+보존하고, 위 보완은 공개 원천 읽기 seam의 실패 재현 후 적용한다. 상세 STD 계약은 portal-catalog가
+소유하며, 이 통합은 새로운 원천 의미 승인이나 형식 자동 추측을 추가하지 않는다.
+
+2026-09-08 원천 통합 검증: 다른 목표 실행 변경이 없는 detached staged-tree에서 tidy/브랜드 일치/
+vet/전체 test/build와 dataset·fetch·apicall·catalog·MCP·CLI race 통과. 원래 worktree의 전체 test 및
+tidy/vet/build도 통과했다. Spec 지적 0건; Standards 규칙 위반 0건, XLSX 구조 순회 중복에 대한
+비차단 의견 1건. 공통 좌표 형식 검사는 공유하되 구조만 읽는 경로와 선택 값/수식 cache를 읽는
+경로의 제한은 유지한다. 전체 parser framework로 합치는 것은 이번 통합에 포함하지 않는다.
+실제 CLI의 STD 계약/5행 스키마 검사는 portal-catalog에 기록한다. 원천 검사 통과를 자율 목표 완주로
+세지 않는다. 원천 값이 파생 결과까지 유지되는 검증은 다음 목표 실행 통합에도 필요하다.
 
 ## Out of Scope
 

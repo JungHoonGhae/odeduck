@@ -213,6 +213,16 @@ func (c *Client) OpenGET(ctx context.Context, rawURL string) (*StreamResponse, e
 	return c.open(ctx, http.MethodGet, rawURL, nil, "", "text/csv,application/octet-stream,*/*")
 }
 
+// OpenGETNoRedirect keeps a streamed first-party response bound to its inspected
+// endpoint. The caller receives redirect status without visiting the destination.
+func (c *Client) OpenGETNoRedirect(ctx context.Context, rawURL string) (*StreamResponse, error) {
+	httpClient := *c.http
+	httpClient.CheckRedirect = func(_ *http.Request, _ []*http.Request) error {
+		return http.ErrUseLastResponse
+	}
+	return c.openWithClient(ctx, &httpClient, http.MethodGet, rawURL, nil, "", "application/json,*/*")
+}
+
 // OpenPostForm starts a streamed form POST for provider assets that are too
 // large for the ordinary bounded response path.
 func (c *Client) OpenPostForm(ctx context.Context, rawURL string, form url.Values) (*StreamResponse, error) {
@@ -220,6 +230,10 @@ func (c *Client) OpenPostForm(ctx context.Context, rawURL string, form url.Value
 }
 
 func (c *Client) open(ctx context.Context, method, rawURL string, body io.Reader, contentType, accept string) (*StreamResponse, error) {
+	return c.openWithClient(ctx, c.http, method, rawURL, body, contentType, accept)
+}
+
+func (c *Client) openWithClient(ctx context.Context, httpClient *http.Client, method, rawURL string, body io.Reader, contentType, accept string) (*StreamResponse, error) {
 	c.throttle()
 	req, err := http.NewRequestWithContext(ctx, method, rawURL, body)
 	if err != nil {
@@ -233,7 +247,7 @@ func (c *Client) open(ctx context.Context, method, rawURL string, body io.Reader
 	if ref := refererOf(rawURL); ref != "" {
 		req.Header.Set("Referer", ref)
 	}
-	streamClient := *c.http
+	streamClient := *httpClient
 	streamClient.Timeout = c.streamTimeout
 	resp, err := streamClient.Do(req)
 	if err != nil {

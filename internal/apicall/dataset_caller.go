@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/JungHoonGhae/odeduck/internal/fetch"
+	"github.com/JungHoonGhae/odeduck/internal/portal"
 )
 
 // CredentialSource keeps secret acquisition outside the invocation module. The
@@ -45,6 +46,10 @@ func NewDatasetCaller(f *fetch.Client, baseURL string, credentials CredentialSou
 }
 
 func newDatasetCaller(f *fetch.Client, baseURL string, credentials CredentialSource, external *ExternalCaller) *DatasetCaller {
+	if baseURL == "" {
+		baseURL = portal.BaseURL
+	}
+	baseURL = strings.TrimRight(baseURL, "/")
 	return &DatasetCaller{fetch: f, baseURL: baseURL, credentials: credentials, external: external, rest: callRESTDataset}
 }
 

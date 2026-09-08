@@ -106,7 +106,7 @@ func inspectCmd() *cobra.Command {
 	var delivery string
 	c := &cobra.Command{
 		Use:   "inspect <publicDataPk>",
-		Short: "데이터 상세 — REST/LINK 계약 또는 FILE 실제 스키마 검사",
+		Short: "데이터 상세 — REST/LINK 계약 또는 FILE/STD 실제 스키마 검사",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			base := flagBaseURL
@@ -122,9 +122,9 @@ func inspectCmd() *cobra.Command {
 			return output.WriteJSON(cmd.OutOrStdout(), result)
 		},
 	}
-	c.Flags().BoolVar(&observe, "observe", false, "FILE 최신 자산을 bounded 다운로드해 실제 CSV/DBF 컬럼과 SHA-256 검사")
+	c.Flags().BoolVar(&observe, "observe", false, "FILE 자산 또는 STD 첫 페이지를 bounded 다운로드해 실제 컬럼과 SHA-256 검사")
 	c.Flags().StringVar(&assetName, "asset", "", "검사할 FILE 자산의 정확한 이름 (기본: 목록 첫 번째 최신 자산)")
-	c.Flags().StringVar(&delivery, "delivery", "auto", "검사할 제공형: auto | api | file (auto는 복수 제공형을 모두 반환)")
+	c.Flags().StringVar(&delivery, "delivery", "auto", "검사할 제공형: auto | api | file | standard (auto는 복수 제공형을 모두 반환)")
 	return c
 }
 

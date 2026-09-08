@@ -7,12 +7,21 @@ section matching a `vX.Y.Z` tag as the GitHub release notes.
 
 ## [Unreleased]
 
+### Added
+
+- Native STD inspection through CLI/MCP, plus bounded CSV, ZIP-member and exact
+  XLSX-rectangle readers with source hashes, original positions and explicit limits.
+
 ### Fixed
 
 - Share semantic-search policy across CLI and MCP, keeping degraded retrieval
   visible and preserving the connection limit through progressive discovery.
 - Strengthen credential isolation at the shared REST and LINK response boundaries;
   withhold unsafe responses without creating replacement source observations.
+- Preserve empty CSV strings instead of inventing nulls; keep STD reads bound to
+  the first-party response and reject ambiguous JSON object members.
+- Reject lossy Unicode decoding in native STD schema/row JSON before retaining
+  source identifiers. Preserve valid replacement characters and surrogate pairs.
 
 ## [0.18.0] - 2026-09-05
 
