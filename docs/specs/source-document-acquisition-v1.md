@@ -1,6 +1,7 @@
 # 공식 보조 문서의 선택 관측 v1
 
-상태: 구현·검증 중. [INTENT.md](../../INTENT.md) 및
+상태: 아래의 제한된 읽기·전달 계약 구현 및 회귀·실취득 검증 완료. 실제 정의 적용과 제품 목표 완주는
+미완료다. [INTENT.md](../../INTENT.md) 및
 [실행·검증 계획](goal-driven-completion-plan.md)의 I4/I5/I7/I9와
 [선택 근거 연결](goal-source-report-review-v1.md#다른-관측의-선택-근거-연결--2026-09-08-후속-계약)의 취득 공백을 잇는다.
 사용자의 설계·구현 위임에 따른 선택이며 G1–G5의 질문·oracle·완료 조건은 유지한다.
@@ -44,7 +45,8 @@
   `form[name=search] .popoverBox .pContent`의 세 PC 도움말 section이 읽기 범위다.
 - 같은 통계 family의 보조 참고문서:
   `https://kosis.kr/civilComplaint/qnaDetail.do?boardIdx=22124`. `adapter_reference`로 표시하고,
-  실제 게시물 ID와 `.answers > .tbx`, `.answers > .an_txt` 두 section을 확인한다.
+  실제 게시물 ID와 `.answers > .tbx`, `.answers > .an_txt`가 각각 정확히 하나인지 확인하고,
+  합집합도 두 section인지 검사한다. 한 구역의 누락을 다른 구역의 중복으로 상쇄하지 않는다.
   질문자 본문이나 화면 탐색 영역을 수집하지 않는다. 만 나이 정의를 반환값에 만들어 넣지 않는다.
 
 관측 근거·원문 위치·적용 한계는
@@ -77,3 +79,27 @@ PDF/OCR, 임의 URL, 월간 통계 export 실행 및 실제 목표의 의미 검
 추출 revision은 `html-block-space-v1`이다. source HTML은 변할 수 있어 live 검사에서 이 해시를
 정답으로 고정하지 않는다. 원문 전달·적용 해석·목표 완료는 별개이며, G4의 기존 7시도/5모델 호출/
 목표 완료 0회는 이 transport 검사로 바뀌지 않는다.
+
+### 구현 검토와 회귀 확인
+
+구현 `6881c5f`와 후속 수정 `e051689`를 `4346156` 기준으로 독립적인 두 축에서 검토했다.
+
+- Standards: 강제 위반 0건. 추출기와 Engine에 중복된 revision·용량 계약이라는 설계 의견 1건은
+  `dataset` 소유 상수로 모아 해결했다. Engine의 독립적인 출처·원문 검증은 유지한다. 재검토 잔여 0건.
+- Spec: KOSIS의 필수 구역 누락을 다른 구역의 중복이 가릴 수 있는 P2 1건을 발견했다. 공개
+  Inspector 테스트에서 두 방향의 오통과를 먼저 재현한 뒤 selector별 개수 검사를 추가했다.
+  부분 관측 반환도 거부하며 재검토 잔여 0건이다.
+
+수정 후 `go mod tidy -diff`, `go vet ./...`, `go test ./...`, `go build ./...`, brand 동기화
+`--check`, `git diff --check`를 통과했다. `dataset`·`goalwork`·`fetch`·`mcpserver`·CLI package의
+race 검사도 통과했다. 일반 회귀는 외부 HTTP/모델 경계 fixture이며 실제 모델 정확도 측정이 아니다.
+
+같은 opt-in live 검사를 수정 후 다시 통과했다. HTML bytes·각 section의 원본 위치·text SHA-256·
+JSON bytes는 첫 취득과 같았다. 전체 HTML SHA-256은 행안부
+`8e245c331da918657d4a80fc34e02fdcd32ea515a1bbc6541c6ef6706e1fa783`, KOSIS
+`8ee24c4d3ad5797cf55f107dc9a90590247071531ad63f46750bedb8541a588c`로 바뀌었다.
+전체 HTML의 동일성과 선택 구역의 동일성은 구분하며, live 원문 전체를 이번 문서에 보관한 것은 아니다.
+
+다음 실제 G4 진단은 기존 `with-table-context`가 이미 8개 근거 packet을 사용하는 점을 먼저
+해결해야 한다. 중복 공개를 줄이거나 근거 선택을 재구성하되 필요한 원천 정의·계산 입력·전체 범위를
+버리거나 예산을 넓혀 통과시키지 않는다. 이 준비를 실제 모델 호출이나 새 G4 시도로 집계하지 않는다.
