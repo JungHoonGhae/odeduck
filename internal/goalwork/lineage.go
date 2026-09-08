@@ -48,6 +48,9 @@ func compositionSources(p Composition, observed map[string]Observation) map[stri
 			return
 		}
 		used[id] = true
+		if reduction := observed[id].Reduction; reduction != nil {
+			add(reduction.Recipe.Observation)
+		}
 		if spatial := observed[id].Spatial; spatial != nil {
 			add(spatial.AnchorObservation)
 			add(spatial.CandidateObservation)
@@ -62,6 +65,19 @@ func compositionSources(p Composition, observed map[string]Observation) map[stri
 
 func prepareLineage(p Composition, inputs map[string][]Row, observed map[string]Observation) (map[string][]rowLineage, error) {
 	used := compositionSources(p, observed)
+	direct := []string{p.Base}
+	for _, join := range p.Joins {
+		direct = append(direct, join.Right)
+	}
+	for _, id := range direct {
+		if reduction := observed[id].Reduction; reduction != nil {
+			for _, other := range direct {
+				if other != id && compositionSources(Composition{Base: other}, observed)[reduction.Recipe.Observation] {
+					return nil, fmt.Errorf("overlapping source reductions or group-to-member joins need explicit allocation; raw and grouped contributions cannot be mixed")
+				}
+			}
+		}
+	}
 	out := map[string][]rowLineage{}
 	// Build original addresses first so pair origins can inherit both retained
 	// row and physical CSV addresses without treating a prefix index as a CSV ID.
@@ -73,6 +89,27 @@ func prepareLineage(p Composition, inputs map[string][]Row, observed map[string]
 		o := observed[id]
 		if o.RowsSHA256 != "" && o.RowsSHA256 != digest(rows) {
 			return nil, fmt.Errorf("source record lineage row revision mismatch for %s", id)
+		}
+		if r := o.Reduction; r != nil {
+			parent, ok := observed[r.Recipe.Observation]
+			if !ok || parent.ID == id || parent.Reduction != nil || parent.Spatial != nil || r.Method != "source_group_v1" || r.Recipe.RowsSHA256 != parent.RowsSHA256 || r.SourceContentSHA256 != parent.ContentSHA256 || r.SourceRequestSHA256 != parent.RequestSHA256 || len(r.Groups) != len(rows) {
+				return nil, fmt.Errorf("reduction source record lineage revision mismatch")
+			}
+			seen := map[int]bool{}
+			for _, group := range r.Groups {
+				if len(group) == 0 {
+					return nil, fmt.Errorf("reduction group has no source records")
+				}
+				for _, position := range group {
+					if position < 1 || position > len(inputs[parent.ID]) || seen[position] {
+						return nil, fmt.Errorf("reduction source record membership is duplicated or outside retained range")
+					}
+					seen[position] = true
+				}
+			}
+			if len(seen) != len(inputs[parent.ID]) {
+				return nil, fmt.Errorf("reduction omits retained source records")
+			}
 		}
 		if o.Spatial != nil {
 			continue
@@ -159,6 +196,9 @@ func outputMatchesRole(field, bound string, observed map[string]Observation) boo
 	origin := fieldSlot(field, observed).observation
 	if origin == bound {
 		return true
+	}
+	if r := observed[origin].Reduction; r != nil && r.Recipe.Observation == bound {
+		return true // computed group still derives from the required original source
 	}
 	// A nearest-derived container represents the candidate role. Its copied
 	// candidate fields can fulfill that role; copied anchor fields cannot.

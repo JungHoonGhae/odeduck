@@ -111,8 +111,8 @@ func LiveDependencies(client *fetch.Client, base string, caller Caller, searcher
 			return dataset.CSVScanReport{}, "", fmt.Errorf("scan asset not in inspected contract")
 		},
 		Sample: func(ctx context.Context, s SampleRequest, i Inspection) (Acquired, error) {
-			if s.Nearest != nil {
-				return Acquired{}, fmt.Errorf("nearest reduction requires the shared engine's retained observations")
+			if s.Nearest != nil || s.Reduce != nil {
+				return Acquired{}, fmt.Errorf("local reduction requires the shared engine's retained observations")
 			}
 			if err := validateSampleSelection(s); err != nil {
 				return Acquired{}, err
@@ -228,6 +228,12 @@ func classifyLiveAcquisitionError(err error, result *apicall.CallResult) error {
 }
 
 func validateSampleSelection(s SampleRequest) error {
+	if s.Reduce != nil {
+		if s.Nearest != nil || s.ScanCSV || s.LayoutID != "" || s.Asset != "" || s.Member != "" || s.XLSX != nil || len(s.Where) != 0 || len(s.Params) != 0 || s.Operation != "" || s.RowPath != "" {
+			return fmt.Errorf("reduce accepts only pk, original delivery and the retained source reduction; no new acquisition selectors")
+		}
+		return nil
+	}
 	if s.Nearest != nil {
 		if !s.ScanCSV || s.LayoutID != "" {
 			return fmt.Errorf("nearest requires scanCsv:true and its own candidate observation revision pin")

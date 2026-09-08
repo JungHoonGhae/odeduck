@@ -79,7 +79,10 @@ func prepareTemporal(p Composition, inputs map[string][]Row, observations ...Obs
 	used := compositionSources(p, byID)
 	readOriginalRows := map[string]bool{}
 	for id := range used {
-		if s := byID[id].Spatial; s != nil {
+		if r := byID[id].Reduction; r != nil {
+			readOriginalRows[r.Recipe.Observation] = true
+			delete(used, id)
+		} else if s := byID[id].Spatial; s != nil {
 			readOriginalRows[s.AnchorObservation] = true
 			delete(used, id)
 		} else if direct[id] {
@@ -87,7 +90,7 @@ func prepareTemporal(p Composition, inputs map[string][]Row, observations ...Obs
 		}
 	}
 	if len(p.Time.Bindings) != len(used) || len(p.Time.Bindings) > 8 {
-		return nil, fmt.Errorf("time alignment requires exactly one binding for every participating original observation, including both spatial sources")
+		return nil, fmt.Errorf("time alignment requires exactly one binding for every participating original observation, including reduction and spatial sources")
 	}
 	var window *dateSpan
 	if p.Time.Window != nil {
@@ -136,6 +139,19 @@ func prepareTemporal(p Composition, inputs map[string][]Row, observations ...Obs
 		}
 	}
 	for id := range direct {
+		if r := byID[id].Reduction; r != nil {
+			// A sum already contains every member. Filtering one member later
+			// would falsify that sum, so intersect ALL original member periods.
+			original := out.spans[r.Recipe.Observation]
+			for _, group := range r.Groups {
+				span := original[group[0]-1] // membership validated by prepareLineage
+				for _, position := range group[1:] {
+					span = intersectDates(span, original[position-1])
+				}
+				out.spans[id] = append(out.spans[id], span)
+			}
+			continue
+		}
 		s := byID[id].Spatial
 		if s == nil {
 			continue

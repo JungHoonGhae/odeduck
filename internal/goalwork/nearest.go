@@ -112,8 +112,8 @@ func (e *Engine) sampleNearest(ctx context.Context, request SampleRequest, inspe
 			candidate = o
 		}
 	}
-	if anchor == nil || candidate == nil || anchor.Spatial != nil || candidate.Spatial != nil {
-		return Acquired{}, fmt.Errorf("nearest needs two retained original observations; nested spatial reduction is unsupported")
+	if anchor == nil || candidate == nil || anchor.Spatial != nil || candidate.Spatial != nil || anchor.Reduction != nil || candidate.Reduction != nil {
+		return Acquired{}, fmt.Errorf("nearest needs two retained original observations; nested spatial/group reduction is unsupported")
 	}
 	prior := e.requests[candidate.ID]
 	if prior.PK != request.PK || prior.Asset != request.Asset || prior.Delivery != "file" || prior.Member != "" || prior.XLSX != nil || candidate.CSV == nil || len(candidate.ContentSHA256) != 64 {

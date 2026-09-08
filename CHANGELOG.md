@@ -9,6 +9,11 @@ section matching a `vX.Y.Z` tag as the GitHub release notes.
 
 ### Added
 
+- Source-grain aggregation of retained observations before cross-source joins via
+  goal `sample.reduce`. Exact sums, contributing-record groups, source revisions,
+  original-period checks and shared budgets survive CLI/MCP execution. Computed
+  groups remain distinct from publisher records and do not acquire source-report approval.
+
 - Opt-in, separately invoked model review for bounded source-field reports via
   CLI `--review-source-reports` or MCP startup `--review-goals-with`. Original-goal
   fit and every output's source support are assessed separately against already

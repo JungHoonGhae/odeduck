@@ -71,6 +71,7 @@ type Parameter struct {
 }
 
 type SampleRequest struct {
+	Reduce    *SourceReduction       `json:"reduce,omitempty"`  // local pre-join aggregation of an exact retained source revision
 	Nearest   *NearestSelection      `json:"nearest,omitempty"` // local reduction using retained observations, never caller coordinates
 	ScanCSV   bool                   `json:"scanCsv,omitempty"` // complete bounded direct-CSV scan; retain only a prefix
 	PK        string                 `json:"pk"`
@@ -85,6 +86,7 @@ type SampleRequest struct {
 	LayoutID  string                 `json:"layoutId,omitempty"` // optional same-source-file pin from layout discovery
 }
 type Acquired struct {
+	Reduction      *ReductionProvenance
 	Spatial        *SpatialProvenance
 	Rows           []Row
 	Delivery       string
@@ -117,6 +119,7 @@ type Node struct {
 	Inspection *Inspection `json:"inspection,omitempty"`
 }
 type Observation struct {
+	Reduction      *ReductionProvenance       `json:"reduction,omitempty"`
 	Spatial        *SpatialProvenance         `json:"spatial,omitempty"`
 	ID             string                     `json:"id"`
 	PK             string                     `json:"pk"`
@@ -533,16 +536,21 @@ func (e *Engine) act(ctx context.Context, d Decision) error {
 		e.samples++
 		attemptIndex := len(e.state.SampleAttempts)
 		e.state.SampleAttempts = append(e.state.SampleAttempts, SampleAttempt{Revision: e.state.Revision, StartedAt: time.Now().UTC().Format(time.RFC3339Nano), Request: cloneSampleRequest(s), RequestSHA256: digest(s), Status: "failed", FailureKind: FailureUnknown, RetryOf: d.RetryOf})
-		if s.Nearest == nil && e.deps.Sample == nil {
+		if s.Nearest == nil && s.Reduce == nil && e.deps.Sample == nil {
 			return fmt.Errorf("sampling unavailable")
 		}
 		// An adapter may add private request state internally. Preserve only the
 		// validated original request, never the adapter's mutable parameter maps.
 		var acq Acquired
-		if s.Nearest != nil {
+		if s.Reduce != nil {
+			acq, err = e.sampleReduction(ctx, cloneSampleRequest(s))
+		} else if s.Nearest != nil {
 			acq, err = e.sampleNearest(ctx, cloneSampleRequest(s), *n.Inspection)
 		} else {
 			acq, err = e.deps.Sample(ctx, cloneSampleRequest(s), *n.Inspection)
+		}
+		if err == nil && s.Reduce == nil && acq.Reduction != nil {
+			err = fmt.Errorf("external acquisition cannot supply local reduction provenance")
 		}
 		if err == nil && expectedLayoutHash != "" && acq.ContentSHA256 != expectedLayoutHash {
 			err = fmt.Errorf("source file changed since layout discovery; inspect the new layout before choosing another observation")
@@ -612,10 +620,10 @@ func (e *Engine) act(ctx context.Context, d Decision) error {
 		e.requests[id] = s
 		e.bytes += len(b)
 		var declaration *SourceDeclaration
-		if declared, ok := n.Inspection.Declarations[s.Delivery]; ok {
+		if declared, ok := n.Inspection.Declarations[s.Delivery]; ok && s.Reduce == nil {
 			declaration = &declared
 		}
-		e.state.Observations = append(e.state.Observations, Observation{Spatial: acq.Spatial, ID: id, PK: s.PK, Delivery: acq.Delivery, Operation: acq.Operation, Asset: s.Asset, RowPath: s.RowPath, RequestSHA256: digest(s), ContentSHA256: acq.ContentSHA256, ContractSHA256: acq.ContractSHA256, RowsSHA256: digest(rows), ObservedAt: time.Now().UTC().Format(time.RFC3339Nano), Columns: names, ColumnTypes: columnTypes, ColumnProfiles: profileColumns(rows, names), RowCount: len(rows), Warnings: acq.Warnings, Selection: acq.Selection, Table: cloneTableProvenance(acq.Table), Archive: cloneArchiveProvenance(acq.Archive), CSV: cloneCSVProvenance(acq.CSV), Declaration: declaration})
+		e.state.Observations = append(e.state.Observations, Observation{Reduction: acq.Reduction, Spatial: acq.Spatial, ID: id, PK: s.PK, Delivery: acq.Delivery, Operation: acq.Operation, Asset: s.Asset, RowPath: s.RowPath, RequestSHA256: digest(s), ContentSHA256: acq.ContentSHA256, ContractSHA256: acq.ContractSHA256, RowsSHA256: digest(rows), ObservedAt: time.Now().UTC().Format(time.RFC3339Nano), Columns: names, ColumnTypes: columnTypes, ColumnProfiles: profileColumns(rows, names), RowCount: len(rows), Warnings: acq.Warnings, Selection: acq.Selection, Table: cloneTableProvenance(acq.Table), Archive: cloneArchiveProvenance(acq.Archive), CSV: cloneCSVProvenance(acq.CSV), Declaration: declaration})
 		e.state.SampleAttempts[attemptIndex].Status = "acquired"
 		e.state.SampleAttempts[attemptIndex].FailureKind = ""
 		e.state.SampleAttempts[attemptIndex].ObservationID = id
@@ -744,26 +752,12 @@ func (e *Engine) node(pk string) *Node {
 func digest(v any) string { b, _ := json.Marshal(v); return fmt.Sprintf("%x", sha256.Sum256(b)) }
 
 func cloneSampleRequest(s SampleRequest) SampleRequest {
-	clone := func(values map[string]string) map[string]string {
-		if values == nil {
-			return nil
-		}
-		copy := make(map[string]string, len(values))
-		for k, v := range values {
-			copy[k] = v
-		}
-		return copy
-	}
-	s.Params, s.Where = clone(s.Params), clone(s.Where)
-	if s.Nearest != nil {
-		selection := *s.Nearest
-		s.Nearest = &selection
-	}
-	if s.XLSX != nil {
-		selection := *s.XLSX
-		s.XLSX = &selection
-	}
-	return s
+	// Requests contain only typed JSON values and have already passed the
+	// decision byte bound. Detach every selector, including nested reductions.
+	b, _ := json.Marshal(s)
+	var copy SampleRequest
+	_ = json.Unmarshal(b, &copy)
+	return copy
 }
 
 func cloneTableProvenance(table *dataset.TableProvenance) *dataset.TableProvenance {

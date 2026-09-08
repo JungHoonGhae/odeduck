@@ -33,7 +33,9 @@ func explainEvidence(c GoalContract, p Composition, sources []Observation, rowCo
 	inputRows := 0
 	for _, source := range sources {
 		ids = append(ids, source.ID)
-		inputRows += source.RowCount
+		if source.Spatial == nil && source.Reduction == nil {
+			inputRows += source.RowCount
+		}
 	}
 	var out []EvidenceExplanation
 	for _, requirement := range c.Explanations {
@@ -132,6 +134,9 @@ func explainMeasurements(p Composition, sources []Observation) string {
 		byID[source.ID] = source
 	}
 	for _, source := range sources {
+		if r := source.Reduction; r != nil {
+			parts = append(parts, fmt.Sprintf("관측 %s는 %s의 보유 원본 %d행을 %d그룹으로 선집계했습니다. reduction.recipe에 필드·수치 형식·단위·집계 규칙을, groups에 각 그룹의 모든 기여 행을 보존합니다. 원천 전체·모집단 완전성이나 그룹 의미를 승인하지 않습니다.", source.ID, r.Recipe.Observation, byID[r.Recipe.Observation].RowCount, len(r.Groups)))
+		}
 		s := source.Spatial
 		if s == nil {
 			continue
