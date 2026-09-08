@@ -543,3 +543,9 @@ ODEDUCK_CITYWIDE_REVIEW=codex ODEDUCK_CITYWIDE_ACQUISITION=historical \
   ODEDUCK_CITYWIDE_REVIEW_OUTPUT=/tmp/odeduck-g4-table-context-new.json \
   go test ./internal/goalwork -run '^TestLiveCitywideGoalAnalysisReview$' -count=1 -v
 ```
+
+고정 candidate `840fd16`은 `go mod tidy -diff`, 브랜드 동기화 검사, `go vet ./...`,
+`go test ./...`, `go build ./...` 및 goalwork/agentplan race 검사를 통과했다. `740ec6d` 대비
+독립 Standards·Spec 검토는 각각 지적 0건이었다. 별도 읽기 전용 원천 감사도
+[인구 조사](population-source-applicability-2026-09-08.md)의 20개 파일 hash와 3,619행·309개 수치
+대조를 재현했다. 이 검증 기록 외의 후속 코드 변경은 없다. 로그인·신청·외부 배포는 하지 않았다.
