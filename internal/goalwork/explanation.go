@@ -47,6 +47,10 @@ func explainEvidence(c GoalContract, p Composition, sources []Observation, rowCo
 			report.Text = fmt.Sprintf("원천 %d개에서 읽은 표본 %d행으로 결과 %d행을 만들었습니다. 원천 행 수의 합은 동일 모집단의 크기가 아닙니다. 대표성·전체 coverage·미발견 대상의 부재는 증명하지 않습니다.", len(sources), inputRows, rowCount)
 			if len(p.Joins) > 0 {
 				report.Text += " inner join은 불일치 행을 제외합니다."
+				for _, metric := range metrics {
+					report.Text += fmt.Sprintf(" %s 결합 단계에서 왼쪽 입력 %d개·오른쪽 원천 기록 %d개가 대응하지 않았습니다.", metric.Right, len(metric.UnmatchedLeft), len(metric.UnmatchedRight))
+				}
+				report.Text += " metrics의 unmatchedLeft/unmatchedRight는 단계별 보유 행 주소입니다. 선택 근거 읽기로 원문을 확인할 수 있으며, 단계 간 중복·후속 제외가 가능하므로 합산한 고유 대상 수나 사건 부재로 해석하지 않습니다."
 			}
 		case "temporal":
 			if temporal.Status == "checked" {

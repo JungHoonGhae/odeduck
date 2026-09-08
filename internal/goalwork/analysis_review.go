@@ -57,7 +57,7 @@ func (e *Engine) analysisReviewInput(ctx context.Context, id string) (ReviewInpu
 		}
 	}
 	usedRows := map[string]map[int]bool{}
-	actual, _, err := executeTraced(a.Recipe, e.rows, 1000, usedRows, a.Sources...)
+	actual, actualMetrics, err := executeTraced(a.Recipe, e.rows, 1000, usedRows, a.Sources...)
 	if err != nil || digest(actual) != digest(a.Rows) {
 		return ReviewInput{}, fmt.Errorf("current result cannot be reproduced from retained sources")
 	}
@@ -90,6 +90,36 @@ func (e *Engine) analysisReviewInput(ctx context.Context, id string) (ReviewInpu
 	if len(packets) == 0 {
 		return ReviewInput{}, fmt.Errorf("read selected evidence before analysis review")
 	}
+	excluded := map[string]map[int]bool{}
+	mark := func(id string, position int) {
+		if excluded[id] == nil {
+			excluded[id] = map[int]bool{}
+		}
+		excluded[id][position-1] = true
+	}
+	for _, metric := range actualMetrics {
+		for _, tuple := range metric.UnmatchedLeft {
+			for id, position := range tuple {
+				mark(id, position)
+			}
+		}
+		for _, position := range metric.UnmatchedRight {
+			mark(metric.Right, position)
+		}
+	}
+	// A matched-only replay can hide excluded regions while reproducing every
+	// output value. Require their comparison context, not unrelated output cells.
+	for _, field := range analysisComparisonFields(a.Recipe) {
+		id, name, _ := strings.Cut(field, ".")
+		if !direct[id] {
+			continue // original reduction members remain local
+		}
+		for position := range excluded[id] {
+			if !cells[id][position][name] {
+				return ReviewInput{}, fmt.Errorf("analysis needs unmatched comparison evidence for %s retained row %d; preserve the original goal", field, position+1)
+			}
+		}
+	}
 	for id, fields := range needed {
 		for field := range fields {
 			seen := false
@@ -116,9 +146,12 @@ func (e *Engine) analysisReviewInput(ctx context.Context, id string) (ReviewInpu
 			metadata[i].RowsSHA256 = digest(selected[o.ID])
 		}
 	}
-	replayed, _, err := execute(a.Recipe, inputs, 1000, metadata...)
+	replayed, replayedMetrics, err := execute(a.Recipe, inputs, 1000, metadata...)
 	if err != nil || digest(replayed) != digest(a.Rows) {
 		return ReviewInput{}, fmt.Errorf("analysis result cannot be reconstructed from disclosed relation values; read missing fields/rows, do not shrink the goal")
+	}
+	if len(a.Recipe.Joins) > 0 && digest(replayedMetrics) != digest(actualMetrics) {
+		return ReviewInput{}, fmt.Errorf("analysis join exclusions cannot be reproduced from disclosed comparison evidence")
 	}
 	in := ReviewInput{Recipient: e.state.Policy.ReviewRecipient, Goal: e.state.Goal, Contract: *e.state.Contract, Artifact: *a, Evidence: packets[0], Analysis: &AnalysisReviewContext{Method: "engine_relational_replay_v1", OutputSHA256: digest(a.Rows), AdditionalEvidence: packets[1:]}}
 	in.Artifact.Sources = slices.Clone(a.Sources)
@@ -193,27 +226,8 @@ func analysisFields(p Composition, observations map[string]Observation, requests
 	for _, a := range p.Aggregates {
 		qualified(a.Field)
 	}
-	for _, j := range p.Joins {
-		for _, field := range j.LeftKeys {
-			qualified(field)
-		}
-		for _, field := range j.RightKeys {
-			add(j.Right, field)
-		}
-		for _, scope := range j.Scopes {
-			for _, field := range scope.LeftParts {
-				qualified(field)
-			}
-			for _, field := range scope.RightParts {
-				add(j.Right, field)
-			}
-		}
-	}
-	if p.Time != nil {
-		for _, binding := range p.Time.Bindings {
-			add(binding.Observation, binding.FromField)
-			add(binding.Observation, binding.ThroughField)
-		}
+	for _, field := range analysisComparisonFields(p) {
+		qualified(field)
 	}
 	for id, o := range observations {
 		for field := range requests[id].Where {
@@ -241,6 +255,31 @@ func analysisFields(p Composition, observations map[string]Observation, requests
 		}
 	}
 	return needed
+}
+
+func analysisComparisonFields(p Composition) []string {
+	var fields []string
+	for _, j := range p.Joins {
+		fields = append(fields, j.LeftKeys...)
+		for _, field := range j.RightKeys {
+			fields = append(fields, j.Right+"."+field)
+		}
+		for _, scope := range j.Scopes {
+			fields = append(fields, scope.LeftParts...)
+			for _, field := range scope.RightParts {
+				fields = append(fields, j.Right+"."+field)
+			}
+		}
+	}
+	if p.Time != nil {
+		for _, binding := range p.Time.Bindings {
+			fields = append(fields, binding.Observation+"."+binding.FromField)
+			if binding.ThroughField != "" {
+				fields = append(fields, binding.Observation+"."+binding.ThroughField)
+			}
+		}
+	}
+	return fields
 }
 
 func validAnalysisCitations(f ReviewFinding, in ReviewInput) bool {

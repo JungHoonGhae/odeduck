@@ -178,6 +178,18 @@ func checkCitywideReduction(t *testing.T, live bool) {
 	if v.Status != "review_required" || !v.Evaluation.NeedsSemanticReview || len(v.Artifact.Rows) != 10 || v.Artifact.Metrics[0].LeftRows != 11 || v.Artifact.Metrics[0].MatchedLeftRows != 10 {
 		t.Fatalf("unresolved district mismatch hidden or goal incorrectly completed: status=%s review=%t rows=%d metrics=%+v", v.Status, v.Evaluation.NeedsSemanticReview, len(v.Artifact.Rows), v.Artifact.Metrics)
 	}
+	m := v.Artifact.Metrics[0]
+	if len(m.UnmatchedLeft) != 1 || len(m.UnmatchedLeft[0]) != 1 || len(m.UnmatchedRight) != 1 || m.UnmatchedRight[0] != 9 {
+		t.Fatalf("excluded districts lack retained source addresses: %+v", m)
+	}
+	position := m.UnmatchedLeft[0]["o3"]
+	if position < 1 || position > 11 || v.Evidence[0].Records[position-1].Values["시군구명"] != "서해구" {
+		t.Fatal("excluded population group cannot be traced to the independent district label")
+	}
+	v = step(goalwork.Decision{Action: "read_evidence", Evidence: &goalwork.EvidenceRequest{Observation: "o2", RowsSHA256: v.Observations[1].RowsSHA256, Rows: m.UnmatchedRight, Fields: []string{"A", "AG", "AK"}}})
+	if v.Evidence[1].Records[0].Values["A"] != " 서구 " || v.Evidence[1].Records[0].Values["AG"] != "111" {
+		t.Fatal("excluded school row was hidden, renamed or confused with pre-split geography")
+	}
 	for _, row := range v.Artifact.Rows {
 		name := row["o3.시군구명"].(string)
 		for _, expected := range oracle.Expected.Rows {

@@ -68,7 +68,7 @@ func TestGoalToolProducesSameArtifactAsStandaloneEngine(t *testing.T) {
 			return goalwork.Inspection{PK: pk, Deliveries: []string{"REST"}, Declarations: map[string]goalwork.SourceDeclaration{"api": {Status: "publisher_declared", Description: "fixture municipality"}}}, nil
 		},
 		Sample: func(_ context.Context, s goalwork.SampleRequest, _ goalwork.Inspection) (goalwork.Acquired, error) {
-			return goalwork.Acquired{Rows: []goalwork.Row{{"id": "001", "label": s.PK, "capacity": "9007199254740993", "adjustment": "1", "year": "2025", "scope": "fixture municipality"}}, Delivery: "REST", Operation: "list"}, nil
+			return goalwork.Acquired{Rows: []goalwork.Row{{"id": "001", "label": s.PK, "capacity": "9007199254740993", "adjustment": "1", "year": "2025", "scope": "fixture municipality"}, {"id": s.PK + "-unmatched", "label": "excluded", "capacity": "1", "adjustment": "0", "year": "2025", "scope": "fixture municipality"}}, Delivery: "REST", Operation: "list"}, nil
 		},
 	}
 	server := mcp.NewServer(&mcp.Implementation{Name: "test", Version: "0"}, nil)
@@ -139,6 +139,10 @@ func TestGoalToolProducesSameArtifactAsStandaloneEngine(t *testing.T) {
 		t.Fatalf("%+v %+v %v", local, remote, err)
 	}
 	for _, result := range []goalwork.View{local, remote.State} {
+		m := result.Artifact.Metrics[0]
+		if len(m.UnmatchedLeft) != 1 || m.UnmatchedLeft[0]["o1"] != 2 || len(m.UnmatchedRight) != 1 || m.UnmatchedRight[0] != 2 {
+			t.Fatalf("public transports lost unmatched retained addresses: %+v", m)
+		}
 		if result.Revision != 17 || len(result.Executions) != 4 || result.Evaluation.ExecutionRevision != 16 || result.Evaluation.CompositionID != correction.ID || result.Artifact.Evaluation.ExecutionRevision != 16 || result.Budget.CompositionsRemaining != 2 {
 			t.Fatalf("shared correction lost revisions or cumulative budget: %+v", result)
 		}

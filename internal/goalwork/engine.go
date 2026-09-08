@@ -706,7 +706,7 @@ func (e *Engine) act(ctx context.Context, d Decision) error {
 			}
 			e.state.Artifact = &Artifact{Status: "sample_executed", Recipe: p, Sources: sources, Requests: requests, Layouts: e.state.Layouts, Metrics: metrics, Rows: rows, Limitations: []string{"Bounded observed sample only; not population coverage.", "Namespace, time, representativeness and usefulness remain declared assumptions, not verified identity or causality.", "Reacquisition may change source bytes; hashes identify the observed revision, not an archived copy.", "Not connection-ledger sample_verified. No automatic claim promotion."}}
 			if len(p.Joins) > 0 {
-				e.state.Artifact.Limitations = append(e.state.Artifact.Limitations, "Inner joins omit unmatched rows.")
+				e.state.Artifact.Limitations = append(e.state.Artifact.Limitations, "Inner joins omit unmatched rows from the result table; metrics retain stage-local source addresses for selected evidence and replanning, not proof of absence.")
 			}
 			evaluation := evaluateRequirements(*e.state.Contract, p, rows, e.state.Observations, e.state.Nodes)
 			evaluation.ExecutionRevision = e.state.Revision

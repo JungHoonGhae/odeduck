@@ -15,8 +15,12 @@ or computed positions. Artifact.sources includes the derivation closure; its col
 metadata is projected to the fields listed in analysis.sources. Dates and publisher
 declarations describe the source, not automatic real-world truth or validity.
 Each source's directRows lists the retained records that actually contributed
-before arithmetic/grouping, including zero/cancelling terms. Nonparticipating
-records remain in acquisition/join counts but their values need not be disclosed.
+before arithmetic/grouping, including zero/cancelling terms. Join metrics retain
+unmatchedLeft tuples (observation to 1-based retained position) and unmatchedRight
+positions in that right observation. These are stage-local exclusions, not unique
+entities or absence facts. Their direct comparison fields must be disclosed and
+join metrics replayed; unrelated excluded output values need not be sent. Use the
+packets to interpret excluded records, not only the matching result table.
 
 analysis.method records an Engine-local replay using retained originals, including
 every member of a source reduction, and a replay using disclosed direct relation

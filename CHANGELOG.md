@@ -9,6 +9,11 @@ section matching a `vX.Y.Z` tag as the GitHub release notes.
 
 ### Added
 
+- Stage-local unmatched record addresses in goal join metrics, including empty
+  joins, for bounded evidence reading and replanning. Relational review now also
+  requires disclosed comparison fields for excluded direct records and replays
+  exclusion metrics; unrelated excluded values remain private.
+
 - Bounded exact value-set selection (`sample.whereIn`) for full direct CSV scans,
   preserving source record positions and separate scanned/matched/retained coverage.
   Selection order cannot bypass acquisition replay limits, and both review kinds

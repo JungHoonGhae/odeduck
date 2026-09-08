@@ -86,6 +86,10 @@ including temporal rejections from an empty join. These records reach PlanningVi
 replanning can distinguish a time mismatch from unsupported fields or missing keys. They are session-local,
 bounded by the composition budget, and are not durable global negative evidence.
 
+Join metrics also retain value-free, stage-local unmatched source positions for selected evidence and
+replanning, including empty joins. See [unmatched record contract](goal-result-execution-v1.md#미대응-기록-추적--2026-09-08-추가-계약)
+for tuple/retained-position semantics, exclusion evidence and the distinction from absence or outer joins.
+
 Standalone planning permits one format-repair invocation per provider when a response cannot be decoded.
 It reuses the same state and existing overall three-minute planning deadline, sends only a bounded decoder
 diagnostic, and never reflects the invalid response body or its values. Provider invocation errors do not

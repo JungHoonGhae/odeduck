@@ -44,17 +44,19 @@ type Aggregate struct {
 }
 
 type JoinMetric struct {
-	Stage                 string       `json:"stage,omitempty"` // base_temporal for filtering a base without additional joins
-	Right                 string       `json:"right"`
-	LeftRows              int          `json:"leftRows"`
-	RightRows             int          `json:"rightRows"`
-	MatchedLeftRows       int          `json:"matchedLeftRows"`
-	OutputRows            int          `json:"outputRows"`
-	TemporalRule          string       `json:"temporalRule,omitempty"`
-	TemporalRejectedPairs int          `json:"temporalRejectedPairs,omitempty"`
-	TemporalUnknownPairs  int          `json:"temporalUnknownPairs,omitempty"`
-	LineageRejectedPairs  int          `json:"lineageRejectedPairs,omitempty"`
-	ScopeChecks           []ScopeCheck `json:"scopeChecks,omitempty"`
+	Stage                 string           `json:"stage,omitempty"` // base_temporal for filtering a base without additional joins
+	Right                 string           `json:"right"`
+	LeftRows              int              `json:"leftRows"`
+	RightRows             int              `json:"rightRows"`
+	MatchedLeftRows       int              `json:"matchedLeftRows"`
+	UnmatchedLeft         []map[string]int `json:"unmatchedLeft,omitempty"`  // one map per excluded left tuple: observation -> 1-based retained row
+	UnmatchedRight        []int            `json:"unmatchedRight,omitempty"` // 1-based retained rows of Right; local to this join stage
+	OutputRows            int              `json:"outputRows"`
+	TemporalRule          string           `json:"temporalRule,omitempty"`
+	TemporalRejectedPairs int              `json:"temporalRejectedPairs,omitempty"`
+	TemporalUnknownPairs  int              `json:"temporalUnknownPairs,omitempty"`
+	LineageRejectedPairs  int              `json:"lineageRejectedPairs,omitempty"`
+	ScopeChecks           []ScopeCheck     `json:"scopeChecks,omitempty"`
 }
 
 func execute(p Composition, inputs map[string][]Row, limit int, observations ...Observation) ([]Row, []JoinMetric, error) {
@@ -152,9 +154,10 @@ func executeTraced(p Composition, inputs map[string][]Row, limit int, usedRows m
 			metric.TemporalRule = "common_overlap_v1"
 		}
 		// Count before allocating the expanded relation.
+		matchedRight := make([]bool, len(right))
 		for leftIndex, r := range rows {
+			n := 0
 			if k, ok := tuple(r, j.LeftKeys, j.Normalization); ok {
-				n := 0
 				for _, candidate := range index[k] {
 					if !compatibleLineage(lineage[leftIndex], traces[j.Right][candidate.ordinal]) {
 						metric.LineageRejectedPairs++
@@ -166,6 +169,7 @@ func executeTraced(p Composition, inputs map[string][]Row, limit int, usedRows m
 					span, ok := temporal.combine(periods[leftIndex], j.Right, candidate.ordinal)
 					if ok {
 						n++
+						matchedRight[candidate.ordinal] = true
 					} else {
 						metric.TemporalRejectedPairs++
 						if !span.known {
@@ -173,13 +177,26 @@ func executeTraced(p Composition, inputs map[string][]Row, limit int, usedRows m
 						}
 					}
 				}
-				if n > 0 {
-					metric.MatchedLeftRows++
+			}
+			if n > 0 {
+				metric.MatchedLeftRows++
+			} else {
+				positions := map[string]int{}
+				for slot, ordinal := range lineage[leftIndex] {
+					if slot.kind == "row" {
+						positions[slot.observation] = ordinal + 1
+					}
 				}
-				if n > limit-metric.OutputRows {
-					return nil, metrics, fmt.Errorf("join row limit exceeded; aggregate source or narrow sample before retry")
-				}
-				metric.OutputRows += n
+				metric.UnmatchedLeft = append(metric.UnmatchedLeft, positions)
+			}
+			if n > limit-metric.OutputRows {
+				return nil, metrics, fmt.Errorf("join row limit exceeded; aggregate source or narrow sample before retry")
+			}
+			metric.OutputRows += n
+		}
+		for position, matched := range matchedRight {
+			if !matched {
+				metric.UnmatchedRight = append(metric.UnmatchedRight, position+1)
 			}
 		}
 		metrics = append(metrics, metric)
