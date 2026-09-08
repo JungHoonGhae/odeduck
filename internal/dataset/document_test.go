@@ -111,6 +111,29 @@ func TestReadRegisteredOfficialAnswerDistinguishesItFromPortalLink(t *testing.T)
 	}
 }
 
+func TestSupportingDocumentRejectsMissingAnswerSectionMaskedByDuplicate(t *testing.T) {
+	for _, section := range []string{"tbx", "an_txt"} {
+		t.Run(section, func(t *testing.T) {
+			body := strings.Replace(answerHTML, `class="tbx"`, `class="`+section+`"`, 1)
+			body = strings.Replace(body, `class="an_txt"`, `class="`+section+`"`, 1)
+			i := documentInspector(t, monthlyDocumentURL, func(r *http.Request) (*http.Response, error) {
+				if r.URL.String() != answerDocumentURL {
+					t.Fatal("wrong official answer request")
+				}
+				return documentResponse(body), nil
+			})
+			c, err := i.Inspect(context.Background(), dataset.Ref{PK: "12345678", Delivery: "FILE"})
+			if err != nil {
+				t.Fatal(err)
+			}
+			got, err := i.SampleDocument(context.Background(), c, dataset.DocumentSelection{ReferenceID: "kosis-answer-22124"})
+			if err == nil || len(got.Rows) != 0 || got.Document != nil {
+				t.Fatalf("duplicate %s masked a missing required section: %+v %v", section, got, err)
+			}
+		})
+	}
+}
+
 func TestSupportingDocumentRejectsDriftAndBoundsWithoutPartialObservations(t *testing.T) {
 	for _, scenario := range []string{"redirect", "status", "media", "charset", "encoding", "oversize", "cell", "identity", "sections", "empty section", "empty selection", "long selector", "unknown reference", "reconstructed contract", "answer identity"} {
 		t.Run(scenario, func(t *testing.T) {

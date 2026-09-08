@@ -36,6 +36,15 @@ type DocumentReference struct {
 const monthlyDocumentURL = "https://jumin.mois.go.kr/ageStatMonth.do"
 const answerDocumentURL = "https://kosis.kr/civilComplaint/qnaDetail.do?boardIdx=22124"
 
+// Supporting-document producers and consumers share this bounded extraction
+// contract; consumers still validate provenance and selected text independently.
+const (
+	DocumentExtractorRevision = "html-block-space-v1"
+	DocumentMaxBytes          = 1 << 20
+	DocumentMaxSections       = 20
+	DocumentMaxTextJSONBytes  = 2048
+)
+
 func supportingDocuments(source, discovery string) []DocumentReference {
 	if source != monthlyDocumentURL {
 		return nil
@@ -114,15 +123,14 @@ func (i *Inspector) SampleDocument(ctx context.Context, c *Contract, s DocumentS
 	if err != nil || media != "text/html" || (params["charset"] != "" && !strings.EqualFold(params["charset"], "utf-8")) {
 		return TableSample{}, fmt.Errorf("document requires UTF-8 text/html")
 	}
-	const maxDocumentBytes = 1 << 20
-	if res.ContentLength > maxDocumentBytes {
+	if res.ContentLength > DocumentMaxBytes {
 		return TableSample{}, fmt.Errorf("document exceeds 1 MiB")
 	}
-	body, err := io.ReadAll(io.LimitReader(res.Body, maxDocumentBytes+1))
+	body, err := io.ReadAll(io.LimitReader(res.Body, DocumentMaxBytes+1))
 	if err != nil {
 		return TableSample{}, err
 	}
-	if len(body) > maxDocumentBytes {
+	if len(body) > DocumentMaxBytes {
 		return TableSample{}, fmt.Errorf("document exceeds 1 MiB")
 	}
 	if !utf8.Valid(body) {
@@ -147,6 +155,11 @@ func (i *Inspector) SampleDocument(ctx context.Context, c *Contract, s DocumentS
 		if identity.Length() != 1 || value != "22124" {
 			return TableSample{}, fmt.Errorf("document identity drift")
 		}
+		for _, selector := range []string{`.answers > .tbx`, `.answers > .an_txt`} {
+			if count := doc.Find(selector).Length(); count != 1 {
+				return TableSample{}, fmt.Errorf("document section count drift: %s expected 1, observed %d", selector, count)
+			}
+		}
 		sections = doc.Find(`.answers > .tbx, .answers > .an_txt`)
 		expected = 2
 	default:
@@ -156,7 +169,7 @@ func (i *Inspector) SampleDocument(ctx context.Context, c *Contract, s DocumentS
 		return TableSample{}, fmt.Errorf("document section count drift: expected %d, observed %d", expected, sections.Length())
 	}
 	sha := fmt.Sprintf("%x", sha256.Sum256(body))
-	p := &DocumentProvenance{Reference: ref, SourceSHA256: sha, Bytes: int64(len(body)), ExtractorRevision: "html-block-space-v1", Sections: expected}
+	p := &DocumentProvenance{Reference: ref, SourceSHA256: sha, Bytes: int64(len(body)), ExtractorRevision: DocumentExtractorRevision, Sections: expected}
 	result := TableSample{SHA256: sha, Bytes: int64(len(body)), Document: p}
 	for n, node := range sections.Nodes {
 		if err := ctx.Err(); err != nil {
@@ -170,12 +183,12 @@ func (i *Inspector) SampleDocument(ctx context.Context, c *Contract, s DocumentS
 			continue
 		}
 		cell, _ := json.Marshal(text)
-		if len(cell) > 2048 {
-			return TableSample{}, fmt.Errorf("document section exceeds 2048 JSON bytes; selection is not truncated")
+		if len(cell) > DocumentMaxTextJSONBytes {
+			return TableSample{}, fmt.Errorf("document section exceeds %d JSON bytes; selection is not truncated", DocumentMaxTextJSONBytes)
 		}
 		p.MatchedSections++
-		if p.MatchedSections > 20 {
-			return TableSample{}, fmt.Errorf("document selection exceeds 20 sections")
+		if p.MatchedSections > DocumentMaxSections {
+			return TableSample{}, fmt.Errorf("document selection exceeds %d sections", DocumentMaxSections)
 		}
 		p.Blocks = append(p.Blocks, DocumentBlock{Ordinal: n + 1, Locator: documentPath(node), TextSHA256: fmt.Sprintf("%x", sha256.Sum256([]byte(text)))})
 		result.Rows = append(result.Rows, map[string]any{"text": text})

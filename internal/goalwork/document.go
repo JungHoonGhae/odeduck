@@ -28,10 +28,10 @@ func validateDocumentAcquisition(s SampleRequest, inspected Inspection, a Acquir
 		}
 	}
 	hash, err := hex.DecodeString(a.ContentSHA256)
-	if !known || a.ContractSHA256 != digest(p.Reference) || err != nil || len(hash) != 32 || p.SourceSHA256 != a.ContentSHA256 || p.Bytes < 1 || p.Bytes > 1<<20 || p.ExtractorRevision != "html-block-space-v1" {
+	if !known || a.ContractSHA256 != digest(p.Reference) || err != nil || len(hash) != 32 || p.SourceSHA256 != a.ContentSHA256 || p.Bytes < 1 || p.Bytes > dataset.DocumentMaxBytes || p.ExtractorRevision != dataset.DocumentExtractorRevision {
 		return fmt.Errorf("document source or contract revision mismatch")
 	}
-	if len(a.Rows) < 1 || len(a.Rows) > 20 || len(p.Blocks) != len(a.Rows) || p.MatchedSections != len(a.Rows) || p.Sections < p.MatchedSections || p.Sections > 20 {
+	if len(a.Rows) < 1 || len(a.Rows) > dataset.DocumentMaxSections || len(p.Blocks) != len(a.Rows) || p.MatchedSections != len(a.Rows) || p.Sections < p.MatchedSections || p.Sections > dataset.DocumentMaxSections {
 		return fmt.Errorf("document section extent is inconsistent")
 	}
 	last := 0
@@ -39,7 +39,7 @@ func validateDocumentAcquisition(s SampleRequest, inspected Inspection, a Acquir
 		text, ok := row["text"].(string)
 		cell, _ := json.Marshal(text)
 		block := p.Blocks[i]
-		if !ok || len(row) != 1 || text == "" || len(cell) > 2048 || !strings.Contains(text, s.Document.Contains) || block.Ordinal <= last || block.Ordinal > p.Sections || !strings.HasPrefix(block.Locator, "/html[1]/body[1]/") || len(block.Locator) > 2048 || block.TextSHA256 != fmt.Sprintf("%x", sha256.Sum256([]byte(text))) {
+		if !ok || len(row) != 1 || text == "" || len(cell) > dataset.DocumentMaxTextJSONBytes || !strings.Contains(text, s.Document.Contains) || block.Ordinal <= last || block.Ordinal > p.Sections || !strings.HasPrefix(block.Locator, "/html[1]/body[1]/") || len(block.Locator) > 2048 || block.TextSHA256 != fmt.Sprintf("%x", sha256.Sum256([]byte(text))) {
 			return fmt.Errorf("document selected text or original block address is inconsistent")
 		}
 		last = block.Ordinal
