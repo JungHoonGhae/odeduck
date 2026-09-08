@@ -76,6 +76,12 @@ func (e *Engine) analysisReviewInput(ctx context.Context, id string, sourceConte
 		return ReviewInput{}, err
 	}
 	selected, cells, packets := disclosure.selected, disclosure.cells, disclosure.packets
+	if digest(a.Explanations) != digest(a.Recipe.Explanations) {
+		return ReviewInput{}, fmt.Errorf("source explanations differ from the executed recipe")
+	}
+	if err := validateExplanationCitations(a.Explanations, packets); err != nil {
+		return ReviewInput{}, err
+	}
 	excluded := map[string]map[int]bool{}
 	mark := func(id string, position int) {
 		if excluded[id] == nil {

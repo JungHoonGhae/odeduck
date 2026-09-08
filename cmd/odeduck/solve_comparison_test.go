@@ -24,12 +24,16 @@ func TestSolveComparisonReturnsSelectedCountsWithoutApprovingSourceMeaning(t *te
 				if c.Comparison == nil || c.Source.Comparison != nil || c.Request.Compare == nil || c.ComparisonSources[0].ArtifactSource != "o1" || c.ComparisonSources[1].Source == nil || c.ComparisonSources[1].Request == nil || c.ComparisonSources[1].Request.PK != "right" || len(in.Artifact.Sources) != 1 {
 					return goalwork.ReviewAssessment{}, fmt.Errorf("CLI lost single-copy recipe, original requests or computational distinction")
 				}
+				if len(in.Artifact.Explanations) != 1 || in.Artifact.Explanations[0].Citations[0].PacketID != c.PacketID || in.Contract.Explanations[0].Basis != "source" {
+					return goalwork.ReviewAssessment{}, fmt.Errorf("CLI lost the source-cited explanatory deliverable")
+				}
 				reviewed = true
 				f := goalwork.ReviewFinding{Verdict: "insufficient", Reason: "fixture: numerical discrepancy does not establish applicability"}
 				for _, p := range in.EvidencePackets() {
 					f.PacketIDs = append(f.PacketIDs, p.ID)
 				}
 				a := goalwork.ReviewAssessment{GoalFit: f, Outputs: []goalwork.OutputReview{{Output: "id", Finding: f}}}
+				a.Explanations = []goalwork.ExplanationReview{{Explanation: "source_difference", Finding: f}}
 				for _, topic := range []string{"relations", "periods", "measurements", "coverage"} {
 					a.AnalysisChecks = append(a.AnalysisChecks, goalwork.AnalysisCheck{Topic: topic, Finding: f})
 				}
@@ -56,6 +60,7 @@ func TestSolveComparisonReturnsSelectedCountsWithoutApprovingSourceMeaning(t *te
 			return goalwork.View{}, err
 		}
 		contract := goalwork.GoalContract{Outcome: goal, Region: "fixture", Period: "source snapshot", Coverage: "sample", Roles: []goalwork.RoleRequirement{{ID: "r", Description: "records"}}, Outputs: []goalwork.OutputRequirement{{ID: "id", Role: "r", Type: "string", Description: "original identifier"}}}
+		contract.Explanations = []goalwork.ExplanationRequirement{{ID: "source_difference", Topic: "measurement", Basis: "source", Description: "Explain the observed source discrepancy"}}
 		decisions := []goalwork.Decision{{Action: "define", Contract: &contract}, {Action: "search", Query: "records", Role: "r"}}
 		for _, pk := range []string{"left", "right"} {
 			decisions = append(decisions, goalwork.Decision{Action: "inspect", PK: pk}, goalwork.Decision{Action: "sample", Sample: &goalwork.SampleRequest{PK: pk, Delivery: "api"}})
@@ -82,6 +87,7 @@ func TestSolveComparisonReturnsSelectedCountsWithoutApprovingSourceMeaning(t *te
 			}
 			if len(v.Compositions) == 0 {
 				p := goalwork.Composition{ID: "report", Base: "o1", Purpose: "report original identifiers with proposed comparison support", Select: []string{"o1.id"}, Roles: []goalwork.RoleBinding{{Role: "r", Observation: "o1"}}, Outputs: []goalwork.OutputBinding{{Output: "id", Field: "o1.id"}}, Assumptions: []string{"comparison does not approve source meaning"}, Support: []goalwork.SupportBinding{{PacketID: v.Evidence[0].ID, Targets: []string{"o1"}, Purpose: "Check source applicability"}}}
+				p.Explanations = []goalwork.ExplanationDraft{{ID: "source_difference", Text: "The retained comparison has one numeric discrepancy; this does not identify its real-world cause.", Citations: []goalwork.EvidenceCitation{{PacketID: v.Evidence[0].ID, PacketRow: 11, Field: "value"}}}}
 				return goalwork.Decision{Action: "compose", Composition: &p}, nil
 			}
 			if len(v.Executions) == 0 {
@@ -110,6 +116,9 @@ func TestSolveComparisonReturnsSelectedCountsWithoutApprovingSourceMeaning(t *te
 		t.Fatalf("CLI lost comparison, disclosure policy or incomplete state: %+v", v)
 	}
 	packet := v.Evidence[0]
+	if len(v.Artifact.Explanations) != 1 || v.Artifact.Explanations[0].Citations[0].PacketID != packet.ID || len(v.Evaluation.Review.Assessment.Explanations) != 1 {
+		t.Fatal("CLI JSON lost the proposed explanation, original reference or its insufficient finding")
+	}
 	if len(packet.Records) != 13 || packet.Records[9].Values["value"] != json.Number("0") || packet.Records[10].Values["value"] != json.Number("1") || packet.Records[10].Origins["value"].Kind != "computed_comparison" {
 		t.Fatal("CLI lost exact-decimal discrepancy or attributed it to a publisher")
 	}

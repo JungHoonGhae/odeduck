@@ -31,7 +31,12 @@ type OutputReview struct {
 	Output  string        `json:"output"`
 	Finding ReviewFinding `json:"finding"`
 }
+type ExplanationReview struct {
+	Explanation string        `json:"explanation"`
+	Finding     ReviewFinding `json:"finding"`
+}
 type ReviewAssessment struct {
+	Explanations   []ExplanationReview    `json:"explanations,omitempty"`
 	GoalFit        ReviewFinding          `json:"goalFit"`
 	Outputs        []OutputReview         `json:"outputs"`
 	AnalysisChecks []AnalysisCheck        `json:"analysisChecks,omitempty"`
@@ -125,6 +130,9 @@ func (e *Engine) reviewResult(ctx context.Context, id string) error {
 	for _, output := range assessment.Outputs {
 		supported = supported && output.Finding.Verdict == "supported"
 	}
+	for _, explanation := range assessment.Explanations {
+		supported = supported && explanation.Finding.Verdict == "supported"
+	}
 	for _, check := range assessment.AnalysisChecks {
 		supported = supported && check.Finding.Verdict == "supported"
 	}
@@ -159,6 +167,9 @@ func (e *Engine) reviewEvidenceHash(ctx context.Context, in ReviewInput) (string
 // ValidateReviewAssessment validates completeness and real references, not
 // natural-language entailment or model accuracy. Live adapters use this too.
 func ValidateReviewAssessment(a ReviewAssessment, in ReviewInput) error {
+	if err := validateExplanationReviews(a, in); err != nil {
+		return err
+	}
 	if err := validateSourceCoverage(a, in); err != nil {
 		return err
 	}
@@ -206,6 +217,9 @@ func (e *Engine) sourceReviewInput(id string) (ReviewInput, error) {
 		return ReviewInput{}, fmt.Errorf("review requires the current executed composition with all structural requirements met")
 	}
 	p := a.Recipe
+	if len(p.Explanations) > 0 {
+		return ReviewInput{}, fmt.Errorf("source-cited explanations require the separately authorized analysis review contract")
+	}
 	if len(a.Sources) != 1 || a.Sources[0].Spatial != nil || len(p.Joins)+len(p.Measures)+len(p.Aggregates)+len(p.GroupBy) != 0 || len(p.Select) == 0 || len(p.Select) > 8 || a.Sources[0].RowCount > 20 {
 		return ReviewInput{}, fmt.Errorf("source review supports only explicit source-field reports up to 20 retained rows and 8 fields; derived, joined and aggregate results remain review items")
 	}

@@ -36,7 +36,8 @@ type Composition struct {
 	Assumptions     []string           `json:"assumptions"` // namespace, time, coverage; assertions, not verification
 	Roles           []RoleBinding      `json:"roles,omitempty"`
 	Outputs         []OutputBinding    `json:"outputs,omitempty"`
-	Support         []SupportBinding   `json:"support,omitempty"` // proposed context, never calculation input
+	Support         []SupportBinding   `json:"support,omitempty"`      // proposed context, never calculation input
+	Explanations    []ExplanationDraft `json:"explanations,omitempty"` // source-cited proposed answers, not execution notes
 }
 
 type Aggregate struct {

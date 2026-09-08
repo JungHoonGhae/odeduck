@@ -208,6 +208,46 @@ Composition의 `support:[{packetId,targets,purpose}]`로 실제 공개한 Eviden
 이 후속 검토의 실제 모델 정확도는 별도 검증 전까지 미확인이다. 종전 분석 calibration을 새 계약의
 통과로 간주하지 않는다.
 
+### 원천 근거를 인용한 설명 — 2026-09-09
+
+원래 G4가 요청한 기준일·개편에 따른 비교 한계는 일반 실행 주의사항으로 답할 수 없다. 기존
+`ExplanationRequirement`의 `basis`를 생략하거나 `execution`으로 두면 종전 실행 사실 설명을
+유지하고, `source`이면 실제 원천 해석을 요구한다. 불변 계약에 필요한 설명을 명시하며 원래 Goal,
+데이터 출력·역할·기간·모집단 요구는 바꾸지 않는다. 설명용 가짜 데이터 컬럼이나 역할은 만들지 않는다.
+
+- 기존 `compose → execute → review_result`에서 `composition.explanations`의
+  `{id,text,citations:[{packetId,packetRow,field}]}`를 받는다. 기존 source 요구 ID당 하나이며 최대
+  8개, 문장 1–2000 UTF-8 bytes와 1–16개 중복 없는 선택 셀 참조다. credential material을 거부한다.
+  유효하지 않은 UTF-8은 JSON 변환 전에 거부해 문장을 조용히 대체하지 않는다.
+- 문장은 계획기의 **해석 제안**이다. 원천 인용문이나 승인 값을 제출하지 않는다. 인용은 같은 목표에서
+  이미 공개한 불변 packet의 실제 retained row·field를 가리킨다. 원천 revision과 값·존재 상태를
+  기존 공개 근거 색인으로 대조하고, 원본 위치는 packet의 `origins`로 추적한다. missing/null/빈 문구/
+  0을 구분하며 인용 확인이 의미의 지지나 날짜·구역 대응을 증명하지 않는다.
+- 실행된 제안은 `artifact.explanations`에 문장과 참조로 반환하고, 원문과 원천 metadata는 반환된
+  View의 `evidence`·`observations`에서 해석한다. `evaluation.explanations`에는 execution 요구의
+  실행 사실만 남는다. 필수 source 설명이 빠지면 계산된 데이터 행은 보존하되 구조 판정은 partial이다.
+  이미 제출한 설명을 수정하려면 새 조합·실행이 필요하며 이전 실행·검토 이력을 덮어쓰지 않는다.
+- 원천 설명이 포함되면 별도 분석 검토 권한이 필요하다. source-report v1만으로 승인하지 않는다.
+  인용 packet은 계산 원천이나 기존 동일 파일/명시적 support 문맥으로 실제 검토 입력에 들어와야 한다.
+  인용만으로 무관한 원천을 자동 첨부하거나 공개 권한을 늘리지 않는다. packet 본문은 기존 단일
+  컬렉션에만 있고, 설명·recipe·문맥을 포함한 전체 입력에 기존 96 KiB 상한을 적용한다.
+- 분석 v3의 선택형 `SOURCE_CITED_EXPLANATIONS_V1` 계약은
+  `assessment.explanations:[{explanation,finding}]`으로 모든 source 요구를 개별 판정한다.
+  각 finding은 실제 packet을 인용하고 supported이면 제안의 모든 근거 packet을 포함해야 한다.
+  설명 전체의 지지와 요구에 대한 응답을 검토하며, 문장을 몰래 고쳐 승인하지 않는다. 누락·중복·
+  알 수 없는 ID·위조 인용·변조는 거부한다. source 설명이 없던 v3·source-report v1 응답은 유지한다.
+- source 설명, 데이터 출력, 기존 분석 축·선택형 원본별 범위·원래 GoalFit가 모두 supported여야
+  output_ready가 된다. 인용 존재·면책 문구·검토자 승인만으로 독립 정답이나 자율 완주를 주장하지 않는다.
+  기존 6조합·3검토·8 packet/64 KiB 공개·만료를 유지한다. 만료 시 조합에 남은 설명 원문도 폐기한다.
+
+대안 중 원문 발췌만으로는 시점·구역 차이의 해석을 표현하기 어렵고, 인용·추론·실행 사실을 단계별로
+조립하는 문서 언어는 현재 필요보다 큰 interface였다. 명시적 문장과 선택 셀 참조를 기존 실행기에
+추가하고, 기계적 인용 확인과 별도 의미 검토를 나누는 안을 택했다. 새 저장소·adapter·설명 추론 언어는 없다.
+
+위임된 Engine·CLI·MCP·ReviewGoal seam에서 누락 설명의 부분 결과, 실제 인용 전달과 비참여 원천
+분리, 위조/미공개 셀·credential·판정 누락/거부·변조, 정정 revision·예산·만료를 검증한다. 기본 테스트의
+reviewer는 fixture이며 실제 원천 지지·모델 정확도·원래 G4 완주는 별도 검증이다.
+
 ### 원래 G4의 실제 검토 진단
 
 위임된 Start/Advance·ReviewGoal seam에서 원래 G4 질문과 독립 citywide reference를 재사용한다.

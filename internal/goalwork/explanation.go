@@ -1,16 +1,21 @@
 package goalwork
 
 import (
+	"context"
 	"fmt"
+	"slices"
 	"strings"
+	"unicode/utf8"
 )
 
 // ExplanationRequirement is a requested evidence explanation, not a pretend
-// data column or another dataset role. The engine, not the planner, writes it.
+// data column or another dataset role. Execution explanations are engine-written;
+// source explanations additionally need a cited proposal and separate review.
 type ExplanationRequirement struct {
 	ID          string `json:"id"`
 	Topic       string `json:"topic"` // provenance, temporal, coverage, identity, measurement
 	Description string `json:"description"`
+	Basis       string `json:"basis,omitempty"` // execution (default) or source
 }
 
 type EvidenceExplanation struct {
@@ -18,6 +23,133 @@ type EvidenceExplanation struct {
 	Topic        string   `json:"topic"`
 	Text         string   `json:"text"`
 	Observations []string `json:"observations"`
+}
+
+// ExplanationDraft is a proposed answer to a source-based explanation
+// requirement, not publisher text or a semantic approval. Its citations resolve
+// through View.Evidence (or ReviewInput.EvidencePackets) to original addresses.
+type ExplanationDraft struct {
+	ID        string             `json:"id"`
+	Text      string             `json:"text"`
+	Citations []EvidenceCitation `json:"citations"`
+}
+
+type EvidenceCitation struct {
+	PacketID  string `json:"packetId"`
+	PacketRow int    `json:"packetRow"` // packet's retained row, not a physical source row
+	Field     string `json:"field"`
+}
+
+func (e *Engine) validateExplanationDrafts(ctx context.Context, p Composition) error {
+	if len(p.Explanations) == 0 {
+		return nil // Missing required drafts leave an executable partial result.
+	}
+	if e.state.Policy.EvidenceRecipient == "" || len(p.Explanations) > 8 {
+		return fmt.Errorf("source explanations require enabled disclosure and at most 8 drafts")
+	}
+	seen := map[string]bool{}
+	for _, draft := range p.Explanations {
+		if seen[draft.ID] || !slices.ContainsFunc(e.state.Contract.Explanations, func(r ExplanationRequirement) bool { return r.ID == draft.ID && r.Basis == "source" }) {
+			return fmt.Errorf("source explanations need distinct IDs from source-based contract requirements")
+		}
+		seen[draft.ID] = true
+		if !utf8.ValidString(draft.Text) || strings.TrimSpace(draft.Text) == "" || len(draft.Text) > 2000 || credentialText(draft.Text) {
+			return fmt.Errorf("source explanation text needs 1–2000 UTF-8 bytes without credential material; it remains a proposal")
+		}
+	}
+	if err := validateExplanationCitations(p.Explanations, e.state.Evidence); err != nil {
+		return err
+	}
+	used := map[string]bool{}
+	for _, draft := range p.Explanations {
+		for _, citation := range draft.Citations {
+			used[citation.PacketID] = true
+		}
+	}
+	var packets []EvidencePacket
+	for _, packet := range e.state.Evidence {
+		if used[packet.ID] {
+			packets = append(packets, packet)
+		}
+	}
+	_, _, err := e.indexReviewDisclosure(ctx, packets)
+	return err
+}
+
+// A citation may describe selected missing/null values, but never undisclosed
+// cells. Revision/value validation is owned by the Engine's disclosure index.
+func validateExplanationCitations(drafts []ExplanationDraft, packets []EvidencePacket) error {
+	byID := map[string]EvidencePacket{}
+	for _, packet := range packets {
+		byID[packet.ID] = packet
+	}
+	for _, draft := range drafts {
+		if len(draft.Citations) < 1 || len(draft.Citations) > 16 {
+			return fmt.Errorf("source explanation requires 1–16 distinct selected cell citations")
+		}
+		seen := map[EvidenceCitation]bool{}
+		for _, citation := range draft.Citations {
+			packet, exists := byID[citation.PacketID]
+			if !exists || seen[citation] || !slices.Contains(packet.Selection.Fields, citation.Field) {
+				return fmt.Errorf("source explanation cites an unavailable, duplicated or undisclosed cell; use participating or supported evidence for review")
+			}
+			seen[citation] = true
+			found := false
+			for _, record := range packet.Records {
+				if record.RetainedRow == citation.PacketRow {
+					_, present := record.Values[citation.Field]
+					found = present != slices.Contains(record.Missing, citation.Field)
+				}
+			}
+			if !found {
+				return fmt.Errorf("source explanation citation needs an actual selected packet row and field, including its presence state")
+			}
+		}
+	}
+	return nil
+}
+
+func validateExplanationReviews(a ReviewAssessment, in ReviewInput) error {
+	required := map[string]bool{}
+	for _, requirement := range in.Contract.Explanations {
+		if requirement.Basis == "source" {
+			required[requirement.ID] = true
+		}
+	}
+	if len(required) != len(a.Explanations) || len(required) != len(in.Artifact.Explanations) {
+		return fmt.Errorf("review requires every source-based explanation and its finding, separate from execution notes")
+	}
+	if len(required) == 0 {
+		return nil
+	}
+	if in.Analysis == nil {
+		return fmt.Errorf("source explanations need analysis review; source report v1 cannot approve them")
+	}
+	if err := validateExplanationCitations(in.Artifact.Explanations, in.EvidencePackets()); err != nil {
+		return err
+	}
+	drafts := map[string]ExplanationDraft{}
+	for _, draft := range in.Artifact.Explanations {
+		if _, duplicate := drafts[draft.ID]; !required[draft.ID] || duplicate {
+			return fmt.Errorf("review requires distinct source explanation drafts matching the contract")
+		}
+		drafts[draft.ID] = draft
+	}
+	seen := map[string]bool{}
+	for _, review := range a.Explanations {
+		if seen[review.Explanation] || !required[review.Explanation] || !validReviewFinding(review.Finding, in) {
+			return fmt.Errorf("source explanation review has a missing, duplicated, unknown or invalid finding")
+		}
+		seen[review.Explanation] = true
+		if review.Finding.Verdict == "supported" {
+			for _, citation := range drafts[review.Explanation].Citations {
+				if !slices.Contains(review.Finding.PacketIDs, citation.PacketID) {
+					return fmt.Errorf("supported explanation must cite every packet proposed as its basis")
+				}
+			}
+		}
+	}
+	return nil
 }
 
 func validExplanationTopic(topic string) bool {
@@ -39,6 +171,9 @@ func explainEvidence(c GoalContract, p Composition, sources []Observation, rowCo
 	}
 	var out []EvidenceExplanation
 	for _, requirement := range c.Explanations {
+		if requirement.Basis == "source" {
+			continue // Source answers are explicit artifact drafts, not generic execution notes.
+		}
 		report := EvidenceExplanation{ID: requirement.ID, Topic: requirement.Topic, Observations: append([]string(nil), ids...)}
 		switch requirement.Topic {
 		case "provenance":

@@ -135,6 +135,31 @@ Judge separately:
   requested regions/periods/coverage and explanations? A weaker frozen Contract or
   a disclaimer cannot turn missing requested work into completion.
 
+SOURCE_CITED_EXPLANATIONS_V1
+When contract.explanations includes basis:"source", artifact.explanations contains
+the executed proposed answer for each such requirement, also frozen in the recipe.
+Its text is PLANNER-PROPOSED INTERPRETATION, not source text or an approval. Each
+citation names a packetId, packetRow (that packet's retained row) and field in the
+existing packet collection; follow the record's original address and revision.
+Missing, null, zero and empty text remain distinct. Citation existence proves
+attribution only. Check the WHOLE proposed answer against the selected cells,
+applicable sourceContext, source revision and stated requirement. Reference dates,
+geography and definitions need source support, not acquisition timestamps, title
+guesses or generic warnings. Contradictory or insufficiently applicable context
+must remain unsupported/insufficient. Do not silently rewrite the proposed answer.
+
+Add "explanations":[{"explanation":"source-based requirement ID","finding":
+{"verdict":"supported|unsupported|insufficient","reason":"...","packetIds":["actual packet ID"]}}]
+to the response, exactly once for EVERY basis:"source" requirement and no others.
+A supported finding must cite every packet proposed in that answer, and may cite
+additional actual evidence. Unsupported/insufficient findings may cite actual
+contradicting or incomplete context. Execution-only requirements (basis omitted or
+"execution") retain the engine-written evaluation.explanations and need no new
+finding; evaluate their adequacy in goalFit. These execution notes do not answer a
+required source-specific question. Without source-based requirements, omit the
+new response field. Every required explanation finding must be supported alongside
+the outputs, analysis dimensions, optional full-scope findings and original goalFit.
+
 Support historical/source-bound comparisons and calculations when the evidence
 supports that requested strength. Do not add causal, payment or present-day field
 inspection requirements to a question asking only for such a comparison. Conversely,

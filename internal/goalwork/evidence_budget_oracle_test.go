@@ -129,7 +129,12 @@ func TestOriginalG4ReviewIncludesCompleteComparisonWithinDisclosureBudget(t *tes
 	replayOriginalG4Disclosure(t, &comparison)
 }
 
-func replayOriginalG4Disclosure(t *testing.T, comparison *originalG4ComparisonReplay) {
+func TestOriginalG4ReviewIncludesSourceExplanationsAndCompleteComparison(t *testing.T) {
+	comparison := replayOriginalG4Comparison(t)
+	replayOriginalG4Disclosure(t, &comparison, true)
+}
+
+func replayOriginalG4Disclosure(t *testing.T, comparison *originalG4ComparisonReplay, explain ...bool) {
 	t.Helper()
 	compressed, err := os.ReadFile("testdata/goalbench-v1/citywide-review-20260908/age-definition-codex.json.gz")
 	if err != nil {
@@ -151,6 +156,14 @@ func replayOriginalG4Disclosure(t *testing.T, comparison *originalG4ComparisonRe
 		t.Fatal(err)
 	}
 	old := archive.Result
+	contract := *old.Contract
+	withExplanations := len(explain) > 0 && explain[0]
+	if withExplanations {
+		contract.Explanations = []goalwork.ExplanationRequirement{
+			{ID: "reference_dates", Topic: "temporal", Basis: "source", Description: "인구 기준일·학교 작성기준일·구역 개편 적용일을 구분한다."},
+			{ID: "comparison_limits", Topic: "coverage", Basis: "source", Description: "미대응 지역과 비교 한계를 원천 기록에 연결해 명시한다."},
+		}
+	}
 	var reference referenceSlice
 	readReference(t, "education-citywide-reference.json", &reference)
 	values := map[string][]goalwork.Row{"o4": make([]goalwork.Row, 19)}
@@ -239,12 +252,30 @@ func replayOriginalG4Disclosure(t *testing.T, comparison *originalG4ComparisonRe
 					t.Fatal("review summary omitted or changed comparison denominators")
 				}
 			}
-			if in.Analysis == nil || in.Analysis.FullScope == nil || len(in.EvidencePackets()) != packets || !reflect.DeepEqual(in.Contract, *old.Contract) || !reflect.DeepEqual(in.Artifact.Rows, old.Artifact.Rows) || !reflect.DeepEqual(in.Artifact.Unmatched, old.Artifact.Unmatched) {
+			if in.Analysis == nil || in.Analysis.FullScope == nil || len(in.EvidencePackets()) != packets || !reflect.DeepEqual(in.Contract, contract) || !reflect.DeepEqual(in.Artifact.Rows, old.Artifact.Rows) || !reflect.DeepEqual(in.Artifact.Unmatched, old.Artifact.Unmatched) {
 				t.Fatal("reuse changed original scope, values or unmatched results")
 			}
 			reviewed = in
 			a := supportedAnalysisReview(in)
 			a.GoalFit.Verdict = "insufficient"
+			if withExplanations {
+				if len(in.Artifact.Explanations) != 2 || len(in.Artifact.Evaluation.Explanations) != 0 || in.Contract.Coverage != "population" || in.Goal != old.Goal {
+					t.Fatal("source explanations weakened the original goal or became execution disclaimers")
+				}
+				for _, draft := range in.Artifact.Explanations {
+					for _, citation := range draft.Citations {
+						packet := reviewPacket(t, in, citation.PacketID)
+						if packet.Selection.Observation == "o4" {
+							for _, record := range packet.Records {
+								if record.RetainedRow == citation.PacketRow && record.Origins[citation.Field].Ordinal != citation.PacketRow+21 {
+									t.Fatal("source explanation lost the original school cell address")
+								}
+							}
+						}
+					}
+					a.Explanations = append(a.Explanations, goalwork.ExplanationReview{Explanation: draft.ID, Finding: a.GoalFit})
+				}
+			}
 			for _, source := range in.Analysis.FullScope.Sources {
 				a.SourceCoverage = append(a.SourceCoverage, goalwork.SourceCoverageReview{Observation: source.Observation, Finding: a.GoalFit})
 			}
@@ -254,7 +285,7 @@ func replayOriginalG4Disclosure(t *testing.T, comparison *originalG4ComparisonRe
 	if err != nil {
 		t.Fatal(err)
 	}
-	advanceUnmatched(t, e, goalwork.Decision{Action: "define", Contract: old.Contract})
+	advanceUnmatched(t, e, goalwork.Decision{Action: "define", Contract: &contract})
 	for _, node := range old.Nodes {
 		advanceUnmatched(t, e, goalwork.Decision{Action: "search", Query: node.Hit.PK, Role: node.Roles[0]})
 	}
@@ -304,6 +335,26 @@ func replayOriginalG4Disclosure(t *testing.T, comparison *originalG4ComparisonRe
 		advanceUnmatched(t, e, goalwork.Decision{Action: "read_evidence", Evidence: &goalwork.EvidenceRequest{Observation: o.ID, RowsSHA256: o.RowsSHA256, Rows: []int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13}, Fields: []string{"metric", "value"}}})
 		p.Support = append(p.Support, goalwork.SupportBinding{PacketID: e.View().Evidence[7].ID, Targets: []string{"o1"}, Purpose: "Compare both retained source revisions and conditions when assessing whether the official series definition applies; numerical agreement alone is not approval."})
 	}
+	if withExplanations {
+		packetFor := func(observation, field string) string {
+			for _, packet := range e.View().Evidence {
+				if packet.Selection.Observation == observation && slices.Contains(packet.Selection.Fields, field) {
+					return packet.ID
+				}
+			}
+			t.Fatalf("original explanation evidence missing: %s.%s", observation, field)
+			return ""
+		}
+		population, school := packetFor("o3", "시군구명"), packetFor("o4", "A")
+		p.Explanations = []goalwork.ExplanationDraft{
+			{ID: "reference_dates", Text: "인구 원본의 기준연월은 2026-07-31입니다. 학교 표의 작성기준일은 2026-04-01이며, 표 제목의 2026-07-01은 행정개편 시행일입니다. 학교가 7월에 다시 조사되었다는 뜻이 아니므로 같은 날의 관측값으로 해석하지 않습니다.", Citations: []goalwork.EvidenceCitation{{PacketID: packetFor("o1", "기준연월"), PacketRow: 1, Field: "기준연월"}, {PacketID: school, PacketRow: 1, Field: "A"}, {PacketID: school, PacketRow: 2, Field: "A"}}},
+			{ID: "comparison_limits", Text: "인구의 서해구와 학교의 서구 표기는 현재 조합에서 대응하지 않았습니다. 두 원천 값을 별도 미대응 표에 남겼으며 같은 지역으로 치환하거나 없는 인구·학교 수를 0으로 채우지 않았습니다. 학교 표는 개편 후 구역을 명시하지만, 이 두 표기의 대응은 이 결과에서 확정하지 않았습니다.", Citations: []goalwork.EvidenceCitation{{PacketID: population, PacketRow: 7, Field: "시군구명"}, {PacketID: school, PacketRow: 1, Field: "A"}, {PacketID: school, PacketRow: 14, Field: "A"}}},
+		}
+		// Independent archive positions, not a producer-derived expected value.
+		if e.View().Evidence[0].Records[6].Values["시군구명"] != "서해구" {
+			t.Fatal("original unmatched population position differs")
+		}
+	}
 	advanceUnmatched(t, e, goalwork.Decision{Action: "compose", Composition: &p})
 	advanceUnmatched(t, e, goalwork.Decision{Action: "execute", CompositionID: p.ID})
 	v := advanceUnmatched(t, e, goalwork.Decision{Action: "review_result", CompositionID: p.ID})
@@ -342,5 +393,5 @@ func replayOriginalG4Disclosure(t *testing.T, comparison *originalG4ComparisonRe
 	if err != nil || len(wire) > 96<<10 {
 		t.Fatal("review no longer fits the unchanged input budget")
 	}
-	t.Logf("original G4 replay preserves 157 disclosed cells, 10 matched rows and 2 unmatched tuples in %d packets; complete comparison added=%t; review input %d bytes; no new model/G4 completion", len(v.Evidence), comparison != nil, len(wire))
+	t.Logf("original G4 replay preserves 157 disclosed cells, 10 matched rows and 2 unmatched tuples in %d packets; complete comparison added=%t; source explanations=%t; review input %d bytes; no new model/G4 completion", len(v.Evidence), comparison != nil, withExplanations, len(wire))
 }

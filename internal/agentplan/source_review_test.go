@@ -272,4 +272,28 @@ func TestReviewGoalSelectsAnalysisContractWithoutChangingSourceReportGuide(t *te
 	if err != nil || !strings.Contains(string(prompt), `"fullScope":`) || !strings.Contains(string(prompt), "EVERY fullScope.sources") {
 		t.Fatal("full-scope evidence or review contract not sent")
 	}
+	// A source-specific explanation is a separately judged deliverable; neither
+	// a successful field nor the older all-supported assessment may approve it.
+	in.Contract.Explanations = []goalwork.ExplanationRequirement{{ID: "reference_date", Topic: "temporal", Basis: "source", Description: "Explain the original reference date"}}
+	in.Artifact.Explanations = []goalwork.ExplanationDraft{{ID: "reference_date", Text: "The header states this source's reference date, not its retrieval time.", Citations: []goalwork.EvidenceCitation{{PacketID: "ep_context", PacketRow: 1, Field: "A"}}}}
+	in.Artifact.Recipe.Explanations = in.Artifact.Explanations
+	in.Analysis.AdditionalEvidence[1].Selection.Fields = []string{"A"}
+	if _, err := ReviewGoal(context.Background(), in, "claude"); err == nil {
+		t.Fatal("review adapter accepted a missing source explanation finding")
+	}
+	a.Explanations = []goalwork.ExplanationReview{{Explanation: "reference_date", Finding: f}}
+	body, _ = json.Marshal(a)
+	script = "#!/bin/sh\n/bin/cat > '" + strings.ReplaceAll(promptPath, "'", "'\\''") + "'\nprintf '%s' '" + strings.ReplaceAll(string(body), "'", "'\\''") + "'\n"
+	if err := os.WriteFile(filepath.Join(dir, "claude"), []byte(script), 0700); err != nil {
+		t.Fatal(err)
+	}
+	response, err = ReviewGoal(context.Background(), in, "claude")
+	if err != nil || len(response.Assessment.Explanations) != 1 || response.Assessment.Explanations[0].Explanation != "reference_date" {
+		t.Fatalf("source explanation judgement lost: %v", err)
+	}
+	prompt, err = os.ReadFile(promptPath)
+	_, inputJSON, found = strings.Cut(string(prompt), "REVIEW_INPUT_JSON:\n")
+	if err != nil || !found || !strings.Contains(string(prompt), "SOURCE_CITED_EXPLANATIONS_V1") || json.Unmarshal([]byte(inputJSON), &delivered) != nil || len(delivered.Artifact.Explanations) != 1 || delivered.Artifact.Explanations[0].Citations[0].PacketID != "ep_context" {
+		t.Fatal("source explanation contract, draft or original citation did not reach the isolated reviewer")
+	}
 }

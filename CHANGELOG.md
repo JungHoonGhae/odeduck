@@ -9,6 +9,12 @@ section matching a `vX.Y.Z` tag as the GitHub release notes.
 
 ### Added
 
+- Source-cited goal explanations through the shared CLI/MCP engine distinguish
+  required source dates/definitions/limits from engine-written execution notes.
+  Exact authorized packet-cell citations and a separate finding per explanation
+  accompany the result; missing or unsupported explanations cannot complete a goal.
+  Corrections retain execution/review history and expiry discards the draft prose.
+
 - Goal analysis review reuses already-disclosed original XLSX cells across verified
   overlapping observations, without another disclosure or broader authority.
   Analysis v3 carries one packet collection with context references and cell

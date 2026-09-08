@@ -25,12 +25,16 @@ func TestMCPComparisonUsesOriginalRevisionsAndExplicitComputedDisclosure(t *test
 				if c.Comparison == nil || c.Source.Comparison != nil || c.Request.Compare == nil || c.ComparisonSources[0].ArtifactSource != "o1" || c.ComparisonSources[1].Source == nil || c.ComparisonSources[1].Request == nil || c.ComparisonSources[1].Request.Delivery != "standard" || len(in.Artifact.Sources) != 1 {
 					return goalwork.ReviewAssessment{}, fmt.Errorf("MCP lost single-copy comparison or both original contracts")
 				}
+				if len(in.Artifact.Explanations) != 1 || in.Artifact.Explanations[0].Citations[0].PacketID != c.PacketID || in.Contract.Explanations[0].Basis != "source" {
+					return goalwork.ReviewAssessment{}, fmt.Errorf("MCP lost source explanatory output or exact citations")
+				}
 				reviewed = true
 				f := goalwork.ReviewFinding{Verdict: "insufficient", Reason: "fixture: comparison is not a meaning verdict"}
 				for _, packet := range in.EvidencePackets() {
 					f.PacketIDs = append(f.PacketIDs, packet.ID)
 				}
 				a := goalwork.ReviewAssessment{GoalFit: f, Outputs: []goalwork.OutputReview{{Output: "code", Finding: f}}}
+				a.Explanations = []goalwork.ExplanationReview{{Explanation: "unmatched", Finding: f}}
 				for _, topic := range []string{"relations", "periods", "measurements", "coverage"} {
 					a.AnalysisChecks = append(a.AnalysisChecks, goalwork.AnalysisCheck{Topic: topic, Finding: f})
 				}
@@ -80,6 +84,7 @@ func TestMCPComparisonUsesOriginalRevisionsAndExplicitComputedDisclosure(t *test
 		}
 	}
 	contract := goalwork.GoalContract{Outcome: "source comparison", Region: "fixture", Period: "source", Coverage: "sample", Roles: []goalwork.RoleRequirement{{ID: "r", Description: "records"}}, Outputs: []goalwork.OutputRequirement{{ID: "code", Role: "r", Type: "string", Description: "original code"}}}
+	contract.Explanations = []goalwork.ExplanationRequirement{{ID: "unmatched", Topic: "coverage", Basis: "source", Description: "Explain the unmatched source records"}}
 	advance(goalwork.Decision{Action: "define", Contract: &contract})
 	advance(goalwork.Decision{Action: "search", Query: "records", Role: "r"})
 	for _, pk := range []string{"left", "right"} {
@@ -109,11 +114,15 @@ func TestMCPComparisonUsesOriginalRevisionsAndExplicitComputedDisclosure(t *test
 	}
 	advance(goalwork.Decision{Action: "read_evidence", Evidence: &goalwork.EvidenceRequest{Observation: "o1", RowsSHA256: v.State.Observations[0].RowsSHA256, Rows: []int{1, 2}, Fields: []string{"code"}}})
 	report := goalwork.Composition{ID: "report", Base: "o1", Purpose: "report identifiers with proposed comparison support", Select: []string{"o1.code"}, Roles: []goalwork.RoleBinding{{Role: "r", Observation: "o1"}}, Outputs: []goalwork.OutputBinding{{Output: "code", Field: "o1.code"}}, Assumptions: []string{"comparison is not applicability approval"}, Support: []goalwork.SupportBinding{{PacketID: v.State.Evidence[0].ID, Targets: []string{"o1"}, Purpose: "Check source interpretation"}}}
+	report.Explanations = []goalwork.ExplanationDraft{{ID: "unmatched", Text: "One retained record on each side did not pair; unmatched records do not establish real-world absence.", Citations: []goalwork.EvidenceCitation{{PacketID: v.State.Evidence[0].ID, PacketRow: 4, Field: "value"}, {PacketID: v.State.Evidence[0].ID, PacketRow: 5, Field: "value"}}}}
 	advance(goalwork.Decision{Action: "compose", Composition: &report})
 	advance(goalwork.Decision{Action: "execute", CompositionID: report.ID})
 	advance(goalwork.Decision{Action: "review_result", CompositionID: report.ID})
 	if !reviewed || len(v.State.Reviews) != 1 || v.State.Status == "output_ready" || len(v.State.Artifact.Sources) != 1 || v.State.Observations[2].Comparison == nil {
 		t.Fatal("MCP omitted review, promoted support or changed stored comparison provenance")
+	}
+	if len(v.State.Artifact.Explanations) != 1 || v.State.Artifact.Explanations[0].Citations[1].PacketRow != 5 || len(v.State.Evaluation.Review.Assessment.Explanations) != 1 {
+		t.Fatal("MCP JSON lost the original explanatory citations or separate finding")
 	}
 	// Optional wire aliases are for comparison operands only. An ordinary output
 	// measure still requires its own alias under the Engine's execution contract.

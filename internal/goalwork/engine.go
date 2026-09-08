@@ -11,6 +11,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 
 	"github.com/JungHoonGhae/odeduck/internal/catalog"
 	"github.com/JungHoonGhae/odeduck/internal/dataset"
@@ -176,16 +177,17 @@ type SearchRecord struct {
 	Warnings []string              `json:"warnings,omitempty"`
 }
 type Artifact struct {
-	Status      string              `json:"status"`
-	Recipe      Composition         `json:"recipe"`
-	Sources     []Observation       `json:"sources"`
-	Requests    []SampleRequest     `json:"requests"`
-	Layouts     []LayoutObservation `json:"layouts,omitempty"`
-	Metrics     []JoinMetric        `json:"metrics"`
-	Rows        []Row               `json:"rows"`
-	Unmatched   []UnmatchedTuple    `json:"unmatched,omitempty"`
-	Limitations []string            `json:"limitations"`
-	Evaluation  GoalEvaluation      `json:"evaluation"`
+	Explanations []ExplanationDraft  `json:"explanations,omitempty"` // proposed source interpretations; verdicts are in Evaluation.Review
+	Status       string              `json:"status"`
+	Recipe       Composition         `json:"recipe"`
+	Sources      []Observation       `json:"sources"`
+	Requests     []SampleRequest     `json:"requests"`
+	Layouts      []LayoutObservation `json:"layouts,omitempty"`
+	Metrics      []JoinMetric        `json:"metrics"`
+	Rows         []Row               `json:"rows"`
+	Unmatched    []UnmatchedTuple    `json:"unmatched,omitempty"`
+	Limitations  []string            `json:"limitations"`
+	Evaluation   GoalEvaluation      `json:"evaluation"`
 }
 type ExecutionRecord struct {
 	CompositionID string       `json:"compositionId"`
@@ -322,6 +324,9 @@ func (e *Engine) expire() {
 		e.requests = nil
 		e.state.Artifact = nil
 		e.state.Evidence = nil
+		for i := range e.state.Compositions {
+			e.state.Compositions[i].Explanations = nil // proposed prose may quote selected source values
+		}
 		if e.state.Evaluation != nil {
 			e.state.Evaluation.Review = nil // reviewer prose can quote selected values
 		}
@@ -355,6 +360,13 @@ func (e *Engine) Advance(ctx context.Context, revision int, d Decision) (View, e
 	}
 	if !canAdvance(e.state.Status) {
 		return e.snapshot(false), fmt.Errorf("goal is %s", e.state.Status)
+	}
+	if d.Action == "compose" && d.Composition != nil {
+		for _, draft := range d.Composition.Explanations {
+			if !utf8.ValidString(draft.Text) {
+				return e.snapshot(false), fmt.Errorf("source explanation text must be valid UTF-8 before JSON encoding")
+			}
+		}
 	}
 	b, err := json.Marshal(d)
 	if err != nil || len(b) > 32<<10 {
@@ -745,6 +757,9 @@ func (e *Engine) act(ctx context.Context, d Decision) error {
 		if _, err := e.supportContext(p); err != nil {
 			return err
 		}
+		if err := e.validateExplanationDrafts(ctx, p); err != nil {
+			return err
+		}
 		b, _ := json.Marshal(p)
 		_ = json.Unmarshal(b, &p)
 		e.state.Compositions = append(e.state.Compositions, p)
@@ -793,6 +808,7 @@ func (e *Engine) act(ctx context.Context, d Decision) error {
 			}
 			e.state.Artifact = &Artifact{Status: "sample_executed", Recipe: p, Sources: sources, Requests: requests, Layouts: e.state.Layouts, Metrics: metrics, Rows: rows, Limitations: []string{"Bounded acquisition only; full requested coverage needs separately authorized source review.", "Namespace, time, representativeness and usefulness remain declared assumptions, not verified identity or causality.", "Reacquisition may change source bytes; hashes identify the observed revision, not an archived copy.", "Not connection-ledger sample_verified. No automatic claim promotion."}}
 			e.state.Artifact.Unmatched = unmatched
+			e.state.Artifact.Explanations = p.Explanations
 			if len(p.Joins) > 0 {
 				e.state.Artifact.Limitations = append(e.state.Artifact.Limitations, "Inner joins omit unmatched rows from the result table; metrics retain stage-local source addresses for selected evidence and replanning, not proof of absence.")
 				if len(p.ReportUnmatched) > 0 {

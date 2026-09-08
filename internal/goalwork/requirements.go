@@ -3,6 +3,7 @@ package goalwork
 import (
 	"encoding/json"
 	"fmt"
+	"slices"
 	"strings"
 )
 
@@ -98,6 +99,9 @@ func validateContract(c GoalContract) error {
 		return fmt.Errorf("at most 8 evidence explanations are supported")
 	}
 	for _, r := range c.Explanations {
+		if r.Basis != "" && r.Basis != "execution" && r.Basis != "source" {
+			return fmt.Errorf("explanation basis must be execution or source")
+		}
 		if !validRequirementID(r.ID) || outputs[r.ID] || !validExplanationTopic(r.Topic) || strings.TrimSpace(r.Description) == "" || len(r.Description) > 1000 {
 			return fmt.Errorf("explanations need unique IDs distinct from data outputs, a supported evidence topic and a description")
 		}
@@ -181,6 +185,10 @@ func evaluateRequirements(c GoalContract, p Composition, rows []Row, observation
 			detail = "missing, null, mistyped or misattributed output; bind an actual selected field or aggregate from its required role"
 		}
 		check("output", o.ID, ok, detail)
+	}
+	for _, requirement := range c.Explanations {
+		present := requirement.Basis != "source" || slices.ContainsFunc(p.Explanations, func(d ExplanationDraft) bool { return d.ID == requirement.ID })
+		check("explanation", requirement.ID, present, "execution notes are generated separately; a source-based requirement needs a cited proposal whose support and goal fit remain review items")
 	}
 	if c.Coverage == "population" && fullScope {
 		result.FullScope = fullScopeExtents(observations, used)
