@@ -26,7 +26,7 @@ func TestCitywideReviewDiagnosticPreservesFailures(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, kind := range []string{"existing-output", "provider-error", "false-approval", "missing-reference", "unproven-full-scope", "unproven-table-context", "invalid-provider", "invalid-mode"} {
+	for _, kind := range []string{"existing-output", "provider-error", "false-approval", "missing-reference", "unproven-full-scope", "unproven-table-context", "invalid-provider", "invalid-mode", "synthetic-document"} {
 		t.Run(kind, func(t *testing.T) {
 			dir := t.TempDir()
 			output := filepath.Join(dir, "diagnostic.json")
@@ -60,6 +60,9 @@ func TestCitywideReviewDiagnosticPreservesFailures(t *testing.T) {
 			if kind == "invalid-mode" {
 				mode = "automatic-fallback"
 			}
+			if kind == "synthetic-document" {
+				variant = "with-age-definition"
+			}
 			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 			defer cancel()
 			cmd := exec.CommandContext(ctx, os.Args[0], "-test.run=^TestLiveCitywideGoalAnalysisReview$", "-test.count=1")
@@ -76,8 +79,11 @@ func TestCitywideReviewDiagnosticPreservesFailures(t *testing.T) {
 			if err == nil {
 				t.Fatalf("diagnostic should fail for %s: %s", kind, log)
 			}
+			if kind == "synthetic-document" && !strings.Contains(string(log), "age-definition diagnostic requires actual acquisition") {
+				t.Fatalf("document variant is missing its explicit acquisition boundary: %s", log)
+			}
 			saved, err := os.ReadFile(output)
-			if kind == "invalid-provider" || kind == "invalid-mode" {
+			if kind == "invalid-provider" || kind == "invalid-mode" || kind == "synthetic-document" {
 				if !os.IsNotExist(err) {
 					t.Fatal("invalid setup created an execution record")
 				}

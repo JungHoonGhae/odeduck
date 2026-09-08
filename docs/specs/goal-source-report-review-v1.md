@@ -217,6 +217,12 @@ hash·행 위치·합계와 대조한다. 인구는 기존 전체 CSV scanner로
 빈 경계행·주석을 선택한 별도 문맥을 추가한다. 기존 XLSX 읽기와 sparse 근거 선택을 사용하며
 rectangle의 모든 행을 공개하거나 합계행을 계산에 넣지 않는다. 새 셀의 독립 reference는 기존
 citywide oracle과 별도로 보존한다. sourceContext 전달과 실제 의미 판정은 구분한다.
+`with-age-definition`은 같은 전체 범위·계산·학교 문맥에 등록된 KOSIS 답변의 실제 문서 관측을
+인구 원본의 명시적 support로 추가한다. 미대응 학교 행의 선공개와 이후 전체 학교 공개를 하나로
+합쳐 기존 데이터 셀·원본 위치를 모두 유지하고 8 packet 예산을 지킨다. 과거 진단의 두 packet과
+실패는 그대로 보존한다. 문서 fixture는 전달 회귀에만 쓰며, 이 실제 모델 진단은 reference 재생을
+허용하지 않는다. 전체 취득·revision·집계·근거 입력 검사가 통과한 경우에만 모델을 호출한다.
+답변은 해당 통계 계열의 정의이며 특정 월 파일의 적용 선언으로 자동 승격하지 않는다.
 과거 archive는 그대로 보존한다. 모델에 기대 verdict나
 oracle 해석을 보내지 않는다. 각 시도의 입력·원 응답·Engine 결과와 준비 실패를 보존한다.
 결과와 한계는 [실행 검증](../research/goal-result-execution-validation-2026-09-08.md#원래-g4의-실제-모델-진단)에

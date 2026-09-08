@@ -99,14 +99,25 @@ func checkCitywideReduction(t *testing.T, live bool, reviewer *citywideModelRevi
 		policy.ReviewFullScope = reviewer.fullScope
 	}
 	reviewCalls := 0
+	ageDefinition := reviewer != nil && reviewer.ageDefinition
+	var documents goalwork.Dependencies
+	if ageDefinition && !live {
+		documents = citywideDocumentFixture(t, policy)
+	}
 	deps := goalwork.Dependencies{
 		Search: func(_ context.Context, q string) (catalog.Result, error) {
 			return catalog.Result{Hits: []catalog.Hit{{PK: q}}}, nil
 		},
-		Inspect: func(_ context.Context, pk string) (goalwork.Inspection, error) {
+		Inspect: func(ctx context.Context, pk string) (goalwork.Inspection, error) {
+			if ageDefinition && pk == "3033304" {
+				return documents.Inspect(ctx, pk)
+			}
 			return goalwork.Inspection{PK: pk}, nil
 		},
-		Sample: func(_ context.Context, s goalwork.SampleRequest, _ goalwork.Inspection) (goalwork.Acquired, error) {
+		Sample: func(ctx context.Context, s goalwork.SampleRequest, inspected goalwork.Inspection) (goalwork.Acquired, error) {
+			if s.Document != nil {
+				return documents.Sample(ctx, s, inspected)
+			}
 			if s.Reduce != nil {
 				t.Fatal("reduction called provider")
 			}
@@ -144,7 +155,11 @@ func checkCitywideReduction(t *testing.T, live bool, reviewer *citywideModelRevi
 		},
 		Review: func(ctx context.Context, in goalwork.ReviewInput) (goalwork.ReviewAssessment, error) {
 			reviewCalls++
-			if in.Goal != goal || in.Analysis == nil || len(in.Analysis.SourceContext) != 1 || len(in.Artifact.Sources) != 3 || len(in.Artifact.Rows) != 10 || len(in.Artifact.Unmatched) != 2 {
+			contexts := 1
+			if ageDefinition {
+				contexts++
+			}
+			if in.Goal != goal || in.Analysis == nil || len(in.Analysis.SourceContext) != contexts || len(in.Artifact.Sources) != 3 || len(in.Artifact.Rows) != 10 || len(in.Artifact.Unmatched) != 2 {
 				t.Fatal("original goal, calculation or header context changed at review boundary")
 			}
 			c := in.Analysis.SourceContext[0]
@@ -339,8 +354,14 @@ func checkCitywideReduction(t *testing.T, live bool, reviewer *citywideModelRevi
 	if position < 1 || position > 11 || v.Evidence[0].Records[position-1].Values["시군구명"] != "서해구" {
 		t.Fatal("excluded population group cannot be traced to the independent district label")
 	}
-	v = step(goalwork.Decision{Action: "read_evidence", Evidence: &goalwork.EvidenceRequest{Observation: "o2", RowsSHA256: v.Observations[1].RowsSHA256, Rows: m.UnmatchedRight, Fields: schoolFields}})
-	if v.Evidence[1].Records[0].Values["A"] != " 서구 " || v.Evidence[1].Records[0].Values["AG"] != "111" {
+	schoolRows, unmatchedRecord := m.UnmatchedRight, 0
+	if ageDefinition {
+		// Include the unmatched row in the one complete school disclosure, rather
+		// than consuming another packet for the same cells later in this run.
+		schoolRows, unmatchedRecord = positions, m.UnmatchedRight[0]-1
+	}
+	v = step(goalwork.Decision{Action: "read_evidence", Evidence: &goalwork.EvidenceRequest{Observation: "o2", RowsSHA256: v.Observations[1].RowsSHA256, Rows: schoolRows, Fields: schoolFields}})
+	if v.Evidence[1].Records[unmatchedRecord].Values["A"] != " 서구 " || v.Evidence[1].Records[unmatchedRecord].Values["AG"] != "111" {
 		t.Fatal("excluded school row was hidden, renamed or confused with pre-split geography")
 	}
 	for _, row := range v.Artifact.Rows {
@@ -371,14 +392,29 @@ func checkCitywideReduction(t *testing.T, live bool, reviewer *citywideModelRevi
 			}
 		}
 	}
-	// Keep the earlier unmatched packet: both it and the failed exact join remain.
+	// Existing diagnostic variants retain their separate unmatched packet.
+	// The new variant retains the same cells in its complete school packet.
 	schoolRequest.XLSX = &dataset.XLSXSelection{Sheet: "구·군별", Range: contextRange}
 	v = step(goalwork.Decision{Action: "sample", Sample: &schoolRequest})
 	v = step(goalwork.Decision{Action: "read_evidence", Evidence: &goalwork.EvidenceRequest{Observation: "o4", RowsSHA256: v.Observations[3].RowsSHA256, Rows: contextRows, Fields: []string{"A", "AG", "AK", "AH", "AL"}}})
-	step(goalwork.Decision{Action: "read_evidence", Evidence: &goalwork.EvidenceRequest{Observation: "o2", RowsSHA256: v.Observations[1].RowsSHA256, Rows: positions, Fields: schoolFields}})
+	if !ageDefinition {
+		step(goalwork.Decision{Action: "read_evidence", Evidence: &goalwork.EvidenceRequest{Observation: "o2", RowsSHA256: v.Observations[1].RowsSHA256, Rows: positions, Fields: schoolFields}})
+	}
 	fields := append([]string{"시도명", "시군구명", "기준연월"}, oracle.Sources[0].AgeFields...)
 	for start := 0; start < len(fields); start += 8 {
 		step(goalwork.Decision{Action: "read_evidence", Evidence: &goalwork.EvidenceRequest{Observation: "o1", RowsSHA256: v.Observations[0].RowsSHA256, Rows: []int{1}, Fields: fields[start:min(start+8, len(fields))]}})
+	}
+	if ageDefinition {
+		// Explicit development diagnostic source hint, never autonomous discovery.
+		step(goalwork.Decision{Action: "search", Query: "3033304", Role: "people"})
+		step(goalwork.Decision{Action: "inspect", PK: "3033304"})
+		v = step(goalwork.Decision{Action: "sample", Sample: &goalwork.SampleRequest{PK: "3033304", Delivery: "document", Document: &dataset.DocumentSelection{ReferenceID: "kosis-answer-22124"}}})
+		doc := v.Observations[len(v.Observations)-1]
+		v = step(goalwork.Decision{Action: "read_evidence", Evidence: &goalwork.EvidenceRequest{Observation: doc.ID, RowsSHA256: doc.RowsSHA256, Rows: []int{1, 2}, Fields: []string{"text"}}})
+		p.ID = "compare-with-definition"
+		p.Support = []goalwork.SupportBinding{{PacketID: v.Evidence[len(v.Evidence)-1].ID, Targets: []string{"o1"}, Purpose: "Check whether the registered official answer's age definition applies to this population source revision; distinguish series documentation from a file-specific declaration."}}
+		step(goalwork.Decision{Action: "compose", Composition: &p})
+		step(goalwork.Decision{Action: "execute", CompositionID: p.ID})
 	}
 	v, err = e.Advance(ctx, e.View().Revision, goalwork.Decision{Action: "review_result", CompositionID: p.ID})
 	if err != nil {

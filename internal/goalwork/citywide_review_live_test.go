@@ -14,13 +14,66 @@ import (
 )
 
 type citywideModelReview struct {
-	recipient    string
-	branches     bool
-	historical   bool
-	fullScope    bool
-	tableContext bool
-	call         func(context.Context, goalwork.ReviewInput) (goalwork.ReviewAssessment, error)
-	observe      func(goalwork.View)
+	recipient     string
+	branches      bool
+	historical    bool
+	fullScope     bool
+	tableContext  bool
+	ageDefinition bool
+	call          func(context.Context, goalwork.ReviewInput) (goalwork.ReviewAssessment, error)
+	observe       func(goalwork.View)
+}
+
+func TestCitywideReviewReceivesAgeDefinitionWithoutLosingEvidence(t *testing.T) {
+	var before, after goalwork.ReviewInput
+	checkCitywideReduction(t, false, &citywideModelReview{recipient: "codex", branches: true, tableContext: true, call: func(_ context.Context, in goalwork.ReviewInput) (goalwork.ReviewAssessment, error) {
+		before = in
+		return supportedAnalysisReview(in), nil
+	}})
+	v := checkCitywideReduction(t, false, &citywideModelReview{recipient: "codex", branches: true, tableContext: true, ageDefinition: true, call: func(_ context.Context, in goalwork.ReviewInput) (goalwork.ReviewAssessment, error) {
+		after = in
+		return supportedAnalysisReview(in), nil // Delivery fixture, not definition applicability.
+	}})
+	if after.Analysis == nil || len(after.Analysis.SourceContext) != 2 {
+		t.Fatal("registered age definition is missing from the existing citywide review")
+	}
+	doc := after.Analysis.SourceContext[1]
+	if !doc.Proposed || !slices.Equal(doc.Targets, []string{"o1"}) || doc.Source.Document == nil || doc.Source.Document.Reference.Basis != "adapter_reference" || doc.Request.Document == nil || doc.Request.Document.ReferenceID != "kosis-answer-22124" || len(doc.Evidence.Records) != 2 {
+		t.Fatal("definition lost its proposed target, actual request or registered origin")
+	}
+	for n, record := range doc.Evidence.Records {
+		address := record.Origins["text"]
+		if address.Kind != "document_block" || address.Ordinal != n+1 || address.Locator == "" || record.Values["text"] == nil {
+			t.Fatal("definition lost its selected original block")
+		}
+	}
+	// Compare disclosed cells, not packet IDs/order. The old duplicate is redundant;
+	// every original value, missing/null distinction and address must survive.
+	dataEvidence := func(in goalwork.ReviewInput) string {
+		cells := map[string]any{}
+		packets := append([]goalwork.EvidencePacket{in.Evidence}, in.Analysis.AdditionalEvidence...)
+		packets = append(packets, in.Analysis.SourceContext[0].Evidence)
+		for _, packet := range packets {
+			for _, record := range packet.Records {
+				for _, field := range packet.Selection.Fields {
+					key := packet.Selection.Observation + ":" + strconv.Itoa(record.RetainedRow) + ":" + field
+					value, present := record.Values[field]
+					cells[key] = []any{present, value, record.Origins[field], slices.Contains(record.Missing, field)}
+				}
+			}
+		}
+		body, err := json.Marshal(cells)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return string(body)
+	}
+	if dataEvidence(before) != dataEvidence(after) {
+		t.Fatal("document context displaced original calculation or school context evidence")
+	}
+	if len(v.Evidence) != 8 || v.Budget.EvidencePacketsRemaining != 0 || len(v.Observations) != 5 || len(v.Artifact.Sources) != 3 || len(v.Artifact.Rows) != 10 || len(v.Artifact.Unmatched) != 2 || before.Analysis.OutputSHA256 != after.Analysis.OutputSHA256 {
+		t.Fatal("document context widened budgets or changed the original citywide comparison")
+	}
 }
 
 func TestCitywideReviewReceivesTableContextWithoutChangingComparison(t *testing.T) {
@@ -112,8 +165,11 @@ func TestLiveCitywideGoalAnalysisReview(t *testing.T) {
 	if variant == "" {
 		variant = "baseline"
 	}
-	if !slices.Contains([]string{"baseline", "with-branches", "with-branches-full-scope", "with-table-context"}, variant) {
-		t.Fatal("result variant must be baseline, with-branches, with-branches-full-scope or with-table-context")
+	if !slices.Contains([]string{"baseline", "with-branches", "with-branches-full-scope", "with-table-context", "with-age-definition"}, variant) {
+		t.Fatal("result variant must be baseline, with-branches, with-branches-full-scope, with-table-context or with-age-definition")
+	}
+	if variant == "with-age-definition" && mode == "reference" {
+		t.Fatal("age-definition diagnostic requires actual acquisition; offline document fixtures are not methodology evidence")
 	}
 	f, err := os.OpenFile(os.Getenv("ODEDUCK_CITYWIDE_REVIEW_OUTPUT"), os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
 	if err != nil {
@@ -150,7 +206,7 @@ func TestLiveCitywideGoalAnalysisReview(t *testing.T) {
 			t.Error(err)
 		}
 	})
-	reviewer := &citywideModelReview{recipient: provider, historical: mode == "historical", branches: variant != "baseline", fullScope: variant == "with-branches-full-scope" || variant == "with-table-context", tableContext: variant == "with-table-context", observe: func(v goalwork.View) { record.Result = v }, call: func(ctx context.Context, in goalwork.ReviewInput) (goalwork.ReviewAssessment, error) {
+	reviewer := &citywideModelReview{recipient: provider, historical: mode == "historical", branches: variant != "baseline", fullScope: variant == "with-branches-full-scope" || variant == "with-table-context" || variant == "with-age-definition", tableContext: variant == "with-table-context" || variant == "with-age-definition", ageDefinition: variant == "with-age-definition", observe: func(v goalwork.View) { record.Result = v }, call: func(ctx context.Context, in goalwork.ReviewInput) (goalwork.ReviewAssessment, error) {
 		record.Input = &in
 		response, err := agentplan.ReviewGoal(ctx, in, provider)
 		record.Response = &response
