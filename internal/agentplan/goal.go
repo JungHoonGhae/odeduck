@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/JungHoonGhae/odeduck/internal/goalwork"
 )
@@ -89,6 +90,9 @@ func goalPrompt(view goalwork.View) (string, error) {
 func decodeGoalDecision(output []byte) (goalwork.Decision, error) {
 	if len(output) > 1<<20 {
 		return goalwork.Decision{}, fmt.Errorf("planner response exceeds 1 MiB")
+	}
+	if !utf8.Valid(output) {
+		return goalwork.Decision{}, fmt.Errorf("planner response must be valid UTF-8 before JSON decoding")
 	}
 	var validationErr error
 	var find func(any, int) (goalwork.Decision, bool)

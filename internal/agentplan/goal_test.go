@@ -13,7 +13,7 @@ import (
 )
 
 func TestPlanGoalRepairsOneMalformedDecisionWithoutEchoingRawValues(t *testing.T) {
-	for _, mode := range []string{"repair", "always-invalid"} {
+	for _, mode := range []string{"repair", "always-invalid", "invalid-utf8"} {
 		t.Run(mode, func(t *testing.T) {
 			original := providerBinariesFor
 			t.Cleanup(func() { providerBinariesFor = original })
@@ -30,7 +30,7 @@ func TestPlanGoalRepairsOneMalformedDecisionWithoutEchoingRawValues(t *testing.T
 			if mode == "repair" && (err != nil || d.Action != "abstain" || provider != ProviderClaude) {
 				t.Fatalf("repair failed: %+v %s %v", d, provider, err)
 			}
-			if mode == "always-invalid" && err == nil {
+			if mode != "repair" && err == nil {
 				t.Fatal("invalid decision accepted")
 			}
 			calls, _ := os.ReadFile(counter)
@@ -55,7 +55,9 @@ func TestGoalRepairCLIHelper(t *testing.T) {
 	if strings.Contains(string(input), "RAW_VALUE_MUST_NOT_BE_ECHOED") {
 		os.Exit(3)
 	}
-	if strings.Contains(string(input), "GOAL_DECISION_REPAIR:") && mode == "repair" {
+	if mode == "invalid-utf8" {
+		fmt.Print("{\"action\":\"compose\",\"composition\":{\"explanations\":[{\"text\":\"RAW_VALUE_MUST_NOT_BE_ECHOED\xff\"}]}}")
+	} else if strings.Contains(string(input), "GOAL_DECISION_REPAIR:") && mode == "repair" {
 		fmt.Println(`{"action":"abstain","reason":"need source evidence"}`)
 	} else {
 		fmt.Println(`{"action":"compose","inventedRows":[{"value":"RAW_VALUE_MUST_NOT_BE_ECHOED"}]}`)
