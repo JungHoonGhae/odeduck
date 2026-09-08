@@ -10,6 +10,19 @@ G1–G5의 범위나 전체 완료 기준을 바꾸지 않는다.
 본문은 primary evidence와 analysis.additionalEvidence에 한 번만 두고 sourceContext는 packetId로
 참조한다. 기존 원천 보고 v1과 과거 검토 archive는 그대로 보존한다.
 
+## 등록된 결정의 마감 경계 — 2026-09-09
+
+사용자가 현재 등록된 Wayfinder 티켓만 마치도록 범위를 고정했다. 최소 승인 계약은 아래 구현된
+원천 보고와 opt-in typed 분석·전체 범위·원천 설명 검토로 확정한다. 원천 revision·계산 재현,
+출력/설명별 지지와 원래 목표 적합성은 각각 남기며 하나의 인용이나 confidence로 합치지 않는다.
+부족한 근거의 재계획은 [같은 목표의 수정 실행](goal-result-execution-v1.md#검토-중-재계획--2026-09-08-추가-계약)을 따른다.
+
+사업 가설은 지지된 전제와 제안·가정·반증 방법을 구분해야 하지만 이 버전의 자동 완료 대상은 아니다.
+인과·현재 안전성·canonical identity·미지원 공간 분석 역시 승인 범위에 넣지 않는다. 더 강한 원래
+질문을 약한 원천 보고로 낮추어 완료하지 않는다. 이 **지원 경계의 결정**은 해당 기능의 구현이나
+G1–G5 완주가 아니며, 미완료 제품 검증은 [완료 계획](goal-driven-completion-plan.md)에 보존한다.
+이 경계를 넓히는 기능·검증은 이번 티켓 마감에 자동 추가하지 않는다.
+
 ## Problem Statement
 
 실제로 실행한 원천 보고도 영구적인 단일 의미 검토 값 때문에 완료될 수 없다. 반대로 계획기의
@@ -218,7 +231,9 @@ Composition의 `support:[{packetId,targets,purpose}]`로 실제 공개한 Eviden
 - 기존 `compose → execute → review_result`에서 `composition.explanations`의
   `{id,text,citations:[{packetId,packetRow,field}]}`를 받는다. 기존 source 요구 ID당 하나이며 최대
   8개, 문장 1–2000 UTF-8 bytes와 1–16개 중복 없는 선택 셀 참조다. credential material을 거부한다.
-  유효하지 않은 UTF-8은 JSON 변환 전에 거부해 문장을 조용히 대체하지 않는다.
+  Go Engine 입력은 JSON 인코딩 전에, CLI planner의 원 응답은 JSON 디코딩 전에 유효하지 않은
+  UTF-8을 거부한다. MCP의 wire JSON 파싱은 SDK가 담당하므로 이 검사를 모든 transport의 손상
+  탐지로 표현하지 않는다.
 - 문장은 계획기의 **해석 제안**이다. 원천 인용문이나 승인 값을 제출하지 않는다. 인용은 같은 목표에서
   이미 공개한 불변 packet의 실제 retained row·field를 가리킨다. 원천 revision과 값·존재 상태를
   기존 공개 근거 색인으로 대조하고, 원본 위치는 packet의 `origins`로 추적한다. missing/null/빈 문구/
