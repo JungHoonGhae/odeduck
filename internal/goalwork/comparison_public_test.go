@@ -228,6 +228,36 @@ func TestSourceComparisonBoundsCompleteReportWithoutDroppingDiscrepancies(t *tes
 	}
 }
 
+func TestSourceComparisonRejectsNumericExpansionWithoutPartialObservation(t *testing.T) {
+	for _, variant := range []string{"sum carry", "left exponent", "right exponent", "missing peer", "invalid peer"} {
+		t.Run(variant, func(t *testing.T) {
+			left := []goalwork.Row{{"code": "001", "first": strings.Repeat("9", 256), "second": "1"}}
+			right := []goalwork.Row{{"label": "A (001)", "total": "1"}}
+			if variant == "left exponent" {
+				left[0]["first"] = json.Number("1e256")
+			}
+			if variant == "right exponent" {
+				left[0]["first"], right[0]["total"] = "1", json.Number("1e256")
+			}
+			if variant == "missing peer" {
+				right[0]["total"] = nil
+			}
+			if variant == "invalid peer" {
+				right[0]["total"] = "not a number"
+			}
+			e := comparisonFixture(t, left, right)
+			s := comparisonRequest(t, e)
+			if variant == "left exponent" {
+				s.Compare.Checks[0].Left = goalwork.Measure{Field: "first", Format: "decimal_v1", Unit: "units"}
+			}
+			v, err := e.Advance(context.Background(), e.View().Revision, goalwork.Decision{Action: "sample", Sample: &s})
+			if err != nil || len(v.Gaps) != 1 || len(v.Observations) != 2 || len(v.Evidence) != 0 || v.SampleAttempts[2].Status != "failed" {
+				t.Fatalf("expanded numeric comparison did not fail atomically: gaps=%+v err=%v", v.Gaps, err)
+			}
+		})
+	}
+}
+
 func TestSourceComparisonUsesExactDecimalsAndDisclosesOnlySelectedComputedEvidence(t *testing.T) {
 	e := comparisonFixture(t,
 		[]goalwork.Row{{"code": "001", "first": "9007199254740993.1", "second": "0.2", "private": "UNSELECTED_PRIVATE"}, {"code": "002", "first": "12.5", "second": "7.5"}, {"code": "003", "first": "5", "second": "5"}},

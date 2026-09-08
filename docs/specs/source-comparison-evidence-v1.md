@@ -39,6 +39,8 @@ or invalid numeric input. Missing and invalid inputs do not enter equality count
 zero. Data discrepancies produce a report, including zero-match reports; structural errors,
 cancellation or overflow reject the whole computed observation. At most 1000 report rows / 2 MiB,
 within existing goal sample/storage budgets; never truncate a successful discrepancy report.
+An evaluated numeric operand exceeding the shared result range also rejects the whole report,
+even when its opposite operand is missing or invalid; malformed source inputs remain diagnostics.
 
 Report rows start with 13 `metric`/`value` summary rows: `leftRows`, `rightRows`, `matchedPairs`,
 `leftOnly`, `rightOnly`, `leftUnresolved`, `rightUnresolved`, `checks`, `comparisons`, `equal`,

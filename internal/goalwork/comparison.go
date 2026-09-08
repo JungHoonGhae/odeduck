@@ -231,6 +231,11 @@ func (e *Engine) sampleComparison(ctx context.Context, request SampleRequest) (A
 			}
 			lv, le := evaluateMeasure(qualified[0][left[0]-1], check[0])
 			rv, re := evaluateMeasure(qualified[1][right[0]-1], check[1])
+			ln, _, leftRangeErr := exactNumber(lv)
+			rn, _, rightRangeErr := exactNumber(rv)
+			if (lv != nil && leftRangeErr != nil) || (rv != nil && rightRangeErr != nil) {
+				return Acquired{}, fmt.Errorf("comparison check %s exceeds the supported exact numeric result range", r.Checks[i].ID)
+			}
 			status := "equal"
 			switch {
 			case le != nil || re != nil:
@@ -238,8 +243,6 @@ func (e *Engine) sampleComparison(ctx context.Context, request SampleRequest) (A
 			case lv == nil || rv == nil:
 				status = "missing"
 			default:
-				ln, _, _ := exactNumber(lv)
-				rn, _, _ := exactNumber(rv)
 				if ln.Cmp(rn) != 0 {
 					status = "different"
 				}

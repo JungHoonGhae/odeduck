@@ -732,3 +732,11 @@ ODEDUCK_COMPARISON_EXPORT_HTML=/tmp/odeduck-monthly-export.fqn2uP/age-july-inche
 검사, `git diff --check`와 goalwork/mcpserver/agentplan race 검사를 통과했다. 오래된 안내 문구를
 그대로 요구하던 private prompt substring 검사는 제거하고, 공통 지침 전체의 실제 CLI subprocess·
 MCP resource 전달 회귀와 EOF/보관 수의 공개 실행 테스트를 유지했다. 기존 목표 oracle은 변경하지 않았다.
+
+`d04de13...9b1bfeb`의 독립 Standards 검토는 문서화된 위반 0건·조치할 설계 휴리스틱 0건이었다.
+Spec은 수치 범위 오류를 버린 뒤 비교하는 P1 한 건을 찾았다. 256자리 `9`와 `1`의 합이 257자리로
+늘어날 때 공개 Engine 테스트에서 nil 역참조 panic을 재현했다. 양쪽 단일 JSON 지수의 전개와
+반대쪽이 결측/잘못된 값인 경우까지 다섯 회귀를 두고, 계산된 숫자의 범위를 판정 전에 확인하도록
+고쳤다. 범위 초과는 근거·부분 관측 없이 실패하며 원천의 일반 결측/형식 오류는 기존 진단으로 남는다.
+수정 뒤 실제 보존 CSV의 6,804개 일치·15개 미대응 원본 위치 재생은 그대로 통과했다.
+수정 후 전체 tidy/vet/test/build·brand·diff 검사와 goalwork/mcpserver/agentplan race 검사도 다시 통과했다.
