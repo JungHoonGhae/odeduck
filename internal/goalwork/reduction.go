@@ -34,7 +34,7 @@ func (e *Engine) sampleReduction(ctx context.Context, request SampleRequest) (Ac
 			source = &e.state.Observations[i]
 		}
 	}
-	if source == nil || source.PK != request.PK || source.Spatial != nil || source.Reduction != nil || r.RowsSHA256 == "" || r.RowsSHA256 != source.RowsSHA256 {
+	if source == nil || source.PK != request.PK || source.Document != nil || source.Spatial != nil || source.Reduction != nil || r.RowsSHA256 == "" || r.RowsSHA256 != source.RowsSHA256 {
 		return Acquired{}, fmt.Errorf("reduce requires this PK's exact retained original observation revision; nested/spatial reductions are unsupported")
 	}
 	if request.Delivery != e.requests[source.ID].Delivery {

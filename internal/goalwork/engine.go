@@ -56,6 +56,7 @@ type Inspection struct {
 	Deliveries           []string                     `json:"deliveries"`
 	Operations           []Operation                  `json:"operations,omitempty"`
 	Assets               []string                     `json:"assets,omitempty"`
+	Documents            []dataset.DocumentReference  `json:"documents,omitempty"`
 	DeclaredColumns      []DeclaredColumn             `json:"declaredColumns,omitempty"`
 	Warnings             []string                     `json:"warnings,omitempty"`
 	Declarations         map[string]SourceDeclaration `json:"declarations,omitempty"` // keyed by request delivery
@@ -78,21 +79,22 @@ type Parameter struct {
 }
 
 type SampleRequest struct {
-	FileVersion string                 `json:"fileVersion,omitempty"` // must equal the selected inspected FILE edition; empty for current files
-	Reduce      *SourceReduction       `json:"reduce,omitempty"`      // local pre-join aggregation of an exact retained source revision
-	Nearest     *NearestSelection      `json:"nearest,omitempty"`     // local reduction using retained observations, never caller coordinates
-	ScanCSV     bool                   `json:"scanCsv,omitempty"`     // complete bounded direct-CSV scan; retain only a prefix
-	PK          string                 `json:"pk"`
-	Delivery    string                 `json:"delivery"` // api, file or standard
-	Operation   string                 `json:"operation,omitempty"`
-	Params      map[string]string      `json:"params,omitempty"`
-	Asset       string                 `json:"asset,omitempty"`
-	Member      string                 `json:"member,omitempty"`   // exact CSV path inside a ZIP asset
-	RowPath     string                 `json:"rowPath,omitempty"`  // API JSON Pointer
-	Where       map[string]string      `json:"where,omitempty"`    // FILE only; conjunctive exact string selection before row limit
-	WhereIn     map[string][]string    `json:"whereIn,omitempty"`  // direct CSV full scan only; OR within each exact value set, AND across fields
-	XLSX        *dataset.XLSXSelection `json:"xlsx,omitempty"`     // FILE only; exact original worksheet rectangle
-	LayoutID    string                 `json:"layoutId,omitempty"` // optional same-source-file pin from layout discovery
+	FileVersion string                     `json:"fileVersion,omitempty"` // must equal the selected inspected FILE edition; empty for current files
+	Reduce      *SourceReduction           `json:"reduce,omitempty"`      // local pre-join aggregation of an exact retained source revision
+	Nearest     *NearestSelection          `json:"nearest,omitempty"`     // local reduction using retained observations, never caller coordinates
+	ScanCSV     bool                       `json:"scanCsv,omitempty"`     // complete bounded direct-CSV scan; retain only a prefix
+	PK          string                     `json:"pk"`
+	Delivery    string                     `json:"delivery"` // api, file, standard or document
+	Document    *dataset.DocumentSelection `json:"document,omitempty"`
+	Operation   string                     `json:"operation,omitempty"`
+	Params      map[string]string          `json:"params,omitempty"`
+	Asset       string                     `json:"asset,omitempty"`
+	Member      string                     `json:"member,omitempty"`   // exact CSV path inside a ZIP asset
+	RowPath     string                     `json:"rowPath,omitempty"`  // API JSON Pointer
+	Where       map[string]string          `json:"where,omitempty"`    // FILE only; conjunctive exact string selection before row limit
+	WhereIn     map[string][]string        `json:"whereIn,omitempty"`  // direct CSV full scan only; OR within each exact value set, AND across fields
+	XLSX        *dataset.XLSXSelection     `json:"xlsx,omitempty"`     // FILE only; exact original worksheet rectangle
+	LayoutID    string                     `json:"layoutId,omitempty"` // optional same-source-file pin from layout discovery
 }
 type Acquired struct {
 	Reduction      *ReductionProvenance
@@ -107,6 +109,7 @@ type Acquired struct {
 	Table          *dataset.TableProvenance
 	Archive        *dataset.ArchiveProvenance
 	CSV            *dataset.CSVProvenance
+	Document       *dataset.DocumentProvenance
 }
 type Decision struct {
 	FileHistory   bool             `json:"fileHistory,omitempty"` // inspect only: list advertised historical FILE editions
@@ -130,29 +133,30 @@ type Node struct {
 	Inspection *Inspection `json:"inspection,omitempty"`
 }
 type Observation struct {
-	Reduction      *ReductionProvenance       `json:"reduction,omitempty"`
-	Spatial        *SpatialProvenance         `json:"spatial,omitempty"`
-	ID             string                     `json:"id"`
-	PK             string                     `json:"pk"`
-	Delivery       string                     `json:"delivery"`
-	Operation      string                     `json:"operation,omitempty"`
-	Asset          string                     `json:"asset,omitempty"`
-	RowPath        string                     `json:"rowPath,omitempty"`
-	RequestSHA256  string                     `json:"requestSha256"`
-	ContentSHA256  string                     `json:"contentSha256,omitempty"`
-	ContractSHA256 string                     `json:"contractSha256,omitempty"`
-	RowsSHA256     string                     `json:"rowsSha256"`
-	ObservedAt     string                     `json:"observedAt"`
-	Columns        []string                   `json:"columns"`
-	ColumnTypes    map[string][]string        `json:"columnTypes"`
-	ColumnProfiles map[string]ColumnProfile   `json:"columnProfiles"`
-	RowCount       int                        `json:"rowCount"`
-	Warnings       []string                   `json:"warnings,omitempty"`
-	Selection      *dataset.SelectionReport   `json:"selection,omitempty"`
-	Table          *dataset.TableProvenance   `json:"table,omitempty"`
-	Archive        *dataset.ArchiveProvenance `json:"archive,omitempty"`
-	CSV            *dataset.CSVProvenance     `json:"csv,omitempty"`
-	Declaration    *SourceDeclaration         `json:"declaration,omitempty"`
+	Reduction      *ReductionProvenance        `json:"reduction,omitempty"`
+	Spatial        *SpatialProvenance          `json:"spatial,omitempty"`
+	ID             string                      `json:"id"`
+	PK             string                      `json:"pk"`
+	Delivery       string                      `json:"delivery"`
+	Operation      string                      `json:"operation,omitempty"`
+	Asset          string                      `json:"asset,omitempty"`
+	RowPath        string                      `json:"rowPath,omitempty"`
+	RequestSHA256  string                      `json:"requestSha256"`
+	ContentSHA256  string                      `json:"contentSha256,omitempty"`
+	ContractSHA256 string                      `json:"contractSha256,omitempty"`
+	RowsSHA256     string                      `json:"rowsSha256"`
+	ObservedAt     string                      `json:"observedAt"`
+	Columns        []string                    `json:"columns"`
+	ColumnTypes    map[string][]string         `json:"columnTypes"`
+	ColumnProfiles map[string]ColumnProfile    `json:"columnProfiles"`
+	RowCount       int                         `json:"rowCount"`
+	Warnings       []string                    `json:"warnings,omitempty"`
+	Selection      *dataset.SelectionReport    `json:"selection,omitempty"`
+	Table          *dataset.TableProvenance    `json:"table,omitempty"`
+	Archive        *dataset.ArchiveProvenance  `json:"archive,omitempty"`
+	CSV            *dataset.CSVProvenance      `json:"csv,omitempty"`
+	Document       *dataset.DocumentProvenance `json:"document,omitempty"`
+	Declaration    *SourceDeclaration          `json:"declaration,omitempty"`
 }
 type Gap struct {
 	Revision int    `json:"revision"`
@@ -579,8 +583,8 @@ func (e *Engine) act(ctx context.Context, d Decision) error {
 		if n == nil || n.Inspection == nil {
 			return fmt.Errorf("inspect known PK before sampling")
 		}
-		if s.Delivery != "api" && s.Delivery != "file" && s.Delivery != "standard" {
-			return fmt.Errorf("sample delivery must be api, file or standard")
+		if s.Delivery != "api" && s.Delivery != "file" && s.Delivery != "standard" && s.Delivery != "document" {
+			return fmt.Errorf("sample delivery must be api, file, standard or document")
 		}
 		if s.Delivery == "file" && s.Reduce == nil {
 			selected := ""
@@ -612,6 +616,9 @@ func (e *Engine) act(ctx context.Context, d Decision) error {
 		}
 		if err == nil && s.Reduce == nil && acq.Reduction != nil {
 			err = fmt.Errorf("external acquisition cannot supply local reduction provenance")
+		}
+		if err == nil {
+			err = validateDocumentAcquisition(s, *n.Inspection, acq)
 		}
 		if err == nil && expectedLayoutHash != "" && acq.ContentSHA256 != expectedLayoutHash {
 			err = fmt.Errorf("source file changed since layout discovery; inspect the new layout before choosing another observation")
@@ -681,10 +688,10 @@ func (e *Engine) act(ctx context.Context, d Decision) error {
 		e.requests[id] = s
 		e.bytes += len(b)
 		var declaration *SourceDeclaration
-		if declared, ok := n.Inspection.Declarations[s.Delivery]; ok && s.Reduce == nil {
+		if declared, ok := n.Inspection.Declarations[s.Delivery]; ok && s.Reduce == nil && s.Document == nil {
 			declaration = &declared
 		}
-		e.state.Observations = append(e.state.Observations, Observation{Reduction: acq.Reduction, Spatial: acq.Spatial, ID: id, PK: s.PK, Delivery: acq.Delivery, Operation: acq.Operation, Asset: s.Asset, RowPath: s.RowPath, RequestSHA256: digest(s), ContentSHA256: acq.ContentSHA256, ContractSHA256: acq.ContractSHA256, RowsSHA256: digest(rows), ObservedAt: time.Now().UTC().Format(time.RFC3339Nano), Columns: names, ColumnTypes: columnTypes, ColumnProfiles: profileColumns(rows, names), RowCount: len(rows), Warnings: acq.Warnings, Selection: acq.Selection, Table: cloneTableProvenance(acq.Table), Archive: cloneArchiveProvenance(acq.Archive), CSV: cloneCSVProvenance(acq.CSV), Declaration: declaration})
+		e.state.Observations = append(e.state.Observations, Observation{Reduction: acq.Reduction, Spatial: acq.Spatial, ID: id, PK: s.PK, Delivery: acq.Delivery, Operation: acq.Operation, Asset: s.Asset, RowPath: s.RowPath, RequestSHA256: digest(s), ContentSHA256: acq.ContentSHA256, ContractSHA256: acq.ContractSHA256, RowsSHA256: digest(rows), ObservedAt: time.Now().UTC().Format(time.RFC3339Nano), Columns: names, ColumnTypes: columnTypes, ColumnProfiles: profileColumns(rows, names), RowCount: len(rows), Warnings: acq.Warnings, Selection: acq.Selection, Table: cloneTableProvenance(acq.Table), Archive: cloneArchiveProvenance(acq.Archive), CSV: cloneCSVProvenance(acq.CSV), Document: cloneDocumentProvenance(acq.Document), Declaration: declaration})
 		e.state.SampleAttempts[attemptIndex].Status = "acquired"
 		e.state.SampleAttempts[attemptIndex].FailureKind = ""
 		e.state.SampleAttempts[attemptIndex].ObservationID = id
@@ -721,6 +728,9 @@ func (e *Engine) act(ctx context.Context, d Decision) error {
 			if _, ok := e.rows[j.Right]; !ok {
 				return fmt.Errorf("unknown joined observation")
 			}
+		}
+		if err := validateComputationalSources(p, e.state.Observations); err != nil {
+			return err
 		}
 		if _, err := e.supportContext(p); err != nil {
 			return err

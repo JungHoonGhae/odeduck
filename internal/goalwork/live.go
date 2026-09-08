@@ -111,6 +111,13 @@ func LiveDependencies(client *fetch.Client, base string, caller Caller, searcher
 				}
 				return Acquired{Rows: sample.Rows, Delivery: "STD", ContentSHA256: sample.SHA256, ContractSHA256: digest(res.Standard), Warnings: append(append([]string(nil), res.Standard.Warnings...), "STD first page only (at most 1000 rows); not representative or population-verified. Original JSON types and record dates are preserved.")}, nil
 			}
+			if s.Delivery == "document" {
+				sample, err := files.SampleDocument(ctx, res.File, *s.Document)
+				if err != nil {
+					return Acquired{}, classifyLiveAcquisitionError(err, nil)
+				}
+				return Acquired{Rows: sample.Rows, Delivery: "DOCUMENT", ContentSHA256: sample.SHA256, ContractSHA256: digest(sample.Document.Reference), Document: sample.Document}, nil
+			}
 			if s.Delivery == "file" {
 				if res.File == nil {
 					return Acquired{}, fmt.Errorf("no inspected FILE contract")
@@ -208,6 +215,7 @@ func projectInspection(pk string, res *dataset.InspectionResult) Inspection {
 		out.Warnings = append(out.Warnings, res.API.Warnings...)
 	}
 	if res.File != nil {
+		out.Documents = append([]dataset.DocumentReference(nil), res.File.Documents...)
 		out.FileVersions, out.FileHistoryCount, out.FileHistoryTruncated, out.SelectedFileVersion = res.File.FileVersions, res.File.FileHistoryCount, res.File.FileHistoryTruncated, res.File.SelectedFileVersion
 		for _, a := range res.File.Assets {
 			out.Assets = append(out.Assets, a.Name)
@@ -248,6 +256,12 @@ func classifyLiveAcquisitionError(err error, result *apicall.CallResult) error {
 }
 
 func validateSampleSelection(s SampleRequest) error {
+	if s.Document != nil || s.Delivery == "document" {
+		if s.Document == nil || s.Delivery != "document" || s.FileVersion != "" || s.Reduce != nil || s.Nearest != nil || s.ScanCSV || s.LayoutID != "" || s.Asset != "" || s.Member != "" || s.XLSX != nil || len(s.Where)+len(s.WhereIn)+len(s.Params) != 0 || s.Operation != "" || s.RowPath != "" {
+			return fmt.Errorf("document sampling accepts only pk, delivery:document and an inspected document selection")
+		}
+		return dataset.ValidateDocumentSelection(*s.Document)
+	}
 	if len(s.FileVersion) > 100 || (s.FileVersion != "" && (s.Delivery != "file" || s.Reduce != nil)) {
 		return fmt.Errorf("fileVersion is a bounded inspected FILE acquisition ID; local reductions use their retained source revision")
 	}

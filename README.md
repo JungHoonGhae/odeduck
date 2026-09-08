@@ -108,6 +108,10 @@ MCP에서는 서버를 `mcp --share-goal-evidence`로 시작해야 하며 모델
 계산할 수 있다. 이 구면 거리는 실제 이동 경로나 현재 접근 가능성을 뜻하지 않는다.
 전체 CSV 검사에서는 `sample.whereIn`으로 여러 지역·연령처럼 정확한 값 목록을 함께 고를 수 있다.
 파일 전체 검사와 일치 행의 실제 보관, 요청한 집단 전체의 확보는 각각 구분해 보고한다.
+검사한 FILE의 등록된 공식 HTML 설명은 `sample`의 `delivery:"document"`로 별도 관측할 수 있다.
+선택 공개한 원문만 `composition.support`로 해석 검토에 연결하며 계산 행이나 모집단 증거로 자동
+승격하지 않는다. 현재 지원은 행안부 월간 통계 도움말과 등록된 KOSIS 공식 답변이며 임의 URL·PDF는
+지원하지 않는다. [보조 문서 읽기 계약](docs/specs/source-document-acquisition-v1.md)에 범위를 명시했다.
 출력 형식이 맞아도 지역·식별자·시간의 의미가 검증되지 않으면 `review_required`로 남기고 같은 목표·예산
 안에서 추가 근거와 대안을 찾는다. 제한된 원천 보고는 CLI의 `--review-source-reports`(명시한 agent와
 `--share-evidence` 필수), MCP의 `--review-goals-with=claude`와 `--share-goal-evidence`로 별도 검토를

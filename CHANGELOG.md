@@ -9,6 +9,12 @@ section matching a `vX.Y.Z` tag as the GitHub release notes.
 
 ### Added
 
+- Registered supporting HTML documents in FILE inspection and goal `sample`
+  (`delivery:document`), with credentialless exact-origin acquisition, selected
+  original DOM addresses and page/text hashes. Explicit evidence disclosure and
+  `composition.support` carry document context into review; documents cannot
+  become computational data or certify applicability or population coverage.
+
 - Additional opt-in full-scope goal review (`solve --review-full-scope`, MCP startup
   `--review-goal-full-scope`), requiring existing analysis/disclosure authorization.
   Complete CSV retention or exact XLSX rectangle acquisition enables review, not

@@ -169,7 +169,8 @@ Composition의 `support:[{packetId,targets,purpose}]`로 실제 공개한 Eviden
 
 공개 seam에서 별도 파일 근거 전달과 무관한 값 비공개, 가짜/중복/비참여 target·권한·예산·변조·
 역할 대체 차단을 검증한다. fixture 판정은 전달·상태 검증일 뿐 의미 정확도나 G4 완주가 아니다.
-외부 웹의 공식 정의를 원천 revision에 연결하는 취득과 전체 범위 수용 계약은 후속으로 남는다.
+외부 HTML 정의의 취득은 [공식 보조 문서 관측](source-document-acquisition-v1.md), 전체 범위 수용은
+아래 후속 계약에 둔다. 취득 지원만으로 다른 원천 revision에 대한 적용이나 G4 완주가 검증되지는 않는다.
 
 ### 전체 요청 범위의 추가 검토 — 2026-09-08 후속 계약
 

@@ -223,6 +223,15 @@ func (c *Client) OpenGETNoRedirect(ctx context.Context, rawURL string) (*StreamR
 	return c.openWithClient(ctx, &httpClient, http.MethodGet, rawURL, nil, "", "application/json,*/*")
 }
 
+// OpenPublicGETNoRedirect reads a caller-pinned public document without the
+// shared client's cookie jar or redirects. The caller bounds body and deadline.
+func (c *Client) OpenPublicGETNoRedirect(ctx context.Context, rawURL string) (*StreamResponse, error) {
+	httpClient := *c.http
+	httpClient.Jar = nil
+	httpClient.CheckRedirect = func(_ *http.Request, _ []*http.Request) error { return http.ErrUseLastResponse }
+	return c.openWithClient(ctx, &httpClient, http.MethodGet, rawURL, nil, "", "text/html")
+}
+
 // OpenPostForm starts a streamed form POST for provider assets that are too
 // large for the ordinary bounded response path.
 func (c *Client) OpenPostForm(ctx context.Context, rawURL string, form url.Values) (*StreamResponse, error) {

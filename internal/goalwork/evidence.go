@@ -41,9 +41,10 @@ type EvidenceRecord struct {
 type EvidenceAddress struct {
 	Observation string `json:"observation"`
 	Field       string `json:"field"`
-	Kind        string `json:"kind"`    // retained_row | csv_data_record | worksheet_row | computed_pair | computed_group
+	Kind        string `json:"kind"`    // retained_row | csv_data_record | worksheet_row | document_block | computed_pair | computed_group
 	Ordinal     int    `json:"ordinal"` // 1-based in the named coordinate system
 	Sheet       string `json:"sheet,omitempty"`
+	Locator     string `json:"locator,omitempty"` // original DOM path for document_block
 }
 
 func (e *Engine) readEvidence(request *EvidenceRequest) error {
@@ -147,6 +148,12 @@ func evidenceAddress(o Observation, field string, trace rowLineage, observed map
 	}
 	if slot.kind == "csv" {
 		address.Kind, address.Ordinal = "csv_data_record", ordinal
+	} else if document := observed[slot.observation].Document; document != nil {
+		if len(document.Blocks) != observed[slot.observation].RowCount || ordinal < 0 || ordinal >= len(document.Blocks) {
+			return EvidenceAddress{}, fmt.Errorf("evidence document block provenance is inconsistent")
+		}
+		block := document.Blocks[ordinal]
+		address.Kind, address.Ordinal, address.Locator = "document_block", block.Ordinal, block.Locator
 	} else if table := observed[slot.observation].Table; table != nil {
 		if len(table.RowNumbers) != observed[slot.observation].RowCount || ordinal < 0 || ordinal >= len(table.RowNumbers) || table.RowNumbers[ordinal] < 1 || table.Sheet == "" {
 			return EvidenceAddress{}, fmt.Errorf("evidence worksheet row provenance is inconsistent")

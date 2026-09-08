@@ -50,26 +50,28 @@ type Ref struct {
 
 // Contract is the observed delivery contract for one Data Node.
 type Contract struct {
-	Ref                  Ref               `json:"ref"`
-	Name                 string            `json:"name,omitempty"`
-	Provider             string            `json:"provider,omitempty"`
-	UpdateCycle          string            `json:"updateCycle,omitempty"`
-	ModifiedAt           string            `json:"modifiedAt,omitempty"`
-	DeclaredFormat       string            `json:"declaredFormat,omitempty"`
-	SourceURL            string            `json:"sourceUrl"`
-	AdapterID            string            `json:"adapterId"`
-	AdapterRevision      int               `json:"adapterRevision"`
-	VerifiedAt           string            `json:"verifiedAt"`
-	Capability           string            `json:"capability"`
-	Evidence             []Evidence        `json:"evidence,omitempty"`
-	Alternatives         []Alternative     `json:"alternatives,omitempty"`
-	Metadata             map[string]string `json:"metadata,omitempty"`
-	Assets               []Asset           `json:"assets,omitempty"`
-	Warnings             []string          `json:"warnings,omitempty"`
-	FileVersions         []FileVersion     `json:"fileVersions,omitempty"`
-	FileHistoryCount     int               `json:"fileHistoryCount,omitempty"`
-	FileHistoryTruncated bool              `json:"fileHistoryTruncated,omitempty"`
-	SelectedFileVersion  *FileVersion      `json:"selectedFileVersion,omitempty"`
+	Ref                  Ref                 `json:"ref"`
+	Name                 string              `json:"name,omitempty"`
+	Provider             string              `json:"provider,omitempty"`
+	UpdateCycle          string              `json:"updateCycle,omitempty"`
+	ModifiedAt           string              `json:"modifiedAt,omitempty"`
+	DeclaredFormat       string              `json:"declaredFormat,omitempty"`
+	SourceURL            string              `json:"sourceUrl"`
+	AdapterID            string              `json:"adapterId"`
+	AdapterRevision      int                 `json:"adapterRevision"`
+	VerifiedAt           string              `json:"verifiedAt"`
+	Capability           string              `json:"capability"`
+	Evidence             []Evidence          `json:"evidence,omitempty"`
+	Alternatives         []Alternative       `json:"alternatives,omitempty"`
+	Metadata             map[string]string   `json:"metadata,omitempty"`
+	Assets               []Asset             `json:"assets,omitempty"`
+	Warnings             []string            `json:"warnings,omitempty"`
+	FileVersions         []FileVersion       `json:"fileVersions,omitempty"`
+	FileHistoryCount     int                 `json:"fileHistoryCount,omitempty"`
+	FileHistoryTruncated bool                `json:"fileHistoryTruncated,omitempty"`
+	SelectedFileVersion  *FileVersion        `json:"selectedFileVersion,omitempty"`
+	Documents            []DocumentReference `json:"documents,omitempty"`
+	documentReferences   []DocumentReference
 }
 
 // Alternative is a provider-advertised representation of the same logical
@@ -242,6 +244,8 @@ func (i *Inspector) inspect(ctx context.Context, ref Ref, history bool, version 
 		if normalized, ok := normalizeSeoulDatasetURL(source); ok {
 			return i.inspectSeoul(ctx, contract, normalized)
 		}
+		contract.documentReferences = supportingDocuments(source, detailURL)
+		contract.Documents = append([]DocumentReference(nil), contract.documentReferences...)
 		contract.Warnings = append(contract.Warnings, "외부 제공기관 파일은 아직 typed Adapter가 없어 공식 URL만 확인했습니다")
 		return contract, nil
 	}

@@ -27,6 +27,7 @@ type TableSample struct {
 	Warnings  []string
 	Archive   *ArchiveProvenance
 	CSV       *CSVProvenance
+	Document  *DocumentProvenance
 }
 
 // CSVProvenance counts logical data records after the header (starting at one).
