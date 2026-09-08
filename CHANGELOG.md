@@ -11,6 +11,16 @@ section matching a `vX.Y.Z` tag as the GitHub release notes.
 
 - Native STD inspection through CLI/MCP, plus bounded CSV, ZIP-member and exact
   XLSX-rectangle readers with source hashes, original positions and explicit limits.
+- Optional, recipient-bound selected evidence for experimental goal planning:
+  CLI `--share-evidence` requires one explicit agent; MCP disclosure is fixed by
+  server startup `--share-goal-evidence`. Original record addresses, exact values,
+  missing/null states, cumulative disclosure budgets and session expiry are retained.
+  Default planning remains value-free; evidence access is not semantic approval.
+- Experimental shared goal-based discovery and bounded composition via CLI `solve`
+  and MCP `advance_goal`, with required-role/output checks, source-record lineage,
+  typed FILE/STD acquisition, explicit retries and versioned scope-label comparison.
+  Candidate artifacts remain distinct from goal completion; automatic semantic
+  approval and durable goal resumption are not implemented.
 
 ### Fixed
 
@@ -20,8 +30,21 @@ section matching a `vX.Y.Z` tag as the GitHub release notes.
   withhold unsafe responses without creating replacement source observations.
 - Preserve empty CSV strings instead of inventing nulls; keep STD reads bound to
   the first-party response and reject ambiguous JSON object members.
+- Allow ordinary single-source projection and aggregation through the shared goal
+  executor; remove the spatial-only zero-join restriction and unexecuted join explanations.
+- Rename the experimental goal artifact state from `sample_joined` to `sample_executed`
+  for all current operations. Historical diagnostics retain their original state;
+  this does not change semantic approval or CLI completion requirements.
 - Reject lossy Unicode decoding in native STD schema/row JSON before retaining
   source identifiers. Preserve valid replacement characters and surrogate pairs.
+- Describe only executed key/measurement operations and preserve the conditional
+  source coverage of nearest-record calculations in goal evidence explanations.
+- Preserve original CSV empty strings in nearest-derived evidence and artifacts.
+
+### Changed
+
+- Share one engine-owned goal planning guide across CLI prompts and the MCP
+  resource; remove duplicate operator instructions and obsolete join requirements.
 
 ## [0.18.0] - 2026-09-05
 

@@ -1,6 +1,6 @@
 # 공통 탐색·원천 읽기·목표 실행 통합
 
-상태: 검색·원천 읽기 통합 검증 완료; 목표 실행 통합 대기.
+상태: 검색·원천 읽기·목표 실행의 공통 통합 검증 완료. 개발 브랜치 변경이며 미릴리스다.
 [교체·삭제 순서 결정](https://github.com/JungHoonGhae/odeduck/issues/43).
 사용자가 설계와 구현 판단을 위임했다. 이는 기존 worktree 중 목표와 관련된 변경의 통합이며,
 전체 INTENT의 완료나 모든 현재 동작의 의미 승인을 뜻하지 않는다.
@@ -72,8 +72,8 @@
   있으며, 지금의 실패는 저장소 부족보다 의미·coverage·결과 계약의 문제다. 측정 근거 없이 도입하지 않는다.
 - 현재 기능 위에 새 facade만 추가: 옛 helper·중복 지침이 그대로 남으므로 채택하지 않는다.
 
-다섯 고정 질문은 G1–G5 benchmark를 유지한다. 원본 `goal-completion-benchmark-v1.md`는 현재
-worktree에 있으며 목표 실행 통합 커밋에 포함한다. G1 지역/인구→쉼터,
+다섯 고정 질문은 [G1–G5 benchmark](goal-completion-benchmark-v1.md)를 유지하며 목표 실행과 함께
+버전 관리한다. G1 지역/인구→쉼터,
 G2 시설→접근성→교통, G3 측정→관측소, G4 연령 인구→학교, G5 인증→리콜에서 Source/Record/Claim을
 별도로 추적하고 필드 namespace·기간·원본 위치 없는 동일시를 허용하지 않는다. 이 구조로 lookup과
 bounded join을 공유할 수 있지만, 그 사실이 질문별 정답이나 고비용 행동의 승인 근거는 아니다.
@@ -112,6 +112,24 @@ tidy/vet/build도 통과했다. Spec 지적 0건; Standards 규칙 위반 0건, 
 경로의 제한은 유지한다. 전체 parser framework로 합치는 것은 이번 통합에 포함하지 않는다.
 실제 CLI의 STD 계약/5행 스키마 검사는 portal-catalog에 기록한다. 원천 검사 통과를 자율 목표 완주로
 세지 않는다. 원천 값이 파생 결과까지 유지되는 검증은 다음 목표 실행 통합에도 필요하다.
+
+목표 실행 단계는 `goalwork/planning-guide.md`를 단일 상세 행동 원본으로 둔다. CLI의 긴 prompt
+본문과 MCP의 별도 목표 장·연산별 tool 설명을 삭제하고, 같은 원본이 실제 provider 입력과 MCP
+resource에 한 번씩 전달되는지 public seam에서 확인한다. 전달/출력/고정 수신자 설정은 adapter에
+남긴다. 용어집의 구현 세부 반복은 줄이고, 현재 lineage/원문 공개 설명을 실제 계약에 맞춘다.
+
+`TestNearestPreservesOriginalScalarStatesInEvidenceAndResult`는 원본 1002번 CSV 레코드의 빈 문자열이
+파생 선택 근거에서 null이 되는 실패를 재현했다. 복사 중 치환을 제거한 뒤 선택 근거와 zero-join
+산출물에서 빈 문자열·null·0·false와 원본 주소를 그대로 확인한다. 의미 승인 상태는 바꾸지 않는다.
+수정 후 원래 worktree의 tidy/브랜드 일치/vet/전체 test/build와 diff 검사를 통과했다.
+
+2026-09-08 목표 통합 검증: `7d4666d`를 기준으로 고정한 detached staged-tree `0c32985`에서
+tidy/브랜드 일치/vet/전체 test/build와 goalwork·agentplan·MCP·CLI race 검사를 통과했다.
+독립 Spec 지적 0건, Standards 규칙 위반·중요 smell 의견 0건이다. 실제 provider 입력과 MCP resource의
+단일 안내 전달, 단일 원천/공간 결과, 수신자·예산·원본 주소와 과거 진단 보존을 검토했다.
+검토 뒤에는 이 검증 결과와 완료 계획의 부분 진전 연결만 문서에 추가했다. 테스트는 외부 모델이나
+새 원천을 호출하지 않는 fixture 검증이며, 이전 dirty foundation을 포함한 통합 기준점을 남긴 것이다.
+이 통합으로 최근 두 기능의 커밋 대기는 해소하지만 I1–I10/G1–G5의 미완료 상태는 유지한다.
 
 ## Out of Scope
 

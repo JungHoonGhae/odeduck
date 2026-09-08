@@ -14,6 +14,7 @@ import (
 	"github.com/JungHoonGhae/odeduck/internal/connectionledger"
 	"github.com/JungHoonGhae/odeduck/internal/dataset"
 	"github.com/JungHoonGhae/odeduck/internal/fetch"
+	"github.com/JungHoonGhae/odeduck/internal/goalwork"
 	"github.com/JungHoonGhae/odeduck/internal/portal"
 	"github.com/JungHoonGhae/odeduck/internal/providerauth"
 	"github.com/JungHoonGhae/odeduck/internal/version"
@@ -22,12 +23,13 @@ import (
 
 // Deps carries the collaborators the server needs.
 type Deps struct {
-	Fetch         *fetch.Client
-	BaseURL       string // data.go.kr root for search/describe (override in tests)
-	SemanticIndex *catalog.SemanticIndex
-	Embedder      catalog.Embedder
-	Caller        datasetCallExecutor
-	Ledger        *connectionledger.Store
+	Fetch             *fetch.Client
+	BaseURL           string // data.go.kr root for search/describe (override in tests)
+	SemanticIndex     *catalog.SemanticIndex
+	Embedder          catalog.Embedder
+	Caller            datasetCallExecutor
+	Ledger            *connectionledger.Store
+	ShareGoalEvidence bool // trusted startup setting; never a model tool argument
 }
 
 type datasetCallExecutor interface {
@@ -471,10 +473,16 @@ func New(deps Deps) *mcp.Server {
 		Description: "odeduck 도구 사용 순서와 인증키 Encoding/Decoding 주의. 먼저 읽으세요.",
 	}, func(context.Context, *mcp.ReadResourceRequest) (*mcp.ReadResourceResult, error) {
 		return &mcp.ReadResourceResult{Contents: []*mcp.ResourceContents{{
-			URI: guideURI, MIMEType: "text/markdown", Text: GuideDoc,
+			URI: guideURI, MIMEType: "text/markdown", Text: guideDoc(),
 		}}}, nil
 	})
 
+	// Reuse one catalog snapshot across bounded goal sessions. Each engine
+	// enforces its immutable semantic policy before admitting any candidates.
+	goalDeps := goalwork.LiveDependencies(deps.Fetch, base, caller, catalog.Searcher{Index: deps.SemanticIndex, Embedder: deps.Embedder}, goalwork.Policy{})
+	registerGoalTool(s, deps.ShareGoalEvidence, func(goalwork.Policy) goalwork.Dependencies {
+		return goalDeps
+	})
 	return s
 }
 

@@ -1,0 +1,199 @@
+{
+  "case": "G5",
+  "kind": "independent_reference_slice",
+  "status": "partial_oracle_not_goal_completion",
+  "method": "Python stdlib exact (certificate, model) tuple comparison of two published historical CSVs, not goalwork. Preserve disagreement in manufacturer strings and missing values. 등록일 is record registration, not certified event effectiveness. These files cannot prove current certificate status, complete variant scope or no recall. Full files contain 30 exact tuple pairs; reference slice retains the first three and actual same-model/different-certificate counterexamples.",
+  "sources": [
+    {
+      "pk": "15040696",
+      "url": "https://www.data.go.kr/cmm/cmm/fileDownload.do?atchFileId=FILE_000000002784452&dataNm=%EC%82%B0%EC%97%85%ED%86%B5%EC%83%81%EB%B6%80_%EA%B5%AD%EA%B0%80%EA%B8%B0%EC%88%A0%ED%91%9C%EC%A4%80%EC%9B%90_%EC%A0%9C%ED%92%88%EC%95%88%EC%A0%84_%EA%B5%AD%EB%82%B4%EB%A6%AC%EC%BD%9C%EC%A0%95%EB%B3%B4_20230809&fileDetailSn=1",
+      "observedAt": "2026-09-07T04:09:58.556228+00:00",
+      "contentSha256": "92e175ec8b51b24e980847e49411de9ac21c361e9cb11ac71987d6dd2f558764",
+      "license": "이용허락범위 제한 없음",
+      "totalCSVRecords": 881,
+      "records": [
+        {
+          "csvRecord": 531,
+          "values": {
+            "인증번호": "HU101071-19001A",
+            "모델명": "UW109",
+            "제품명": "직류전원장치",
+            "브랜드명": "-",
+            "사업자구분": "수입",
+            "법정제품분류": "정보통신사무기기>직류전원장치>직류전원장치",
+            "리콜종류": "명령에따른리콜",
+            "리콜사업자명": "주식회사조아무역",
+            "제조국가명": "국외>아시아지역>중국",
+            "제조사명": "Zhongshani-RegalElectronicsCo.",
+            "제조사국가명": "",
+            "리콜방법": "교환",
+            "위해유형": "화재및화상",
+            "안전성조사명": "3차",
+            "등록일": "2021-05-25"
+          }
+        },
+        {
+          "csvRecord": 172,
+          "values": {
+            "인증번호": "JD11203-19017",
+            "모델명": "QMA-R0060",
+            "제품명": "일반조명기구",
+            "브랜드명": "",
+            "사업자구분": "제조",
+            "법정제품분류": "조명기기>일반조명기구>LED등기구",
+            "리콜종류": "명령에따른리콜",
+            "리콜사업자명": "㈜아이티스퀘어",
+            "제조국가명": "국내>아시아지역>대한민국",
+            "제조사명": "(주)아이티스퀘어",
+            "제조사국가명": "국내>아시아지역>대한민국",
+            "리콜방법": "교환수거",
+            "위해유형": "감전",
+            "안전성조사명": "2",
+            "등록일": "2020-04-29"
+          }
+        },
+        {
+          "csvRecord": 740,
+          "values": {
+            "인증번호": "JH11714-19007",
+            "모델명": "TL-LVRM180LP-6",
+            "제품명": "LED등기구(일반조명기구)",
+            "브랜드명": "장수램프",
+            "사업자구분": "제조",
+            "법정제품분류": "조명기기>일반조명기구>LED등기구",
+            "리콜종류": "명령에따른리콜",
+            "리콜사업자명": "(주)토탈룩스",
+            "제조국가명": "국내>아시아지역>대한민국",
+            "제조사명": "",
+            "제조사국가명": "",
+            "리콜방법": "",
+            "위해유형": "감전",
+            "안전성조사명": "6차",
+            "등록일": "2021-12-10"
+          }
+        }
+      ]
+    },
+    {
+      "pk": "15040703",
+      "url": "https://www.data.go.kr/cmm/cmm/fileDownload.do?atchFileId=FILE_000000002788500&dataNm=%EC%82%B0%EC%97%85%ED%86%B5%EC%83%81%EB%B6%80_%EA%B5%AD%EA%B0%80%EA%B8%B0%EC%88%A0%ED%91%9C%EC%A4%80%EC%9B%90_%EC%A0%9C%ED%92%88%EC%95%88%EC%A0%84_%EC%9D%B8%EC%A6%9D%EC%A0%9C%ED%92%88+%EC%A0%95%EB%B3%B4_20220801&fileDetailSn=1",
+      "observedAt": "2026-09-07T04:10:04.380144+00:00",
+      "contentSha256": "9234fefb0507ae48e77777ebba474531ea3f885170092fca2dae88dd39005fbc",
+      "license": "이용허락범위 제한 없음",
+      "totalCSVRecords": 152433,
+      "records": [
+        {
+          "csvRecord": 4823,
+          "values": {
+            "인증번호": "HU101071-19001A",
+            "인증구분명": "전기용품및생활용품안전관리법대상>안전인증대상전기용품",
+            "인증상태": "적합",
+            "인증일자": "2019-10-30",
+            "인증변경일자": "",
+            "인증사유": "",
+            "제품명": "직류전원장치",
+            "모델명": "UW109",
+            "제품분류코드명": "정보통신사무기기>직류전원장치>직류전원장치",
+            "수입제조": "수입",
+            "제조사명": "Zhongshani-RegalElectronicsCo.Ltd",
+            "제조사국가명": "중국",
+            "수입사명": ""
+          }
+        },
+        {
+          "csvRecord": 8674,
+          "values": {
+            "인증번호": "JD11203-19017",
+            "인증구분명": "전기용품및생활용품안전관리법대상>안전인증대상전기용품",
+            "인증상태": "적합",
+            "인증일자": "2019-11-21",
+            "인증변경일자": "",
+            "인증사유": "",
+            "제품명": "LED등기구(고정형)",
+            "모델명": "QMA-R0060",
+            "제품분류코드명": "조명기기>일반조명기구>LED등기구",
+            "수입제조": "제조",
+            "제조사명": "주식회사폴룩스코리아",
+            "제조사국가명": "대한민국",
+            "수입사명": ""
+          }
+        },
+        {
+          "csvRecord": 88445,
+          "values": {
+            "인증번호": "JH11714-19007A",
+            "인증구분명": "전기용품및생활용품안전관리법대상>안전인증대상전기용품",
+            "인증상태": "적합",
+            "인증일자": "2021-06-11",
+            "인증변경일자": "",
+            "인증사유": "",
+            "제품명": "LED등기구(고정형)",
+            "모델명": "TL-LVRM180LP-6",
+            "제품분류코드명": "조명기기>일반조명기구>LED등기구",
+            "수입제조": "제조",
+            "제조사명": "(주)토탈룩스",
+            "제조사국가명": "대한민국",
+            "수입사명": ""
+          }
+        },
+        {
+          "csvRecord": 10987,
+          "values": {
+            "인증번호": "JH11714-19007",
+            "인증구분명": "전기용품및생활용품안전관리법대상>안전인증대상전기용품",
+            "인증상태": "적합",
+            "인증일자": "2019-12-04",
+            "인증변경일자": "",
+            "인증사유": "",
+            "제품명": "LED등기구(고정형)",
+            "모델명": "TL-LVRM180LP-6",
+            "제품분류코드명": "조명기기>일반조명기구>LED등기구",
+            "수입제조": "제조",
+            "제조사명": "(주)토탈룩스",
+            "제조사국가명": "대한민국",
+            "수입사명": ""
+          }
+        }
+      ]
+    }
+  ],
+  "expected": {
+    "exactTuplePairsInFullFiles": 30,
+    "retainedPairs": [
+      {
+        "certificationCSVRecord": 4823,
+        "recallCSVRecord": 531,
+        "certificate": "HU101071-19001A",
+        "model": "UW109",
+        "certificateDate": "2019-10-30",
+        "recallRegisteredAt": "2021-05-25",
+        "verdict": "source_records_share_certificate_and_model_not_current_safety"
+      },
+      {
+        "certificationCSVRecord": 8674,
+        "recallCSVRecord": 172,
+        "certificate": "JD11203-19017",
+        "model": "QMA-R0060",
+        "certificateDate": "2019-11-21",
+        "recallRegisteredAt": "2020-04-29",
+        "verdict": "source_records_share_certificate_and_model_not_current_safety"
+      },
+      {
+        "certificationCSVRecord": 10987,
+        "recallCSVRecord": 740,
+        "certificate": "JH11714-19007",
+        "model": "TL-LVRM180LP-6",
+        "certificateDate": "2019-12-04",
+        "recallRegisteredAt": "2021-12-10",
+        "verdict": "source_records_share_certificate_and_model_not_current_safety"
+      }
+    ],
+    "excludedNameOnlyPairs": [
+      {
+        "certificationCSVRecord": 88445,
+        "recallCSVRecord": 740,
+        "reason": "same model label but different certificate; name-only matching is not identity evidence"
+      }
+    ]
+  }
+}

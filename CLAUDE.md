@@ -115,6 +115,11 @@ Go CLI + MCP. 사람은 정부 SSO 로그인 한 번만 하고 이후 포털 작
 
 ## Agent skills
 
+### Product intent
+
+목표 기반 탐색·연결 아키텍처의 사용자 의도는 @INTENT.md 에 있다. 해당 기능을 변경하거나 완료를
+판정할 때 `docs/specs/goal-driven-completion-plan.md`의 요구사항별 검증 근거까지 확인한다.
+
 ### Business opportunity research
 
 수익화, 사업 후보, 구매자 문제, 시장 선택, 경쟁 또는 GTM을 조사할 때는

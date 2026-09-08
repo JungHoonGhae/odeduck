@@ -1,0 +1,88 @@
+package main
+
+import (
+	"context"
+	"fmt"
+	"time"
+
+	"github.com/JungHoonGhae/odeduck/internal/agentplan"
+	"github.com/JungHoonGhae/odeduck/internal/apicall"
+	"github.com/JungHoonGhae/odeduck/internal/catalog"
+	"github.com/JungHoonGhae/odeduck/internal/goalwork"
+	"github.com/JungHoonGhae/odeduck/internal/output"
+	"github.com/JungHoonGhae/odeduck/internal/providerauth"
+	"github.com/spf13/cobra"
+)
+
+type solveRunner func(context.Context, string, goalwork.Policy, string, func(goalwork.View)) (goalwork.View, error)
+
+func solveCmd() *cobra.Command { return solveCommand(runGoal) }
+
+func solveCommand(run solveRunner) *cobra.Command {
+	var provider string
+	var strict bool
+	var shareEvidence bool
+	var rounds int
+	cmd := &cobra.Command{Use: "solve <목표>", Short: "목표 → 역할 탐색·검사·표본 조회·분석·결합 (experimental)", Args: cobra.ExactArgs(1), SilenceUsage: true, SilenceErrors: true,
+		Long: "키워드를 몰라도 목표를 입력하면 설치된 tool-free agent가 데이터 역할을 추론하고 검색·검사·표본 결합을 반복합니다. 실패하면 대안이나 코드 대응표를 탐색합니다. 관측한 한 원천의 조회·집계도 가능하며 결합은 선택 연산입니다. API/CSV·ZIP·XLSX/STD의 sample_executed는 표본 실행 결과입니다. 구조 조건이 맞아도 의미 검증이 남으면 review_required와 실패 코드를 반환합니다. 현재 자동 의미 승인 경로는 없으며 목표 완료를 선언하지 않습니다. 자동 활용신청은 하지 않습니다. JSON만 출력합니다.",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if flagFormat != "json" {
+				return fmt.Errorf("solve outputs a structured JSON artifact; use --format json")
+			}
+			if rounds < 1 || rounds > 64 {
+				return fmt.Errorf("max-rounds must be 1–64")
+			}
+			policy := goalwork.Policy{RequireSemantic: strict, MaxRounds: rounds}
+			if shareEvidence {
+				switch provider {
+				case "codex", "claude", "gemini":
+					policy.EvidenceRecipient = provider
+				default:
+					return fmt.Errorf("--share-evidence requires an explicit --agent=codex|claude|gemini; auto fallback is forbidden")
+				}
+				fmt.Fprintln(cmd.ErrOrStderr(), "선택한 원천 값을", provider, "계획기에 전송합니다. 개인정보·전송 권한을 확인하세요. 세션당 최대 64 KiB이며 전체 표본은 전송하지 않습니다.")
+			}
+			ctx, cancel := context.WithTimeout(cmd.Context(), time.Hour)
+			defer cancel()
+			fmt.Fprintln(cmd.ErrOrStderr(), "목표 기반 탐색 시작: agent 호출·검색·API/CSV/ZIP/XLSX/STD 읽기를 최대", rounds, "단계 실행합니다.")
+			view, err := run(ctx, args[0], policy, provider, func(v goalwork.View) {
+				fmt.Fprintf(cmd.ErrOrStderr(), "  %d단계: %s · 후보 %d · 관측 %d · 실행안 %d · gaps %d\n", v.Revision, v.Status, len(v.Nodes), len(v.Observations), len(v.Compositions), len(v.Gaps))
+				if n := len(v.Gaps); n > 0 && v.Gaps[n-1].Revision == v.Revision {
+					fmt.Fprintln(cmd.ErrOrStderr(), "    "+v.Gaps[n-1].Detail)
+				}
+			})
+			if view.Goal != "" {
+				if writeErr := output.WriteJSON(cmd.OutOrStdout(), view); writeErr != nil {
+					return writeErr
+				}
+			}
+			if err != nil {
+				return err
+			}
+			if view.Status != "output_ready" || view.Evaluation == nil || view.Evaluation.NeedsSemanticReview || view.Evaluation.Status != "requirements_met" {
+				return fmt.Errorf("목표 미완료: %s — JSON의 evaluation과 gaps를 확인하세요; 검토가 필요한 후보는 목표 완료가 아닙니다", view.Status)
+			}
+			return nil
+		}}
+	cmd.Flags().StringVar(&provider, "agent", "auto", "계획 agent: auto | codex | claude | gemini (Cursor는 tool-free 격리 미지원)")
+	cmd.Flags().BoolVar(&strict, "require-semantic", true, "실제 의미 검색 사용을 요구; false는 명시적인 lexical 저하 허용")
+	cmd.Flags().BoolVar(&shareEvidence, "share-evidence", false, "선택 원천 값을 명시한 단일 --agent에 전송 허용; 기본 비공개, 일반 개인정보 탐지는 아님")
+	cmd.Flags().IntVar(&rounds, "max-rounds", 32, "최대 진행 단계 (1–64); agent 호출마다 해당 CLI의 비용/한도 적용")
+	return cmd
+}
+
+func runGoal(ctx context.Context, goal string, policy goalwork.Policy, provider string, progress func(goalwork.View)) (goalwork.View, error) {
+	client := newFetchClient()
+	caller := apicall.NewDatasetCaller(client, flagBaseURL, providerauth.Source{})
+	e, err := goalwork.Start(goal, policy, goalwork.LiveDependencies(client, flagBaseURL, caller, catalog.Searcher{}, policy))
+	if err != nil {
+		return goalwork.View{}, err
+	}
+	return goalwork.Run(ctx, e, func(ctx context.Context, v goalwork.View) (goalwork.Decision, error) {
+		d, used, err := agentplan.PlanGoal(ctx, v, provider)
+		if err == nil {
+			provider = used
+		}
+		return d, err
+	}, progress)
+}

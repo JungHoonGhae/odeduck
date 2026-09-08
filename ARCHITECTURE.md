@@ -59,14 +59,78 @@ append-only JSONL로 유지된다.
 저하 상태를 `semantic.status`와 `warnings`에 남긴다. 고신뢰 조사에서 `--require-semantic` 또는 MCP
 `requireSemantic=true`를 사용하면 의미 검색이 실제로 쓰이지 않은 경우 어휘 결과를 반환하지 않고 실패한다.
 
-독립 CLI의 `catalog discover`만 설치되어 이미 로그인된 Codex·Claude·Gemini·Cursor 중 하나를 별도
+`catalog.Searcher`가 CLI·MCP 공통으로 인덱스 로드, 상태별 폴백, 인덱스 모델에 맞는 embedder 선택과
+필수 semantic 판정을 소유한다. 실패 시 내부 진단 결과는 유지하지만, 두 adapter는 오류를 먼저 처리해
+후보가 출력되지 않도록 한다. 일반 CLI 검색에서도 저하 경고를 stderr에 표시한다.
+
+독립 CLI의 `catalog discover`는 설치되어 이미 로그인된 Codex·Claude·Gemini·Cursor 중 하나를 별도
 프로세스로 실행한다. [`internal/agentplan`](internal/agentplan)은 자연어 목표를 작은 `QueryPlan`으로 바꾸고,
 실제 카탈로그 순위와 네트워크 호출은 [`internal/catalog`](internal/catalog)이 소유한다. MCP에서는 이미
 호스트 AI가 검색축을 만들 수 있으므로 중첩 모델을 실행하지 않는다.
 
+[`internal/discovery`](internal/discovery)의 `Runner`가 독립 CLI의
+Generate → Search → Expand → Search → Compose → Search 순서를 실행한다. 원래 Anchor 축,
+provider, 검색 정책을 유지하며 Bridge 선택지와 단계별 폴백·Abstention을 관리한다. planner와 검색은
+주입 가능한 seam이며, 진행 순서 테스트는 Cobra나 package 전역 함수 교체 없이 이 interface를 사용한다.
+
 교차 도메인 발견도 검색 결과를 곧바로 관계라고 부르지 않는다. Anchor와 Bridge 역할별 후보를 제한된
 수로 꺼낸 뒤, 실제 PK가 명시적으로 선택되고 역할·연결 계약을 통과한 조합만 `candidate` 카드가 된다.
 필드, grain, 값 교집합을 검사하기 전에는 join이나 사업성을 검증했다고 표시하지 않는다.
+
+### 1.5. Goal-driven composition (experimental)
+
+`odeduck solve "목표"`와 MCP `advance_goal`은 [`internal/goalwork`](internal/goalwork)의 동일한
+Start/Advance interface를 사용한다. `solve`만 tool-free Codex·Claude·Gemini를 호출하고 MCP에서는
+host가 다음 행동을 제안한다. 고정 Anchor 없이 역할별 후보와 여러 Composition을 보존한다.
+상세 행동 안내는 Goal Engine의 [정적 계획 계약](internal/goalwork/planning-guide.md) 하나를
+CLI prompt와 MCP resource가 공유한다. 각 adapter는 전달·출력·신뢰된 시작 설정만 덧붙인다.
+
+```text
+goal → define(필수 역할·범위·출력) → search → inspect → sample → compose → execute
+                                      ↑                                  │
+                                      └── gap / 부분 산출물 / 대안 탐색 ───┤
+                                                                         └→ evaluate → review_required
+```
+
+module이 revision·중복 억제·예산·실제 원천 획득·실행 결과를 소유한다. 모델 JSON은 행이나 성공
+근거를 제출할 수 없다. API는 기존 DatasetCaller를, 직접 CSV는 검사된 Asset의 bounded reader를
+재사용한다. STD는 검증된 first-party JSON 계약의 private handle로 첫 페이지를 읽는다. 인증키 입력과
+자동 신청은 없다. XLSX/DBF/ZIP은 스키마 검사와 결합 실행을 구분한다.
+
+실행은 복합키 exact/trim inner join, projection, groupBy+count/sum이며 tuple을 보존한다. null은
+결합되지 않고 중복 expansion과 빈 전체 경로는 실패한다. 원문 행은 세션 메모리에만 두며 외부 CLI
+planner에는 기본적으로 컬럼·타입·해시·오류만 보낸다. 명시한 단일 agent에 --share-evidence를 켜면
+공통 read_evidence가 선택한 행·필드만 원본 주소와 함께 전달한다. MCP는 --share-goal-evidence로
+서버 시작 시 상한을 정하고 모델 입력으로 바꾸지 못한다. 선택 근거는 셀·packet·세션 누적 예산과
+만료를 적용하며 전체 Artifact는 외부 CLI 계획 입력에서 계속 제외한다. 기존 MCP Artifact/call_api
+원문 반환은 별개다. [공개·재사용 신뢰 경계](docs/adr/0007-selected-evidence-and-reuse.md)를 따른다.
+최종 artifact에는 제한된 행·recipe·요청·해시·관측시각·
+join metrics가 들어간다. 표본 재현에 필요한 요청은 남지만 원천의 과거 bytes는 보관하지 않는다.
+
+문자열 측정값은 원본과 별도의 Measure에 형식·단위를 선언해 변환한다. 결합 키는 바꾸지 않는다.
+수치 합은 십진 정밀도를 보존하며, 같은 원천 행이 결합 과정에서 반복 기여한 합계는 거부한다.
+MCP 출력도 숫자를 float64로 재해석하지 않고 직렬화한다. 클라이언트의 정확한 수치 복원 조건은 spec에 있다.
+
+시간 비교는 모든 참여 원천의 실제 기간 필드를 바인딩하고 전체 경로의 공통 달력 기간을 계산한다.
+목표에서 고정한 날짜 범위는 조합에서 제거할 수 없다. 날짜 누락·불일치를 통과시키지 않으며,
+조회 시각과 원천의 유효 기간은 구분한다. 계산된 시간 검사와 미검증 필드 의미를 함께 반환한다.
+한계 설명은 가상의 데이터 컬럼이 아니라 원천·실행 근거에서 만든 Evidence Explanation으로 제공한다.
+
+Row-bound Scope Check는 후보 행의 실제 범위 필드들을 토큰 단위로 대조한다. 키가 같아도 설정한
+범위 조건이 불일치하거나 값이 없으면 시간 검사·행 확장·집계 전에 제외하며, 집계된 검사 결과를
+Discovery Gap과 함께 재탐색에 돌려준다. 문자열 규칙의 일치는 지리 해석·식별 관계의 승인이 아니다.
+행별 상위 범위가 없으면 명시적인 Cited Scope Claim으로 관측 당시 원천 설명을 인용할 수 있다.
+문구 위치·출처·관측/선언 해시를 보존하되 새 행 컬럼이나 식별자로 만들지 않는다. 인용은 가설이며,
+그 문구가 긍정적·보편적·현재 유효한 범위를 뜻하는지까지 검증한 것은 아니다.
+
+한 원천의 조회·집계와 여러 원천의 결합은 같은 실행 경로를 사용한다. `sample_executed`는 표본 실행 결과이지
+namespace 동일성·인과·사용자 목표 효과의 검증이 아니다.
+필수 역할·출력 타입·출처가 빠진 artifact는 partial로 남기고 탐색을 계속한다. 구조적 조건을 통과해도
+`needsSemanticReview=true`이면 `review_required`로 멈추고 후보를 보존하며 CLI는 실패 코드를 반환한다.
+현재 의미 검증은 미완성이므로 `output_ready`를 자동 발급하지 않는다. 모델의 가정 문구는 승인이 아니다.
+기존 connection ledger의 `sample_verified` gate와 분리한다. bounded join에는 별도 graph DB가
+필요하지 않다. 계약과 현재 한계는 [spec](docs/specs/goal-driven-composition-v1.md), 결정은
+[ADR-0006](docs/adr/0006-goal-driven-composition.md)에 있다.
 
 ### 2. Inspect
 
@@ -77,6 +141,7 @@ append-only JSONL로 유지된다.
 | `REST` | 포털이 게시한 operation, endpoint, 필수 파라미터, 심의 유형 | 필요하면 `apply`, 이후 `call_api` |
 | `LINK` | 공식 시작점과 검토된 provider adapter 계약 | 구현된 typed adapter만 `call_api` |
 | `FILE` | 실제 다운로드 자산, 기간, 수정일 | bounded 표본에서 CSV/DBF/XLSX worksheet 컬럼과 SHA-256 관찰 |
+| `STD` | 공식 포털의 PK·표·컬럼 계약, 표시명, 선언 건수 | private handle로 bounded 첫 JSON 페이지 관찰·조합; 레코드 날짜와 모집단 범위는 별도 검증 |
 
 API와 FILE을 함께 제공하는 항목은 두 계약을 모두 보존한다. 알 수 없는 LINK를 임의의 API endpoint로
 해석하거나, FILE을 API처럼 호출하지 않는다.
@@ -102,6 +167,8 @@ MCP 도구는 외부 상태를 바꾸는 destructive action으로 표시해 호�
 | [`cmd/odeduck`](cmd/odeduck) | Cobra 명령, 플래그, 출력 연결, dependency composition | 검색·신청·호출 규칙 |
 | [`internal/mcpserver`](internal/mcpserver) | stdio MCP 도구·리소스, 입력 제한, tool annotation | 별도 비즈니스 로직 |
 | [`internal/catalog`](internal/catalog) | snapshot 동기화, 어휘·hybrid 검색, bounded connection 후보 | 모델 실행, 자격증명, API 호출 |
+| [`internal/discovery`](internal/discovery) | 독립 CLI의 계획·검색·선택 순서, 폴백·Abstention | ranking, 연결 검증, MCP host 계획 대체 |
+| [`internal/goalwork`](internal/goalwork) | 불변 목표·관측·예산·실행·평가·선택 근거와 공통 행동 안내 | 자동 의미 승인, 자격증명 소유, 전역 entity merge |
 | [`internal/agentplan`](internal/agentplan) | 자연어 목표를 검색축으로 변환하고 실제 후보 중 Bridge PK 선택 | 카탈로그 ranking, 신청, 호출 |
 | [`internal/dataset`](internal/dataset) | REST·LINK·FILE 통합 검사, bounded FILE schema 관찰 | FILE을 호출 가능한 API로 추측 |
 | [`internal/apicall`](internal/apicall) | 공식 API 계약 해석, REST/LINK dispatch, 검증·호출·profiling | 브라우저 로그인 UI |
