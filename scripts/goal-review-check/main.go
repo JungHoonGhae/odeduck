@@ -43,6 +43,7 @@ type trial struct {
 	ExpectedReady             bool                  `json:"expectedReady"`
 	Matched                   bool                  `json:"matched"`
 	ReferenceObservedAt       string                `json:"referenceObservedAt"`
+	AcquisitionMode           string                `json:"acquisitionMode,omitempty"`
 	Input                     *goalwork.ReviewInput `json:"input,omitempty"`
 	Result                    goalwork.View         `json:"result"`
 	Error                     string                `json:"error,omitempty"`
@@ -51,8 +52,10 @@ type trial struct {
 }
 
 type calibrationServices struct {
-	Inspect func(context.Context, string) (goalwork.Inspection, error)
-	Review  func(context.Context, goalwork.ReviewInput, string) (agentplan.GoalReviewResponse, error)
+	Inspect     func(context.Context, string) (goalwork.Inspection, error)
+	Review      func(context.Context, goalwork.ReviewInput, string) (agentplan.GoalReviewResponse, error)
+	Sample      func(context.Context, goalwork.SampleRequest, goalwork.Inspection) (goalwork.Acquired, error)
+	Acquisition map[string]goalwork.SampleRequest // optional explicit live recipes; frozen goals/oracles stay unchanged
 }
 
 type preparedSource struct {
@@ -66,13 +69,29 @@ func main() {
 	provider := flag.String("agent", "", "explicit codex|claude|gemini; sends selected public aggregate records")
 	out := flag.String("output", "", "new JSONL file; existing files are never overwritten")
 	manifest := flag.String("cases", "internal/goalwork/testdata/goalbench-v1/source-report-cases.json", "frozen development cases")
+	acquisition := flag.String("acquisition", "", "optional inspected CSV full-scan recipes by PK; actually downloads sources and checks frozen reference revisions/records")
 	flag.Parse()
 	if !slices.Contains([]string{"codex", "claude", "gemini"}, *provider) || *out == "" {
 		fmt.Fprintln(os.Stderr, "explicit --agent and --output required")
 		os.Exit(2)
 	}
 	live := goalwork.LiveDependencies(fetch.New(), "https://www.data.go.kr", nil, catalog.Searcher{}, goalwork.Policy{})
-	if err := run(*provider, *out, *manifest, calibrationServices{Inspect: live.Inspect, Review: agentplan.ReviewGoal}); err != nil {
+	runtime := calibrationServices{Inspect: live.Inspect, Review: agentplan.ReviewGoal}
+	if *acquisition != "" {
+		body, err := os.ReadFile(*acquisition)
+		if err != nil || len(body) > 32<<10 {
+			fmt.Fprintln(os.Stderr, "acquisition recipes must be a readable JSON file up to 32 KiB")
+			os.Exit(2)
+		}
+		d := json.NewDecoder(strings.NewReader(string(body)))
+		d.DisallowUnknownFields()
+		if err := d.Decode(&runtime.Acquisition); err != nil || len(runtime.Acquisition) == 0 {
+			fmt.Fprintln(os.Stderr, "acquisition recipes must be a nonempty PK-to-SampleRequest object")
+			os.Exit(2)
+		}
+		runtime.Sample = live.Sample
+	}
+	if err := run(*provider, *out, *manifest, runtime); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
@@ -94,6 +113,13 @@ func run(provider, output, manifest string, runtime calibrationServices) error {
 	}
 	if len(config.Cases) != 2 {
 		return fmt.Errorf("expected two frozen development cases")
+	}
+	if runtime.Acquisition != nil {
+		for _, c := range config.Cases {
+			if c.Analysis == nil {
+				return fmt.Errorf("live acquisition requires analysis cases; source-report replay cannot silently satisfy this option")
+			}
+		}
 	}
 	f, err := os.OpenFile(output, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
 	if err != nil {

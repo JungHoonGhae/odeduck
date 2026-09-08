@@ -104,7 +104,7 @@ func LiveDependencies(client *fetch.Client, base string, caller Caller, searcher
 			}
 			for _, asset := range res.File.Assets {
 				if asset.Name == s.Asset {
-					report, err := files.ScanCSV(ctx, asset, s.Where, visit)
+					report, err := files.ScanCSV(ctx, asset, dataset.CSVSelection{Equals: s.Where, In: s.WhereIn}, visit)
 					return report, digest(res.File), classifyLiveAcquisitionError(err, nil)
 				}
 			}
@@ -152,7 +152,7 @@ func LiveDependencies(client *fetch.Client, base string, caller Caller, searcher
 					if s.XLSX != nil {
 						sample, err = files.SampleXLSX(ctx, asset, *s.XLSX)
 					} else if s.ScanCSV {
-						sample, err = files.SampleCSVScanned(ctx, asset, 1000, s.Where)
+						sample, err = files.SampleCSVScanned(ctx, asset, 1000, dataset.CSVSelection{Equals: s.Where, In: s.WhereIn})
 					} else if s.Member != "" {
 						sample, err = files.SampleZIPCSV(ctx, asset, s.Member, 1000, s.Where)
 					} else {
@@ -170,7 +170,7 @@ func LiveDependencies(client *fetch.Client, base string, caller Caller, searcher
 						out.Warnings = sample.Warnings
 					}
 					if sample.Prefix {
-						out.Warnings = append(out.Warnings, "First 1000 matching rows only (all rows when where is absent); ordered prefix is not a representative sample.")
+						out.Warnings = append(out.Warnings, "First 1000 matching rows only (all rows when selectors are absent); ordered prefix is not a representative sample.")
 					}
 					out.Selection = sample.Selection
 					if sample.Selection != nil {
@@ -229,7 +229,7 @@ func classifyLiveAcquisitionError(err error, result *apicall.CallResult) error {
 
 func validateSampleSelection(s SampleRequest) error {
 	if s.Reduce != nil {
-		if s.Nearest != nil || s.ScanCSV || s.LayoutID != "" || s.Asset != "" || s.Member != "" || s.XLSX != nil || len(s.Where) != 0 || len(s.Params) != 0 || s.Operation != "" || s.RowPath != "" {
+		if s.Nearest != nil || s.ScanCSV || s.LayoutID != "" || s.Asset != "" || s.Member != "" || s.XLSX != nil || len(s.Where)+len(s.WhereIn) != 0 || len(s.Params) != 0 || s.Operation != "" || s.RowPath != "" {
 			return fmt.Errorf("reduce accepts only pk, original delivery and the retained source reduction; no new acquisition selectors")
 		}
 		return nil
@@ -244,6 +244,9 @@ func validateSampleSelection(s SampleRequest) error {
 	}
 	if s.ScanCSV && (s.Delivery != "file" || s.Member != "" || s.XLSX != nil) {
 		return fmt.Errorf("scanCsv requires a direct FILE CSV without ZIP member or XLSX selection")
+	}
+	if len(s.WhereIn) != 0 && !s.ScanCSV {
+		return fmt.Errorf("whereIn requires a complete direct CSV scan with scanCsv:true; value sets are not silently applied to bounded/ZIP/XLSX/API/STD readers")
 	}
 	if s.Member != "" {
 		if s.Delivery != "file" || s.XLSX != nil {
@@ -272,7 +275,12 @@ func validateSampleSelection(s SampleRequest) error {
 			return fmt.Errorf("credential selection fields are forbidden")
 		}
 	}
-	return dataset.ValidateCSVSelection(s.Where)
+	for field := range s.WhereIn {
+		if sensitiveParameter(field) {
+			return fmt.Errorf("credential selection fields are forbidden")
+		}
+	}
+	return (dataset.CSVSelection{Equals: s.Where, In: s.WhereIn}).Validate()
 }
 
 func sensitiveParameter(name string) bool {

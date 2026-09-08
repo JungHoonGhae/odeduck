@@ -106,6 +106,8 @@ MCP에서는 서버를 `mcp --share-goal-evidence`로 시작해야 하며 모델
 `sample_executed`는 표본 실행 결과이며, 필수 요구 충족이나 의미 검증과는 별개다.
 직접 CSV는 선택적으로 전체를 순차 검사하고, 관측한 좌표를 기준으로 전체 일치 레코드의 최근접 후보를
 계산할 수 있다. 이 구면 거리는 실제 이동 경로나 현재 접근 가능성을 뜻하지 않는다.
+전체 CSV 검사에서는 `sample.whereIn`으로 여러 지역·연령처럼 정확한 값 목록을 함께 고를 수 있다.
+파일 전체 검사와 일치 행의 실제 보관, 요청한 집단 전체의 확보는 각각 구분해 보고한다.
 출력 형식이 맞아도 지역·식별자·시간의 의미가 검증되지 않으면 `review_required`로 남기고 같은 목표·예산
 안에서 추가 근거와 대안을 찾는다. 제한된 원천 보고는 CLI의 `--review-source-reports`(명시한 agent와
 `--share-evidence` 필수), MCP의 `--review-goals-with=claude`와 `--share-goal-evidence`로 별도 검토를

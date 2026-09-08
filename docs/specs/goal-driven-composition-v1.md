@@ -230,6 +230,28 @@ No matches yields a gap, not absence proof. The request flag, raw source hash, d
 line positions survive the common CLI/MCP execution path. External CLI planning excludes full rows;
 explicitly authorized selected evidence follows the separate bounded disclosure contract.
 
+#### Exact value sets — 2026-09-08
+
+For this full direct CSV scan, `sample.whereIn` maps observed fields to 1–32 distinct nonblank
+string values each. Values within a field use OR; fields and existing `where` predicates use AND.
+The two selectors share the 8-field limit and cannot name the same field. Each field/value stays
+within 256 bytes. Matching preserves leading zeros, case, spaces and original values; no ranges,
+substring matching, coercion, empty/null matching or provider query expansion is implied.
+
+The Engine sorts each detached set before request/replay hashing, so order alone cannot buy another
+acquisition. Requests, retries, artifacts and reviewer inputs preserve these canonical selectors.
+Selection fields must have explicitly disclosed semantic evidence before either review kind proceeds.
+The full scanner reports `exact_string_sets_full_scan_v1` when a value set is used, retaining the same
+separate scanned/matched/returned counts, original record positions, source hash and malformed-tail gates.
+
+`whereIn` requires `scanCsv:true`; bounded direct reads, ZIP/XLSX, API/STD and source reduction requests
+reject it instead of silently ignoring it. The existing complete-stream consumer can use it too.
+This scope follows the observed multi-region/cohort acquisition need, not a new general expression language.
+Fixed environmental and population calibration goals/oracles stay unchanged; actual acquisition recipes
+are separate data in `testdata/goalbench-v1/analysis-acquisition.json`. The development command compares
+real acquisition hashes, retained coverage, record positions and original values before model review.
+File completeness is still not population certification or proof that its fields answer the original goal.
+
 ### Conditional nearest source records
 
 For G2's frozen distance question, `sample.scanCsv:true` accepts `nearest` with method

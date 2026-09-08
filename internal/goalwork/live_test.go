@@ -214,7 +214,7 @@ func TestLiveAdaptersSearchInspectDownloadAndJoinThreeCSVFixtures(t *testing.T) 
 	if err := (&catalog.Catalog{SyncedAt: time.Now(), Type: "ALL", Entries: entries}).Save(); err != nil {
 		t.Fatal(err)
 	}
-	bodies := map[string]string{"111": "legal,n\n001,100\n", "222": "admin,name\nA,쉼터\n", "333": "legal,admin,scope\n" + strings.Repeat("999,Z,other\n", 1001) + "001,A,target\n"}
+	bodies := map[string]string{"111": "legal,n\n001,100\n", "222": "admin,name\nA,쉼터\n", "333": "legal,admin,scope\n" + strings.Repeat("999,Z,other\n", 1001) + "001,A,target\n001,X,target\n"}
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case strings.HasPrefix(r.URL.Path, "/catalog/"):
@@ -244,6 +244,7 @@ func TestLiveAdaptersSearchInspectDownloadAndJoinThreeCSVFixtures(t *testing.T) 
 		if entry.PK == "333" {
 			request.ScanCSV = true
 			request.Where = map[string]string{"scope": "target"}
+			request.WhereIn = map[string][]string{"admin": {"A", "B"}}
 		}
 		decisions = append(decisions, Decision{Action: "search", Query: entry.Title, Role: entry.Title}, Decision{Action: "inspect", PK: entry.PK}, Decision{Action: "sample", Sample: &request})
 	}
@@ -274,7 +275,7 @@ func TestLiveAdaptersSearchInspectDownloadAndJoinThreeCSVFixtures(t *testing.T) 
 		t.Fatal("missing reproducible requests")
 	}
 	selection := v.Artifact.Sources[2].Selection
-	if selection == nil || selection.Mode != "exact_strings_full_scan_v1" || selection.ScannedRows != 1002 || selection.MatchedRows != 1 || !selection.Exhausted || !v.Artifact.Requests[2].ScanCSV || v.Artifact.Requests[2].Where["scope"] != "target" {
+	if selection == nil || selection.Mode != "exact_string_sets_full_scan_v1" || selection.ScannedRows != 1003 || selection.MatchedRows != 1 || !selection.Exhausted || !v.Artifact.Requests[2].ScanCSV || v.Artifact.Requests[2].Where["scope"] != "target" || len(v.Artifact.Requests[2].WhereIn["admin"]) != 2 {
 		t.Fatal("selected crosswalk lost its scan provenance or request")
 	}
 	declaration := v.Artifact.Sources[2].Declaration

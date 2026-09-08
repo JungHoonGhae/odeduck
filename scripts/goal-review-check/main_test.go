@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/JungHoonGhae/odeduck/internal/agentplan"
+	"github.com/JungHoonGhae/odeduck/internal/dataset"
 	"github.com/JungHoonGhae/odeduck/internal/goalwork"
 )
 
@@ -226,5 +227,60 @@ func TestAnalysisManifestReplaysIndependentExpectedRows(t *testing.T) {
 	}
 	if calls != 12 || len(readTrials(t, output)) != 12 {
 		t.Fatal("frozen reference replay lost a case")
+	}
+}
+
+func TestAnalysisCalibrationAcquiresInspectedSourcesAndChecksIndependentRecords(t *testing.T) {
+	for _, mode := range []string{"complete", "wrong revision", "partial retention", "wrong ordinal", "changed value"} {
+		t.Run(mode, func(t *testing.T) {
+			dir := t.TempDir()
+			manifest := fixtureCases(t, dir, false)
+			body, _ := os.ReadFile(manifest)
+			var config struct{ Cases []calibrationCase }
+			if err := json.Unmarshal(body, &config); err != nil {
+				t.Fatal(err)
+			}
+			c := config.Cases[0]
+			p := prepareSource(c, dir, calibrationServices{Inspect: func(_ context.Context, pk string) (goalwork.Inspection, error) {
+				return goalwork.Inspection{PK: pk}, nil
+			}})
+			contract := goalwork.GoalContract{Outcome: c.Goal, Region: "fixture", Period: "source", Coverage: "sample", Roles: []goalwork.RoleRequirement{{ID: "r", Description: "records"}}, Outputs: []goalwork.OutputRequirement{{ID: "value", Role: "r", Description: "values", Type: "string"}}}
+			recipe := goalwork.Composition{ID: "rows", Base: "o1", Purpose: "recorded values", Select: []string{"o1.value"}, Roles: []goalwork.RoleBinding{{Role: "r", Observation: "o1"}}, Outputs: []goalwork.OutputBinding{{Output: "value", Field: "o1.value"}}, Assumptions: []string{"fixture source scope"}}
+			c.Analysis = &analysisPlan{Sources: []analysisSource{{PK: c.PK, Role: "r", Records: c.Records}}, Contract: contract, Decisions: []goalwork.Decision{{Action: "compose", Composition: &recipe}, {Action: "execute", CompositionID: "rows"}}, Evidence: []goalwork.EvidenceRequest{{Observation: "o1", Rows: []int{1, 2}, Fields: []string{"value"}}}, ExpectedRows: []goalwork.Row{{"o1.value": "64"}, {"o1.value": "62"}}}
+			acquisitions, reviews := 0, 0
+			runtime := calibrationServices{
+				Acquisition: map[string]goalwork.SampleRequest{c.PK: {PK: c.PK, Delivery: "file", ScanCSV: true, WhereIn: map[string][]string{"value": {"62", "64"}}}},
+				Sample: func(_ context.Context, r goalwork.SampleRequest, i goalwork.Inspection) (goalwork.Acquired, error) {
+					acquisitions++
+					if i.PK != c.PK || !r.ScanCSV || len(r.WhereIn["value"]) != 2 {
+						t.Fatal("acquisition did not receive the inspected full-scan request")
+					}
+					a := goalwork.Acquired{Delivery: "FILE", ContentSHA256: c.SourceSHA256, ContractSHA256: strings.Repeat("b", 64), Rows: []goalwork.Row{{"value": "64"}, {"value": "62"}}, CSV: &dataset.CSVProvenance{DataRecords: []int{13, 14}, StartLines: []int{14, 15}}, Selection: &dataset.SelectionReport{Mode: "exact_string_sets_full_scan_v1", ScannedRows: 16, MatchedRows: 2, ReturnedRows: 2, Exhausted: true}}
+					switch mode {
+					case "wrong revision":
+						a.ContentSHA256 = strings.Repeat("c", 64)
+					case "partial retention":
+						a.Selection.MatchedRows = 3
+					case "wrong ordinal":
+						a.CSV.DataRecords[0] = 12
+					case "changed value":
+						a.Rows[0]["value"] = "63"
+					}
+					return a, nil
+				},
+				Review: func(_ context.Context, in goalwork.ReviewInput, _ string) (agentplan.GoalReviewResponse, error) {
+					reviews++
+					if in.Artifact.Sources[0].Selection == nil || in.Artifact.Sources[0].CSV.DataRecords[0] != 13 {
+						t.Fatal("actual acquisition evidence was lost")
+					}
+					f := goalwork.ReviewFinding{Verdict: "supported", Reason: "fixture only", PacketID: in.Evidence.ID}
+					return agentplan.GoalReviewResponse{Assessment: goalwork.ReviewAssessment{GoalFit: f, Outputs: []goalwork.OutputReview{{Output: "value", Finding: f}}}}, nil
+				},
+			}
+			trial := runAnalysisTrial("codex", "test", c, []preparedSource{p}, runtime, 1, true)
+			if acquisitions != 1 || (trial.Matched != (mode == "complete")) || (reviews == 1) != (mode == "complete") {
+				t.Fatalf("mode=%s acquisitions=%d reviews=%d: %s", mode, acquisitions, reviews, trial.Error)
+			}
+		})
 	}
 }

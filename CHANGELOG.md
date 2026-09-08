@@ -9,6 +9,12 @@ section matching a `vX.Y.Z` tag as the GitHub release notes.
 
 ### Added
 
+- Bounded exact value-set selection (`sample.whereIn`) for full direct CSV scans,
+  preserving source record positions and separate scanned/matched/retained coverage.
+  Selection order cannot bypass acquisition replay limits, and both review kinds
+  require selected evidence for predicate fields. Development calibration can
+  now acquire inspected sources and check unchanged independent records before review.
+
 - Additional opt-in review of typed relational calculations via CLI
   `--review-analyses` or MCP startup `--review-goal-analyses`. Local replay and
   original record participation bind already-disclosed result values; separate

@@ -43,11 +43,12 @@ type CSVScanReport struct {
 // exact string equality, not verified geographic scope or population coverage.
 // The first physical header line selects UTF-8 or strict EUC-KR. An ASCII header
 // followed by EUC-KR values fails as invalid UTF-8; there is no midstream fallback.
-func (i *Inspector) ScanCSV(ctx context.Context, asset Asset, where map[string]string, visit func(CSVScanRecord) error) (report CSVScanReport, err error) {
+func (i *Inspector) ScanCSV(ctx context.Context, asset Asset, selection CSVSelection, visit func(CSVScanRecord) error) (report CSVScanReport, err error) {
 	if err := ctx.Err(); err != nil {
 		return report, err
 	}
-	if err := ValidateCSVSelection(where); err != nil {
+	fields, err := selection.compile()
+	if err != nil {
 		return report, err
 	}
 	if !strings.EqualFold(path.Ext(asset.Name), ".csv") && !strings.EqualFold(asset.Format, "CSV") {
@@ -100,7 +101,7 @@ func (i *Inspector) ScanCSV(ctx context.Context, asset Asset, where map[string]s
 		seen[h] = true
 		header[n] = h
 	}
-	for field := range where {
+	for field := range fields {
 		if !seen[field] {
 			return report, fmt.Errorf("CSV scan selection field %q not in observed header", field)
 		}
@@ -137,7 +138,7 @@ func (i *Inspector) ScanCSV(ctx context.Context, asset Asset, where map[string]s
 			if len(v) > 64<<10 || rowBytes > 1<<20 {
 				return report, fmt.Errorf("CSV scan field/record size limit exceeded")
 			}
-			if want, required := where[header[n]]; required && v != want {
+			if allowed, required := fields[header[n]]; required && !allowed[v] {
 				matches = false
 			}
 		}
@@ -160,13 +161,13 @@ func (i *Inspector) ScanCSV(ctx context.Context, asset Asset, where map[string]s
 
 // SampleCSVScanned retains a bounded prefix but continues scanning all matching
 // and excluded rows. It deliberately separates full scan from retained coverage.
-func (i *Inspector) SampleCSVScanned(ctx context.Context, asset Asset, limit int, where map[string]string) (TableSample, error) {
+func (i *Inspector) SampleCSVScanned(ctx context.Context, asset Asset, limit int, selection CSVSelection) (TableSample, error) {
 	if limit < 1 || limit > 1000 {
 		return TableSample{}, fmt.Errorf("sample row limit must be 1–1000")
 	}
 	out := TableSample{CSV: &CSVProvenance{Encoding: "utf-8"}}
 	retainedBytes := 2
-	report, err := i.ScanCSV(ctx, asset, where, func(record CSVScanRecord) error {
+	report, err := i.ScanCSV(ctx, asset, selection, func(record CSVScanRecord) error {
 		if len(out.Rows) == limit {
 			return nil
 		}
@@ -197,6 +198,9 @@ func (i *Inspector) SampleCSVScanned(ctx context.Context, asset Asset, limit int
 	out.CSV.Encoding = report.Encoding
 	out.Prefix = report.MatchedRows > len(out.Rows)
 	out.Selection = &SelectionReport{Mode: "exact_strings_full_scan_v1", ScannedRows: report.ScannedRows, MatchedRows: report.MatchedRows, ReturnedRows: len(out.Rows), Exhausted: report.Exhausted}
+	if len(selection.In) != 0 {
+		out.Selection.Mode = "exact_string_sets_full_scan_v1"
+	}
 	out.Warnings = []string{"Direct comma-delimited CSV fully scanned (64 MiB cap); all parsed rows checked, including excluded rows and the tail. The first physical header line selects UTF-8 or lossless EUC-KR, with no midstream fallback. Only the first matching rows are retained. Exhausted describes scanning, NOT retention of all matches or population completeness. Source bytes were hashed as a stream, not archived. No identity or geographic approval."}
 	return out, nil
 }

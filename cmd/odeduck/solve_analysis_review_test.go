@@ -24,8 +24,11 @@ func TestSolveAnalysisReviewRunsTheActualEngineWithAdditionalAuthority(t *testin
 				Inspect: func(context.Context, string) (goalwork.Inspection, error) {
 					return goalwork.Inspection{PK: "values"}, nil
 				},
-				Sample: func(context.Context, goalwork.SampleRequest, goalwork.Inspection) (goalwork.Acquired, error) {
-					return goalwork.Acquired{Delivery: "REST", Rows: []goalwork.Row{{"n": "9007199254740993"}, {"n": "1"}}}, nil
+				Sample: func(_ context.Context, r goalwork.SampleRequest, _ goalwork.Inspection) (goalwork.Acquired, error) {
+					if !r.ScanCSV || len(r.WhereIn["n"]) != 2 {
+						t.Fatal("CLI calculation lost its source value-set request")
+					}
+					return goalwork.Acquired{Delivery: "FILE", Rows: []goalwork.Row{{"n": "9007199254740993"}, {"n": "1"}}}, nil
 				},
 				Review: func(_ context.Context, in goalwork.ReviewInput) (goalwork.ReviewAssessment, error) {
 					if in.Analysis == nil || in.Artifact.Rows[0]["total"] != json.Number("9007199254740994") {
@@ -44,7 +47,7 @@ func TestSolveAnalysisReviewRunsTheActualEngineWithAdditionalAuthority(t *testin
 			}
 			c := goalwork.GoalContract{Outcome: goal, Region: "fixture", Period: "source snapshot", Coverage: "sample", Roles: []goalwork.RoleRequirement{{ID: "r", Description: "values"}}, Outputs: []goalwork.OutputRequirement{{ID: "total", Role: "r", Type: "number", Description: "sum"}}}
 			p := goalwork.Composition{ID: "sum", Base: "o1", Purpose: "sum recorded values", Select: []string{"total"}, Measures: []goalwork.Measure{{As: "n", Field: "o1.n", Format: "decimal_v1", Unit: "fixture"}}, Aggregates: []goalwork.Aggregate{{As: "total", Op: "sum", Field: "n"}}, Roles: []goalwork.RoleBinding{{Role: "r", Observation: "o1"}}, Outputs: []goalwork.OutputBinding{{Output: "total", Field: "total"}}, Assumptions: []string{"fixture calculation"}}
-			decisions := []goalwork.Decision{{Action: "define", Contract: &c}, {Action: "search", Query: "values", Role: "r"}, {Action: "inspect", PK: "values"}, {Action: "sample", Sample: &goalwork.SampleRequest{PK: "values", Delivery: "api"}}, {Action: "compose", Composition: &p}, {Action: "execute", CompositionID: "sum"}}
+			decisions := []goalwork.Decision{{Action: "define", Contract: &c}, {Action: "search", Query: "values", Role: "r"}, {Action: "inspect", PK: "values"}, {Action: "sample", Sample: &goalwork.SampleRequest{PK: "values", Delivery: "file", ScanCSV: true, WhereIn: map[string][]string{"n": {"1", "9007199254740993"}}}}, {Action: "compose", Composition: &p}, {Action: "execute", CompositionID: "sum"}}
 			index := 0
 			return goalwork.Run(ctx, e, func(_ context.Context, v goalwork.View) (goalwork.Decision, error) {
 				if index < len(decisions) {

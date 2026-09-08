@@ -212,6 +212,9 @@ func (e *Engine) sourceReviewInput(id string) (ReviewInput, error) {
 			for field := range request.Where {
 				complete = complete && slices.Contains(packet.Selection.Fields, field)
 			}
+			for field := range request.WhereIn {
+				complete = complete && slices.Contains(packet.Selection.Fields, field)
+			}
 		}
 		if !complete {
 			continue

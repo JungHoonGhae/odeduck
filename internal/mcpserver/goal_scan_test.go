@@ -23,7 +23,7 @@ func TestGoalMCPFullCSVScanPreservesRequestAndPartialRetention(t *testing.T) {
 				return goalwork.Inspection{PK: "123", Assets: []string{"source.csv"}}, nil
 			},
 			Sample: func(_ context.Context, r goalwork.SampleRequest, _ goalwork.Inspection) (goalwork.Acquired, error) {
-				if !r.ScanCSV || r.Where["city"] != "target" {
+				if !r.ScanCSV || r.Where["city"] != "target" || len(r.WhereIn["kind"]) != 2 {
 					t.Error("MCP lost full scan selector")
 				}
 				return goalwork.Acquired{Rows: []goalwork.Row{{"id": "001"}}, Delivery: "FILE", ContentSHA256: strings.Repeat("a", 64), Selection: &dataset.SelectionReport{Mode: "exact_strings_full_scan_v1", ScannedRows: 2000, MatchedRows: 1200, ReturnedRows: 1, Exhausted: true}, CSV: &dataset.CSVProvenance{Encoding: "euc-kr", DataRecords: []int{801}, StartLines: []int{802}}}, nil
@@ -45,10 +45,10 @@ func TestGoalMCPFullCSVScanPreservesRequestAndPartialRetention(t *testing.T) {
 	}
 	v := call(map[string]any{"goal": "source comparison", "requireSemantic": false})
 	contract := goalwork.GoalContract{Outcome: "comparison", Region: "fixture", Period: "fixture", Coverage: "sample", Roles: []goalwork.RoleRequirement{{ID: "r", Description: "source"}}, Outputs: []goalwork.OutputRequirement{{ID: "id", Role: "r", Description: "code", Type: "string"}}}
-	for _, d := range []goalwork.Decision{{Action: "define", Contract: &contract}, {Action: "search", Query: "source", Role: "r"}, {Action: "inspect", PK: "123"}, {Action: "sample", Sample: &goalwork.SampleRequest{PK: "123", Delivery: "file", Asset: "source.csv", ScanCSV: true, Where: map[string]string{"city": "target"}}}} {
+	for _, d := range []goalwork.Decision{{Action: "define", Contract: &contract}, {Action: "search", Query: "source", Role: "r"}, {Action: "inspect", PK: "123"}, {Action: "sample", Sample: &goalwork.SampleRequest{PK: "123", Delivery: "file", Asset: "source.csv", ScanCSV: true, Where: map[string]string{"city": "target"}, WhereIn: map[string][]string{"kind": {"rail", "bus"}}}}} {
 		v = call(map[string]any{"sessionId": v.SessionID, "revision": v.State.Revision, "decision": d})
 	}
-	if len(v.State.Gaps) > 0 || len(v.State.Observations) != 1 || !v.State.SampleAttempts[0].Request.ScanCSV || v.State.Status != "exploring" {
+	if len(v.State.Gaps) > 0 || len(v.State.Observations) != 1 || !v.State.SampleAttempts[0].Request.ScanCSV || len(v.State.SampleAttempts[0].Request.WhereIn["kind"]) != 2 || v.State.Status != "exploring" {
 		t.Fatal("MCP lost request or asserted completion")
 	}
 	o := v.State.Observations[0]

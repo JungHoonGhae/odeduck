@@ -99,7 +99,7 @@ func TestLiveNearestMatchesIndependentMobilityDistances(t *testing.T) {
 			if s.PK == anchorSource.PK {
 				return anchors, nil
 			}
-			sample, err := files.SampleCSVScanned(ctx, candidateAsset, 1000, candidateSource.Selection)
+			sample, err := files.SampleCSVScanned(ctx, candidateAsset, 1000, dataset.CSVSelection{Equals: candidateSource.Selection})
 			if err != nil {
 				return Acquired{}, err
 			}

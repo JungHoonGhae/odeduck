@@ -219,7 +219,7 @@ func supportedSourceReview(in goalwork.ReviewInput) goalwork.ReviewAssessment {
 	return goalwork.ReviewAssessment{GoalFit: finding, Outputs: []goalwork.OutputReview{{Output: "record", Finding: finding}}}
 }
 
-func sourceReviewEngine(t *testing.T, policy goalwork.Policy, review func(context.Context, goalwork.ReviewInput) (goalwork.ReviewAssessment, error)) *goalwork.Engine {
+func sourceReviewEngine(t *testing.T, policy goalwork.Policy, review func(context.Context, goalwork.ReviewInput) (goalwork.ReviewAssessment, error), requests ...goalwork.SampleRequest) *goalwork.Engine {
 	t.Helper()
 	e, err := goalwork.Start("Report the labels recorded in this source snapshot, not current operating status", policy, goalwork.Dependencies{
 		Search: func(context.Context, string) (catalog.Result, error) {
@@ -237,7 +237,11 @@ func sourceReviewEngine(t *testing.T, policy goalwork.Policy, review func(contex
 		t.Fatal(err)
 	}
 	c := resultContract()
-	for _, d := range []goalwork.Decision{{Action: "define", Contract: &c}, {Action: "search", Query: "records", Role: "records"}, {Action: "inspect", PK: "records"}, {Action: "sample", Sample: &goalwork.SampleRequest{PK: "records", Delivery: "api"}}} {
+	sample := goalwork.SampleRequest{PK: "records", Delivery: "api"}
+	if len(requests) > 0 {
+		sample = requests[0]
+	}
+	for _, d := range []goalwork.Decision{{Action: "define", Contract: &c}, {Action: "search", Query: "records", Role: "records"}, {Action: "inspect", PK: "records"}, {Action: "sample", Sample: &sample}} {
 		v, err := e.Advance(context.Background(), e.View().Revision, d)
 		if err != nil || len(v.Gaps) != 0 {
 			t.Fatalf("setup: %+v %v", v, err)

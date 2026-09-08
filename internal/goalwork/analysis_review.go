@@ -219,6 +219,9 @@ func analysisFields(p Composition, observations map[string]Observation, requests
 		for field := range requests[id].Where {
 			add(id, field)
 		}
+		for field := range requests[id].WhereIn {
+			add(id, field)
+		}
 		if o.Reduction != nil {
 			r := o.Reduction.Recipe
 			for _, field := range r.GroupBy {

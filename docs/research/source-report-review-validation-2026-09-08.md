@@ -24,11 +24,11 @@
 
 - 환경: [공식 월별 통계](https://www.data.go.kr/data/15150551/fileData.do)의 기존 독립
   [환경 원천 기록](../../internal/goalwork/testdata/goalbench-v1/environment-reference.json)을 재생했다.
-  CSV data record 12460·12463, 원 관측 시각은 `2026-09-07T04:06:30.759848+00:00`이다.
+  reference의 `csvRecord` 12460·12463, 원 관측 시각은 `2026-09-07T04:06:30.759848+00:00`이다.
   선택한 8개 필드에는 도시별 구분, 측정소수 25·25와 `1시간 월평균` 19·19가 포함된다.
 - 인구: [공식 동별 연령·성별 자료](https://www.data.go.kr/data/15085585/fileData.do)의 기존 독립
   [교육·인구 원천 기록](../../internal/goalwork/testdata/goalbench-v1/education-reference.json)을 재생했다.
-  CSV data record 14·15, 원 관측 시각은 `2026-09-07T04:04:54.160580+00:00`이다.
+  reference의 `csvRecord` 14·15, 원 관측 시각은 `2026-09-07T04:04:54.160580+00:00`이다.
   선택한 3개 필드는 `연령(세)` 6, `성별` 남·여, `부평1동인구수` 64·62다. 합계나 재학 여부를 만들지 않았다.
 - 당시 파일의 SHA256과 record 위치는 기존 reference 및 새
   [사례 manifest](../../internal/goalwork/testdata/goalbench-v1/source-report-cases.json)에 고정했다.
@@ -38,6 +38,10 @@
   자율 발견 실험이 아니다. 상태 전이와 실행·근거·검토 결합은 실제 Engine을 사용했다.
 - 공개 집계 기록만 명시한 provider로 전송했다. 공공데이터 로그인이나 활용신청은 필요 없었다.
   모델에는 기대 판정, 음성 사례 설명, 이전 검토 답, 전체 reference 파일을 보내지 않았다.
+
+후속 실제 취득 대조에서 번호 설명을 바로잡았다. 위 reference의 `csvRecord`는 헤더를 1로 센다.
+Engine의 헤더 제외 data record는 환경 12459·12462, 인구 13·14다. 기존 원천 값·reference 번호·
+과거 실행 기록은 바꾸지 않았으며, 물리 줄 번호와도 구분한다.
 
 ## 실패를 포함한 전체 분모
 
@@ -184,3 +188,64 @@ go run ./scripts/goal-review-check --agent codex \
 I7/M4의 부분 진전이며 INTENT는 미완료다. 범위가 한정된 관계·계산의 검토 경로는 구현했지만,
 환경 양성의 취득 범위와 실제 무힌트 목표 완주를 해결해야 한다. 별도 모델은 독립 정답이 아니며,
 검토 호출의 추가 지연·비용 때문에 원천 보고와 분석 모두 기본 off를 유지한다.
+
+## 실취득 후속: 같은 질문·정답, 취득 범위 근거 추가
+
+2026-09-08 07:13:12–07:24:35 UTC에 같은 분석 manifest로 새 배치 12회를 실행했다.
+이번에는 **12/12 기대 일치**다. 환경·인구 각각 양성 3/3은 `output_ready`, 더 강한 결론 음성
+3/3은 `review_required`였다. 첫 시도도 두 양성 모두 완료됐으며 any-of-three만 성공한 결과가 아니다.
+앞의 9/12 미통과 배치는 그대로 보존한다. 두 배치를 섞어 범용 정확도 비율로 제시하지 않는다.
+
+바꾼 것은 선택 조건과 실제 취득 경로다. 질문·Contract·계산 recipe·선택 근거·독립 정답을 담은
+`analysis-review-cases.json`은 위 SHA256 그대로이고, 검토 guide도 호출 중 바꾸지 않았다.
+새 [취득 recipe](../../internal/goalwork/testdata/goalbench-v1/analysis-acquisition.json)는 실행 전에
+오데덕으로 검사한 정확한 파일 이름과 `scanCsv`/`where`/`whereIn` 조건만 담는다. 기대 값이나
+완료 영수증을 넣지 않았다. 검색 PK와 계산 절차는 여전히 미리 고른 **개발 calibration**이다.
+
+| 실제 취득 원천 | 파일 전체 검사 | 조건 일치 / 보관 | 실행 결과 |
+| --- | ---: | ---: | --- |
+| 측정소 정보 15150453 | 688행 | 51 / 51 | 서울 목록 25, 인천 목록 26 |
+| 도시별 월통계 15150551 | 12,888행 | 2 / 2 | 통계표 측정소수 25·25, 도시별 PM25 월평균 원문 19·19 |
+| 동별 연령·성별 인구 15085585 | 222행 | 24 / 24 | 부평1동 만 6–17세 남녀 주민 인구 합계 2,332명 |
+
+각 시도는 실제 `LiveDependencies.Sample`로 파일을 새로 읽었다. 총 18회 원천 취득과 12회 모델
+요청이 실행됐다. 현재 metadata 검사는 세 원천에 한 번씩 했고, Engine의 원천 관측·선집계·결합·
+결과·근거 읽기·검토는 실제 경로다. 선택 조건은 필드 내 OR/필드 간 AND이며 원문을 정규화하지 않는다.
+소스 해시, 전체 일치 행 보관, 원본 행 위치와 기존 reference 값이 다르면 모델 호출 전에 중단한다.
+`SelectionReport`는 실제 scanner가 만들며 reference에서 만들어 붙이지 않는다.
+
+앞서 빠졌던 환경의 목록 범위가 이제 원천 요청·전체 검사·보관 행 수로 이어진다. 별도 검토는
+서울 25/인천 26과 통계표 25/25의 불일치를 그대로 보고하는 역사적 비교를 지지했다. 개별 측정소
+농도나 월중 측정 참여로 해석하는 음성은 여전히 지지하지 않았다. 인구 역시 주민 인구이지 재학생
+수가 아니라는 경계를 유지했다. 파일 내 완전한 선택은 모집단 인증·현재 상태 보증이 아니다.
+
+### 새 원문과 재현
+
+새 [live archive](../../internal/goalwork/testdata/goalbench-v1/analysis-review-20260908/live-codex-raw.jsonl.gz)는
+입력·전체 결과·원 provider 응답 12건을 담는다. 기존 실패 archive를 덮어쓰지 않았다.
+압축 전후 대조한 JSONL 952,611 bytes의 SHA256은
+`533085b46905e43680ba3b1e3b901d5a5013d4ffc703e46a5a7bc8387d8d662d`다.
+취득 recipe SHA256은 `e69248b8c4e9c18bc6694557d98930ad3b41fc9dbb7308fe5daa68595daa254a`,
+검토 guide SHA256은 `ef45b1e88b52cbf539017e269eee8b27e1ef7e55eefef6f209ed02a3637d5658`이다.
+
+입력은 회당 18,474–21,261 bytes였다. 실제 취득·실행·검토를 포함한 회당 시간은 환경
+64.76–69.64초, 인구 43.86–48.65초다. 원문 이벤트 사용량 합계는 input 301,088, cached input
+102,912, output 19,494 tokens다. 실제 모델명·달러 비용은 확인하지 못했으며 청구량을 추정하지 않는다.
+공공데이터 로그인·활용신청은 필요 없었다. 모델에는 선택한 공개 집계 근거만 전송했다.
+
+```sh
+# offline: 새 12건과 과거 24건의 보존 응답을 현재 adapter로 재생
+go test ./internal/agentplan -run TestReviewGoalReplaysArchivedCodexCalibration -count=1
+
+# 새 실취득·모델 배치. 원천이 바뀌면 기존 정답을 고치지 않고 실패 기록을 남긴다.
+go run ./scripts/goal-review-check --agent codex \
+  --cases internal/goalwork/testdata/goalbench-v1/analysis-review-cases.json \
+  --acquisition internal/goalwork/testdata/goalbench-v1/analysis-acquisition.json \
+  --output /tmp/odeduck-analysis-live-new.jsonl
+```
+
+이번 배치가 사용한 실행·검토 로직은 코드 리뷰 후보 `5c700e6c`와 같다. 이후 보존 archive의 decoder
+회귀와 이 보고만 추가했다. 전체 테스트·vet·build·브랜드/의존성 검사·변경 경로 race 검사는 구현
+계약 검사다. 새 12회도 독립 모델 정확도 인증·미노출 평가·의미 검색 기여·무힌트 G1–G5 완주는 아니다.
+I4/I7/M3/M4의 실제 실패 하나를 해결했으며, 원래 G4의 전체 지역 비교·미대응 지역·기간 해석과
+G1–G5의 나머지 역할/출력/범위 검증을 계속한다. INTENT의 완료 기준은 유지한다.

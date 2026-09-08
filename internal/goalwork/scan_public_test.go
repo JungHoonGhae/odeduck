@@ -48,7 +48,7 @@ func TestLiveFullCSVScanMatchesIndependentTransitReference(t *testing.T) {
 	defer cancel()
 	i := dataset.NewInspector(fetch.New(), "")
 	found := 0
-	report, err := i.ScanCSV(ctx, dataset.Asset{Name: "stops.csv", Format: "CSV", Request: dataset.Request{Method: http.MethodGet, URL: source.URL}}, source.Selection, func(r dataset.CSVScanRecord) error {
+	report, err := i.ScanCSV(ctx, dataset.Asset{Name: "stops.csv", Format: "CSV", Request: dataset.Request{Method: http.MethodGet, URL: source.URL}}, dataset.CSVSelection{Equals: source.Selection}, func(r dataset.CSVScanRecord) error {
 		if expected, ok := wanted[r.DataRecord]; ok {
 			found++
 			if !reflect.DeepEqual(r.Values, expected) {

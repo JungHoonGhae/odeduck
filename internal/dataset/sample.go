@@ -52,11 +52,15 @@ func ValidateCSVSelection(where map[string]string) error {
 		return fmt.Errorf("CSV selection allows at most 8 exact string predicates")
 	}
 	for field, value := range where {
-		if strings.TrimSpace(field) == "" || len(field) > 256 || strings.TrimSpace(value) == "" || len(value) > 256 {
+		if !validCSVSelectionTerm(field, value) {
 			return fmt.Errorf("CSV selection needs nonblank field/value pairs of at most 256 bytes; null selection is unsupported")
 		}
 	}
 	return nil
+}
+
+func validCSVSelectionTerm(field, value string) bool {
+	return strings.TrimSpace(field) != "" && len(field) <= 256 && strings.TrimSpace(value) != "" && len(value) <= 256
 }
 
 // SampleCSV reuses inspected Asset retrieval. The caller must select the exact

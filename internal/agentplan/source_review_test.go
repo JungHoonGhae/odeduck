@@ -20,15 +20,16 @@ import (
 func TestReviewGoalReplaysArchivedCodexCalibration(t *testing.T) {
 	for _, archive := range []struct {
 		folder string
+		file   string
 		ready  int
-	}{{"source-report-review-20260908", 6}, {"analysis-review-20260908", 3}} {
-		t.Run(archive.folder, func(t *testing.T) { replayArchivedReview(t, archive.folder, archive.ready) })
+	}{{"source-report-review-20260908", "codex-raw.jsonl.gz", 6}, {"analysis-review-20260908", "codex-raw.jsonl.gz", 3}, {"analysis-review-20260908", "live-codex-raw.jsonl.gz", 6}} {
+		t.Run(archive.folder+"/"+archive.file, func(t *testing.T) { replayArchivedReview(t, archive.folder, archive.file, archive.ready) })
 	}
 }
 
-func replayArchivedReview(t *testing.T, folder string, wantReady int) {
+func replayArchivedReview(t *testing.T, folder, file string, wantReady int) {
 	t.Helper()
-	f, err := os.Open(filepath.Join("../goalwork/testdata/goalbench-v1", folder, "codex-raw.jsonl.gz"))
+	f, err := os.Open(filepath.Join("../goalwork/testdata/goalbench-v1", folder, file))
 	if err != nil {
 		t.Fatal(err)
 	}

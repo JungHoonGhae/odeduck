@@ -83,6 +83,7 @@ type SampleRequest struct {
 	Member    string                 `json:"member,omitempty"`   // exact CSV path inside a ZIP asset
 	RowPath   string                 `json:"rowPath,omitempty"`  // API JSON Pointer
 	Where     map[string]string      `json:"where,omitempty"`    // FILE only; conjunctive exact string selection before row limit
+	WhereIn   map[string][]string    `json:"whereIn,omitempty"`  // direct CSV full scan only; OR within each exact value set, AND across fields
 	XLSX      *dataset.XLSXSelection `json:"xlsx,omitempty"`     // FILE only; exact original worksheet rectangle
 	LayoutID  string                 `json:"layoutId,omitempty"` // optional same-source-file pin from layout discovery
 }
@@ -342,6 +343,11 @@ func (e *Engine) Advance(ctx context.Context, revision int, d Decision) (View, e
 		return e.snapshot(false), err
 	}
 	d = detached
+	if d.Sample != nil {
+		for _, values := range d.Sample.WhereIn {
+			sort.Strings(values) // a set has no order; reordering cannot buy another acquisition
+		}
+	}
 	if d.Action == "retry_sample" {
 		request, err := e.retryRequest(d)
 		if err != nil {
