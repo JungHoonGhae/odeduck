@@ -9,6 +9,11 @@ section matching a `vX.Y.Z` tag as the GitHub release notes.
 
 ### Added
 
+- Optional `composition.support` links already-disclosed evidence from another
+  original observation to proposed interpretation targets in analysis review.
+  Exact packets and acquisition provenance are preserved; support does not change
+  calculations, satisfy required roles or certify applicability or population scope.
+
 - Bounded portal FILE history discovery and exact edition selection through CLI,
   MCP and goal inspection. Historical requests retain edition-specific metadata
   and acquisition provenance, reject latest-file fallback and preserve old

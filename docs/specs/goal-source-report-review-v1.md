@@ -146,6 +146,30 @@ fixture 승인만으로 모델 정확도나 원래 G1–G5의 자율 완주를 �
 전달되는 것을 검사한다. 이것은 입력 경계 검증이며 실제 모델의 문맥 해석 calibration은 아니다.
 별도 파일의 법령/대응표 문맥, 전체 지역 결과와 의미 승인은 이 slice에서 완료하지 않는다.
 
+### 다른 관측의 선택 근거 연결 — 2026-09-08 후속 계약
+
+같은 파일 자동 연관만으로는 별도 대응표·정의 자료의 이미 취득한 기록을 검토할 수 없다. 기존
+Composition의 `support:[{packetId,targets,purpose}]`로 실제 공개한 Evidence Packet과 계산 원천
+관측 사이의 **제안된 적용 관계**를 명시한다. 새 저장소·임의 문서 원문 입력·URL 취득은 추가하지 않는다.
+
+- 기존 Start/Advance·CLI command·MCP JSON-RPC·ReviewGoal seam을 재사용한다. `ReviewAnalyses`와
+  기존 선택 공개가 켜진 목표에서만 사용한다. packet은 이 목표의 불변 관측 revision에 속해야 한다.
+- 최대 8개 서로 다른 packet, 각 1–8개 중복 없는 target 관측과 1–1000 UTF-8 byte purpose를 받는다.
+  target은 계산의 직접 원천 또는 그 원본 lineage에 속해야 한다. 근거 자체는 계산에 참여하지 않는
+  원본 관측이며 파생/공간 기록이나 다른 목표의 packet은 거부한다. credential material은 받지 않는다.
+- `analysis.sourceContext`에 실제 packet·투영 metadata·요청·target과 `proposed:true`, purpose를
+  전달한다. purpose와 target은 계획기의 가설이지 출처의 진술이나 적용 승인 값이 아니다.
+  같은 파일 자동 문맥은 종전대로 유지하고, 명시한 packet은 그 제안 한 번만 전달한다.
+- 문맥은 원래 계산·행 수·원본 lineage·역할·출력·시간·모집단 검사를 변경하지 않는다. 적용되는
+  필드·기간·대상은 원문과 원본 위치로 검토해야 한다. 독립 승인 없이 명칭 대응이나 정의를 사실로
+  사용하지 않는다. 검토 불가·누락 근거는 같은 목표의 추가 취득·재계획으로 남긴다.
+- 같은 실행과 같은 셀 근거의 재포장으로 검토를 충전하지 않는다. 새로운 적용 제안은 새 composition과
+  실행을 필요로 하며 기존 6조합·3검토·8 packet/64 KiB·96 KiB 입력·만료·수신자 상한을 유지한다.
+
+공개 seam에서 별도 파일 근거 전달과 무관한 값 비공개, 가짜/중복/비참여 target·권한·예산·변조·
+역할 대체 차단을 검증한다. fixture 판정은 전달·상태 검증일 뿐 의미 정확도나 G4 완주가 아니다.
+외부 웹의 공식 정의를 원천 revision에 연결하는 취득과 전체 범위 수용 계약은 후속으로 남는다.
+
 ### 원래 G4의 실제 검토 진단
 
 위임된 Start/Advance·ReviewGoal seam에서 원래 G4 질문과 독립 citywide reference를 재사용한다.

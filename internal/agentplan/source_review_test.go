@@ -150,6 +150,7 @@ func TestReviewGoalSelectsAnalysisContractWithoutChangingSourceReportGuide(t *te
 	t.Setenv("PATH", dir)
 	in := goalwork.ReviewInput{Recipient: "claude", Goal: "compare recorded totals", Contract: goalwork.GoalContract{Outputs: []goalwork.OutputRequirement{{ID: "total"}}}, Evidence: goalwork.EvidencePacket{ID: "ep_one"}, Analysis: &goalwork.AnalysisReviewContext{Method: "engine_relational_replay_v1", AdditionalEvidence: []goalwork.EvidencePacket{{ID: "ep_two"}}}}
 	in.Analysis.SourceContext = []goalwork.SourceContext{{Targets: []string{"o1"}, Evidence: goalwork.EvidencePacket{ID: "ep_context", Records: []goalwork.EvidenceRecord{{RetainedRow: 1, Values: goalwork.Row{"A": "SOURCE_HEADER_FIXTURE"}}}}}}
+	in.Analysis.SourceContext = append(in.Analysis.SourceContext, goalwork.SourceContext{Targets: []string{"o1"}, Proposed: true, Purpose: "Check definition applicability", Source: goalwork.Observation{ID: "o3", PK: "definitions"}, Evidence: goalwork.EvidencePacket{ID: "ep_definitions", Records: []goalwork.EvidenceRecord{{RetainedRow: 1, Values: goalwork.Row{"term": "SEPARATE_DEFINITION_FIXTURE"}}}}})
 	response, err := ReviewGoal(context.Background(), in, "claude")
 	if err != nil || len(response.Assessment.AnalysisChecks) != 4 {
 		t.Fatalf("analysis response: %v", err)
@@ -160,5 +161,10 @@ func TestReviewGoalSelectsAnalysisContractWithoutChangingSourceReportGuide(t *te
 	}
 	if !strings.Contains(string(prompt), "SOURCE_HEADER_FIXTURE") || !strings.Contains(string(prompt), "same-file association") {
 		t.Fatal("selected context or its association-only interpretation was lost in the adapter")
+	}
+	for _, required := range []string{"SEPARATE_DEFINITION_FIXTURE", `"proposed":true`, `"purpose":"Check definition applicability"`, "UNTRUSTED PROPOSALS"} {
+		if !strings.Contains(string(prompt), required) {
+			t.Fatalf("proposed support or its interpretation was lost: %s", required)
+		}
 	}
 }

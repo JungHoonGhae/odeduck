@@ -718,6 +718,9 @@ func (e *Engine) act(ctx context.Context, d Decision) error {
 				return fmt.Errorf("unknown joined observation")
 			}
 		}
+		if _, err := e.supportContext(p); err != nil {
+			return err
+		}
 		b, _ := json.Marshal(p)
 		_ = json.Unmarshal(b, &p)
 		e.state.Compositions = append(e.state.Compositions, p)

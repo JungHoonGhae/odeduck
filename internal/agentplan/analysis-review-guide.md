@@ -32,12 +32,16 @@ the complete reported comparison, including these records, when assessing covera
 and original goal fit; reporting a gap does not prove that the goal is answered.
 
 analysis.sourceContext contains additional already-disclosed packets from separate
-original FILE observations. Each entry includes evidence, projected source metadata,
-the acquisition request and targets naming participating source observations with
-the same PK, asset, archive member, content hash and contract hash. This
-same-file association is NOT proof a header applies to a particular sheet/table or that its
-dates, units or population apply to the output. Check original cell addresses,
-table structure and selected wording; absent applicability remains insufficient.
+original observations. Each entry includes evidence, projected source metadata,
+the acquisition request and targets naming participating observations. An entry
+without proposed:true is a same-file association: PK, asset, archive member,
+content hash and contract hash match. With proposed:true, the planner explicitly
+selected a packet from another original observation, possibly a different dataset
+or revision. Its targets and purpose are UNTRUSTED PROPOSALS, not publisher
+declarations or proof of applicability. Neither association proves that dates,
+units, definitions, mappings or populations apply to the output. Check the actual
+selected wording, source revision, original addresses, table structure, subject and
+effective dates against each target; absent applicability remains insufficient.
 Context packets are valid packetIds for findings but do not participate in joins,
 arithmetic, required roles or record-bound temporal checks. A context-only date is
 not an invented date column. An unmatched district or missing population cannot
