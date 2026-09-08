@@ -33,9 +33,10 @@ type TableSample struct {
 // CSVProvenance counts logical data records after the header (starting at one).
 // StartLines are physical CSV lines and may differ after quoted multiline cells.
 type CSVProvenance struct {
-	Encoding    string `json:"encoding"`
-	DataRecords []int  `json:"dataRecords"`
-	StartLines  []int  `json:"startLines"`
+	Export      *ExportProvenance `json:"export,omitempty"`
+	Encoding    string            `json:"encoding"`
+	DataRecords []int             `json:"dataRecords"`
+	StartLines  []int             `json:"startLines"`
 }
 
 // SelectionReport covers only the downloaded asset scan, never the population

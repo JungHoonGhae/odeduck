@@ -1,0 +1,19 @@
+<html><body><form name="search" action="ageStatMonth.do" method="post">
+<select name="searchYearStart"><option value="2026" selected>2026</option></select>
+<select name="searchYearEnd"><option value="2026" selected>2026</option></select>
+<select name="searchMonthStart"><option value="07" selected>07</option></select>
+<select name="searchMonthEnd"><option value="07" selected>07</option></select>
+<select name="sltUndefType"><option value="" selected>전체</option></select>
+<select name="sltArgTypes"><option value="1" selected>1</option></select>
+<input name="sum" type="checkbox" value="sum" checked><input name="gender" type="checkbox" value="gender" checked>
+</form><form name="formXlsDown" id="formXlsDown" method="post">
+<input name="sltOrgType" type="hidden" value="2"><input name="sltOrgLvl1" type="hidden" value="2800000000">
+<input name="sltOrgLvl2" type="hidden" value="A"><input name="sltUndefType" type="hidden" value="">
+<input name="searchYearStart" type="hidden" value="2026"><input name="searchYearEnd" type="hidden" value="2026">
+<input name="searchMonthStart" type="hidden" value="07"><input name="searchMonthEnd" type="hidden" value="07">
+<input name="sltOrderType" type="hidden" value="1"><input name="sltOrderValue" type="hidden" value="ASC">
+<input name="sltArgTypes" type="hidden" value="1"><input name="sltArgTypeA" type="hidden" value="6"><input name="sltArgTypeB" type="hidden" value="7">
+<input name="sum" type="hidden" value=""><input name="gender" type="hidden" value=""><input name="category" type="hidden" value="month">
+<input id="down3" name="state" type="radio" value="3"><a id="csvDown">CSV</a></form>
+<script>$("#csvDown").click(function(){ $("#formXlsDown").attr("action", "downloadCsvAge.do?searchYearMonth="+$("input[name=category]").val()+"&xlsStats=3").submit(); });</script>
+</body></html>

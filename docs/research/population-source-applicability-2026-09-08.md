@@ -251,3 +251,152 @@ typed adapter가 없다는 경고를 낸다. 이번 HTML/CSV 취득과 대조는
 연구 스킬의 1차 원천 추적과 그래프 엔지니어링 스킬의 원천/record/claim·기준일 구분을 적용했다.
 법령이나 일반 정의만으로 파일별 적용을 승인하지 않고, 실제 기록의 결정론적 대조와 남은 미확인을
 따로 남겼다. 로그인·신청·계정 변경·유료 모델 호출·추가 에이전트·외부 메시지 전송은 수행하지 않았다.
+
+## 추가 조사: 공식 6–17세 범위 CSV 계약
+
+2026-09-08 13:34–13:39 UTC에 [같은 행안부 월간 화면](https://jumin.mois.go.kr/ageStatMonth.do)의
+기본 연령 범위 선택과 CSV 동작을 확인했다. **공식 폼의 1세 단위·6세부터 17세 조건은 모든 요청
+연령을 보존한 43열 CSV를 반환했다.** 실제 내려받기는 1,050,109 bytes, 전국 3,919행으로,
+기존 310열 내려받기와 코드 집합이 같았다. 인천을 선택한 폼이라는 이유로 응답을 인천 전용으로
+취급할 수는 없다. `전체읍면동현황`의 실제 전달 범위는 전국이며, 인천 범위는 코드로 구분했다.
+
+### 공식 폼·선택 반영·다운로드 연결
+
+아래 위치는 새로 보존한 `age-july-incheon-all-6to17.html`의 물리 행 번호다. HTML과 그 안의
+스크립트를 읽고 별도 POST로 응답을 확인했으며, 브라우저에서 JavaScript를 실행한 검증은 아니다.
+
+| 확인 대상 | 공식 응답의 위치와 계약 |
+| --- | --- |
+| 검색 폼 | 1062행 `form[name=search][action="ageStatMonth.do"][method=post]` |
+| 1세 단위 | 1419행 `select#sltArgTypes[name=sltArgTypes]`의 `option[value=1]`이 선택됨. 나머지 선택지는 10·5세 |
+| 범위 선택 | `select#sltArgTypeA`, `select#sltArgTypeB`는 원시 HTML에서 비어 있고 `load2()`의 `ageGroup1[2]`, `ageGroup2[2]`가 각각 0–100 정수 옵션 101개를 생성함 |
+| 요청 범위 반영 | 979–982행 `init2()`의 `selInitial` 값은 단위 1, 시작 6, 끝 17. 1444행 `#ageChange`는 `세` |
+| 100세 경계 | 182–189행은 끝 값 100일 때 `#ageChange`를 `세(이상)`으로 표시. 앞서 보존한 전체 연령 CSV의 실제 마지막 연령 헤더도 `100세 이상` |
+| 등록구분·월 | `select#register[name=sltUndefType]`의 빈 값=전체가 선택됨. `#searchYearStart/End`는 2026, `#searchMonthStart/End`는 07이 선택됨 |
+| 다운로드 폼 | 1460행 `form#formXlsDown[name=formXlsDown][method=post]`. 1462–1477행 hidden 필드가 인천 코드·전체·2026-07·단위 1·범위 6–17을 반영함 |
+| 출력 종류 | 1483행 `input#down3[name=state][value=3]`의 라벨이 전체읍면동현황. 기본 체크값 1에서 3을 선택하는 동작에 해당 |
+| CSV 목적지 | 48–60행 `#csvDown` click handler가 선택된 `state=3`을 읽어 `#formXlsDown`의 action을 `downloadCsvAge.do?searchYearMonth=month&xlsStats=3`으로 바꿔 submit함 |
+| 계·남녀 선택 | 541–548행 `chkExcel()`이 hidden `sum`, `gender`의 초기 빈 값을 검색 체크박스 상태에 따라 `sum`, `gender`로 채움 |
+| 출력 표 | `table#contextTable`의 1785행 월 표시는 `2026년 07월`; 계·남·여 각각 총인구수·연령구간인구수·6–17세 12개 열을 갖고, 데이터 행은 코드·명칭을 포함해 44칸 |
+
+연령 시작·끝의 101개 옵션을 각각 검사했다. 100은 100세 이상 구간이며 110은 화면에 없는 값이다.
+이번에는 110 또는 65세 이상을 별도로 요청하지 않았고, 요청한 6–17세 범위를 다른 연령 집계로
+대체하지 않았다. 한 달·1세·전체읍면동 조건에 대한 `chkExcel()` 검사도 같은 범위를 허용한다.
+
+지역 선택은 주의가 필요하다. `#sltOrgLvl1`, `#sltOrgLvl2`는 원시 HTML에서 비어 있다.
+198–262행의 함수는 공식 AJAX 응답으로 옵션을 채우며, `loadSidonm()`은 `levels=1` 중 요청 코드와
+같은 `hangkikcd`를 선택한다. 이번 조사에서는 이 추가 AJAX를 호출하지 않았다. 따라서 hidden이나
+JS에 요청 코드가 다시 나타난다는 사실만으로 그 코드의 유효성을 검증했다고 하지 않는다.
+실제 표의 첫 행 `2800000000`·인천광역시와 CSV의 같은 코드 및 원본 수치가 일치하는 것이 이번
+요청의 관측 근거다. 검색 폼의 hidden `sltOrgType`은 초기값 1이지만 `goSearch()`가 시도 선택에
+따라 2로 바꾸며, 다운로드 폼에는 요청한 2가 반영되어 있다.
+
+연도 선택지는 2008–2026이고 월 선택지는 01–12이므로, 옵션에 있다는 것만으로 해당 월의 공표를
+보장하지도 않는다. 이 요청의 월은 출력 표와 **CSV의 모든 42개 수치 헤더**가 `2026년07월_`로
+시작하는지 별도로 확인했다. 코드·월·연령의 응답 검증을 요청값 반영 검사와 함께 적용해야 한다.
+
+### 실제 응답과 독립 수치 대조
+
+새 요청은 [공식 CSV action](https://jumin.mois.go.kr/downloadCsvAge.do?searchYearMonth=month&xlsStats=3)에
+다음 폼을 URL-encoded POST한 것이다. `Content-Type`은 `application/x-www-form-urlencoded`,
+`Referer`는 `https://jumin.mois.go.kr/ageStatMonth.do`로 고정했다. 검색 HTML 요청에는 같은 조건에서
+`category`, `state`를 빼고 `tableChart=T`, `searchYearMonth=month`를 넣었다.
+
+```json
+{
+  "sltOrgType": "2", "sltOrgLvl1": "2800000000", "sltOrgLvl2": "A", "sltUndefType": "",
+  "searchYearStart": "2026", "searchMonthStart": "07",
+  "searchYearEnd": "2026", "searchMonthEnd": "07",
+  "sum": "sum", "gender": "gender", "sltOrderType": "1", "sltOrderValue": "ASC",
+  "sltArgTypes": "1", "sltArgTypeA": "6", "sltArgTypeB": "17", "category": "month", "state": "3"
+}
+```
+
+검색 HTML은 13:34:55.093–13:34:55.706 UTC에 HTTP 200, `text/html;charset=UTF-8`,
+104,915 bytes로 응답했다. CSV는 13:35:31.726–13:35:37.662 UTC에 HTTP 200으로 응답했다.
+CSV의 실제 응답 헤더는 `Content-Type: application/octet-stream;charset=utf-8`이고
+`Content-Disposition`은 다음과 같다.
+
+```text
+attachment; filename="202607_202607_%EC%97%B0%EB%A0%B9%EB%B3%84%EC%9D%B8%EA%B5%AC%ED%98%84%ED%99%A9_%EC%9B%94%EA%B0%84.csv";
+```
+
+**헤더의 charset 표시와 달리 CSV bytes는 strict UTF-8 해독이 실패하고 strict EUC-KR 해독이
+성공했다.** 별도의 따옴표 상태 기반 CSV 파서로 escaped quote·필드 안의 쉼표·행 경계를 처리하고,
+헤더 중복·행 너비·정수 표기·10자리 코드·코드 중복을 검사했다. 인코딩 오류를 치환 문자로 숨기지
+않았다. 첫 필드는 `행정구역`이며 표시명의 마지막 괄호에 있는 10자리 코드를 매칭 키로 읽었다.
+이름 유사도는 대조 기준이 아니다. 43열의 순서는 행정구역 1열 다음 계·남·여 각각
+`총인구수`, `연령구간인구수`, `6세`부터 `17세`까지 14열이다.
+
+| 대조 범위 | 대조 위치 수 | 결과 |
+| --- | ---: | --- |
+| 기존 310열 공식 CSV의 전국 3,919코드 → 새 CSV | 3,919 × 42 = 164,598 | 코드 집합 동일, 누락·수치 불일치 0 |
+| July 원본 230열의 3,619코드 → 새 CSV | 3,619 × 42 = 151,998 | 누락·수치 불일치 0 |
+| 선택 HTML의 인천·11개 구군 → 새 CSV | 12 × 42 = 504 | 누락·수치 불일치 0 |
+| 원본 인천 162행의 11개 코드별 구군 합과 인천 합 → 새 CSV의 집계행 | 12 × 42 = 504 | 수치 불일치 0 |
+
+각 행의 42개 수치 중 24개는 원본의 남·여별 6–17세를 직접 대조하고, 계의 12개 연령은 원본
+남녀를 더했다. 3개 전체 연령 총인구수를 대조하고 나머지 3개 연령구간인구수는 해당 성별의
+6–17세를 독립 합산했다. **기존 0–100세 이상 구간합을 새 6–17세 구간합과 직접 비교하지 않았다.**
+인천의 전체 연령 총인구수는 3,063,730명으로 유지되지만 새 연령구간인구수는 304,280명이며,
+남 155,855명·여 148,425명이다. 모든 새 CSV 행에서도 남녀 합과 선택 구간 합을 확인했다.
+이 대조 수는 중복 합계를 포함한 검사 위치이며, 앞 절의 전체 연령 1,118,271개 대조나 모델 평가
+분모에 더하지 않는다.
+
+실제 응답의 전국 3,919행에는 `0000000000` 전국 총계 행이 없고, 16개 시도 집계행이 있다.
+원본 일치 3,619행과 추가 300행(상위 코드 패턴 296행·비상위 4행)은 기존 전체 연령 export와
+같다. 인천 코드는 177행으로, **원본과 일치하는 162행 안에 읍면 출장소 4행이 이미 포함**되어
+있다. 추가 15행은 인천/11개 구군 집계 12행과 기존 구의 인구 0명 출장소 3행이다.
+
+| 원본에 포함된 읍면 출장소 코드 | 원본 행 / 새 CSV 행 | 6–17세 |
+| --- | --- | ---: |
+| `2871042500` 서도면볼음출장소 | 1357 / 1453 | 5 |
+| `2872031500` 북도면장봉출장소 | 1359 / 1456 | 9 |
+| `2872034500` 대청면소청출장소 | 1362 / 1459 | 2 |
+| `2872037500` 자월면이작출장소 | 1366 / 1463 | 23 |
+
+행 번호는 각 CSV의 헤더를 1행으로 센 값이다. 이 네 행의 39명은 원본과 새 export 모두에서
+같으며, 기존 **G4의 원본 162행 → 11개 구군 → 304,280명**을 바꾸지 않는다. 구군 그룹은 이번
+snapshot에서 원본 코드 앞 5자리와 공식 집계코드를 대조해 확인했으며, 다른 시점까지 일반화한
+행정구역 규칙이나 출장소 일괄 제외 규칙을 추가하지 않았다.
+
+### 새 보존물·재현·구현상 의미
+
+새 보존 경로는 `/tmp/odeduck-monthly-export.fqn2uP/`다. 이전 조사 디렉터리의 원본과 결과를
+덮어쓰지 않았다. 두 POST는 각각 55초·16 MiB 스트림 제한을 적용했고 redirect는 따르지 않았다.
+Cookie·Authorization을 보내지 않았으며 응답의 익명 세션 쿠키도 후속 요청에 재사용하지 않았다.
+HTTP 상태·응답 종류·HTML 완결성 또는 CSV 시작 헤더·attachment를 검사하고, 정확한 요청 body,
+시간, 전체 응답 헤더, raw bytes 및 해시를 아래 파일에 보존했다.
+
+| 파일 — 새 디렉터리 기준 | SHA256 |
+| --- | --- |
+| `mois-july-all-eupmyeondong-6to17.csv` | `911940f3c38ffb7ed487a820607560616dedd5d226dcec1c0b9d7ffb65c4e47f` |
+| `age-july-incheon-all-6to17.html` | `1a1423e466dbc572ebee91b7cfeabf5ee7ac39085dc44c2b91ce3b689bfef982` |
+| `acquire-range.mjs` | `a584812f515de8a9524dbb699c432d0bf2e0117fd0085826369cd44f8778f713` |
+| `verify-range.mjs` | `74472073f9c86ee3471574f738a55a324047914d311b2d77119d931d32591e22` |
+| `page-request.json` | `ba93b366f2d9d95fa510b71dd47c7c4e50e46ec72418bb33a8fcc9bfda717296` |
+| `page-response.json` | `441cdf92f70a2d600fd01b75617680e9921263ac2ca011f0ca5cbbd9f683d806` |
+| `export-request.json` | `5c4b480a3e29052c3c4bf41c40d7c9bfbe7e453f12f0d88894072b976f96a135` |
+| `export-response.json` | `6b28af1860cdeac0b099229856f37e3f8ecac4cb505d9fb97b6823693ee82cf8` |
+| `comparison-range-summary.json` | `937fdf823a0a1e1c96bd3463f0f29c7d3828eff61c1010e34d3553eaeb14eb03` |
+| `contract-range-summary.json` | `7b2f4e1b9f4bc3b7bd62e24432c46a6b64221ba6ba90ad44f866090ea80505fe` |
+| `verification-attempts.json` | `c5583763cfad25917dc0737d3b3f6176b4c212c3b65dbca72981b21db685e0c6` |
+
+`verify-range.mjs`는 이전 원본 SHA256 `6920fdafd269554d259e8498301f004c9799f499c38832de9352a0e7def916c5`,
+이전 전체 연령 export SHA256 `3f1c7c0000104dc1feb3cf643187c1427d87736c67a05df0cb0b7a2e9e78315c`,
+새 CSV·HTML의 해시를 먼저 고정 검사한다. Node `v22.23.1`에서 대조를 완료한 시각은
+13:39:42.437 UTC다. 첫 오프라인 실행에서는 JS의 `new Option("9", "9")` 안 공백을 옵션 추출
+정규식이 허용하지 않아 실패했다. 공백 처리를 고친 다음 전체 검사가 통과했으며, 이를 원천의
+9세 누락으로 분류하지 않았다. 두 POST 요청의 실패나 추가 재요청은 없었다.
+
+재현 명령은 `node acquire-range.mjs page`, `node acquire-range.mjs export`,
+`node verify-range.mjs`다. 각 스크립트의 보존 경로는 고정되어 있고 산출물은 `wx`로 신규 생성하므로,
+다시 실행할 때는 새 임시 디렉터리를 만들고 스크립트의 출력 경로를 그곳으로 바꾼다. 해시가 고정된
+이전 원본은 그대로 읽는다. 이 임시 보존물이 영구 Git archive라는 주장은 하지 않는다.
+
+구현에는 공식 연령 선택을 그대로 보존하는 고정 계약을 사용할 근거가 생겼다. 이 요청은 310열
+전체 자료를 내려받아 임의로 자르는 단계 없이 43열의 공식 응답을 제공한다. 다만 응답의 전국 범위,
+실제 EUC-KR bytes, 코드·월·요청 연령·합계의 검증과 집계행 구분을 함께 전달해야 한다.
+**이번 절은 공식 계약과 수치 보존 조사이며, 오데덕의 자동 발견·제품 취득·검토 입력 전달·모델 호출
+또는 G4 완료를 입증하는 실행 결과가 아니다.** 제품 코드·oracle·기존 전체 연령 대조 판정은 이
+조사에서 수정하지 않았다.

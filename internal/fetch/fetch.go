@@ -220,7 +220,7 @@ func (c *Client) OpenGETNoRedirect(ctx context.Context, rawURL string) (*StreamR
 	httpClient.CheckRedirect = func(_ *http.Request, _ []*http.Request) error {
 		return http.ErrUseLastResponse
 	}
-	return c.openWithClient(ctx, &httpClient, http.MethodGet, rawURL, nil, "", "application/json,*/*")
+	return c.openWithClient(ctx, &httpClient, http.MethodGet, rawURL, nil, "", "application/json,*/*", refererOf(rawURL))
 }
 
 // OpenPublicGETNoRedirect reads a caller-pinned public document without the
@@ -229,7 +229,25 @@ func (c *Client) OpenPublicGETNoRedirect(ctx context.Context, rawURL string) (*S
 	httpClient := *c.http
 	httpClient.Jar = nil
 	httpClient.CheckRedirect = func(_ *http.Request, _ []*http.Request) error { return http.ErrUseLastResponse }
-	return c.openWithClient(ctx, &httpClient, http.MethodGet, rawURL, nil, "", "text/html")
+	return c.openWithClient(ctx, &httpClient, http.MethodGet, rawURL, nil, "", "text/html", refererOf(rawURL))
+}
+
+// OpenPublicPostFormNoRedirect streams a caller-pinned public export or its
+// selection page, without shared cookies or redirects. The adapter owns the
+// exact endpoint/form/referer and bounds the response body and deadline.
+func (c *Client) OpenPublicPostFormNoRedirect(ctx context.Context, rawURL, referer string, form url.Values) (*StreamResponse, error) {
+	target, targetErr := url.Parse(rawURL)
+	source, sourceErr := url.Parse(referer)
+	if targetErr != nil || sourceErr != nil || target == nil || source == nil ||
+		(target.Scheme != "http" && target.Scheme != "https") || target.Host == "" ||
+		target.User != nil || source.User != nil || target.Fragment != "" || source.Fragment != "" ||
+		target.Opaque != "" || source.Opaque != "" || target.Scheme != source.Scheme || target.Host != source.Host {
+		return nil, fmt.Errorf("public form requires credential-free URLs and an exact same-origin source-page referer")
+	}
+	httpClient := *c.http
+	httpClient.Jar = nil
+	httpClient.CheckRedirect = func(_ *http.Request, _ []*http.Request) error { return http.ErrUseLastResponse }
+	return c.openWithClient(ctx, &httpClient, http.MethodPost, rawURL, strings.NewReader(form.Encode()), "application/x-www-form-urlencoded", "text/html,text/csv,application/octet-stream,*/*", referer)
 }
 
 // OpenPostForm starts a streamed form POST for provider assets that are too
@@ -239,10 +257,10 @@ func (c *Client) OpenPostForm(ctx context.Context, rawURL string, form url.Value
 }
 
 func (c *Client) open(ctx context.Context, method, rawURL string, body io.Reader, contentType, accept string) (*StreamResponse, error) {
-	return c.openWithClient(ctx, c.http, method, rawURL, body, contentType, accept)
+	return c.openWithClient(ctx, c.http, method, rawURL, body, contentType, accept, refererOf(rawURL))
 }
 
-func (c *Client) openWithClient(ctx context.Context, httpClient *http.Client, method, rawURL string, body io.Reader, contentType, accept string) (*StreamResponse, error) {
+func (c *Client) openWithClient(ctx context.Context, httpClient *http.Client, method, rawURL string, body io.Reader, contentType, accept, referer string) (*StreamResponse, error) {
 	c.throttle()
 	req, err := http.NewRequestWithContext(ctx, method, rawURL, body)
 	if err != nil {
@@ -253,8 +271,8 @@ func (c *Client) openWithClient(ctx context.Context, httpClient *http.Client, me
 	if contentType != "" {
 		req.Header.Set("Content-Type", contentType)
 	}
-	if ref := refererOf(rawURL); ref != "" {
-		req.Header.Set("Referer", ref)
+	if referer != "" {
+		req.Header.Set("Referer", referer)
 	}
 	streamClient := *httpClient
 	streamClient.Timeout = c.streamTimeout

@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/url"
 	"sort"
 	"strings"
 	"sync"
@@ -57,6 +58,7 @@ type Inspection struct {
 	Operations           []Operation                  `json:"operations,omitempty"`
 	Assets               []string                     `json:"assets,omitempty"`
 	Documents            []dataset.DocumentReference  `json:"documents,omitempty"`
+	Exports              []dataset.ExportReference    `json:"exports,omitempty"`
 	DeclaredColumns      []DeclaredColumn             `json:"declaredColumns,omitempty"`
 	Warnings             []string                     `json:"warnings,omitempty"`
 	Declarations         map[string]SourceDeclaration `json:"declarations,omitempty"` // keyed by request delivery
@@ -875,6 +877,15 @@ func cloneCSVProvenance(p *dataset.CSVProvenance) *dataset.CSVProvenance {
 	copy := *p
 	copy.DataRecords = append([]int(nil), p.DataRecords...)
 	copy.StartLines = append([]int(nil), p.StartLines...)
+	if p.Export != nil {
+		export := *p.Export
+		export.Columns = append([]string(nil), p.Export.Columns...)
+		export.Request.Form = make(url.Values, len(p.Export.Request.Form))
+		for name, values := range p.Export.Request.Form {
+			export.Request.Form[name] = append([]string(nil), values...)
+		}
+		copy.Export = &export
+	}
 	return &copy
 }
 func bounded(s string, n int) string {

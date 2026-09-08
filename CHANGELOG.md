@@ -9,6 +9,11 @@ section matching a `vX.Y.Z` tag as the GitHub release notes.
 
 ### Added
 
+- Registered monthly FILE export through the shared CLI/MCP goal `sample` path,
+  with typed period/registration/province/age choices, credentialless no-redirect
+  form POSTs and complete CSV scan provenance. Publisher rows and selected-age
+  columns stay original; source applicability and goal completion remain separate.
+
 - Registered supporting HTML documents in FILE inspection and goal `sample`
   (`delivery:document`), with credentialless exact-origin acquisition, selected
   original DOM addresses and page/text hashes. Explicit evidence disclosure and

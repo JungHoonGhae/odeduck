@@ -15,6 +15,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	"github.com/JungHoonGhae/odeduck/internal/fetch"
 	"golang.org/x/text/encoding/korean"
 	"golang.org/x/text/transform"
 )
@@ -59,6 +60,12 @@ func (i *Inspector) ScanCSV(ctx context.Context, asset Asset, selection CSVSelec
 		return report, err
 	}
 	defer res.Body.Close()
+	return scanCSVResponse(ctx, res, fields, visit)
+}
+
+// Static assets and inspected exports share the complete parser and byte hash.
+// The caller owns and closes Body; interim visitor state is discarded on error.
+func scanCSVResponse(ctx context.Context, res *fetch.StreamResponse, fields map[string]map[string]bool, visit func(CSVScanRecord) error) (report CSVScanReport, err error) {
 	if res.Status != http.StatusOK {
 		return report, fmt.Errorf("CSV scan download status %d", res.Status)
 	}

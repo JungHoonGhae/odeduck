@@ -621,3 +621,40 @@ Standards의 별도 위생 참고 의견은 공식 답변 구역에 발행자가
 남는다는 점이다. 파서용 HTML fixture가 아니라 실제 선택·전송된 입력의 진단 기록이므로 이번에
 원문을 바꾸지는 않았다. 공개 문서라고 개인정보 부재를 보증하지 않으며, 원문 선택·수신자 고정·
 전송 시작 권한은 기존 계약을 따른다. 전체 HTML·질문자 본문·포털 세션은 이 archive에 포함하지 않는다.
+
+### 공식 월간 FILE export의 제품 취득 — 2026-09-08
+
+[공식 선택 계약 조사](population-source-applicability-2026-09-08.md#추가-조사-공식-617세-범위-csv-계약)에서
+6–17세 선택은 43열·전국 3,919행이며 원래 요청 연령을 유지함을 확인했다. 따라서 310열 전체 원천을
+위해 공통 projection framework나 기존 256열 한도를 넓히는 대신, 검사된 FILE export operation을
+기존 sample에 추가했다. 세 대안과 선택 이유는 [취득 계약](../specs/monthly-file-export-v1.md)에 있다.
+
+외부 HTTP만 대체하는 fixture에서 공개 취득 경로를 먼저 실패시킨 뒤 구현했다. 공식 URL family의
+private 검사 참조, 다섯 typed 선택값, 선택 페이지의 실제 반영값과 CSV 버튼 계약, 응답 헤더의 월·
+성별·연령, 엄격한 CSV 전체 스캔을 확인한다. 소스 선택 조건과 로컬 코드 선택·scan/matched/returned
+수를 구분한다. 별도 CSV parser를 만들지 않았으며 일반 CSV 경로도 같은 내부 parser를 계속 사용한다.
+공개 POST는 공유 쿠키를 송수신하지 않고 같은 원천 페이지의 Referer를 사용하며 모든 redirect를 반환한다.
+userinfo URL·다른 origin의 Referer·미검사 참조·섞인 선택자·form/header drift·손상된 제외 tail은 거부했다.
+
+아래 opt-in 명령은 실제 `dataset.Inspector`로 data.go.kr 광고를 검사한 뒤 공식 페이지와 CSV를
+읽었다. 7.87초에 통과했으며 CSV SHA256
+`911940f3c38ffb7ed487a820607560616dedd5d226dcec1c0b9d7ffb65c4e47f`, 1,050,109 bytes,
+EUC-KR·43열·3,919행 검사·인천 177행 전부 보관이 독립 조사본과 일치했다. 선택 페이지는
+104,915 bytes, SHA256 `dda8b66761680e6db3eb51c668aef1b2fce89c982ed086a523cdff3515ece444`다.
+HTML은 익명 세션 문자열 때문에 같은 선택에서도 hash가 바뀔 수 있어 CSV의 고정 revision과 구분한다.
+
+```sh
+ODEDUCK_MONTHLY_EXPORT_LIVE=1 \
+  go test ./internal/dataset -run '^TestMonthlyExportLiveContract$' -count=1 -v
+```
+
+CLI solve·MCP advance_goal·공통 Engine에서는 합성 HTML/CSV를 같은 실제 취득 코드로 읽고
+선택 조건·원본 주소·원문 기본 비공개 및 명시적인 evidence 공개를 검증했다. CLI의 계획 선택은
+scripted runner이며 실제 모델 선택이 아니다. 공유 planning guide의 CLI subprocess·MCP resource
+전달 테스트도 통과했다. 검토자 지침과 기존 G4 원문 archive는 변경하지 않았다.
+
+원래 인구 162행과 공식 export 177행은 서로 다른 관측이다. 집계·인구 0행·출장소를 제공기관 원문에서
+삭제하거나 이름을 코드 컬럼으로 바꾸지 않았다. 선택용 코드 추출 규칙은 provenance에만 둔다.
+현재 export는 population 검토 자격을 자동 획득하지 않으며, 독립 대조를 제품의 계산 근거로 실행·
+공개하는 경로와 정의 적용·학교 구역 근거를 포함한 G4 검토는 남는다. 추가 모델 호출 없이
+**G4 누적 8시도/6실제 모델 호출/완료 0회**를 유지한다. 로그인·신청·외부 배포도 하지 않았다.

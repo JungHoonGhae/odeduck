@@ -72,6 +72,8 @@ type Contract struct {
 	SelectedFileVersion  *FileVersion        `json:"selectedFileVersion,omitempty"`
 	Documents            []DocumentReference `json:"documents,omitempty"`
 	documentReferences   []DocumentReference
+	Exports              []ExportReference `json:"exports,omitempty"`
+	exportReferences     []ExportReference
 }
 
 // Alternative is a provider-advertised representation of the same logical
@@ -246,6 +248,12 @@ func (i *Inspector) inspect(ctx context.Context, ref Ref, history bool, version 
 		}
 		contract.documentReferences = supportingDocuments(source, detailURL)
 		contract.Documents = append([]DocumentReference(nil), contract.documentReferences...)
+		contract.exportReferences = fileExports(source, detailURL)
+		contract.Exports = append([]ExportReference(nil), contract.exportReferences...)
+		if len(contract.Exports) != 0 {
+			contract.Warnings = append(contract.Warnings, "공식 월간 FILE export는 검사된 operation과 명시적인 선택 조건이 필요합니다; 원천 요청 범위와 실제 반환 범위는 다를 수 있습니다")
+			return contract, nil
+		}
 		contract.Warnings = append(contract.Warnings, "외부 제공기관 파일은 아직 typed Adapter가 없어 공식 URL만 확인했습니다")
 		return contract, nil
 	}

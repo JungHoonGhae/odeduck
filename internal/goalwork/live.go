@@ -125,6 +125,13 @@ func LiveDependencies(client *fetch.Client, base string, caller Caller, searcher
 				if !selectedFileVersion(s.FileVersion, res.File) {
 					return Acquired{}, fmt.Errorf("sample fileVersion must match its selected inspected FILE contract")
 				}
+				if s.Operation != "" {
+					sample, err := files.SampleExport(ctx, res.File, s.Operation, s.Params, 1000)
+					if err != nil {
+						return Acquired{}, classifyLiveAcquisitionError(err, nil)
+					}
+					return Acquired{Rows: sample.Rows, Delivery: "FILE", Operation: s.Operation, ContentSHA256: sample.SHA256, ContractSHA256: digest(sample.CSV.Export.Reference), CSV: sample.CSV, Selection: sample.Selection, Warnings: sample.Warnings}, nil
+				}
 				if s.Asset == "" {
 					return Acquired{}, fmt.Errorf("select an exact inspected asset name")
 				}
@@ -216,6 +223,7 @@ func projectInspection(pk string, res *dataset.InspectionResult) Inspection {
 	}
 	if res.File != nil {
 		out.Documents = append([]dataset.DocumentReference(nil), res.File.Documents...)
+		out.Exports = append([]dataset.ExportReference(nil), res.File.Exports...)
 		out.FileVersions, out.FileHistoryCount, out.FileHistoryTruncated, out.SelectedFileVersion = res.File.FileVersions, res.File.FileHistoryCount, res.File.FileHistoryTruncated, res.File.SelectedFileVersion
 		for _, a := range res.File.Assets {
 			out.Assets = append(out.Assets, a.Name)
@@ -256,6 +264,12 @@ func classifyLiveAcquisitionError(err error, result *apicall.CallResult) error {
 }
 
 func validateSampleSelection(s SampleRequest) error {
+	if s.Delivery == "file" && s.Operation != "" {
+		if s.Document != nil || s.FileVersion != "" || s.Reduce != nil || s.Nearest != nil || s.ScanCSV || s.LayoutID != "" || s.Asset != "" || s.Member != "" || s.XLSX != nil || len(s.Where)+len(s.WhereIn) != 0 || s.RowPath != "" {
+			return fmt.Errorf("FILE export accepts only pk, delivery:file, inspected operation and typed params; export owns scanning and selection")
+		}
+		return dataset.ValidateExportSelection(s.Operation, s.Params)
+	}
 	if s.Document != nil || s.Delivery == "document" {
 		if s.Document == nil || s.Delivery != "document" || s.FileVersion != "" || s.Reduce != nil || s.Nearest != nil || s.ScanCSV || s.LayoutID != "" || s.Asset != "" || s.Member != "" || s.XLSX != nil || len(s.Where)+len(s.WhereIn)+len(s.Params) != 0 || s.Operation != "" || s.RowPath != "" {
 			return fmt.Errorf("document sampling accepts only pk, delivery:document and an inspected document selection")
