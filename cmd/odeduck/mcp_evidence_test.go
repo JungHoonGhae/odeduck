@@ -18,12 +18,17 @@ func TestMCPReviewNeedsSeparateStartupDisclosure(t *testing.T) {
 		{[]string{"--review-goals-with=claude"}, false},
 		{[]string{"--share-goal-evidence", "--review-goals-with=auto"}, false},
 		{[]string{"--share-goal-evidence", "--review-goals-with=claude"}, true},
+		{[]string{"--review-goal-analyses", "--share-goal-evidence"}, false},
+		{[]string{"--review-goal-analyses", "--share-goal-evidence", "--review-goals-with=claude"}, true},
 	} {
 		called := false
 		cmd := mcpCommand(func(_ context.Context, d mcpserver.Deps) error {
 			called = true
 			if d.GoalReviewProvider != "claude" || !d.ShareGoalEvidence {
 				t.Fatal("lost review authority")
+			}
+			if d.ReviewGoalAnalyses != strings.Contains(strings.Join(tc.args, " "), "--review-goal-analyses") {
+				t.Fatal("analysis startup authority changed")
 			}
 			return nil
 		})

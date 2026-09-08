@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/JungHoonGhae/odeduck/internal/agentplan"
@@ -23,6 +24,7 @@ type calibrationCase struct {
 	ID, Reference, PK, Goal, NegativeGoal, NegativeReason, Region, Period, SourceSHA256 string
 	Records                                                                             []int
 	Fields                                                                              []string
+	Analysis                                                                            *analysisPlan `json:"analysis,omitempty"`
 }
 type referenceSource struct {
 	PK, URL, ObservedAt, ContentSHA256 string
@@ -85,7 +87,9 @@ func run(provider, output, manifest string, runtime calibrationServices) error {
 		Kind  string
 		Cases []calibrationCase
 	}
-	if err := json.Unmarshal(body, &config); err != nil {
+	decoder := json.NewDecoder(strings.NewReader(string(body)))
+	decoder.UseNumber()
+	if err := decoder.Decode(&config); err != nil {
 		return err
 	}
 	if len(config.Cases) != 2 {
@@ -99,10 +103,24 @@ func run(provider, output, manifest string, runtime calibrationServices) error {
 	encoder := json.NewEncoder(f)
 	matched, count := 0, 0
 	for _, c := range config.Cases {
-		prepared := prepareSource(c, filepath.Dir(manifest), runtime)
+		var evaluate func(int, bool) trial
+		if c.Analysis == nil {
+			prepared := prepareSource(c, filepath.Dir(manifest), runtime)
+			evaluate = func(repeat int, positive bool) trial {
+				return runTrial(provider, config.Kind, c, prepared, runtime, repeat, positive)
+			}
+		} else {
+			var prepared []preparedSource
+			for _, source := range c.Analysis.Sources {
+				prepared = append(prepared, prepareSource(calibrationCase{ID: c.ID, Reference: source.Reference, PK: source.PK, SourceSHA256: source.SourceSHA256, Records: source.Records}, filepath.Dir(manifest), runtime))
+			}
+			evaluate = func(repeat int, positive bool) trial {
+				return runAnalysisTrial(provider, config.Kind, c, prepared, runtime, repeat, positive)
+			}
+		}
 		for repeat := 1; repeat <= 3; repeat++ {
 			for _, positive := range []bool{true, false} {
-				t := runTrial(provider, config.Kind, c, prepared, runtime, repeat, positive)
+				t := evaluate(repeat, positive)
 				if err := encoder.Encode(t); err != nil {
 					return err
 				}

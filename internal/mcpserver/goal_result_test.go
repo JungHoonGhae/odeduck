@@ -25,7 +25,7 @@ func TestGoalMCPSingleSourceAnalysisMatchesActualEngine(t *testing.T) {
 		},
 	}
 	s := mcp.NewServer(&mcp.Implementation{Name: "test", Version: "0"}, nil)
-	registerGoalTool(s, false, "", func(goalwork.Policy) goalwork.Dependencies { return deps })
+	registerGoalTool(s, goalwork.Policy{}, func(goalwork.Policy) goalwork.Dependencies { return deps })
 	client := connectTestClient(t, s)
 	call := func(args map[string]any) goalOut {
 		t.Helper()
@@ -87,7 +87,7 @@ func TestGoalMCPSourceReductionPreservesPrecisionAndOrigin(t *testing.T) {
 		},
 	}
 	s := mcp.NewServer(&mcp.Implementation{Name: "test", Version: "0"}, nil)
-	registerGoalTool(s, true, "", func(goalwork.Policy) goalwork.Dependencies { return deps })
+	registerGoalTool(s, goalwork.Policy{EvidenceRecipient: "mcp_host"}, func(goalwork.Policy) goalwork.Dependencies { return deps })
 	client := connectTestClient(t, s)
 	call := func(args map[string]any) goalOut {
 		t.Helper()
@@ -123,5 +123,66 @@ func TestGoalMCPSourceReductionPreservesPrecisionAndOrigin(t *testing.T) {
 	step(goalwork.Decision{Action: "execute", CompositionID: p.ID})
 	if v.State.Status != "review_required" || v.State.Artifact.Rows[0]["o2.total"] != json.Number("9007199254740994") || len(v.State.Artifact.Sources) != 2 || v.State.Evidence[0].Records[0].Origins["total"].Kind != "computed_group" {
 		t.Fatal("MCP lost group origin/precision or approved the goal")
+	}
+}
+
+func TestGoalMCPAnalysisReviewUsesTrustedPolicyAndActualCalculation(t *testing.T) {
+	ctx := context.Background()
+	deps := goalwork.Dependencies{
+		Search: func(context.Context, string) (catalog.Result, error) {
+			return catalog.Result{Hits: []catalog.Hit{{PK: "values"}}}, nil
+		},
+		Inspect: func(context.Context, string) (goalwork.Inspection, error) {
+			return goalwork.Inspection{PK: "values"}, nil
+		},
+		Sample: func(context.Context, goalwork.SampleRequest, goalwork.Inspection) (goalwork.Acquired, error) {
+			return goalwork.Acquired{Delivery: "REST", Rows: []goalwork.Row{{"n": "9007199254740993"}, {"n": "1"}}}, nil
+		},
+		Review: func(_ context.Context, in goalwork.ReviewInput) (goalwork.ReviewAssessment, error) {
+			if in.Recipient != "claude" || in.Analysis == nil || in.Artifact.Rows[0]["total"] != json.Number("9007199254740994") {
+				t.Fatal("MCP lost authorized actual calculation")
+			}
+			f := goalwork.ReviewFinding{Verdict: "supported", Reason: "fixture calculation judgement", PacketIDs: []string{in.Evidence.ID}}
+			a := goalwork.ReviewAssessment{GoalFit: f, Outputs: []goalwork.OutputReview{{Output: "total", Finding: f}}}
+			for _, topic := range []string{"relations", "periods", "measurements", "coverage"} {
+				a.AnalysisChecks = append(a.AnalysisChecks, goalwork.AnalysisCheck{Topic: topic, Finding: f})
+			}
+			return a, nil
+		},
+	}
+	s := mcp.NewServer(&mcp.Implementation{Name: "test", Version: "0"}, nil)
+	registerGoalTool(s, goalwork.Policy{EvidenceRecipient: "mcp_host", ReviewRecipient: "claude", ReviewAnalyses: true}, func(goalwork.Policy) goalwork.Dependencies { return deps })
+	client := connectTestClient(t, s)
+	call := func(args map[string]any) goalOut {
+		t.Helper()
+		r, err := client.CallTool(ctx, &mcp.CallToolParams{Name: "advance_goal", Arguments: args})
+		if err != nil || r.IsError {
+			t.Fatalf("MCP analysis: %v %+v", err, r)
+		}
+		d := json.NewDecoder(strings.NewReader(r.Content[0].(*mcp.TextContent).Text))
+		d.UseNumber()
+		var out goalOut
+		if err := d.Decode(&out); err != nil {
+			t.Fatal(err)
+		}
+		return out
+	}
+	v := call(map[string]any{"goal": "표본 원천 수치의 합계를 계산해줘", "requireSemantic": false})
+	step := func(d goalwork.Decision) {
+		t.Helper()
+		v = call(map[string]any{"sessionId": v.SessionID, "revision": v.State.Revision, "decision": d})
+		if len(v.State.Gaps) != 0 {
+			t.Fatalf("%s: %+v", d.Action, v.State.Gaps)
+		}
+	}
+	c := goalwork.GoalContract{Outcome: "sample sum", Region: "fixture", Period: "source", Coverage: "sample", Roles: []goalwork.RoleRequirement{{ID: "r", Description: "recorded values"}}, Outputs: []goalwork.OutputRequirement{{ID: "total", Role: "r", Description: "sum", Type: "number"}}}
+	p := goalwork.Composition{ID: "sum", Base: "o1", Purpose: "sum values", Select: []string{"total"}, Measures: []goalwork.Measure{{As: "n", Field: "o1.n", Format: "decimal_v1", Unit: "fixture"}}, Aggregates: []goalwork.Aggregate{{As: "total", Op: "sum", Field: "n"}}, Roles: []goalwork.RoleBinding{{Role: "r", Observation: "o1"}}, Outputs: []goalwork.OutputBinding{{Output: "total", Field: "total"}}, Assumptions: []string{"fixture only"}}
+	for _, d := range []goalwork.Decision{{Action: "define", Contract: &c}, {Action: "search", Query: "values", Role: "r"}, {Action: "inspect", PK: "values"}, {Action: "sample", Sample: &goalwork.SampleRequest{PK: "values", Delivery: "api"}}, {Action: "compose", Composition: &p}, {Action: "execute", CompositionID: "sum"}} {
+		step(d)
+	}
+	step(goalwork.Decision{Action: "read_evidence", Evidence: &goalwork.EvidenceRequest{Observation: "o1", RowsSHA256: v.State.Observations[0].RowsSHA256, Rows: []int{1, 2}, Fields: []string{"n"}}})
+	step(goalwork.Decision{Action: "review_result", CompositionID: "sum"})
+	if v.State.Status != "output_ready" || v.State.Evaluation.Review.Method != goalwork.AnalysisReviewMethod || v.State.Artifact.Rows[0]["total"] != json.Number("9007199254740994") {
+		t.Fatal("MCP did not return reviewed exact result")
 	}
 }

@@ -14,7 +14,7 @@ import (
 
 func TestGoalToolKeepsStateBoundToMCPSession(t *testing.T) {
 	s := mcp.NewServer(&mcp.Implementation{Name: "test", Version: "0"}, nil)
-	registerGoalTool(s, false, "", func(goalwork.Policy) goalwork.Dependencies {
+	registerGoalTool(s, goalwork.Policy{}, func(goalwork.Policy) goalwork.Dependencies {
 		return goalwork.Dependencies{Search: func(context.Context, string) (catalog.Result, error) {
 			return catalog.Result{Hits: []catalog.Hit{{PK: "123", Title: "candidate"}}}, nil
 		}}
@@ -72,7 +72,7 @@ func TestGoalToolProducesSameArtifactAsStandaloneEngine(t *testing.T) {
 		},
 	}
 	server := mcp.NewServer(&mcp.Implementation{Name: "test", Version: "0"}, nil)
-	registerGoalTool(server, false, "", func(goalwork.Policy) goalwork.Dependencies { return deps })
+	registerGoalTool(server, goalwork.Policy{}, func(goalwork.Policy) goalwork.Dependencies { return deps })
 	client := connectTestClient(t, server)
 	invoke := func(args map[string]any) goalOut {
 		t.Helper()

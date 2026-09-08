@@ -12,7 +12,7 @@ import (
 
 func TestGoalMCPReplansScopeUsingPublishedVocabulary(t *testing.T) {
 	s := mcp.NewServer(&mcp.Implementation{Name: "test", Version: "0"}, nil)
-	registerGoalTool(s, false, "", func(goalwork.Policy) goalwork.Dependencies {
+	registerGoalTool(s, goalwork.Policy{}, func(goalwork.Policy) goalwork.Dependencies {
 		return goalwork.Dependencies{
 			Search: func(_ context.Context, q string) (catalog.Result, error) {
 				return catalog.Result{Hits: []catalog.Hit{{PK: q}}}, nil

@@ -21,6 +21,7 @@ type Policy struct {
 	MaxRounds         int    `json:"maxRounds,omitempty"`
 	EvidenceRecipient string `json:"evidenceRecipient,omitempty"` // empty disables selected value disclosure
 	ReviewRecipient   string `json:"reviewRecipient,omitempty"`   // explicit second disclosure/authority; never a planner input
+	ReviewAnalyses    bool   `json:"reviewAnalyses,omitempty"`    // additional trusted opt-in; source-report permission alone is insufficient
 }
 
 const (
@@ -258,6 +259,9 @@ func Start(goal string, policy Policy, deps Dependencies) (*Engine, error) {
 		if (policy.ReviewRecipient != "codex" && policy.ReviewRecipient != "claude" && policy.ReviewRecipient != "gemini") || policy.EvidenceRecipient == "" || (policy.EvidenceRecipient != "mcp_host" && policy.EvidenceRecipient != policy.ReviewRecipient) || deps.Review == nil {
 			return nil, fmt.Errorf("review requires a fixed supported CLI recipient, authorized evidence and a trusted reviewer adapter")
 		}
+	}
+	if policy.ReviewAnalyses && policy.ReviewRecipient == "" {
+		return nil, fmt.Errorf("analysis review requires an explicitly authorized reviewer")
 	}
 	return &Engine{deps: deps, state: View{Goal: goal, Status: "exploring", Policy: policy, ExpiresAt: time.Now().UTC().Add(time.Hour)}, rows: map[string][]Row{}, requests: map[string]SampleRequest{}, seen: map[string]bool{}}, nil
 }

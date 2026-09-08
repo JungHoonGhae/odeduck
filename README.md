@@ -109,8 +109,9 @@ MCP에서는 서버를 `mcp --share-goal-evidence`로 시작해야 하며 모델
 출력 형식이 맞아도 지역·식별자·시간의 의미가 검증되지 않으면 `review_required`로 남기고 같은 목표·예산
 안에서 추가 근거와 대안을 찾는다. 제한된 원천 보고는 CLI의 `--review-source-reports`(명시한 agent와
 `--share-evidence` 필수), MCP의 `--review-goals-with=claude`와 `--share-goal-evidence`로 별도 검토를
-켤 수 있다. 원래 질문 적합성과 출력별 원천 지지를 모두 통과해야 성공 종료한다. 모델 검토이지 현장·사람
-검증은 아니며 계산·조합·가설의 의미 승인은 아직 미완료다. 결과와 검토는 실제 실행 revision에 묶인다.
+켤 수 있다. typed 관계·계산은 CLI `--review-analyses` 또는 MCP 시작 설정 `--review-goal-analyses`로
+추가 허용한다. 원래 질문·출력별 지지와 관계·기간·측정·범위를 통과해야 성공 종료한다. 모델 검토이지
+현장·사람 검증은 아니며 공간·인과·사업 가설 및 범용 목표 완주는 미완료다. 결과와 검토는 실행 revision에 묶인다.
 [원천 보고 검토의 범위와 공개 정책](docs/specs/goal-source-report-review-v1.md)을 확인할 수 있다.
 의미 검색이 쓰이지 않으면 기본적으로 멈추며, 자동 활용신청은 하지 않는다.
 [실행 계약과 한계](docs/specs/goal-driven-composition-v1.md)를 확인할 수 있다.

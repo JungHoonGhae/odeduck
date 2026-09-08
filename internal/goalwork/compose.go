@@ -58,6 +58,12 @@ type JoinMetric struct {
 }
 
 func execute(p Composition, inputs map[string][]Row, limit int, observations ...Observation) ([]Row, []JoinMetric, error) {
+	return executeTraced(p, inputs, limit, nil, observations...)
+}
+
+// usedRows receives every contributing retained row before arithmetic/grouping,
+// including zero/cancelling terms. Result-value equality is not participation.
+func executeTraced(p Composition, inputs map[string][]Row, limit int, usedRows map[string]map[int]bool, observations ...Observation) ([]Row, []JoinMetric, error) {
 	base, ok := inputs[p.Base]
 	if !ok || len(base) == 0 {
 		return nil, nil, fmt.Errorf("base observation missing or empty")
@@ -214,6 +220,19 @@ func execute(p Composition, inputs map[string][]Row, limit int, observations ...
 		lineage = nextLineage
 		periods = nextPeriods
 		used[j.Right] = true
+	}
+	if usedRows != nil {
+		for _, trace := range lineage {
+			for slot, ordinal := range trace {
+				if slot.kind != "row" {
+					continue
+				}
+				if usedRows[slot.observation] == nil {
+					usedRows[slot.observation] = map[int]bool{}
+				}
+				usedRows[slot.observation][ordinal] = true
+			}
+		}
 	}
 	if err := measureRows(rows, p.Measures); err != nil {
 		return nil, metrics, err

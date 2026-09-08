@@ -32,6 +32,7 @@ type Deps struct {
 	Ledger             *connectionledger.Store
 	ShareGoalEvidence  bool   // trusted startup setting; never a model tool argument
 	GoalReviewProvider string // additional explicit disclosure to a separate reviewer
+	ReviewGoalAnalyses bool   // additional review scope, fixed at trusted startup
 }
 
 type datasetCallExecutor interface {
@@ -488,7 +489,11 @@ func New(deps Deps) *mcp.Server {
 			return response.Assessment, err
 		}
 	}
-	registerGoalTool(s, deps.ShareGoalEvidence, deps.GoalReviewProvider, func(goalwork.Policy) goalwork.Dependencies {
+	goalPolicy := goalwork.Policy{ReviewRecipient: deps.GoalReviewProvider, ReviewAnalyses: deps.ReviewGoalAnalyses}
+	if deps.ShareGoalEvidence {
+		goalPolicy.EvidenceRecipient = "mcp_host"
+	}
+	registerGoalTool(s, goalPolicy, func(goalwork.Policy) goalwork.Dependencies {
 		return goalDeps
 	})
 	return s

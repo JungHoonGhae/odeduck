@@ -16,6 +16,9 @@ import (
 //go:embed source-review-guide.md
 var sourceReviewGuide string
 
+//go:embed analysis-review-guide.md
+var analysisReviewGuide string
+
 // GoalReviewResponse lets an explicit calibration retain provider output even
 // when decoding fails. Product adapters pass ONLY Assessment to the Engine;
 // RawResponse is untrusted and must never enter a goal, gap, or planning view.
@@ -40,7 +43,14 @@ func ReviewGoal(ctx context.Context, in goalwork.ReviewInput, requested string) 
 	if err != nil {
 		return GoalReviewResponse{}, err
 	}
-	body, err := invokeProvider(ctx, sourceReviewGuide+"\nREVIEW_INPUT_JSON:\n"+string(b), providers[0])
+	guide := sourceReviewGuide
+	if in.Analysis != nil {
+		if in.Analysis.Method != "engine_relational_replay_v1" {
+			return GoalReviewResponse{}, fmt.Errorf("unsupported analysis replay contract")
+		}
+		guide = analysisReviewGuide
+	}
+	body, err := invokeProvider(ctx, guide+"\nREVIEW_INPUT_JSON:\n"+string(b), providers[0])
 	response := GoalReviewResponse{}
 	if len(body) > 1<<20 {
 		response.RawResponse, response.Truncated = string(body[:1<<20]), true

@@ -23,9 +23,10 @@ func solveCommand(run solveRunner) *cobra.Command {
 	var strict bool
 	var shareEvidence bool
 	var reviewReports bool
+	var reviewAnalyses bool
 	var rounds int
 	cmd := &cobra.Command{Use: "solve <목표>", Short: "목표 → 역할 탐색·검사·표본 조회·분석·결합 (experimental)", Args: cobra.ExactArgs(1), SilenceUsage: true, SilenceErrors: true,
-		Long: "키워드를 몰라도 목표를 입력하면 설치된 tool-free agent가 데이터 역할을 추론하고 검색·검사·표본 결합을 반복합니다. 실패하면 대안이나 코드 대응표를 탐색합니다. 관측한 한 원천의 조회·집계도 가능하며 결합은 선택 연산입니다. API/CSV·ZIP·XLSX/STD의 sample_executed는 표본 실행 결과입니다. review_required에서도 같은 목표·예산·만료 안에서 추가 근거와 대안을 찾습니다. 판정의 executionRevision은 해당 결과를 만든 실행을 가리킵니다. 선택형 --review-source-reports는 별도 모델이 원천 보고의 출력별 지지와 원래 목표 적합성을 검토합니다. 기본은 꺼져 있고 계산·가설·현장 검증을 승인하지 않습니다. 미완료 결과는 실패 코드로 반환합니다. 자동 활용신청은 하지 않습니다. JSON만 출력합니다.",
+		Long: "키워드를 몰라도 목표를 입력하면 설치된 tool-free agent가 데이터 역할을 추론하고 검색·검사·표본 결합을 반복합니다. 실패하면 대안이나 코드 대응표를 탐색합니다. 관측한 한 원천의 조회·집계도 가능하며 결합은 선택 연산입니다. API/CSV·ZIP·XLSX/STD의 sample_executed는 표본 실행 결과입니다. review_required에서도 같은 목표·예산·만료 안에서 추가 근거와 대안을 찾습니다. 판정의 executionRevision은 해당 결과를 만든 실행을 가리킵니다. 선택형 --review-source-reports는 별도 모델이 원천 보고의 출력별 지지와 원래 목표 적합성을 검토합니다. --review-analyses는 관계·계산의 단위·기간·범위 검토를 추가합니다. 모두 기본 꺼짐이며 명시적 agent와 근거 공개가 필요합니다. 공간·인과·사업 가설·현장 검증은 승인하지 않습니다. 미완료 결과는 실패 코드로 반환합니다. 자동 활용신청은 하지 않습니다. JSON만 출력합니다.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if flagFormat != "json" {
 				return fmt.Errorf("solve outputs a structured JSON artifact; use --format json")
@@ -43,11 +44,12 @@ func solveCommand(run solveRunner) *cobra.Command {
 				}
 				fmt.Fprintln(cmd.ErrOrStderr(), "선택한 원천 값을", provider, "계획기에 전송합니다. 개인정보·전송 권한을 확인하세요. 세션당 최대 64 KiB이며 전체 표본은 전송하지 않습니다.")
 			}
-			if reviewReports {
+			if reviewReports || reviewAnalyses {
 				if policy.EvidenceRecipient == "" {
-					return fmt.Errorf("--review-source-reports requires --share-evidence and an explicit --agent")
+					return fmt.Errorf("--review-source-reports/--review-analyses require --share-evidence and an explicit --agent")
 				}
 				policy.ReviewRecipient = provider
+				policy.ReviewAnalyses = reviewAnalyses
 				fmt.Fprintln(cmd.ErrOrStderr(), "같은 provider의 별도 tool-free 검토 요청에도 선택 근거를 전송합니다. 최대 세 번이며 모델 판단이지 현장/사람 검증이 아닙니다.")
 			}
 			ctx, cancel := context.WithTimeout(cmd.Context(), time.Hour)
@@ -76,6 +78,7 @@ func solveCommand(run solveRunner) *cobra.Command {
 	cmd.Flags().BoolVar(&strict, "require-semantic", true, "실제 의미 검색 사용을 요구; false는 명시적인 lexical 저하 허용")
 	cmd.Flags().BoolVar(&shareEvidence, "share-evidence", false, "선택 원천 값을 명시한 단일 --agent에 전송 허용; 기본 비공개, 일반 개인정보 탐지는 아님")
 	cmd.Flags().BoolVar(&reviewReports, "review-source-reports", false, "별도 모델 검토로 제한된 원천 보고 완료 허용; --share-evidence/명시 --agent 필수, 계산·가설 승인 아님")
+	cmd.Flags().BoolVar(&reviewAnalyses, "review-analyses", false, "원천 보고와 typed 관계·계산의 별도 검토 허용; --share-evidence/명시 --agent 필수, 공간·인과·가설 승인 아님")
 	cmd.Flags().IntVar(&rounds, "max-rounds", 32, "최대 진행 단계 (1–64); agent 호출마다 해당 CLI의 비용/한도 적용")
 	return cmd
 }

@@ -20,7 +20,11 @@ func TestGoalMCPEvidenceUsesTrustedServerPolicy(t *testing.T) {
 			if enabled {
 				reviewer = "claude"
 			}
-			registerGoalTool(s, enabled, reviewer, func(goalwork.Policy) goalwork.Dependencies {
+			policy := goalwork.Policy{ReviewRecipient: reviewer}
+			if enabled {
+				policy.EvidenceRecipient = "mcp_host"
+			}
+			registerGoalTool(s, policy, func(goalwork.Policy) goalwork.Dependencies {
 				return goalwork.Dependencies{
 					Review: func(_ context.Context, in goalwork.ReviewInput) (goalwork.ReviewAssessment, error) {
 						b, _ := json.Marshal(in)

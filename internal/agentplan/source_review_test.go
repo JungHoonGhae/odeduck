@@ -18,7 +18,17 @@ import (
 // Replay the retained real-provider transcripts through the public adapter.
 // This is an offline decoder regression, not another model accuracy trial.
 func TestReviewGoalReplaysArchivedCodexCalibration(t *testing.T) {
-	f, err := os.Open("../goalwork/testdata/goalbench-v1/source-report-review-20260908/codex-raw.jsonl.gz")
+	for _, archive := range []struct {
+		folder string
+		ready  int
+	}{{"source-report-review-20260908", 6}, {"analysis-review-20260908", 3}} {
+		t.Run(archive.folder, func(t *testing.T) { replayArchivedReview(t, archive.folder, archive.ready) })
+	}
+}
+
+func replayArchivedReview(t *testing.T, folder string, wantReady int) {
+	t.Helper()
+	f, err := os.Open(filepath.Join("../goalwork/testdata/goalbench-v1", folder, "codex-raw.jsonl.gz"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -67,7 +77,7 @@ func TestReviewGoalReplaysArchivedCodexCalibration(t *testing.T) {
 			}
 		})
 	}
-	if count != 12 || ready != 6 {
+	if count != 12 || ready != wantReady {
 		t.Fatalf("archive denominator changed: %d trials, %d ready", count, ready)
 	}
 }
@@ -113,5 +123,30 @@ func TestReviewGoalRejectsInventedOrMalformedVerdicts(t *testing.T) {
 		if response.RawResponse != body {
 			t.Fatal("malformed provider response was not preserved for explicit calibration")
 		}
+	}
+}
+
+func TestReviewGoalSelectsAnalysisContractWithoutChangingSourceReportGuide(t *testing.T) {
+	dir := t.TempDir()
+	promptPath := filepath.Join(dir, "prompt.txt")
+	f := goalwork.ReviewFinding{Verdict: "supported", Reason: "typed fixture", PacketIDs: []string{"ep_one", "ep_two"}}
+	a := goalwork.ReviewAssessment{GoalFit: f, Outputs: []goalwork.OutputReview{{Output: "total", Finding: f}}}
+	for _, topic := range []string{"relations", "periods", "measurements", "coverage"} {
+		a.AnalysisChecks = append(a.AnalysisChecks, goalwork.AnalysisCheck{Topic: topic, Finding: f})
+	}
+	body, _ := json.Marshal(a)
+	script := "#!/bin/sh\n/bin/cat > '" + strings.ReplaceAll(promptPath, "'", "'\\''") + "'\nprintf '%s' '" + strings.ReplaceAll(string(body), "'", "'\\''") + "'\n"
+	if err := os.WriteFile(filepath.Join(dir, "claude"), []byte(script), 0700); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", dir)
+	in := goalwork.ReviewInput{Recipient: "claude", Goal: "compare recorded totals", Contract: goalwork.GoalContract{Outputs: []goalwork.OutputRequirement{{ID: "total"}}}, Evidence: goalwork.EvidencePacket{ID: "ep_one"}, Analysis: &goalwork.AnalysisReviewContext{Method: "engine_relational_replay_v1", AdditionalEvidence: []goalwork.EvidencePacket{{ID: "ep_two"}}}}
+	response, err := ReviewGoal(context.Background(), in, "claude")
+	if err != nil || len(response.Assessment.AnalysisChecks) != 4 {
+		t.Fatalf("analysis response: %v", err)
+	}
+	prompt, err := os.ReadFile(promptPath)
+	if err != nil || !strings.Contains(string(prompt), "RELATIONAL_ANALYSIS_V1") || strings.Contains(string(prompt), "No semantic approval of joins") {
+		t.Fatal("analysis sent to source-only reviewer instructions")
 	}
 }

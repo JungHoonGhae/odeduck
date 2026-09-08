@@ -10,28 +10,31 @@ import (
 
 const SourceReportReviewMethod = "independent_model_source_report_v1"
 
-// ReviewInput is created only from the current executed artifact and a complete,
-// already disclosed packet. It carries no planner history or prior judgements.
+// ReviewInput is created only from the current executed artifact and already
+// disclosed evidence. It carries no planner history or prior judgements.
 type ReviewInput struct {
-	Recipient string         `json:"recipient"`
-	Goal      string         `json:"goal"`
-	Contract  GoalContract   `json:"contract"`
-	Artifact  Artifact       `json:"artifact"`
-	Evidence  EvidencePacket `json:"evidence"`
+	Recipient string                 `json:"recipient"`
+	Goal      string                 `json:"goal"`
+	Contract  GoalContract           `json:"contract"`
+	Artifact  Artifact               `json:"artifact"`
+	Evidence  EvidencePacket         `json:"evidence"`
+	Analysis  *AnalysisReviewContext `json:"analysis,omitempty"`
 }
 
 type ReviewFinding struct {
-	Verdict  string `json:"verdict"` // supported | unsupported | insufficient
-	Reason   string `json:"reason"`
-	PacketID string `json:"packetId"`
+	Verdict   string   `json:"verdict"` // supported | unsupported | insufficient
+	Reason    string   `json:"reason"`
+	PacketID  string   `json:"packetId,omitempty"`
+	PacketIDs []string `json:"packetIds,omitempty"` // analysis only; source v1 keeps its single-packet contract
 }
 type OutputReview struct {
 	Output  string        `json:"output"`
 	Finding ReviewFinding `json:"finding"`
 }
 type ReviewAssessment struct {
-	GoalFit ReviewFinding  `json:"goalFit"`
-	Outputs []OutputReview `json:"outputs"`
+	GoalFit        ReviewFinding   `json:"goalFit"`
+	Outputs        []OutputReview  `json:"outputs"`
+	AnalysisChecks []AnalysisCheck `json:"analysisChecks,omitempty"`
 }
 type ResultReview struct {
 	Method            string           `json:"method"`
@@ -55,17 +58,20 @@ type ReviewAttempt struct {
 
 func (e *Engine) reviewResult(ctx context.Context, id string) error {
 	if e.state.Policy.ReviewRecipient == "" || e.deps.Review == nil {
-		return fmt.Errorf("source report review is disabled by trusted startup policy")
+		return fmt.Errorf("result review is disabled by trusted startup policy")
 	}
 	if len(e.state.Reviews) >= 3 {
-		return fmt.Errorf("source report review budget exhausted")
+		return fmt.Errorf("result review budget exhausted")
 	}
 	in, err := e.sourceReviewInput(id)
+	if err != nil && e.state.Policy.ReviewAnalyses {
+		in, err = e.analysisReviewInput(ctx, id)
+	}
 	if err != nil {
 		return err
 	}
 	inputHash := digest(in)
-	evidenceHash := reviewEvidenceHash(in.Evidence)
+	evidenceHash := reviewEvidenceHash(in)
 	for _, attempt := range e.state.Reviews {
 		if attempt.ExecutionRevision == in.Artifact.Evaluation.ExecutionRevision && attempt.EvidenceSHA256 == evidenceHash {
 			return fmt.Errorf("this execution and selected evidence were already reviewed; acquire new relevant evidence or correct the result")
@@ -82,7 +88,7 @@ func (e *Engine) reviewResult(ctx context.Context, id string) error {
 		return ctx.Err()
 	}
 	if err != nil {
-		return fmt.Errorf("independent source review failed; no approval recorded") // external errors may quote selected values
+		return fmt.Errorf("separate model review failed; no approval recorded") // external errors may quote selected values
 	}
 	if digest(in) != inputHash {
 		return fmt.Errorf("review adapter changed its input; no approval recorded")
@@ -94,11 +100,20 @@ func (e *Engine) reviewResult(ctx context.Context, id string) error {
 	b, _ := json.Marshal(assessment)
 	_ = json.Unmarshal(b, &assessment)
 	review := &ResultReview{Method: SourceReportReviewMethod, Provider: in.Recipient, InputSHA256: inputHash, ExecutionRevision: in.Artifact.Evaluation.ExecutionRevision, Revision: e.state.Revision, Assessment: assessment}
+	if in.Analysis != nil {
+		review.Method = AnalysisReviewMethod
+	}
 	e.state.Evaluation.Review = review
 	e.state.Evaluation.ReviewReason = "Separate bounded model judgement of source support and original goal fit; not human/publisher approval, field verification or a guarantee of truth."
+	if in.Analysis != nil {
+		e.state.Evaluation.ReviewReason = "Separate bounded model judgement of relations, periods, measurements, coverage, output support and original goal fit; not canonical identity, population certification, human/publisher approval or a guarantee of truth."
+	}
 	supported := assessment.GoalFit.Verdict == "supported"
 	for _, output := range assessment.Outputs {
 		supported = supported && output.Finding.Verdict == "supported"
+	}
+	for _, check := range assessment.AnalysisChecks {
+		supported = supported && check.Finding.Verdict == "supported"
 	}
 	e.state.Evaluation.NeedsSemanticReview = !supported
 	e.state.Artifact.Evaluation = *e.state.Evaluation
@@ -111,26 +126,52 @@ func (e *Engine) reviewResult(ctx context.Context, id string) error {
 	return nil
 }
 
-func reviewEvidenceHash(packet EvidencePacket) string {
-	packet.ID = ""
-	packet.Selection.Rows = slices.Clone(packet.Selection.Rows)
-	packet.Selection.Fields = slices.Clone(packet.Selection.Fields)
-	packet.Records = slices.Clone(packet.Records)
-	slices.Sort(packet.Selection.Rows)
-	slices.Sort(packet.Selection.Fields)
-	slices.SortFunc(packet.Records, func(a, b EvidenceRecord) int { return a.RetainedRow - b.RetainedRow })
-	for i := range packet.Records {
-		packet.Records[i].Missing = slices.Clone(packet.Records[i].Missing)
-		slices.Sort(packet.Records[i].Missing)
+// Canonical cells ignore ordering, packet splitting and review kind. Repacking
+// the same disclosure cannot buy another review of the same execution.
+func reviewEvidenceHash(in ReviewInput) string {
+	cells := map[string]any{}
+	packets := []EvidencePacket{in.Evidence}
+	if in.Analysis != nil {
+		packets = append(packets, in.Analysis.AdditionalEvidence...)
 	}
-	return digest(packet)
+	for _, packet := range packets {
+		for _, record := range packet.Records {
+			for _, field := range packet.Selection.Fields {
+				key, _ := json.Marshal([]any{packet.Selection.Observation, packet.Selection.RowsSHA256, record.RetainedRow, field})
+				value, exists := record.Values[field]
+				cells[string(key)] = []any{exists, value, record.Origins[field]}
+			}
+		}
+	}
+	return digest(cells)
 }
 
 // ValidateReviewAssessment validates completeness and real references, not
 // natural-language entailment or model accuracy. Live adapters use this too.
 func ValidateReviewAssessment(a ReviewAssessment, in ReviewInput) error {
 	valid := func(f ReviewFinding) bool {
-		return slices.Contains([]string{"supported", "unsupported", "insufficient"}, f.Verdict) && strings.TrimSpace(f.Reason) != "" && len(f.Reason) <= 2000 && !credentialText(f.Reason) && f.PacketID == in.Evidence.ID && f.PacketID != ""
+		if !slices.Contains([]string{"supported", "unsupported", "insufficient"}, f.Verdict) || strings.TrimSpace(f.Reason) == "" || len(f.Reason) > 2000 || credentialText(f.Reason) {
+			return false
+		}
+		if in.Analysis != nil {
+			return validAnalysisCitations(f, in)
+		}
+		return len(f.PacketIDs) == 0 && f.PacketID == in.Evidence.ID && f.PacketID != ""
+	}
+	if in.Analysis == nil && len(a.AnalysisChecks) != 0 {
+		return fmt.Errorf("source report v1 cannot supply analysis findings")
+	}
+	if in.Analysis != nil {
+		topics := map[string]bool{}
+		for _, check := range a.AnalysisChecks {
+			if topics[check.Topic] || !slices.Contains([]string{"relations", "periods", "measurements", "coverage"}, check.Topic) || !valid(check.Finding) {
+				return fmt.Errorf("analysis requires distinct relation, period, measurement and coverage findings with actual citations")
+			}
+			topics[check.Topic] = true
+		}
+		if len(topics) != 4 {
+			return fmt.Errorf("analysis requires every semantic dimension, not only output support")
+		}
 	}
 	if !valid(a.GoalFit) || len(a.Outputs) != len(in.Contract.Outputs) {
 		return fmt.Errorf("review requires bounded goal fit and every output, each citing the actual evidence packet")
@@ -184,25 +225,29 @@ func (e *Engine) sourceReviewInput(id string) (ReviewInput, error) {
 			continue
 		}
 		in := ReviewInput{Recipient: e.state.Policy.ReviewRecipient, Goal: e.state.Goal, Contract: *e.state.Contract, Artifact: *a, Evidence: packet}
-		in.Artifact.Evaluation.Review = nil
-		in.Artifact.Evaluation.ReviewReason = ""
-		in.Artifact.Evaluation.NeedsSemanticReview = true
-		in.Artifact.Layouts = nil // unrelated layout history is not review evidence
-		b, err := json.Marshal(in)
-		if err != nil || len(b) > 96<<10 {
-			return ReviewInput{}, fmt.Errorf("source review input exceeds 96 KiB; no silent truncation")
-		}
-		if credentialText(string(b)) {
-			return ReviewInput{}, fmt.Errorf("source review contains credential material; withheld")
-		}
-		// External adapters cannot mutate the live artifact or selected packet.
-		decoder := json.NewDecoder(strings.NewReader(string(b)))
-		decoder.UseNumber()
-		var detached ReviewInput
-		if err := decoder.Decode(&detached); err != nil {
-			return ReviewInput{}, err
-		}
-		return detached, nil
+		return detachReviewInput(in)
 	}
 	return ReviewInput{}, fmt.Errorf("read one evidence packet covering every retained source row and all output/time/selection fields before review; do not shrink the original goal")
+}
+
+// Both review kinds share the same privacy, size and callback-isolation seam.
+func detachReviewInput(in ReviewInput) (ReviewInput, error) {
+	in.Artifact.Evaluation.Review = nil
+	in.Artifact.Evaluation.ReviewReason = ""
+	in.Artifact.Evaluation.NeedsSemanticReview = true
+	in.Artifact.Layouts = nil // unrelated layout history is not review evidence
+	b, err := json.Marshal(in)
+	if err != nil || len(b) > 96<<10 {
+		return ReviewInput{}, fmt.Errorf("review input exceeds 96 KiB; withheld, never truncated")
+	}
+	if credentialText(string(b)) {
+		return ReviewInput{}, fmt.Errorf("review input contains credential material; withheld")
+	}
+	decoder := json.NewDecoder(strings.NewReader(string(b)))
+	decoder.UseNumber()
+	var detached ReviewInput
+	if err := decoder.Decode(&detached); err != nil {
+		return ReviewInput{}, err
+	}
+	return detached, nil
 }

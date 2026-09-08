@@ -9,6 +9,13 @@ section matching a `vX.Y.Z` tag as the GitHub release notes.
 
 ### Added
 
+- Additional opt-in review of typed relational calculations via CLI
+  `--review-analyses` or MCP startup `--review-goal-analyses`. Local replay and
+  original record participation bind already-disclosed result values; separate
+  relation, period, measurement and coverage findings accompany goal/output checks.
+  Source-report authority does not enable this scope. Review budgets and canonical
+  evidence deduplication are shared; spatial, causal and hypothesis approval remain unsupported.
+
 - Source-grain aggregation of retained observations before cross-source joins via
   goal `sample.reduce`. Exact sums, contributing-record groups, source revisions,
   original-period checks and shared budgets survive CLI/MCP execution. Computed
