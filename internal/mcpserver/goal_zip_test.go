@@ -14,7 +14,7 @@ import (
 
 func TestGoalMCPZIPMemberSelectionAndRecordProvenanceUseSharedContract(t *testing.T) {
 	s := mcp.NewServer(&mcp.Implementation{Name: "test", Version: "0"}, nil)
-	registerGoalTool(s, false, func(goalwork.Policy) goalwork.Dependencies {
+	registerGoalTool(s, false, "", func(goalwork.Policy) goalwork.Dependencies {
 		return goalwork.Dependencies{
 			Search: func(context.Context, string) (catalog.Result, error) {
 				return catalog.Result{Hits: []catalog.Hit{{PK: "123"}}}, nil

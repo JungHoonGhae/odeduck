@@ -58,6 +58,7 @@ type GoalEvaluation struct {
 	ReviewReason        string                `json:"reviewReason"`
 	Temporal            TemporalEvaluation    `json:"temporal"`
 	Explanations        []EvidenceExplanation `json:"explanations,omitempty"`
+	Review              *ResultReview         `json:"review,omitempty"`
 }
 
 func validateContract(c GoalContract) error {

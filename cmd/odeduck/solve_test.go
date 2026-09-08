@@ -87,7 +87,7 @@ func TestSolveExitRequiresMoreThanStructuralOutput(t *testing.T) {
 		evaluation   *goalwork.GoalEvaluation
 		complete     bool
 	}{
-		{"reserved verified status", "output_ready", &goalwork.GoalEvaluation{Status: "requirements_met"}, true},
+		{"unattributed success status", "output_ready", &goalwork.GoalEvaluation{Status: "requirements_met"}, false},
 		{"missing evaluation", "output_ready", nil, false},
 		{"legacy unsafe success", "output_ready", &goalwork.GoalEvaluation{Status: "requirements_met", NeedsSemanticReview: true}, false},
 		{"review pending", "review_required", &goalwork.GoalEvaluation{Status: "requirements_met", NeedsSemanticReview: true}, false},

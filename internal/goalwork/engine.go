@@ -20,6 +20,7 @@ type Policy struct {
 	RequireSemantic   bool   `json:"requireSemantic"`
 	MaxRounds         int    `json:"maxRounds,omitempty"`
 	EvidenceRecipient string `json:"evidenceRecipient,omitempty"` // empty disables selected value disclosure
+	ReviewRecipient   string `json:"reviewRecipient,omitempty"`   // explicit second disclosure/authority; never a planner input
 }
 
 const (
@@ -33,6 +34,7 @@ var ErrActionAlreadyAttempted = errors.New("action already attempted")
 // Dependencies are acquisition seams, not planner authority. Implementations
 // must use catalogued PKs and official inspected contracts, never arbitrary URLs.
 type Dependencies struct {
+	Review  func(context.Context, ReviewInput) (ReviewAssessment, error) // trusted startup adapter; separate tool-free context
 	Search  func(context.Context, string) (catalog.Result, error)
 	Inspect func(context.Context, string) (Inspection, error)
 	Sample  func(context.Context, SampleRequest, Inspection) (Acquired, error)
@@ -96,7 +98,7 @@ type Acquired struct {
 	CSV            *dataset.CSVProvenance
 }
 type Decision struct {
-	Action        string           `json:"action"`            // define | search | inspect | layout | sample | retry_sample | read_evidence | compose | execute | abstain
+	Action        string           `json:"action"`            // define | search | inspect | layout | sample | retry_sample | read_evidence | compose | execute | review_result | abstain
 	RetryOf       int              `json:"retryOf,omitempty"` // latest failed SampleAttempt revision; never a replacement request
 	Contract      *GoalContract    `json:"contract,omitempty"`
 	Query         string           `json:"query,omitempty"`
@@ -202,6 +204,7 @@ type View struct {
 	Gaps            []Gap               `json:"gaps,omitempty"`
 	Artifact        *Artifact           `json:"artifact,omitempty"`
 	Evidence        []EvidencePacket    `json:"evidence,omitempty"`
+	Reviews         []ReviewAttempt     `json:"reviews,omitempty"`
 }
 
 type Budget struct {
@@ -214,6 +217,7 @@ type Budget struct {
 	SampleBytesRemaining     int `json:"sampleBytesRemaining"`
 	EvidencePacketsRemaining int `json:"evidencePacketsRemaining"`
 	EvidenceBytesRemaining   int `json:"evidenceBytesRemaining"`
+	ReviewsRemaining         int `json:"reviewsRemaining"`
 }
 
 // Engine serializes each action and returns detached views. Rows are immutable,
@@ -247,6 +251,11 @@ func Start(goal string, policy Policy, deps Dependencies) (*Engine, error) {
 	default:
 		return nil, fmt.Errorf("evidenceRecipient must name one supported recipient or be empty")
 	}
+	if policy.ReviewRecipient != "" {
+		if (policy.ReviewRecipient != "codex" && policy.ReviewRecipient != "claude" && policy.ReviewRecipient != "gemini") || policy.EvidenceRecipient == "" || (policy.EvidenceRecipient != "mcp_host" && policy.EvidenceRecipient != policy.ReviewRecipient) || deps.Review == nil {
+			return nil, fmt.Errorf("review requires a fixed supported CLI recipient, authorized evidence and a trusted reviewer adapter")
+		}
+	}
 	return &Engine{deps: deps, state: View{Goal: goal, Status: "exploring", Policy: policy, ExpiresAt: time.Now().UTC().Add(time.Hour)}, rows: map[string][]Row{}, requests: map[string]SampleRequest{}, seen: map[string]bool{}}, nil
 }
 
@@ -264,6 +273,9 @@ func (e *Engine) snapshot(planning bool) View {
 		v.Budget.EvidencePacketsRemaining = maxEvidencePackets - len(v.Evidence)
 		v.Budget.EvidenceBytesRemaining = maxEvidenceBytes - e.evidenceBytes
 	}
+	if v.Policy.ReviewRecipient != "" {
+		v.Budget.ReviewsRemaining = 3 - len(v.Reviews)
+	}
 	if planning {
 		v.Artifact = nil
 	}
@@ -280,6 +292,9 @@ func (e *Engine) expire() {
 		e.requests = nil
 		e.state.Artifact = nil
 		e.state.Evidence = nil
+		if e.state.Evaluation != nil {
+			e.state.Evaluation.Review = nil // reviewer prose can quote selected values
+		}
 		e.state.Status = "expired"
 	}
 }
@@ -352,6 +367,9 @@ func (e *Engine) Advance(ctx context.Context, revision int, d Decision) (View, e
 		keyDecision.CompositionID = d.CompositionID
 	case "read_evidence":
 		keyDecision.Evidence = d.Evidence
+	case "review_result":
+		keyDecision.CompositionID = d.CompositionID
+		keyDecision.Reason = digest(e.state.Evidence) // new evidence may justify another bounded review
 	}
 	key := digest(keyDecision)
 	if e.seen[key] {
@@ -701,6 +719,8 @@ func (e *Engine) act(ctx context.Context, d Decision) error {
 			return nil
 		}
 		return fmt.Errorf("unknown composition ID")
+	case "review_result":
+		return e.reviewResult(ctx, d.CompositionID)
 	case "abstain":
 		if strings.TrimSpace(d.Reason) == "" {
 			return fmt.Errorf("abstention reason required")
@@ -709,7 +729,7 @@ func (e *Engine) act(ctx context.Context, d Decision) error {
 		e.state.Status = "abstained"
 		return nil
 	default:
-		return fmt.Errorf("unknown action; use define, search, inspect, layout, sample, retry_sample, read_evidence, compose, execute or abstain")
+		return fmt.Errorf("unknown action; use define, search, inspect, layout, sample, retry_sample, read_evidence, compose, execute, review_result or abstain")
 	}
 }
 

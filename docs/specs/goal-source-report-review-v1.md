@@ -1,0 +1,79 @@
+# 원천 보고의 분리 검토 v1
+
+상태: 제한된 원천 보고 경로 구현·개발 검증 완료. 실제 모델 응답과 실패를 포함한 분모는
+[검증 결과](../research/source-report-review-validation-2026-09-08.md)에 보존한다.
+[주장별 근거·재계획 결정](https://github.com/JungHoonGhae/odeduck/issues/51)의 원천 보고 부분이며,
+G1–G5의 범위나 전체 완료 기준을 바꾸지 않는다.
+
+## Problem Statement
+
+실제로 실행한 원천 보고도 영구적인 단일 의미 검토 값 때문에 완료될 수 없다. 반대로 계획기의
+자기 승인이나 원천 인용의 존재만으로 질문에 맞는 답이라고 판정해서는 안 된다.
+
+## Solution
+
+신뢰된 시작 설정으로 선택한 검토자가 계획 이력 없는 별도 요청에서 원래 질문과 산출물을 검토한다.
+원천 지지와 원래 목표 충족을 따로 기록한다. 기본은 꺼짐이며, 승인 결과도 모델 판단이지 현장 검증이나
+진실 보증이 아니다. 검토 미충족·실패는 같은 목표의 추가 탐색으로 돌아간다.
+
+## User Stories
+
+1. As a 사용자, I want 자료에 실린 사실을 출처와 함께 받아, 불필요한 현실 효과 검증을 기다리지 않는다.
+2. As a 사용자, I want 원래 질문의 범위를 검토해, 계획기가 더 쉬운 질문으로 바꾸지 못하게 한다.
+3. As a 사용자, I want 필드별 지지 근거를 받아, 일부 맞는 값이 답 전체를 승인하지 않게 한다.
+4. As a 사용자, I want 원천 보고와 현재 상태·계산·가설을 구분해, 더 강한 결론을 오해하지 않는다.
+5. As a 사용자, I want 검토자와 한계를 확인해, 모델 검토를 사람/제공기관 승인으로 오해하지 않는다.
+6. As a 사용자, I want 외부 전송을 직접 설정해, 검토 도입이 원문 공개 범위를 넓히지 않게 한다.
+7. As a 사용자, I want 미지원 연산도 기존대로 실행·재계획해, 새 검토가 기능을 없애지 않게 한다.
+8. As a 운영자, I want 검토 비용·실패·근거 revision을 남겨, 무한 재검토와 오래된 승인을 막는다.
+9. As a CLI/MCP 사용자, I want 같은 실행·검토 판정을 받아, 인터페이스에 따라 신뢰가 달라지지 않는다.
+
+## Implementation Decisions
+
+- 기존 Engine에 `review_result` 행동을 추가한다. 모델 입력은 현재 composition ID뿐이며 판정·원문·
+  검토자 설정을 입력하지 못한다. Review는 신뢰된 dependency를 통해 실행하고 Engine이 결과에 묶는다.
+- 첫 지원은 한 관측의 원천 필드 보고다. join/aggregate/measure/spatial 결과의 의미 승인, 인과/현재
+  안전성·모집단/사업 가설은 이 검토 경로에서 승인하지 않는다. 기존 실행 기능은 유지한다.
+- 실행의 구조 검사가 모두 통과해야 한다. 원래 Goal와 불변 Contract를 함께 검토한다. 검토자는
+  원천 보고만으로 원래 질문이 충족되는지 따로 판단한다. 더 강한 요청을 보고로 낮추어 승인하지 않는다.
+- 입력은 최대 20개 retained record, 8개 관측 필드의 이미 공개 허용된 단일 Evidence Packet과 실제
+  원천 메타데이터·요청·recipe·실행 결과다. 모든 retained row와 선택/시간/선택조건 필드를 포함해야 한다.
+  결과 필드의 값은 이 packet으로 재현 가능해야 하며, 전체 표본을 새로 공개하거나 잘라 승인하지 않는다.
+- 별도 tool-free 요청은 기존 coding-agent CLI adapter를 재사용한다. 계획 이력·oracle·예전 검토 답을
+  보내지 않는다. 같은 provider도 별도 context일 뿐 통계적 독립·정답 보증은 아니다. 자동 fallback 없음.
+- 검토는 `source_report`의 출력별 지지와 원래 목표 적합성에 supported/unsupported/insufficient,
+  이유와 실제 packet ID를 반환한다. 빠진/중복/가짜 ID, 잘못된 형식, 원문 credential material, 실패는
+  승인하지 않는다. 모든 필수 출력과 목표가 supported여야 `output_ready`가 된다.
+- Engine이 검토 입력 hash, 실행 revision, 시도 revision, provider와 검토 계약 버전을 기록한다.
+  같은 실행+같은 근거로 재시도하지 못하며 행·필드 순서만 바꾸어도 같은 근거로 취급한다.
+  세션당 최대 세 번 호출한다. 만료/취소/오류를 승인으로 바꾸지 않는다.
+  새 실행은 이전 검토를 현재 결과에서 제거하고 시도 이력은 보존한다. 만료 시 검토 원문도 폐기한다.
+- CLI는 `--review-source-reports`와 명시적인 `--agent`/`--share-evidence`가 필요하다. MCP는 서버 시작
+  시 `--review-goals-with=<provider>` 및 `--share-goal-evidence`가 필요하다. MCP host 공개 허용을
+  다른 provider 전송 허용으로 재해석하지 않는다. 검토 provider를 모델 tool argument로 바꿀 수 없다.
+- `NeedsSemanticReview=false`는 이 제한된 검토를 통과했다는 호환 요약이다. Review의 method/범위/한계가
+  함께 출력되며 외부 현실 검증·sample_verified·장부 재사용 승인으로 승격하지 않는다.
+
+## Testing Decisions
+
+사용자 위임으로 기존 Start/Advance/Run, CLI command, MCP JSON-RPC와 외부 모델 adapter의 공개 함수를
+seam으로 선택한다. 원천 보고 양성부터 TDD로 구현하고, 입력 공개·revision·구조/목표/주장별 음성을 보강한다.
+모델 fixture로 상태 전이만 검증한 것은 실제 양성 검토 증거로 세지 않는다. 독립 원천에 고정된 최소 두 분야의
+양성/강한 결론 음성을 실제 격리 reviewer로 각각 세 번 실행하고 원 응답·전체 분모를 보존한다. 이는 개발
+calibration이지 held-out 평가/오류율 보증이 아니다. 실패 시 해당 경로를 유효하게 검증했다고 보고하지 않는다.
+G1–G5 원문 목표와 기존 oracle은 변경하지 않는다. 별도 단순 양성은 추가 개발 사례로 명시한다.
+
+개발 calibration 명령 handler도 사용자 위임에 따른 검증 seam이다. 외부 inspection/model만 대체하고
+실제 Engine으로 성공·모델 오류·오탐·원천 누락의 예정 12개 기록 및 기존 출력 파일 비덮어쓰기를 검사한다.
+검토 adapter는 calibration이 명시적으로 저장할 수 있는 원 응답을 별도로 반환하지만 CLI/MCP 목표에는
+구조화된 Assessment만 전달한다. 원 응답 보존 상한은 1 MiB이며 초과 시 잘림을 표시하고 승인하지 않는다.
+
+## Out of Scope
+
+이 slice 밖: 계산·가설의 자동 승인, 인물/시설 identity 승인, population 완전성 승인, 장부 재사용,
+외부 현장 진실 보증, 모든 G1–G5의 자율 완주. 제품 목표에서는 계속 미완료다.
+
+## Further Notes
+
+[원천 지지의 1차 자료 검토](../research/claim-scoped-evidence-primary-sources-2026-09-08.md)는 출처 지지와
+질문 적합성이 별개임을 뒷받침한다. 모델 검토의 실제 정확도는 그 문헌이 아니라 위 calibration으로 점검한다.

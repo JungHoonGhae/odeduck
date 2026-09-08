@@ -9,6 +9,13 @@ section matching a `vX.Y.Z` tag as the GitHub release notes.
 
 ### Added
 
+- Opt-in, separately invoked model review for bounded source-field reports via
+  CLI `--review-source-reports` or MCP startup `--review-goals-with`. Original-goal
+  fit and every output's source support are assessed separately against already
+  authorized evidence; qualified completion carries reviewer/method/input/execution
+  provenance. This is not field verification or approval of joins, calculations,
+  population claims or hypotheses. Default-off disclosure and three-review limits apply.
+
 - Native STD inspection through CLI/MCP, plus bounded CSV, ZIP-member and exact
   XLSX-rectangle readers with source hashes, original positions and explicit limits.
 - Optional, recipient-bound selected evidence for experimental goal planning:
@@ -19,7 +26,7 @@ section matching a `vX.Y.Z` tag as the GitHub release notes.
 - Experimental shared goal-based discovery and bounded composition via CLI `solve`
   and MCP `advance_goal`, with required-role/output checks, source-record lineage,
   typed FILE/STD acquisition, explicit retries and versioned scope-label comparison.
-  Candidate artifacts remain distinct from goal completion; automatic semantic
+  Candidate artifacts remain distinct from goal completion; general semantic
   approval and durable goal resumption are not implemented.
 
 ### Fixed

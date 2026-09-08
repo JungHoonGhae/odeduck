@@ -25,7 +25,7 @@ func TestGoalMCPSingleSourceAnalysisMatchesActualEngine(t *testing.T) {
 		},
 	}
 	s := mcp.NewServer(&mcp.Implementation{Name: "test", Version: "0"}, nil)
-	registerGoalTool(s, false, func(goalwork.Policy) goalwork.Dependencies { return deps })
+	registerGoalTool(s, false, "", func(goalwork.Policy) goalwork.Dependencies { return deps })
 	client := connectTestClient(t, s)
 	call := func(args map[string]any) goalOut {
 		t.Helper()

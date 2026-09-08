@@ -16,8 +16,20 @@ func TestGoalMCPEvidenceUsesTrustedServerPolicy(t *testing.T) {
 	for _, enabled := range []bool{false, true} {
 		t.Run(fmt.Sprint(enabled), func(t *testing.T) {
 			s := mcp.NewServer(&mcp.Implementation{Name: "test", Version: "0"}, nil)
-			registerGoalTool(s, enabled, func(goalwork.Policy) goalwork.Dependencies {
+			reviewer := ""
+			if enabled {
+				reviewer = "claude"
+			}
+			registerGoalTool(s, enabled, reviewer, func(goalwork.Policy) goalwork.Dependencies {
 				return goalwork.Dependencies{
+					Review: func(_ context.Context, in goalwork.ReviewInput) (goalwork.ReviewAssessment, error) {
+						b, _ := json.Marshal(in)
+						if !enabled || in.Recipient != "claude" || strings.Contains(string(b), "NOT_SELECTED") {
+							t.Fatal("review disclosed unauthorized input")
+						}
+						f := goalwork.ReviewFinding{Verdict: "supported", Reason: "fixture recorded value only", PacketID: in.Evidence.ID}
+						return goalwork.ReviewAssessment{GoalFit: f, Outputs: []goalwork.OutputReview{{Output: "v", Finding: f}}}, nil
+					},
 					Search: func(context.Context, string) (catalog.Result, error) {
 						return catalog.Result{Hits: []catalog.Hit{{PK: "records"}}}, nil
 					},
@@ -76,8 +88,16 @@ func TestGoalMCPEvidenceUsesTrustedServerPolicy(t *testing.T) {
 				if len(v.State.Evidence) != 1 || v.State.Evidence[0].Records[0].Values["value"] != json.Number("9007199254740993") {
 					t.Fatal("MCP changed exact evidence")
 				}
+				v = call(map[string]any{"sessionId": v.SessionID, "revision": v.State.Revision, "decision": goalwork.Decision{Action: "review_result", CompositionID: p.ID}})
+				if v.State.Status != "output_ready" || v.State.Evaluation.NeedsSemanticReview || v.State.Evaluation.Review.Provider != "claude" || v.State.Evaluation.Review.ExecutionRevision != 6 || v.State.Artifact.Rows[0]["o1.value"] != json.Number("9007199254740993") {
+					t.Fatalf("MCP lost actual review transition: %+v", v.State)
+				}
 			} else if len(v.State.Evidence) != 0 || len(v.State.Gaps) != 1 || !strings.Contains(v.State.Gaps[0].Detail, "disabled") {
 				t.Fatal("MCP default disclosure was not blocked")
+			}
+			bad, err = client.CallTool(context.Background(), &mcp.CallToolParams{Name: "advance_goal", Arguments: map[string]any{"goal": "fixture", "reviewRecipient": "claude"}})
+			if err == nil && !bad.IsError {
+				t.Fatal("model-controlled review authority was accepted")
 			}
 			other := connectTestClient(t, s)
 			foreign, err := other.CallTool(context.Background(), &mcp.CallToolParams{Name: "advance_goal", Arguments: map[string]any{"sessionId": v.SessionID}})

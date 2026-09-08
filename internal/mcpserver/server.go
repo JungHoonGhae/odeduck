@@ -6,6 +6,7 @@ package mcpserver
 import (
 	"context"
 	"fmt"
+	"github.com/JungHoonGhae/odeduck/internal/agentplan"
 	"strings"
 	"time"
 
@@ -23,13 +24,14 @@ import (
 
 // Deps carries the collaborators the server needs.
 type Deps struct {
-	Fetch             *fetch.Client
-	BaseURL           string // data.go.kr root for search/describe (override in tests)
-	SemanticIndex     *catalog.SemanticIndex
-	Embedder          catalog.Embedder
-	Caller            datasetCallExecutor
-	Ledger            *connectionledger.Store
-	ShareGoalEvidence bool // trusted startup setting; never a model tool argument
+	Fetch              *fetch.Client
+	BaseURL            string // data.go.kr root for search/describe (override in tests)
+	SemanticIndex      *catalog.SemanticIndex
+	Embedder           catalog.Embedder
+	Caller             datasetCallExecutor
+	Ledger             *connectionledger.Store
+	ShareGoalEvidence  bool   // trusted startup setting; never a model tool argument
+	GoalReviewProvider string // additional explicit disclosure to a separate reviewer
 }
 
 type datasetCallExecutor interface {
@@ -480,7 +482,13 @@ func New(deps Deps) *mcp.Server {
 	// Reuse one catalog snapshot across bounded goal sessions. Each engine
 	// enforces its immutable semantic policy before admitting any candidates.
 	goalDeps := goalwork.LiveDependencies(deps.Fetch, base, caller, catalog.Searcher{Index: deps.SemanticIndex, Embedder: deps.Embedder}, goalwork.Policy{})
-	registerGoalTool(s, deps.ShareGoalEvidence, func(goalwork.Policy) goalwork.Dependencies {
+	if deps.GoalReviewProvider != "" {
+		goalDeps.Review = func(ctx context.Context, in goalwork.ReviewInput) (goalwork.ReviewAssessment, error) {
+			response, err := agentplan.ReviewGoal(ctx, in, deps.GoalReviewProvider)
+			return response.Assessment, err
+		}
+	}
+	registerGoalTool(s, deps.ShareGoalEvidence, deps.GoalReviewProvider, func(goalwork.Policy) goalwork.Dependencies {
 		return goalDeps
 	})
 	return s
