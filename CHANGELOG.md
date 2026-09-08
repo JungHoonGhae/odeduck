@@ -24,6 +24,10 @@ section matching a `vX.Y.Z` tag as the GitHub release notes.
 
 ### Fixed
 
+- Continue experimental goal planning after `review_required` within the original
+  contract, disclosure policy, budgets and expiry. Pin evaluations to execution
+  revisions and clear stale current results before a replacement execution.
+  Restarting the planning loop no longer refills its one replay correction.
 - Share semantic-search policy across CLI and MCP, keeping degraded retrieval
   visible and preserving the connection limit through progressive discovery.
 - Strengthen credential isolation at the shared REST and LINK response boundaries;

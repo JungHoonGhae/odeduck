@@ -501,8 +501,9 @@ observed field and skips null; unqualified count cannot invent role-specific lin
 
 The artifact remains `sample_executed`. Separately calculated `evaluation.status=partial` leaves the engine
 exploring with gaps; a different composition can complete missing outputs. `requirements_met` describes
-structural checks only. If `needsSemanticReview=true`, the session stops as `review_required`, retains
-the candidate artifact and exits CLI with an error, not success. This is a review handoff, not a verified
+structural checks only. If `needsSemanticReview=true`, the session enters `review_required` and can continue
+under the [review-continuation contract](goal-result-execution-v1.md#검토-중-재계획--2026-09-08-추가-계약).
+CLI reports a non-success exit while approval is missing. Review is not a verified
 connection or a detection of every contradiction. The current evaluator always requires semantic review:
 region, time, namespace meaning and goal interpretation are not independently verified. Therefore current
 composition does not produce `output_ready`; that status is reserved for a future evidence-backed acceptance

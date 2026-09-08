@@ -61,7 +61,17 @@ func TestGoalMCPEvidenceUsesTrustedServerPolicy(t *testing.T) {
 			for _, d := range []goalwork.Decision{{Action: "define", Contract: &c}, {Action: "search", Query: "records", Role: "r"}, {Action: "inspect", PK: "records"}, {Action: "sample", Sample: &goalwork.SampleRequest{PK: "records", Delivery: "api"}}} {
 				v = call(map[string]any{"sessionId": v.SessionID, "revision": v.State.Revision, "decision": d})
 			}
+			p := goalwork.Composition{ID: "reported value", Purpose: "selected source value", Base: "o1", Select: []string{"o1.value"}, Roles: []goalwork.RoleBinding{{Role: "r", Observation: "o1"}}, Outputs: []goalwork.OutputBinding{{Output: "v", Field: "o1.value"}}, Assumptions: []string{"fixture interpretation only"}}
+			for _, d := range []goalwork.Decision{{Action: "compose", Composition: &p}, {Action: "execute", CompositionID: p.ID}} {
+				v = call(map[string]any{"sessionId": v.SessionID, "revision": v.State.Revision, "decision": d})
+			}
+			if v.State.Status != "review_required" {
+				t.Fatal("MCP did not reach review through real execution")
+			}
 			v = call(map[string]any{"sessionId": v.SessionID, "revision": v.State.Revision, "decision": goalwork.Decision{Action: "read_evidence", Evidence: &goalwork.EvidenceRequest{Observation: "o1", RowsSHA256: v.State.Observations[0].RowsSHA256, Rows: []int{1}, Fields: []string{"value"}}}})
+			if v.State.Status != "exploring" || v.State.Evaluation.ExecutionRevision != 6 || !v.State.Evaluation.NeedsSemanticReview {
+				t.Fatal("MCP review continuation relabeled or approved the result")
+			}
 			if enabled {
 				if len(v.State.Evidence) != 1 || v.State.Evidence[0].Records[0].Values["value"] != json.Number("9007199254740993") {
 					t.Fatal("MCP changed exact evidence")

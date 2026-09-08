@@ -139,7 +139,12 @@ func resultRecipe() goalwork.Composition {
 
 func observedResultEngine(t *testing.T, contract goalwork.GoalContract) *goalwork.Engine {
 	t.Helper()
-	e, err := goalwork.Start("original user goal", goalwork.Policy{}, goalwork.Dependencies{
+	return observedResultEnginePolicy(t, contract, goalwork.Policy{})
+}
+
+func observedResultEnginePolicy(t *testing.T, contract goalwork.GoalContract, policy goalwork.Policy) *goalwork.Engine {
+	t.Helper()
+	e, err := goalwork.Start("original user goal", policy, goalwork.Dependencies{
 		Search: func(context.Context, string) (catalog.Result, error) {
 			return catalog.Result{Hits: []catalog.Hit{{PK: "records", Title: "source records"}}}, nil
 		},

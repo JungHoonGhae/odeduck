@@ -228,6 +228,7 @@ type Engine struct {
 	inspections, samples, bytes int
 	layouts                     int
 	evidenceBytes               int
+	replayCorrectionUsed        bool
 }
 
 func Start(goal string, policy Policy, deps Dependencies) (*Engine, error) {
@@ -283,6 +284,20 @@ func (e *Engine) expire() {
 	}
 }
 
+func canAdvance(status string) bool {
+	return status == "exploring" || status == "review_required"
+}
+
+func (e *Engine) allowReplayCorrection() bool {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if e.replayCorrectionUsed {
+		return false
+	}
+	e.replayCorrectionUsed = true
+	return true
+}
+
 // Advance consumes one bounded action. Acquisition/validation failures become
 // session-local gaps for replanning. Revision, replay and terminal-state errors do
 // not consume another step. Context cancellation is propagated after recording.
@@ -293,7 +308,7 @@ func (e *Engine) Advance(ctx context.Context, revision int, d Decision) (View, e
 	if revision != e.state.Revision {
 		return e.snapshot(false), fmt.Errorf("stale revision: expected %d", e.state.Revision)
 	}
-	if e.state.Status != "exploring" {
+	if !canAdvance(e.state.Status) {
 		return e.snapshot(false), fmt.Errorf("goal is %s", e.state.Status)
 	}
 	b, err := json.Marshal(d)
@@ -347,6 +362,7 @@ func (e *Engine) Advance(ctx context.Context, revision int, d Decision) (View, e
 	}
 	e.seen[key] = true
 	e.state.Revision++
+	e.state.Status = "exploring"
 	err = e.act(ctx, d)
 	if err != nil {
 		target := d.PK
@@ -364,7 +380,7 @@ func (e *Engine) Advance(ctx context.Context, revision int, d Decision) (View, e
 		}
 		e.state.Gaps = append(e.state.Gaps, Gap{Revision: e.state.Revision, Action: d.Action, Target: target, Detail: bounded(err.Error(), 2000)})
 	}
-	if e.state.Status == "exploring" && e.state.Revision >= e.state.Policy.MaxRounds {
+	if canAdvance(e.state.Status) && e.state.Revision >= e.state.Policy.MaxRounds {
 		e.state.Status = "budget_exhausted"
 	}
 	return e.snapshot(false), ctx.Err()
@@ -625,6 +641,8 @@ func (e *Engine) act(ctx context.Context, d Decision) error {
 			if p.ID != d.CompositionID {
 				continue
 			}
+			e.state.Artifact = nil
+			e.state.Evaluation = nil
 			rows, metrics, err := execute(p, e.rows, 1000, e.state.Observations...)
 			attempt := len(e.state.Executions)
 			e.state.Executions = append(e.state.Executions, ExecutionRecord{CompositionID: p.ID, Revision: e.state.Revision, Status: "failed", Metrics: metrics})
@@ -655,6 +673,7 @@ func (e *Engine) act(ctx context.Context, d Decision) error {
 				e.state.Artifact.Limitations = append(e.state.Artifact.Limitations, "Inner joins omit unmatched rows.")
 			}
 			evaluation := evaluateRequirements(*e.state.Contract, p, rows, e.state.Observations, e.state.Nodes)
+			evaluation.ExecutionRevision = e.state.Revision
 			for _, o := range sources {
 				if o.Spatial != nil {
 					e.state.Artifact.Limitations = append(e.state.Artifact.Limitations, "Spatial values are conditional spherical distances among exact-filter source records, not distinct destinations or accessible routes. Anchor selection, common datum, coordinate accuracy and current operation remain unverified.")

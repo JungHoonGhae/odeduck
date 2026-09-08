@@ -50,6 +50,7 @@ func TestNearestUsesSharedHTTPInspectionAcquisitionAndRun(t *testing.T) {
 	p := Composition{ID: "near", Purpose: "conditional comparison", Base: "o1", Joins: []Join{{Right: "o3", LeftKeys: []string{"o1.id", "o1.lat", "o1.lon"}, RightKeys: []string{"anchor.id", "anchor.lat", "anchor.lon"}}}, Select: []string{"o1.id", "o3.candidate.id", "o3.distance_m"}, Roles: []RoleBinding{{Role: "facility", Observation: "o1"}, {Role: "transit", Observation: "o3"}}, Outputs: []OutputBinding{{Output: "distance", Field: "o3.distance_m"}}, Assumptions: []string{"conditional degrees, datum/route/operation unverified"}}
 	steps := []Decision{{Action: "define", Contract: &c}, {Action: "search", Query: "시설", Role: "facility"}, {Action: "inspect", PK: "111"}, {Action: "sample", Sample: &SampleRequest{PK: "111", Delivery: "file", Asset: "source.csv"}}, {Action: "search", Query: "정류장", Role: "transit"}, {Action: "inspect", PK: "222"}, {Action: "sample", Sample: &SampleRequest{PK: "222", Delivery: "file", Asset: "source.csv", ScanCSV: true}}, {Action: "sample", Sample: &nearest}, {Action: "compose", Composition: &p}, {Action: "execute", CompositionID: "near"}}
 	n := 0
+	steps = append(steps, Decision{Action: "abstain", Reason: "conditional distances do not verify datum or routes"})
 	v, err := Run(context.Background(), e, func(_ context.Context, v View) (Decision, error) {
 		if len(v.Gaps) > 0 || n >= len(steps) {
 			return Decision{}, fmt.Errorf("fixture failed: %+v", v.Gaps)
@@ -58,7 +59,7 @@ func TestNearestUsesSharedHTTPInspectionAcquisitionAndRun(t *testing.T) {
 		n++
 		return d, nil
 	}, nil)
-	if err != nil || v.Status != "review_required" || v.Artifact == nil || len(v.Artifact.Rows) != 2 {
+	if err != nil || v.Status != "abstained" || v.Artifact == nil || len(v.Artifact.Rows) != 2 || !v.Evaluation.NeedsSemanticReview {
 		t.Fatalf("HTTP nearest failed: %+v %v", v.Gaps, err)
 	}
 	if v.Artifact.Rows[0]["o3.candidate.id"] != "ICB001" || v.Artifact.Rows[1]["o3.candidate.id"] != "GGB001" || v.Observations[2].Spatial.Scan.MatchedRows != 1003 || v.Observations[2].Spatial.Comparisons != 2006 {

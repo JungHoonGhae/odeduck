@@ -117,6 +117,7 @@ func TestSolveExitRequiresMoreThanStructuralOutput(t *testing.T) {
 }
 
 func TestSolveRunsSingleSourceProjectionWithoutReportingSemanticApproval(t *testing.T) {
+	sawReview := false
 	cmd := solveCommand(func(ctx context.Context, goal string, policy goalwork.Policy, _ string, progress func(goalwork.View)) (goalwork.View, error) {
 		e, err := goalwork.Start(goal, policy, goalwork.Dependencies{
 			Search: func(context.Context, string) (catalog.Result, error) {
@@ -138,7 +139,14 @@ func TestSolveRunsSingleSourceProjectionWithoutReportingSemanticApproval(t *test
 		n := 0
 		return goalwork.Run(ctx, e, func(_ context.Context, view goalwork.View) (goalwork.Decision, error) {
 			if n >= len(decisions) {
-				return goalwork.Decision{Action: "abstain", Reason: "expected execution did not finish"}, nil
+				if !sawReview {
+					if view.Status != "review_required" {
+						t.Fatal("CLI did not deliver the review state to its planner")
+					}
+					sawReview = true
+					return goalwork.Decision{Action: "search", Query: "official field meaning", Role: "scope"}, nil
+				}
+				return goalwork.Decision{Action: "abstain", Reason: "fixture does not establish field meaning"}, nil
 			}
 			b, _ := json.Marshal(view)
 			if strings.Contains(string(b), "9007199254740993") {
@@ -162,7 +170,7 @@ func TestSolveRunsSingleSourceProjectionWithoutReportingSemanticApproval(t *test
 	if err := decoder.Decode(&v); err != nil {
 		t.Fatal(err)
 	}
-	if v.Status != "review_required" || v.Artifact == nil || v.Artifact.Status != "sample_executed" || len(v.Artifact.Rows) != 1 || v.Artifact.Rows[0]["o1.value"] != json.Number("9007199254740993") {
+	if !sawReview || v.Status != "abstained" || v.Revision != 8 || v.Evaluation.ExecutionRevision != 6 || !v.Evaluation.NeedsSemanticReview || len(v.Searches) != 2 || v.Artifact == nil || v.Artifact.Status != "sample_executed" || len(v.Artifact.Rows) != 1 || v.Artifact.Rows[0]["o1.value"] != json.Number("9007199254740993") {
 		t.Fatalf("CLI lost the single-source result: %+v", v)
 	}
 }

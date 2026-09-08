@@ -24,7 +24,7 @@ func solveCommand(run solveRunner) *cobra.Command {
 	var shareEvidence bool
 	var rounds int
 	cmd := &cobra.Command{Use: "solve <목표>", Short: "목표 → 역할 탐색·검사·표본 조회·분석·결합 (experimental)", Args: cobra.ExactArgs(1), SilenceUsage: true, SilenceErrors: true,
-		Long: "키워드를 몰라도 목표를 입력하면 설치된 tool-free agent가 데이터 역할을 추론하고 검색·검사·표본 결합을 반복합니다. 실패하면 대안이나 코드 대응표를 탐색합니다. 관측한 한 원천의 조회·집계도 가능하며 결합은 선택 연산입니다. API/CSV·ZIP·XLSX/STD의 sample_executed는 표본 실행 결과입니다. 구조 조건이 맞아도 의미 검증이 남으면 review_required와 실패 코드를 반환합니다. 현재 자동 의미 승인 경로는 없으며 목표 완료를 선언하지 않습니다. 자동 활용신청은 하지 않습니다. JSON만 출력합니다.",
+		Long: "키워드를 몰라도 목표를 입력하면 설치된 tool-free agent가 데이터 역할을 추론하고 검색·검사·표본 결합을 반복합니다. 실패하면 대안이나 코드 대응표를 탐색합니다. 관측한 한 원천의 조회·집계도 가능하며 결합은 선택 연산입니다. API/CSV·ZIP·XLSX/STD의 sample_executed는 표본 실행 결과입니다. review_required에서도 같은 목표·예산·만료 안에서 추가 근거와 대안을 찾습니다. 판정의 executionRevision은 해당 결과를 만든 실행을 가리킵니다. 현재 자동 의미 승인 경로는 없으며 미완료 결과는 실패 코드로 반환합니다. 자동 활용신청은 하지 않습니다. JSON만 출력합니다.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if flagFormat != "json" {
 				return fmt.Errorf("solve outputs a structured JSON artifact; use --format json")

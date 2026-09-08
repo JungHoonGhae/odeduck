@@ -21,6 +21,10 @@ CLI/MCP의 상세 행동 원본을 정리한다. 이는 I6/I9의 부분 진전�
 분리한다. [Goal Trial Audit](goal-trial-audit-v1.md)은 두 과거 G2 진단과 나머지 미실행 사례를 함께 집계한다.
 준비 통과선은 실패하며 실제 원천 채점·자율 완주·M5 착수 근거가 아니다. 다음 결정은
 [주장별 근거 승인과 검토 중 재계획](https://github.com/JungHoonGhae/odeduck/issues/51)이다.
+그중 [검토 중 재계획 구현](https://github.com/JungHoonGhae/odeduck/issues/52)은 같은 목표·예산·만료에서
+추가 탐색/근거 읽기/수정 실행을 열고, 판정의 실행 revision과 실패 시 현재 결과 교체를 고정한다.
+자동 의미 승인과 실제 원천 양성 완주는 여전히 미완료다. 세부 계약과 검증은
+[Goal Result](goal-result-execution-v1.md#검토-중-재계획--2026-09-08-추가-계약)에 모은다.
 
 ## 완료 감사표
 

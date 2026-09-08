@@ -52,6 +52,7 @@ type RequirementCheck struct {
 type GoalEvaluation struct {
 	Status              string                `json:"status"` // partial or requirements_met, never a claim of real-world goal completion
 	CompositionID       string                `json:"compositionId"`
+	ExecutionRevision   int                   `json:"executionRevision,omitempty"` // omitted by historical writers; never the current exploration revision
 	Checks              []RequirementCheck    `json:"checks"`
 	NeedsSemanticReview bool                  `json:"needsSemanticReview"`
 	ReviewReason        string                `json:"reviewReason"`

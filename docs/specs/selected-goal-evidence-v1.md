@@ -39,7 +39,8 @@
   MCP --share-goal-evidence는 서버 시작 설정이다. tool start/continuation 입력에는 공개 권한이 없다.
 - 입력은 observation, rowsSha256, 서로 다른 1-based retained rows 1–20개와 관측 fields 1–8개다.
   stale revision·미관측 필드·범위 밖 행·중복·credential 필드/표식은 원문을 포함하지 않는 gap으로
-  거부한다. 현재 exploring 상태에서만 읽으며 기존 terminal 전이를 바꾸지 않는다.
+  거부한다. 진행 상태는 이후 [검토 중 재계획 계약](goal-result-execution-v1.md#검토-중-재계획--2026-09-08-추가-계약)을
+  따른다. 이 선택 근거 계약 자체는 의미 승인 권한을 추가하지 않는다.
 - scalar만 그대로 반환한다. Missing은 별도 표시하고 null/false/0/빈 문자열을 보존한다. 셀 JSON
   2048 bytes, packet JSON 16 KiB, 최대 8 packets/세션 누적 64 KiB. 초과는 packet 전체를 거부하며
   조용한 값 잘림이나 부분 공개는 없다. 성공한 packet의 누적 크기는 재조회로 회수되지 않는다.

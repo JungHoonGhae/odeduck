@@ -58,3 +58,36 @@
 
 중단된 구현의 재개와 불필요한 변경 정리는 사용자 2026-09-08 위임에 따른다.
 보존할 원천·실패 oracle을 임의로 삭제하지 않으며, 새 경로를 검증한 뒤 대체된 제약·설명만 정리한다.
+
+## 검토 중 재계획 — 2026-09-08 추가 계약
+
+[주장별 근거·재계획 결정](https://github.com/JungHoonGhae/odeduck/issues/51)의 재계획 부분이다.
+주장별 의미 승인 정책은 아직 미결정이며, 아래 전이를 구현했다고 전체 결정을 완료하지 않는다.
+[주장 근거의 1차 자료 검토](../research/claim-scoped-evidence-primary-sources-2026-09-08.md)는
+원천 지지와 목표 충족을 구분하는 후속 판단 자료이지 자동 승인 구현의 근거가 아니다.
+
+사용자는 최초 실행 뒤에도 부족한 근거·대응표·대체 원천을 같은 목표 안에서 찾고, 수정 결과를
+실행하며, 이전 결과와 새 실패를 구별할 수 있어야 한다. 기존 Start/Advance/Run, CLI command,
+MCP JSON-RPC를 사용자 위임에 따른 검증 seam으로 재사용한다. 새 엔진이나 resume 저장소는 만들지 않는다.
+
+- `review_required`는 `exploring`과 함께 진행 가능한 상태다. Run도 여기서 다음 계획을 요청한다.
+  같은 목표·불변 GoalContract·수신자 공개 정책·원천·누적 예산·고정 만료 시간을 유지한다.
+- 허용된 다음 행동을 실제 소비하면 `exploring`으로 돌아간다. 새 실행의 판정이 다시 검토 필요인지
+  부분 결과인지를 정한다. stale/replay/취소 등 행동 전 거부는 revision·기존 결과·상태를 바꾸지 않는다.
+- 재계획은 기존 행동으로만 한다. 불변 Composition을 같은 ID로 재실행하지 않는다. 대안은 새 ID와
+  남은 조합 예산을 사용한다. 새 근거를 읽었다고 이전 결과의 의미 승인을 해제하지 않는다.
+- Evaluation의 `executionRevision`과 `compositionId`가 어느 실행의 판정인지 고정한다. 검색·추가 관측
+  중 마지막 Artifact/Evaluation을 보존하되 세션의 최신 revision에서 실행됐다고 표현하지 않는다.
+- 알려진 새 Composition의 실행을 시작하면 이전 Artifact/Evaluation을 현재 결과에서 제거한다.
+  실패는 해당 ExecutionRecord에 남고, 성공/부분 결과는 새 실행의 판정과 산출물로 교체한다.
+  원래 관측·recipe·실행 이력은 보존한다. 이전에 반환한 detached 결과 사본은 바꾸지 않는다.
+- 총 단계 한도는 두 진행 상태에 동일하게 적용한다. 마지막 단계가 검토 필요여도 `budget_exhausted`로
+  종료하며 산출물과 검토 판정은 보존한다. output_ready/abstained/blocked/expired 등은 재개하지 않는다.
+  Run의 한 번뿐인 replay 보정도 같은 Engine에서 다시 Run한다고 충전되지 않는다.
+- 원문 없는 PlanningView, 허용된 선택 Evidence Packet, 한 시간 만료와 MCP 소유권은 그대로다.
+  추가 근거가 없으면 이유를 남겨 abstain할 수 있으며 CLI는 이를 성공 종료로 처리하지 않는다.
+
+TDD 검증은 실제 Engine의 검토 도달 → 근거 읽기/대안 탐색 → 수정 실행을 사용한다. 검토 후
+부분·실패·예산·만료·재실행·계약 약화 음성을 포함하고 CLI/MCP에서 같은 전이를 관측한다.
+외부 취득·모델만 fixture로 대체한다. 이 상태 전이 검증은 독립 실원천 정답이나 G1–G5의 자율 완주
+증거가 아니다. 자동 승인, 프로세스 간 복원, 장부 재사용은 후속 범위로 남는다.

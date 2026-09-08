@@ -118,17 +118,30 @@ func TestGoalToolProducesSameArtifactAsStandaloneEngine(t *testing.T) {
 	partial.ID = "missing_output"
 	partial.Outputs = partial.Outputs[:1]
 	decisions = append(decisions, goalwork.Decision{Action: "compose", Composition: &partial}, goalwork.Decision{Action: "execute", CompositionID: partial.ID}, goalwork.Decision{Action: "compose", Composition: &p}, goalwork.Decision{Action: "execute", CompositionID: p.ID})
+	partialCorrection, correction := partial, p
+	partialCorrection.ID, correction.ID = "partial correction", "corrected"
+	decisions = append(decisions,
+		goalwork.Decision{Action: "search", Query: "official definition", Role: "scope"},
+		goalwork.Decision{Action: "compose", Composition: &partialCorrection}, goalwork.Decision{Action: "execute", CompositionID: partialCorrection.ID},
+		goalwork.Decision{Action: "compose", Composition: &correction}, goalwork.Decision{Action: "execute", CompositionID: correction.ID},
+		goalwork.Decision{Action: "abstain", Reason: "source calculation still needs meaning verification"},
+	)
 	for _, d := range decisions {
 		remote = invoke(map[string]any{"sessionId": remote.SessionID, "revision": remote.State.Revision, "decision": d})
-		if d.Action == "execute" && d.CompositionID == partial.ID && (remote.State.Status != "exploring" || remote.State.Evaluation == nil || remote.State.Evaluation.Status != "partial" || remote.State.Artifact == nil) {
+		if d.Action == "execute" && (d.CompositionID == partial.ID || d.CompositionID == partialCorrection.ID) && (remote.State.Status != "exploring" || remote.State.Evaluation == nil || remote.State.Evaluation.Status != "partial" || remote.State.Artifact == nil) {
 			t.Fatalf("MCP ended on partial artifact: %+v", remote.State)
 		}
 	}
 	e, _ := goalwork.Start("compare observations", goalwork.Policy{}, deps)
 	i := 0
 	local, err := goalwork.Run(context.Background(), e, func(context.Context, goalwork.View) (goalwork.Decision, error) { d := decisions[i]; i++; return d, nil }, nil)
-	if err != nil || local.Status != "review_required" || remote.State.Status != local.Status {
+	if err != nil || local.Status != "abstained" || remote.State.Status != local.Status {
 		t.Fatalf("%+v %+v %v", local, remote, err)
+	}
+	for _, result := range []goalwork.View{local, remote.State} {
+		if result.Revision != 17 || len(result.Executions) != 4 || result.Evaluation.ExecutionRevision != 16 || result.Evaluation.CompositionID != correction.ID || result.Artifact.Evaluation.ExecutionRevision != 16 || result.Budget.CompositionsRemaining != 2 {
+			t.Fatalf("shared correction lost revisions or cumulative budget: %+v", result)
+		}
 	}
 	a, _ := json.Marshal(local.Artifact.Rows)
 	b, _ := json.Marshal(remote.State.Artifact.Rows)

@@ -65,6 +65,7 @@ func TestZIPMembersUseSharedDiscoveryPinningSelectionAndComposition(t *testing.T
 	p := Composition{ID: "association", Purpose: "fixture association", Base: "o1", Joins: []Join{{Right: "o2", LeftKeys: []string{"o1.id"}, RightKeys: []string{"id"}}}, Select: []string{"o1.id", "o2.ramp"}, Roles: []RoleBinding{{Role: "facility", Observation: "o1"}, {Role: "access", Observation: "o2"}}, Outputs: []OutputBinding{{Output: "id", Field: "o1.id"}, {Output: "ramp", Field: "o2.ramp"}}, Assumptions: []string{"Fixture namespace association, not verified current accessibility"}}
 	decisions := []Decision{{Action: "define", Contract: &contract}, {Action: "search", Query: "시설접근", Role: "facility"}, {Action: "search", Query: "시설접근", Role: "access"}, {Action: "inspect", PK: "111"}, {Action: "layout", Layout: &LayoutRequest{PK: "111", Asset: "source.zip"}}, {Action: "sample", Sample: &SampleRequest{PK: "111", Delivery: "file", Asset: "source.zip", Member: "facilities.csv", LayoutID: "l1", Where: map[string]string{"scope": "target"}}}, {Action: "sample", Sample: &SampleRequest{PK: "111", Delivery: "file", Asset: "source.zip", Member: "access.csv", LayoutID: "l1", Where: map[string]string{"scope": "target"}}}, {Action: "compose", Composition: &p}, {Action: "execute", CompositionID: p.ID}}
 	n := 0
+	decisions = append(decisions, Decision{Action: "abstain", Reason: "source association does not verify current accessibility"})
 	v, err := Run(context.Background(), e, func(_ context.Context, v View) (Decision, error) {
 		if len(v.Gaps) > 0 {
 			return Decision{}, fmt.Errorf("unexpected gaps: %+v", v.Gaps)
@@ -76,7 +77,7 @@ func TestZIPMembersUseSharedDiscoveryPinningSelectionAndComposition(t *testing.T
 		n++
 		return d, nil
 	}, nil)
-	if err != nil || v.Status != "review_required" || v.Artifact == nil || len(v.Artifact.Rows) != 1 || downloads != 3 {
+	if err != nil || v.Status != "abstained" || v.Artifact == nil || len(v.Artifact.Rows) != 1 || downloads != 3 || !v.Evaluation.NeedsSemanticReview {
 		t.Fatalf("ZIP flow failed: %+v %v downloads=%d", v.Gaps, err, downloads)
 	}
 	if v.Artifact.Rows[0]["o1.id"] != "001" || v.Artifact.Rows[0]["o2.ramp"] != "Y" {

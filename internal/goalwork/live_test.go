@@ -252,7 +252,7 @@ func TestLiveAdaptersSearchInspectDownloadAndJoinThreeCSVFixtures(t *testing.T) 
 	p.Measures = []Measure{{As: "population_number", Field: "o1.n", Format: "decimal_v1", Unit: "persons"}}
 	p.Select = []string{"population_number", "o2.name"}
 	p.Outputs = []OutputBinding{{Output: "population", Field: "population_number"}, {Output: "shelter", Field: "o2.name"}}
-	decisions = append(decisions, Decision{Action: "compose", Composition: &p}, Decision{Action: "execute", CompositionID: p.ID})
+	decisions = append(decisions, Decision{Action: "compose", Composition: &p}, Decision{Action: "execute", CompositionID: p.ID}, Decision{Action: "abstain", Reason: "fixture mapping does not verify real-world meaning"})
 	i := 0
 	v, err := Run(context.Background(), e, func(context.Context, View) (Decision, error) {
 		if i >= len(decisions) {
@@ -262,7 +262,7 @@ func TestLiveAdaptersSearchInspectDownloadAndJoinThreeCSVFixtures(t *testing.T) 
 		i++
 		return d, nil
 	}, nil)
-	if err != nil || v.Status != "review_required" || len(v.Artifact.Rows) != 1 {
+	if err != nil || v.Status != "abstained" || len(v.Artifact.Rows) != 1 || !v.Evaluation.NeedsSemanticReview {
 		t.Fatalf("%+v %v", v, err)
 	}
 	for _, o := range v.Artifact.Sources {

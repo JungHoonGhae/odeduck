@@ -34,13 +34,13 @@ func TestSameNameInDifferentMunicipalitiesCannotFinishGoal(t *testing.T) {
 		decisions = append(decisions, Decision{Action: "search", Query: pk, Role: pk}, Decision{Action: "inspect", PK: pk}, Decision{Action: "sample", Sample: &SampleRequest{PK: pk, Delivery: "file", Asset: "fixture.csv"}})
 	}
 	p := Composition{ID: "same-name", Purpose: "compare", Base: "o1", Joins: []Join{{Right: "o2", LeftKeys: []string{"o1.area"}, RightKeys: []string{"area"}}}, Roles: []RoleBinding{{Role: "people", Observation: "o1"}, {Role: "shelters", Observation: "o2"}}, Outputs: []OutputBinding{{Output: "population", Field: "o1.population"}, {Output: "name", Field: "o2.name"}}, Assumptions: []string{"Names match; municipality identity and time remain unverified."}}
-	decisions = append(decisions, Decision{Action: "compose", Composition: &p}, Decision{Action: "execute", CompositionID: p.ID})
+	decisions = append(decisions, Decision{Action: "compose", Composition: &p}, Decision{Action: "execute", CompositionID: p.ID}, Decision{Action: "abstain", Reason: "same-name records do not establish municipal identity"})
 	next := 0
 	v, err := Run(context.Background(), e, func(context.Context, View) (Decision, error) { d := decisions[next]; next++; return d, nil }, nil)
 	if err != nil || v.Artifact == nil || len(v.Artifact.Rows) != 1 || v.Evaluation.Status != "requirements_met" {
 		t.Fatalf("hard negative did not exercise structurally valid join: %+v %v", v, err)
 	}
-	if v.Status != "review_required" || !v.Evaluation.NeedsSemanticReview {
+	if v.Status != "abstained" || !v.Evaluation.NeedsSemanticReview {
 		t.Fatalf("same-name cross-city candidate incorrectly finished goal: status=%s evaluation=%+v", v.Status, v.Evaluation)
 	}
 }
