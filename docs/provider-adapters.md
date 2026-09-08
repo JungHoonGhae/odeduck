@@ -19,7 +19,7 @@ portal LINK URL
   → provider-scoped credential
   → typed operation/parameter validator
   → exact HTTPS request + redirect rejection
-  → bounded response + provider error parser + secret redaction
+  → bounded response + provider error parser + credential-bearing response rejection
 ```
 
 provider adapter가 채우는 부분은 exact host/path/query, API family, operation, 필수값·enum,
@@ -107,8 +107,10 @@ DACL) exact credential scope에서만 읽는다. `logout`은 현재·호환 conf
    provider ID·exact credential scope도 함께 등록한다. doctor가 adapter contract와 credential
    store의 scope 조합이 일치하지 않으면 drift로 거부한다. CLI help의 provider 목록은
    이 store inventory에서 자동 생성된다.
-7. header/query/path credential 각각에 대해 redirect rejection과 raw/query/path-escaped redaction을
-   public seam에서 테스트한다. response size와 timeout도 제한한다.
+7. header/query/path credential 각각에 대해 redirect rejection과 transport error의
+   raw/query/path-escaped redaction을 public seam에서 테스트한다. 응답은 원문·구조화 값·content type에
+   알려진 인증키가 있으면 전체를 거부하며 대체 값을 원천 관측처럼 반환하지 않는다.
+   response size와 timeout도 제한한다.
 8. MCP JSON round-trip, `go test ./...`, `odeduck doctor --adapters-only`와 고정 자연어 검색
    시나리오를 통과시킨다.
 

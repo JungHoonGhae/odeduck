@@ -35,7 +35,7 @@ func TestCallWaitingRetriesUntilPropagated(t *testing.T) {
 	defer old()
 
 	res, err := callWaiting(context.Background(), fetch.New(fetch.WithDelay(0)),
-		srv.URL, nil, "k", time.Second, nil, callTrusted)
+		srv.URL, nil, "fixture-wait-credential", time.Second, nil, callTrusted)
 	if err != nil {
 		t.Fatalf("should have succeeded once the gateway caught up: %v", err)
 	}

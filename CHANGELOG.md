@@ -7,6 +7,11 @@ section matching a `vX.Y.Z` tag as the GitHub release notes.
 
 ## [Unreleased]
 
+### Fixed
+
+- Strengthen credential isolation at the shared REST and LINK response boundaries;
+  withhold unsafe responses without creating replacement source observations.
+
 ## [0.18.0] - 2026-09-05
 
 ### Added

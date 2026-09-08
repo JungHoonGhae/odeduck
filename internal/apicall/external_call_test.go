@@ -90,12 +90,8 @@ func TestExternalCallerRedactsSecretsAndRejectsProviderFailures(t *testing.T) {
 		})
 		result, err := newExternalCaller(&http.Client{Transport: transport}, nil).Call(
 			context.Background(), contract, "certificationDetail", params, ExternalCredential{Key: secret})
-		if !errors.Is(err, ErrExternalProvider) {
-			t.Fatalf("error = %v, want ErrExternalProvider", err)
-		}
-		encoded := fmt.Sprint(result.Body)
-		if strings.Contains(encoded, secret) || !strings.Contains(encoded, "REDACTED") {
-			t.Fatalf("body was not redacted: %s", encoded)
+		if err == nil || result != nil || strings.Contains(err.Error(), secret) {
+			t.Fatal("credential-bearing provider failure must be withheld, not returned with replacement values")
 		}
 	})
 
