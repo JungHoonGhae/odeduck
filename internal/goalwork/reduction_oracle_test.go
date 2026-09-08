@@ -16,6 +16,12 @@ import (
 	"github.com/JungHoonGhae/odeduck/internal/goalwork"
 )
 
+type citywideContextRecord struct {
+	Sheet string
+	Row   int
+	Cells goalwork.Row
+}
+
 // Full retained citywide reference, not a smaller substitute for G4. External
 // acquisition replays independent records; reduction and joins use the Engine.
 func TestCitywideSourceReductionMatchesIndependentAgeTotalsBeforeSchoolJoin(t *testing.T) {
@@ -38,11 +44,7 @@ func checkCitywideReduction(t *testing.T, live bool, reviewer *citywideModelRevi
 	var oracle struct {
 		Sources []struct {
 			AgeFields      []string `json:"ageFields"`
-			HeaderEvidence []struct {
-				Sheet string
-				Row   int
-				Cells map[string]string
-			}
+			HeaderEvidence []citywideContextRecord
 		}
 		Expected struct {
 			Rows []struct {
@@ -56,6 +58,24 @@ func checkCitywideReduction(t *testing.T, live bool, reviewer *citywideModelRevi
 		}
 	}
 	readReference(t, "education-citywide-reference.json", &oracle)
+	contextRange := "A22:AM26"
+	contextRows := []int{1, 2, 3, 4, 5}
+	contextRecords := append([]citywideContextRecord(nil), oracle.Sources[1].HeaderEvidence...)
+	if reviewer != nil && reviewer.tableContext {
+		var extra struct {
+			PK, ContentSHA256 string
+			Records           []citywideContextRecord
+		}
+		readReference(t, "education-table-context-reference.json", &extra)
+		if extra.PK != ref.Sources[1].PK || extra.ContentSHA256 != ref.Sources[1].ContentSHA256 {
+			t.Fatal("additional context belongs to a different source revision")
+		}
+		contextRange = "A22:AM40"
+		for _, record := range extra.Records {
+			contextRecords = append(contextRecords, record)
+			contextRows = append(contextRows, record.Row-21)
+		}
+	}
 	acquired := map[string]goalwork.Acquired{}
 	for _, source := range ref.Sources {
 		a := goalwork.Acquired{Delivery: "FILE", ContentSHA256: source.ContentSHA256, ContractSHA256: strings.Repeat("b", 64), Warnings: []string{"Development replay of independent retained reference; synthetic contract revision, not a new file download. Original source URL: " + source.URL, "Original observedAt: " + source.ObservedAt}}
@@ -90,17 +110,33 @@ func checkCitywideReduction(t *testing.T, live bool, reviewer *citywideModelRevi
 			if s.Reduce != nil {
 				t.Fatal("reduction called provider")
 			}
-			if s.XLSX != nil && s.XLSX.Range == "A22:AM26" {
+			if s.XLSX != nil && s.XLSX.Range == contextRange {
 				a := acquired[s.PK]
 				a.Rows = nil
 				a.Table = &dataset.TableProvenance{Sheet: s.XLSX.Sheet, Range: s.XLSX.Range}
-				for _, record := range oracle.Sources[1].HeaderEvidence {
+				for ordinal := 22; ordinal <= contextRecords[len(contextRecords)-1].Row; ordinal++ {
 					row := goalwork.Row{}
-					for field, value := range record.Cells {
-						row[field] = value
+					if reviewer != nil && reviewer.tableContext {
+						// Replay every row of the rectangle, including the intervening
+						// table and explicit blank cells. Disclosure remains sparse.
+						row = goalwork.Row{"A": nil, "AG": nil, "AK": nil, "AH": nil, "AL": nil}
+						for _, record := range ref.Sources[1].Records {
+							if record.Row == ordinal {
+								for field, value := range record.Cells {
+									row[field] = value
+								}
+							}
+						}
+					}
+					for _, record := range contextRecords {
+						if record.Row == ordinal {
+							for field, value := range record.Cells {
+								row[field] = value
+							}
+						}
 					}
 					a.Rows = append(a.Rows, row)
-					a.Table.RowNumbers = append(a.Table.RowNumbers, record.Row)
+					a.Table.RowNumbers = append(a.Table.RowNumbers, ordinal)
 				}
 				return a, nil
 			}
@@ -112,16 +148,16 @@ func checkCitywideReduction(t *testing.T, live bool, reviewer *citywideModelRevi
 				t.Fatal("original goal, calculation or header context changed at review boundary")
 			}
 			c := in.Analysis.SourceContext[0]
-			if c.Source.ID != "o4" || len(c.Targets) != 1 || c.Targets[0] != "o2" || c.Request.XLSX.Range != "A22:AM26" || len(c.Evidence.Records) != len(oracle.Sources[1].HeaderEvidence) {
+			if c.Source.ID != "o4" || len(c.Targets) != 1 || c.Targets[0] != "o2" || c.Request.XLSX.Range != contextRange || len(c.Evidence.Records) != len(contextRecords) {
 				t.Fatal("header was not associated with its actual school file")
 			}
 			for i, record := range c.Evidence.Records {
 				for _, field := range c.Evidence.Selection.Fields {
-					if value, present := oracle.Sources[1].HeaderEvidence[i].Cells[field]; present {
+					if value, present := contextRecords[i].Cells[field]; present {
 						if record.Values[field] != value {
 							t.Fatal("header differs from independently frozen source cells")
 						}
-						if address := record.Origins[field]; address.Ordinal != oracle.Sources[1].HeaderEvidence[i].Row || address.Sheet != "구·군별" {
+						if address := record.Origins[field]; address.Ordinal != contextRecords[i].Row || address.Sheet != contextRecords[i].Sheet {
 							t.Fatal("context lost original worksheet addresses")
 						}
 					}
@@ -336,9 +372,9 @@ func checkCitywideReduction(t *testing.T, live bool, reviewer *citywideModelRevi
 		}
 	}
 	// Keep the earlier unmatched packet: both it and the failed exact join remain.
-	schoolRequest.XLSX = &dataset.XLSXSelection{Sheet: "구·군별", Range: "A22:AM26"}
+	schoolRequest.XLSX = &dataset.XLSXSelection{Sheet: "구·군별", Range: contextRange}
 	v = step(goalwork.Decision{Action: "sample", Sample: &schoolRequest})
-	v = step(goalwork.Decision{Action: "read_evidence", Evidence: &goalwork.EvidenceRequest{Observation: "o4", RowsSHA256: v.Observations[3].RowsSHA256, Rows: []int{1, 2, 3, 4, 5}, Fields: []string{"A", "AG", "AK", "AH", "AL"}}})
+	v = step(goalwork.Decision{Action: "read_evidence", Evidence: &goalwork.EvidenceRequest{Observation: "o4", RowsSHA256: v.Observations[3].RowsSHA256, Rows: contextRows, Fields: []string{"A", "AG", "AK", "AH", "AL"}}})
 	step(goalwork.Decision{Action: "read_evidence", Evidence: &goalwork.EvidenceRequest{Observation: "o2", RowsSHA256: v.Observations[1].RowsSHA256, Rows: positions, Fields: schoolFields}})
 	fields := append([]string{"시도명", "시군구명", "기준연월"}, oracle.Sources[0].AgeFields...)
 	for start := 0; start < len(fields); start += 8 {

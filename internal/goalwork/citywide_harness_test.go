@@ -26,7 +26,7 @@ func TestCitywideReviewDiagnosticPreservesFailures(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, kind := range []string{"existing-output", "provider-error", "false-approval", "missing-reference", "unproven-full-scope", "invalid-provider", "invalid-mode"} {
+	for _, kind := range []string{"existing-output", "provider-error", "false-approval", "missing-reference", "unproven-full-scope", "unproven-table-context", "invalid-provider", "invalid-mode"} {
 		t.Run(kind, func(t *testing.T) {
 			dir := t.TempDir()
 			output := filepath.Join(dir, "diagnostic.json")
@@ -50,6 +50,9 @@ func TestCitywideReviewDiagnosticPreservesFailures(t *testing.T) {
 			provider, mode, variant := "codex", "reference", "baseline"
 			if kind == "unproven-full-scope" {
 				variant = "with-branches-full-scope"
+			}
+			if kind == "unproven-table-context" {
+				variant = "with-table-context"
 			}
 			if kind == "invalid-provider" {
 				provider = "auto"
@@ -105,7 +108,7 @@ func TestCitywideReviewDiagnosticPreservesFailures(t *testing.T) {
 				}
 				return
 			}
-			if kind == "unproven-full-scope" {
+			if kind == "unproven-full-scope" || kind == "unproven-table-context" {
 				if record.Input != nil || record.Response != nil || record.Result.Contract == nil || record.Result.Contract.Coverage != "population" || record.Result.Evaluation == nil || record.Result.Evaluation.FullScope == nil || record.Result.Evaluation.FullScope.Eligible {
 					t.Fatal("reference replay manufactured acquisition evidence or called the reviewer")
 				}

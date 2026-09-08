@@ -14,12 +14,50 @@ import (
 )
 
 type citywideModelReview struct {
-	recipient  string
-	branches   bool
-	historical bool
-	fullScope  bool
-	call       func(context.Context, goalwork.ReviewInput) (goalwork.ReviewAssessment, error)
-	observe    func(goalwork.View)
+	recipient    string
+	branches     bool
+	historical   bool
+	fullScope    bool
+	tableContext bool
+	call         func(context.Context, goalwork.ReviewInput) (goalwork.ReviewAssessment, error)
+	observe      func(goalwork.View)
+}
+
+func TestCitywideReviewReceivesTableContextWithoutChangingComparison(t *testing.T) {
+	var ref struct {
+		ContentSHA256 string
+		Records       []struct {
+			Sheet string
+			Row   int
+			Cells goalwork.Row
+		}
+	}
+	readReference(t, "education-table-context-reference.json", &ref)
+	called := false
+	reviewer := &citywideModelReview{recipient: "codex", branches: true, tableContext: true, call: func(_ context.Context, in goalwork.ReviewInput) (goalwork.ReviewAssessment, error) {
+		called = true
+		c := in.Analysis.SourceContext[0]
+		if c.Request.XLSX.Range != "A22:AM40" || c.Source.ContentSHA256 != ref.ContentSHA256 || len(c.Evidence.Records) != 8 {
+			t.Fatal("review is missing independently observed table footer context")
+		}
+		for i, want := range ref.Records {
+			got := c.Evidence.Records[5+i]
+			if got.RetainedRow != want.Row-21 || len(got.Values) != 5 || len(got.Missing) != 0 {
+				t.Fatal("context did not preserve selected blank cells and original row positions")
+			}
+			for field, value := range want.Cells {
+				address := got.Origins[field]
+				if got.Values[field] != value || address.Sheet != want.Sheet || address.Ordinal != want.Row {
+					t.Fatalf("context differs from independent original cell %s!%s%d", want.Sheet, field, want.Row)
+				}
+			}
+		}
+		return supportedAnalysisReview(in), nil // Delivery test, not a source interpretation.
+	}}
+	v := checkCitywideReduction(t, false, reviewer)
+	if !called || len(v.Evidence) != 8 || len(v.Artifact.Rows) != 10 || len(v.Artifact.Unmatched) != 2 || len(v.Artifact.Sources) != 3 {
+		t.Fatal("table context changed the calculation, disclosure budget or review path")
+	}
 }
 
 func TestCitywideComparisonPreservesSeparateBranchCounts(t *testing.T) {
@@ -74,8 +112,8 @@ func TestLiveCitywideGoalAnalysisReview(t *testing.T) {
 	if variant == "" {
 		variant = "baseline"
 	}
-	if variant != "baseline" && variant != "with-branches" && variant != "with-branches-full-scope" {
-		t.Fatal("result variant must be baseline, with-branches or with-branches-full-scope")
+	if !slices.Contains([]string{"baseline", "with-branches", "with-branches-full-scope", "with-table-context"}, variant) {
+		t.Fatal("result variant must be baseline, with-branches, with-branches-full-scope or with-table-context")
 	}
 	f, err := os.OpenFile(os.Getenv("ODEDUCK_CITYWIDE_REVIEW_OUTPUT"), os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
 	if err != nil {
@@ -112,7 +150,7 @@ func TestLiveCitywideGoalAnalysisReview(t *testing.T) {
 			t.Error(err)
 		}
 	})
-	reviewer := &citywideModelReview{recipient: provider, historical: mode == "historical", branches: variant != "baseline", fullScope: variant == "with-branches-full-scope", observe: func(v goalwork.View) { record.Result = v }, call: func(ctx context.Context, in goalwork.ReviewInput) (goalwork.ReviewAssessment, error) {
+	reviewer := &citywideModelReview{recipient: provider, historical: mode == "historical", branches: variant != "baseline", fullScope: variant == "with-branches-full-scope" || variant == "with-table-context", tableContext: variant == "with-table-context", observe: func(v goalwork.View) { record.Result = v }, call: func(ctx context.Context, in goalwork.ReviewInput) (goalwork.ReviewAssessment, error) {
 		record.Input = &in
 		response, err := agentplan.ReviewGoal(ctx, in, provider)
 		record.Response = &response

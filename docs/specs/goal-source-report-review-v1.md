@@ -212,7 +212,11 @@ hash·행 위치·합계와 대조한다. 인구는 기존 전체 CSV scanner로
 보존 reference 재생은 별도 명시 모드로만 선택하고 새 취득·자율 발견으로 세지 않는다. 원 질문과
 기존 기대값은 유지하며 baseline, 분교 출력 추가, 별도 전체 범위 권한을 켠 진단 recipe를 구분한다.
 `with-branches-full-scope`는 원래 population 계약을 보존하며 실제 취득이 없는 reference 재생은
-자격 검사에서 중단한다. 과거 archive는 그대로 보존한다. 모델에 기대 verdict나
+자격 검사에서 중단한다. `with-table-context`는 같은 권한·질문·계산에 학교 원본의 헤더와 합계행·
+빈 경계행·주석을 선택한 별도 문맥을 추가한다. 기존 XLSX 읽기와 sparse 근거 선택을 사용하며
+rectangle의 모든 행을 공개하거나 합계행을 계산에 넣지 않는다. 새 셀의 독립 reference는 기존
+citywide oracle과 별도로 보존한다. sourceContext 전달과 실제 의미 판정은 구분한다.
+과거 archive는 그대로 보존한다. 모델에 기대 verdict나
 oracle 해석을 보내지 않는다. 각 시도의 입력·원 응답·Engine 결과와 준비 실패를 보존한다.
 결과와 한계는 [실행 검증](../research/goal-result-execution-validation-2026-09-08.md#원래-g4의-실제-모델-진단)에
 둔다. 이 진단의 예상 보류나 단일 전후 관측은 양성 목표 완주·모델 정확도 통과선이 아니다.

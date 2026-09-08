@@ -470,7 +470,7 @@ recipe의 기대 완료 상태 문장은 제거했다. 질문·독립 oracle·�
   행정동/집계행의 포함 범위, 학교는 선택 사각형과 논리적 표 전체의 관계 및 서구/서해구 적용 근거가
   부족하다고 판정했다. 이 원천 적용 공백은 취득 자격 통과나 미대응 값 보고만으로 해소되지 않았다.
 
-현재 G4 진단 누적은 **6시도/4모델 호출/목표 완료 0회**다. 새 단일 관측은 모델 정확도 통과선이나
+이 시점의 G4 진단 누적은 **6시도/4모델 호출/목표 완료 0회**다. 새 단일 관측은 모델 정확도 통과선이나
 양성 완주 증거가 아니다. 새 guide와 full-scope 입력, 기대 상태 문장 제거가 함께 바뀌었으므로
 앞선 sample 진단과 동등 조건 A/B 비교로 제시하지 않는다. 원래 모든 G1–G5 통과선은 유지한다.
 
@@ -491,5 +491,55 @@ input 35,354, cached input 10,752, output 3,094 tokens다. 모델명·청구 비
 ODEDUCK_CITYWIDE_REVIEW=codex ODEDUCK_CITYWIDE_ACQUISITION=historical \
   ODEDUCK_CITYWIDE_RESULT=with-branches-full-scope \
   ODEDUCK_CITYWIDE_REVIEW_OUTPUT=/tmp/odeduck-g4-full-scope-new.json \
+  go test ./internal/goalwork -run '^TestLiveCitywideGoalAnalysisReview$' -count=1 -v
+```
+
+### 학교 표의 합계·주석 문맥 전달 — 2026-09-08
+
+위 full-scope 진단이 받지 못한 학교 표의 주변 셀을 같은 원본에서 읽었다. 원본 XLSX hash는
+`c8f57fc8e3bd7e70175ff0debd1529a17539e526e436dc244fcea39ed9a0f695`로 유지된다.
+Go reader/Engine과 별개로 `unzip`·`xml-js`로 OOXML 셀을 확인하고, 추가 15개 셀만
+[독립 문맥 reference](../../internal/goalwork/testdata/goalbench-v1/education-table-context-reference.json)에
+고정했다. 기존 citywide oracle과 기대 계산은 바꾸지 않았다.
+
+`구·군별` 38행의 A는 공백을 포함한 `합계 `, AG/AK/AH/AL은 각각 960/335562/7/63이다.
+39행의 선택 셀은 비어 있고, 40행 A에는 학급수가 일반·특수·한국어 학급의 합이라는 주석이 있다.
+이는 '재적 학생' 정의가 아니다. AK41에도 값이 있으므로 40행을 시트의 물리적 끝이라고 해석하지 않는다.
+합계와 인접 공백은 논리적 표 해석의 근거이지 전체 모집단·행정구역 동일성의 자동 증명이 아니다.
+
+`with-table-context` 진단은 기존 XLSX 선택을 `A22:AM40`으로 넓혀 19행을 보관하되, 문맥 공개는
+22–26·38–40행의 A/AG/AK/AH/AL 40개 셀로 한정한다. 표 데이터 27–37행은 기존 계산 관측과
+공개 packet으로 유지한다. 문맥을 계산에 결합하지 않으며 전체 8 packet 상한도 늘리지 않는다.
+Start/Advance·검토 입력 seam에서 누락 테스트의 실패를 확인한 뒤 진단 recipe만 보강해 통과했다.
+제품의 읽기·공개·승인 코드, 원래 질문·계산·미대응 기록은 변경하지 않았다. 합성 reference 모드는
+새 문맥이 있어도 실제 취득 자격을 얻지 못하고 모델 호출 전에 중단한다.
+
+11:56:24 UTC에 과거 7월 원본을 실제 취득해 이 variant를 1회 실행했다. CSV 전체 3,619행 검사·
+인천 162행 보관·11그룹 304,280명, 학교 11행, 10쌍과 미대응 두 기록이 독립 reference와 일치했다.
+원래 `population` 계약과 full-scope 권한을 유지했다. Codex는 학교 `sourceCoverage`를 supported로
+판정하며 새 합계행·빈 행을 인용했다. 11행의 원천 학교/학생/분교 합계는 38행과 일치한다.
+이는 제공기관 표 범위에 대한 단일 모델 판단이지 현실의 모든 교육기관·행정구역 대응 인증이 아니다.
+
+전체 결과는 **review_required**다. 인구 출력·인구 sourceCoverage·관계·측정·coverage·GoalFit은
+insufficient, 기간과 학교 관련 네 출력은 supported다. '재적 학생' 출력도 직전 insufficient에서
+supported로 바뀌었지만, 추가한 주석은 학급수에 관한 것이므로 이 판정 변화를 학생 정의 확보로
+해석하지 않는다. 인구 정의 및 명칭 대응의 외부 조사 결과는 이 입력에 주입하지 않았다.
+
+직전 full-scope와 질문·계약·recipe·계산/미대응 결과·guide는 같다. 입력 차이는 새 취득 관측 시각과
+학교 문맥의 보관 범위·선택 셀·metadata다. 두 단일 관측은 모델 정확도나 통계적 A/B의 증거가 아니다.
+G4 진단 누적은 **7시도/5실제 모델 호출/목표 완료 0회**다. 실패와 기존 원문은 모두 유지한다.
+
+[이번 archive](../../internal/goalwork/testdata/goalbench-v1/citywide-review-20260908/table-context-codex.json.gz)의
+압축 전 JSON은 486,463 bytes, SHA256은
+`151807bc4d940955a1c9bab6eb5943961a0b890185bae6e09d559d4ddbaf2d74`다. 검토 입력은 51,002 bytes,
+원 응답은 9,408 bytes이며 잘리지 않았다. guide hash는 직전과 같은
+`92a453b15321e29e8e4dbfda7f0f3b739ee353bd529af3ca83ccd7f4aaa1e54b`다. 총 122.69초,
+원 이벤트 사용량은 input 36,977/cached input 10,752/output 3,340 tokens다. 모델명·청구 비용은
+확인하지 못했다. offline adapter 재생은 기존 40개에 이번 응답 하나를 더한 41개 회귀이며 새 모델 호출이 아니다.
+
+```sh
+ODEDUCK_CITYWIDE_REVIEW=codex ODEDUCK_CITYWIDE_ACQUISITION=historical \
+  ODEDUCK_CITYWIDE_RESULT=with-table-context \
+  ODEDUCK_CITYWIDE_REVIEW_OUTPUT=/tmp/odeduck-g4-table-context-new.json \
   go test ./internal/goalwork -run '^TestLiveCitywideGoalAnalysisReview$' -count=1 -v
 ```
