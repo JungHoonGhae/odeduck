@@ -165,10 +165,18 @@ func TestLiveCitywideGoalAnalysisReview(t *testing.T) {
 	if variant == "" {
 		variant = "baseline"
 	}
-	if !slices.Contains([]string{"baseline", "with-branches", "with-branches-full-scope", "with-table-context", "with-age-definition"}, variant) {
+	recipes := map[string]citywideModelReview{
+		"baseline":                 {},
+		"with-branches":            {branches: true},
+		"with-branches-full-scope": {branches: true, fullScope: true},
+		"with-table-context":       {branches: true, fullScope: true, tableContext: true},
+		"with-age-definition":      {branches: true, fullScope: true, tableContext: true, ageDefinition: true},
+	}
+	recipe, known := recipes[variant]
+	if !known {
 		t.Fatal("result variant must be baseline, with-branches, with-branches-full-scope, with-table-context or with-age-definition")
 	}
-	if variant == "with-age-definition" && mode == "reference" {
+	if recipe.ageDefinition && mode == "reference" {
 		t.Fatal("age-definition diagnostic requires actual acquisition; offline document fixtures are not methodology evidence")
 	}
 	f, err := os.OpenFile(os.Getenv("ODEDUCK_CITYWIDE_REVIEW_OUTPUT"), os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
@@ -206,7 +214,10 @@ func TestLiveCitywideGoalAnalysisReview(t *testing.T) {
 			t.Error(err)
 		}
 	})
-	reviewer := &citywideModelReview{recipient: provider, historical: mode == "historical", branches: variant != "baseline", fullScope: variant == "with-branches-full-scope" || variant == "with-table-context" || variant == "with-age-definition", tableContext: variant == "with-table-context" || variant == "with-age-definition", ageDefinition: variant == "with-age-definition", observe: func(v goalwork.View) { record.Result = v }, call: func(ctx context.Context, in goalwork.ReviewInput) (goalwork.ReviewAssessment, error) {
+	reviewer := &recipe
+	reviewer.recipient, reviewer.historical = provider, mode == "historical"
+	reviewer.observe = func(v goalwork.View) { record.Result = v }
+	reviewer.call = func(ctx context.Context, in goalwork.ReviewInput) (goalwork.ReviewAssessment, error) {
 		record.Input = &in
 		response, err := agentplan.ReviewGoal(ctx, in, provider)
 		record.Response = &response
@@ -214,7 +225,7 @@ func TestLiveCitywideGoalAnalysisReview(t *testing.T) {
 			record.Error = err.Error()
 		}
 		return response.Assessment, err
-	}}
+	}
 	record.Result = checkCitywideReduction(t, mode != "reference", reviewer)
 	if record.Input == nil || record.Response == nil || record.Error != "" {
 		t.Fatal("actual model review was not completed; retain this failed attempt")

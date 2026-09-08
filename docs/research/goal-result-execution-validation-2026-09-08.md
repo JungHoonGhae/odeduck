@@ -549,3 +549,64 @@ ODEDUCK_CITYWIDE_REVIEW=codex ODEDUCK_CITYWIDE_ACQUISITION=historical \
 독립 Standards·Spec 검토는 각각 지적 0건이었다. 별도 읽기 전용 원천 감사도
 [인구 조사](population-source-applicability-2026-09-08.md)의 20개 파일 hash와 3,619행·309개 수치
 대조를 재현했다. 이 검증 기록 외의 후속 코드 변경은 없다. 로그인·신청·외부 배포는 하지 않았다.
+
+### 공식 나이 정의의 실제 전달 — 2026-09-08
+
+후속 [등록 문서 취득](../specs/source-document-acquisition-v1.md)을 기존 G4 진단에 연결했다.
+`with-age-definition`은 원래 population 목표·7월 파일·선집계·분교 출력·학교 표 문맥을 유지하고,
+PK 3033304의 실제 inspection이 제공한 KOSIS 답변을 `DOCUMENT` 관측으로 읽는다. 문서 PK와
+참조 ID는 개발 진단의 명시적 힌트이며 자율 발견 성과가 아니다. 인구 원본 o1에 대한 `support`는
+적용 검토의 제안이고, 답변을 특정 월 파일의 제공기관 선언으로 넣지 않는다.
+
+미대응 학교 행의 선공개와 전체 학교 공개를 하나로 합쳤다. 공개 seam의 실패 테스트 후 연결했고,
+기존 진단과 새 진단의 데이터·학교 문맥 155개 고유 셀을 값·missing/null·원본 위치별로 비교해
+전부 동일함을 확인했다. 27개 원본 인구 필드의 예시 값, 11개 계산 그룹, 학교 11행 및 헤더·합계·
+공백·주석은 유지한다. 8 packet·64 KiB 상한도 그대로다. 과거 archive의 중복 packet은 지우지
+않았다. 일반 회귀의 문서 본문은 명시적 합성 HTTP fixture이며 실제 모델 진단은 이 fixture/
+reference 모드를 실행 전에 거부한다.
+
+고정 코드 `2ed4a2e`로 13:05:18 UTC에 `historical` 진단을 한 번 실행했다. 인구 원본
+`6920fdafd269554d259e8498301f004c9799f499c38832de9352a0e7def916c5`의 전체 3,619행 검사·
+인천 162행 보관·11그룹 304,280명과 학교 원본
+`c8f57fc8e3bd7e70175ff0debd1529a17539e526e436dc244fcea39ed9a0f695`의 11행을 기존 독립
+reference에 대조했다. 10쌍·미대응 두 기록과 전체 범위 취득 자격은 유지했다.
+
+KOSIS HTML은 83,632 bytes, SHA256
+`9e16cbb7fc6ee3405e4ae3636227b2bba93139f231842b772cd4aa4ec55566d1`이었다. 두 공식 답변
+section의 원본 DOM 위치와 정규화 text hash는 앞선 live 문서 관측과 같았다. 답변의 통계 계열·
+만 나이·월말 기준 설명과 실제 공개 원문은 archive에 보존했다. 전체 HTML을 archive에 넣거나,
+포털이 KOSIS를 직접 연결했다고 표시하지 않았다. 행안부 도움말과 월간 export 대조는 이번
+검토 입력에 추가하지 않았다.
+
+실제 Codex 결과는 **review_required**다. 문서 packet을 인용했지만 인구 출력·인구 원천 범위는
+계속 insufficient였다. 2024년 통계 계열 답변과 해당 2026년 파일의 적용 관계가 부족하다는
+판정이며 문서 전달 실패는 아니다. GoalFit·관계·측정·coverage도 insufficient, 기간·학교 수·
+분교 학교/학생 수·학교 원천 범위는 supported다. 학교의 `enrolled`는 직전 supported에서
+insufficient로 바뀌었다. 같은 학교 셀인데 '재적 학생'이라는 더 구체적인 정의가 명시되지 않았다고
+보았다. 이 변동을 원천 학생 정의의 새 발견이나 문서 추가의 인과 효과로 해석하지 않는다.
+
+Node의 별도 읽기 전용 archive 대조에서도 원래 Goal Contract·계산/미대응 행·결합 지표·세 계산
+원천의 revision/행 수 및 155개 고유 공개 셀이 직전과 동일했다. 새 문서와 적용 제안, 중복 packet
+제거, 취득 시각과 실행 ID가 달라졌다. 분석 reviewer guide는 같은
+`92a453b15321e29e8e4dbfda7f0f3b739ee353bd529af3ca83ccd7f4aaa1e54b`다. 두 단일 관측은
+정확도 통과율·통계적 A/B·목표 완주 증거가 아니다. G4 누적은 **8시도/6실제 모델 호출/목표 완료 0회**다.
+
+[새 archive](../../internal/goalwork/testdata/goalbench-v1/citywide-review-20260908/age-definition-codex.json.gz)는
+원본 JSON을 내용 변경 없이 gzip `-n`으로 압축하고 압축 해제 bytes를 원본과 비교했다.
+압축 전 501,122 bytes, SHA256은
+`0946308262f2509367e48877de88e2b940986bcd578afd906eb0e0c1a8b9927d`다. 검토 입력은 54,004 bytes,
+SHA256 `9066a0fae15957df2a3b89b5658a3873dc1f10e220a0cf63b7a57579d636ceb7`, 공개 packet 합계는
+22,732 bytes다. 원 응답 9,778 bytes는 잘리지 않았다. 총 122.38초, 원 이벤트 사용량은 input
+37,971/cached input 10,752/output 3,414/reasoning output 283 tokens다. 모델명·청구 비용은
+확인하지 못했다. 새 원 응답을 기존 41개에 더한 42개 offline adapter 재생은 새 모델 호출이 아니다.
+
+```sh
+ODEDUCK_CITYWIDE_REVIEW=codex ODEDUCK_CITYWIDE_ACQUISITION=historical \
+  ODEDUCK_CITYWIDE_RESULT=with-age-definition \
+  ODEDUCK_CITYWIDE_REVIEW_OUTPUT=/tmp/odeduck-g4-age-definition-new.json \
+  go test ./internal/goalwork -run '^TestLiveCitywideGoalAnalysisReview$' -count=1 -v
+```
+
+다음은 이미 독립 조사한 원천 계열의 실제 월간 export·등록구분·코드/수치 대조를 제품 관측과
+검토 입력까지 연결하고, 학교 원문으로 확인한 행정구역 범위·기준일·비교 한계를 산출물로 표현하는
+일이다. 단순 재호출이나 원래 범위 축소로 해결하지 않는다. 로그인·활용신청·외부 배포는 하지 않았다.
