@@ -3,6 +3,7 @@ package goalwork
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"slices"
 	"sort"
@@ -233,7 +234,8 @@ func (e *Engine) sampleComparison(ctx context.Context, request SampleRequest) (A
 			rv, re := evaluateMeasure(qualified[1][right[0]-1], check[1])
 			ln, _, leftRangeErr := exactNumber(lv)
 			rn, _, rightRangeErr := exactNumber(rv)
-			if (lv != nil && leftRangeErr != nil) || (rv != nil && rightRangeErr != nil) {
+			if errors.Is(le, errMeasureResultRange) || errors.Is(re, errMeasureResultRange) ||
+				(lv != nil && leftRangeErr != nil) || (rv != nil && rightRangeErr != nil) {
 				return Acquired{}, fmt.Errorf("comparison check %s exceeds the supported exact numeric result range", r.Checks[i].ID)
 			}
 			status := "equal"

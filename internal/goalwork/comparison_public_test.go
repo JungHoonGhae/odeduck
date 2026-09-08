@@ -229,20 +229,21 @@ func TestSourceComparisonBoundsCompleteReportWithoutDroppingDiscrepancies(t *tes
 }
 
 func TestSourceComparisonRejectsNumericExpansionWithoutPartialObservation(t *testing.T) {
-	for _, variant := range []string{"sum carry", "left exponent", "right exponent", "missing peer", "invalid peer"} {
+	for _, variant := range []string{"sum carry", "left exponent", "sum exponent", "right exponent", "right sum exponent", "missing peer", "invalid peer", "sum exponent missing peer", "sum exponent invalid peer"} {
 		t.Run(variant, func(t *testing.T) {
 			left := []goalwork.Row{{"code": "001", "first": strings.Repeat("9", 256), "second": "1"}}
 			right := []goalwork.Row{{"label": "A (001)", "total": "1"}}
-			if variant == "left exponent" {
+			if variant == "left exponent" || strings.HasPrefix(variant, "sum exponent") {
 				left[0]["first"] = json.Number("1e256")
 			}
-			if variant == "right exponent" {
+			if variant == "right exponent" || variant == "right sum exponent" {
 				left[0]["first"], right[0]["total"] = "1", json.Number("1e256")
+				right[0]["extra"] = "1"
 			}
-			if variant == "missing peer" {
+			if strings.HasSuffix(variant, "missing peer") {
 				right[0]["total"] = nil
 			}
-			if variant == "invalid peer" {
+			if strings.HasSuffix(variant, "invalid peer") {
 				right[0]["total"] = "not a number"
 			}
 			e := comparisonFixture(t, left, right)
@@ -250,11 +251,44 @@ func TestSourceComparisonRejectsNumericExpansionWithoutPartialObservation(t *tes
 			if variant == "left exponent" {
 				s.Compare.Checks[0].Left = goalwork.Measure{Field: "first", Format: "decimal_v1", Unit: "units"}
 			}
+			if variant == "right sum exponent" {
+				s.Compare.Checks[0].Right = goalwork.Measure{Op: "sum_fields", Fields: []string{"total", "extra"}, Format: "decimal_v1", Unit: "units"}
+			}
 			v, err := e.Advance(context.Background(), e.View().Revision, goalwork.Decision{Action: "sample", Sample: &s})
 			if err != nil || len(v.Gaps) != 1 || len(v.Observations) != 2 || len(v.Evidence) != 0 || v.SampleAttempts[2].Status != "failed" {
 				t.Fatalf("expanded numeric comparison did not fail atomically: gaps=%+v err=%v", v.Gaps, err)
 			}
 		})
+	}
+}
+
+func TestSourceComparisonKeepsMalformedSourceNumbersAsDiagnostics(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		value any
+	}{
+		{"overlong string", strings.Repeat("7", 257)},
+		{"overlong JSON number", json.Number(strings.Repeat("7", 257))},
+		{"unsupported source exponent", json.Number("1e1001")},
+	} {
+		for _, side := range []string{"sum left", "convert right"} {
+			t.Run(tc.name+"/"+side, func(t *testing.T) {
+				left := []goalwork.Row{{"code": "001", "first": "1", "second": "2"}}
+				right := []goalwork.Row{{"label": "A (001)", "total": "3"}}
+				if side == "sum left" {
+					left[0]["first"] = tc.value
+				} else {
+					right[0]["total"] = tc.value
+				}
+				e := comparisonFixture(t, left, right)
+				s := comparisonRequest(t, e)
+				advanceUnmatched(t, e, goalwork.Decision{Action: "sample", Sample: &s})
+				values := readComparisonSummary(t, e)
+				if values["invalid"] != json.Number("1") || values["equal"] != json.Number("0") || values["missing"] != json.Number("0") {
+					t.Fatalf("malformed source token lost its diagnostic: %+v", values)
+				}
+			})
+		}
 	}
 }
 

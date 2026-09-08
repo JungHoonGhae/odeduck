@@ -2,6 +2,7 @@ package goalwork
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math"
 	"math/big"
@@ -27,6 +28,8 @@ type Measure struct {
 var plainMeasure = regexp.MustCompile(`^-?[0-9]+(?:\.[0-9]+)?$`)
 var groupedMeasure = regexp.MustCompile(`^-?(?:[0-9]+|[1-9][0-9]{0,2}(?:,[0-9]{3})+)(?:\.[0-9]+)?$`)
 var jsonDecimal = regexp.MustCompile(`^-?(?:0|[1-9][0-9]*)(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?$`)
+
+var errMeasureResultRange = errors.New("numeric result exceeds supported exact range")
 
 func measureRows(rows []Row, specs []Measure) error {
 	if len(specs) > 16 {
@@ -130,7 +133,9 @@ func evaluateMeasure(row Row, s Measure) (any, error) {
 		}
 		n, precision, err := exactNumber(value)
 		if err != nil {
-			return nil, err
+			// Conversion already accepted the source token. Failure here concerns
+			// its expanded result, not malformed source input.
+			return nil, fmt.Errorf("%w: %v", errMeasureResultRange, err)
 		}
 		total.Add(total, n)
 		if precision > scale {

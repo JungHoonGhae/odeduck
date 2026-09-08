@@ -41,6 +41,7 @@ cancellation or overflow reject the whole computed observation. At most 1000 rep
 within existing goal sample/storage budgets; never truncate a successful discrepancy report.
 An evaluated numeric operand exceeding the shared result range also rejects the whole report,
 even when its opposite operand is missing or invalid; malformed source inputs remain diagnostics.
+This includes an expanded intermediate term within `sum_fields`, not just its final sum.
 
 Report rows start with 13 `metric`/`value` summary rows: `leftRows`, `rightRows`, `matchedPairs`,
 `leftOnly`, `rightOnly`, `leftUnresolved`, `rightUnresolved`, `checks`, `comparisons`, `equal`,
