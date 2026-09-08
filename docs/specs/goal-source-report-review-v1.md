@@ -5,7 +5,8 @@
 [주장별 근거·재계획 결정](https://github.com/JungHoonGhae/odeduck/issues/51)의 원천 보고 부분이며,
 G1–G5의 범위나 전체 완료 기준을 바꾸지 않는다.
 
-분석 검토의 현재 입력은 [원본 셀 재사용 v2 계약](original-cell-evidence-reuse-v1.md)을 따른다.
+분석 검토의 현재 입력은 [원본 셀 재사용](original-cell-evidence-reuse-v1.md)과
+[비교 근거 v3 투영](source-comparison-evidence-v1.md#analysis-review-projection-v3)을 따른다.
 본문은 primary evidence와 analysis.additionalEvidence에 한 번만 두고 sourceContext는 packetId로
 참조한다. 기존 원천 보고 v1과 과거 검토 archive는 그대로 보존한다.
 
@@ -196,7 +197,7 @@ Composition의 `support:[{packetId,targets,purpose}]`로 실제 공개한 Eviden
   한 번씩 반환한다. 원본의 선택 근거 또는 그 원본을 target으로 삼은 문맥을 인용해야 한다.
   선택 조건의 누락 대상, 시트의 논리적 표 범위, join/시간 제외와 요청한 미대응 설명을 함께 판단한다.
   범위 밖 원천의 부재를 0이나 부정 사실로 만들지 않는다. 원천별 적용을 입증하지 못하면 insufficient다.
-- 모든 항목이 supported여야 `independent_model_full_scope_analysis_v2` 검토를 붙여 output_ready가
+- 모든 항목이 supported여야 `independent_model_full_scope_analysis_v3` 검토를 붙여 output_ready가
   된다. 이것은 제한된 모델의 원천 기반 전체 범위 판단이며 모집단 인증·실세계 진실·고비용 행동 승인이
   아니다. source-report/일반 analysis 권한만으로 이 경로를 열지 않고, 기존 예산·revision·공개 상한을 유지한다.
 

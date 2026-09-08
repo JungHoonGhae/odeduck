@@ -1,7 +1,7 @@
 # Reuse disclosed original cells across observations
 
 Status: runtime reuse implemented; public-seam and original G4 disclosure replay
-verified. Complete comparison-support input and actual model validation remain open.
+verified, including complete comparison-support input. Actual model validation remains open.
 Continues I5/I7/I9 through the original G4 evidence-delivery gap. The original question,
 population contract, source revisions, oracle and autonomous completion gates remain unchanged.
 Uses [selected evidence](selected-goal-evidence-v1.md),
@@ -96,7 +96,8 @@ Independent source expectations, actual model judgement and autonomous completio
 
 `ReviewInput.EvidencePackets()` enumerates the primary packet plus analysis.additionalEvidence;
 SourceContext holds packetId references and AnalysisSource.disclosure attributes packet rows/fields
-to participating retained rows. Active analysis replay and result methods use v2. Source-report v1
+to participating retained rows. The initial reuse contract used v2; active analysis now uses the
+[v3 comparison projection](source-comparison-evidence-v1.md#analysis-review-projection-v3). Source-report v1
 and historical archives remain unchanged; archive response tests explicitly convert legacy context
 in memory and do not count those replays as actual v2 model observations.
 
@@ -111,5 +112,7 @@ tests confirm single-copy context delivery and retain all 42 historical response
 and independent retained values through the Engine. It preserves the original population contract,
 157 disclosed cells (155 data cells plus two document blocks), ten matched rows and two unmatched
 tuples in seven packets, with a 57,280-byte review input. This is not fresh acquisition or a model
-trial. The complete comparison summary has not yet been added to that input; school-boundary and
-definition applicability, required explanations and original G4 completion remain unverified.
+trial. The subsequent complete comparison replay first failed at about 107,207 bytes despite fitting
+eight packets. The v3 projection now retains all those cells plus the complete comparison summary
+in about 91,325 bytes. School-boundary and definition applicability, required explanations, actual
+model judgement and original G4 completion remain unverified.

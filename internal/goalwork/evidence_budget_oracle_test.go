@@ -119,6 +119,18 @@ func TestOriginalG4SchoolDisclosureFitsOnePacketWithoutLosingCells(t *testing.T)
 // not a fresh download or model trial. The original population contract and all
 // disclosed cells survive; only duplicate school disclosure is consolidated.
 func TestOriginalG4ReviewReusesSchoolCellsWithinDisclosureBudget(t *testing.T) {
+	replayOriginalG4Disclosure(t, nil)
+}
+
+// Opt-in original CSV byte replay plus archived XLSX/document evidence. No
+// network or actual model is called; the full comparison summary is computed.
+func TestOriginalG4ReviewIncludesCompleteComparisonWithinDisclosureBudget(t *testing.T) {
+	comparison := replayOriginalG4Comparison(t)
+	replayOriginalG4Disclosure(t, &comparison)
+}
+
+func replayOriginalG4Disclosure(t *testing.T, comparison *originalG4ComparisonReplay) {
+	t.Helper()
 	compressed, err := os.ReadFile("testdata/goalbench-v1/citywide-review-20260908/age-definition-codex.json.gz")
 	if err != nil {
 		t.Fatal(err)
@@ -169,6 +181,9 @@ func TestOriginalG4ReviewReusesSchoolCellsWithinDisclosureBudget(t *testing.T) {
 			}
 		}
 	}
+	if comparison != nil {
+		values["o1"] = comparison.Original.Rows
+	}
 	inspections := map[string]goalwork.Inspection{}
 	for _, node := range old.Nodes {
 		if node.Inspection != nil {
@@ -189,6 +204,9 @@ func TestOriginalG4ReviewReusesSchoolCellsWithinDisclosureBudget(t *testing.T) {
 			return i, nil
 		},
 		Sample: func(_ context.Context, request goalwork.SampleRequest, _ goalwork.Inspection) (goalwork.Acquired, error) {
+			if comparison != nil && reflect.DeepEqual(request, comparison.ExportRequest) {
+				return comparison.Export, nil
+			}
 			for _, attempt := range old.SampleAttempts {
 				if attempt.Request.Reduce == nil && reflect.DeepEqual(attempt.Request, request) {
 					for _, o := range old.Observations {
@@ -201,7 +219,27 @@ func TestOriginalG4ReviewReusesSchoolCellsWithinDisclosureBudget(t *testing.T) {
 			return goalwork.Acquired{}, fmt.Errorf("request not in the immutable diagnostic")
 		},
 		Review: func(_ context.Context, in goalwork.ReviewInput) (goalwork.ReviewAssessment, error) {
-			if in.Analysis == nil || in.Analysis.FullScope == nil || len(in.EvidencePackets()) != 7 || !reflect.DeepEqual(in.Contract, *old.Contract) || !reflect.DeepEqual(in.Artifact.Rows, old.Artifact.Rows) || !reflect.DeepEqual(in.Artifact.Unmatched, old.Artifact.Unmatched) {
+			packets := 7
+			if comparison != nil {
+				packets++
+				if len(in.Analysis.SourceContext) != 3 || in.Analysis.SourceContext[2].Comparison == nil || len(in.Analysis.SourceContext[2].ComparisonSources) != 2 {
+					t.Fatal("full computed comparison and both original revisions did not reach review")
+				}
+				c := in.Analysis.SourceContext[2]
+				if c.Source.Comparison != nil || c.Request.Compare == nil || len(c.Request.Compare.Checks) != 42 || len(c.Comparison.Pairs) != 162 || len(c.Comparison.Records) != 70 || c.ComparisonSources[0].ArtifactSource != "o1" || c.ComparisonSources[1].Source == nil || c.ComparisonSources[1].Source.ID != "o6" || c.ComparisonSources[1].Request == nil || !reflect.DeepEqual(*c.ComparisonSources[1].Request, comparison.ExportRequest) {
+					t.Fatal("comparison projection lost recipe, complete positional provenance or original acquisition conditions")
+				}
+				summary := reviewPacket(t, in, in.Analysis.SourceContext[2].PacketID)
+				got := map[string]any{}
+				for _, record := range summary.Records {
+					got[record.Values["metric"].(string)] = record.Values["value"]
+				}
+				want := map[string]int{"leftRows": 162, "rightRows": 177, "matchedPairs": 162, "leftOnly": 0, "rightOnly": 15, "leftUnresolved": 0, "rightUnresolved": 0, "checks": 42, "comparisons": 6804, "equal": 6804, "different": 0, "missing": 0, "invalid": 0}
+				if !equalJSON(got, want) {
+					t.Fatal("review summary omitted or changed comparison denominators")
+				}
+			}
+			if in.Analysis == nil || in.Analysis.FullScope == nil || len(in.EvidencePackets()) != packets || !reflect.DeepEqual(in.Contract, *old.Contract) || !reflect.DeepEqual(in.Artifact.Rows, old.Artifact.Rows) || !reflect.DeepEqual(in.Artifact.Unmatched, old.Artifact.Unmatched) {
 				t.Fatal("reuse changed original scope, values or unmatched results")
 			}
 			reviewed = in
@@ -223,6 +261,8 @@ func TestOriginalG4ReviewReusesSchoolCellsWithinDisclosureBudget(t *testing.T) {
 	for _, attempt := range old.SampleAttempts {
 		r := attempt.Request
 		if r.Reduce != nil {
+			reduction := *r.Reduce
+			r.Reduce = &reduction
 			r.Reduce.RowsSHA256 = e.View().Observations[0].RowsSHA256
 		} else if attempt.ObservationID != "o4" {
 			if r.FileVersion != "" {
@@ -251,17 +291,36 @@ func TestOriginalG4ReviewReusesSchoolCellsWithinDisclosureBudget(t *testing.T) {
 		advanceUnmatched(t, e, goalwork.Decision{Action: "read_evidence", Evidence: &r})
 	}
 	p := old.Artifact.Recipe
+	p.Support = slices.Clone(p.Support)
 	p.Support[0].PacketID = e.View().Evidence[6].ID
+	if comparison != nil {
+		advanceUnmatched(t, e, goalwork.Decision{Action: "sample", Sample: &comparison.ExportRequest})
+		left, right := e.View().Observations[0], e.View().Observations[5]
+		r := comparison.Comparison
+		r.Left.Observation, r.Left.RowsSHA256 = left.ID, left.RowsSHA256
+		r.Right.Observation, r.Right.RowsSHA256 = right.ID, right.RowsSHA256
+		advanceUnmatched(t, e, goalwork.Decision{Action: "sample", Sample: &goalwork.SampleRequest{PK: left.PK, Delivery: "file", Compare: &r}})
+		o := e.View().Observations[6]
+		advanceUnmatched(t, e, goalwork.Decision{Action: "read_evidence", Evidence: &goalwork.EvidenceRequest{Observation: o.ID, RowsSHA256: o.RowsSHA256, Rows: []int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13}, Fields: []string{"metric", "value"}}})
+		p.Support = append(p.Support, goalwork.SupportBinding{PacketID: e.View().Evidence[7].ID, Targets: []string{"o1"}, Purpose: "Compare both retained source revisions and conditions when assessing whether the official series definition applies; numerical agreement alone is not approval."})
+	}
 	advanceUnmatched(t, e, goalwork.Decision{Action: "compose", Composition: &p})
 	advanceUnmatched(t, e, goalwork.Decision{Action: "execute", CompositionID: p.ID})
 	v := advanceUnmatched(t, e, goalwork.Decision{Action: "review_result", CompositionID: p.ID})
-	if reviewed.Analysis == nil || v.Status == "output_ready" || len(v.Reviews) != 1 || v.Budget.EvidencePacketsRemaining != 1 {
+	remaining := 1
+	if comparison != nil {
+		remaining = 0
+	}
+	if reviewed.Analysis == nil || v.Status == "output_ready" || len(v.Reviews) != 1 || v.Budget.EvidencePacketsRemaining != remaining {
 		t.Fatal("original goal was approved or the disclosed packet budget was not preserved")
 	}
 	// Compare actual original addresses/value presence, not acquisition aliases.
 	cells := func(state goalwork.View) map[string]any {
 		result := map[string]any{}
 		for _, packet := range state.Evidence {
+			if packet.Selection.Observation == "o7" {
+				continue // Added computed summary, not part of the preserved 157 cells.
+			}
 			for _, record := range packet.Records {
 				for _, field := range packet.Selection.Fields {
 					address := record.Origins[field]
@@ -283,5 +342,5 @@ func TestOriginalG4ReviewReusesSchoolCellsWithinDisclosureBudget(t *testing.T) {
 	if err != nil || len(wire) > 96<<10 {
 		t.Fatal("review no longer fits the unchanged input budget")
 	}
-	t.Logf("original G4 replay preserves 157 disclosed cells, 10 matched rows and 2 unmatched tuples in 7 packets; review input %d bytes; no new model/G4 completion", len(wire))
+	t.Logf("original G4 replay preserves 157 disclosed cells, 10 matched rows and 2 unmatched tuples in %d packets; complete comparison added=%t; review input %d bytes; no new model/G4 completion", len(v.Evidence), comparison != nil, len(wire))
 }

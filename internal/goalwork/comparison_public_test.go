@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 
@@ -365,9 +366,15 @@ func TestSourceComparisonSupportCarriesBothRevisionsWithoutChangingTheResult(t *
 		c := in.Analysis.SourceContext[0]
 		wire, _ := json.Marshal(c)
 		var decoded struct {
+			Comparison *struct {
+				Method  string
+				Pairs   [][2]int
+				Records []goalwork.ComparisonOrigin
+			}
 			ComparisonSources []struct {
-				Source  goalwork.Observation
-				Request goalwork.SampleRequest
+				ArtifactSource string
+				Source         *goalwork.Observation
+				Request        *goalwork.SampleRequest
 			}
 		}
 		if err := json.Unmarshal(wire, &decoded); err != nil {
@@ -376,16 +383,27 @@ func TestSourceComparisonSupportCarriesBothRevisionsWithoutChangingTheResult(t *
 		if len(decoded.ComparisonSources) != 2 {
 			t.Fatalf("computed support omitted its two original revisions: %s", wire)
 		}
+		if decoded.Comparison == nil || decoded.Comparison.Method != "source_comparison_v1" || !reflect.DeepEqual(decoded.Comparison.Pairs, [][2]int{{1, 1}}) || len(decoded.Comparison.Records) != 14 || c.Source.Comparison != nil || c.Request.Compare == nil {
+			t.Fatal("review must keep one comparison recipe in the actual request, with complete separate positional provenance")
+		}
 		for i, source := range decoded.ComparisonSources {
 			wantID, wantPK, wantHash := "o1", "left", strings.Repeat("a", 64)
 			if i == 1 {
 				wantID, wantPK, wantHash = "o2", "right", strings.Repeat("b", 64)
+			} else {
+				if source.ArtifactSource != "o1" || source.Source != nil || source.Request != nil {
+					t.Fatal("existing computational source must be referenced, not copied into comparison support")
+				}
+				source.Source, source.Request = &in.Artifact.Sources[0], &in.Artifact.Requests[0]
 			}
-			if source.Source.ID != wantID || source.Source.ContentSHA256 != wantHash || source.Request.PK != wantPK || source.Request.Asset != wantPK+".csv" {
+			if source.Source == nil || source.Request == nil || source.Source.ID != wantID || source.Source.ContentSHA256 != wantHash || source.Request.PK != wantPK || source.Request.Asset != wantPK+".csv" {
 				t.Fatalf("comparison provenance lost: %+v", source)
 			}
 		}
-		if !c.Proposed || len(c.Targets) != 1 || c.Targets[0] != "o1" || c.Source.Delivery != "DERIVED" || c.Source.Comparison == nil || reviewPacket(t, in, c.PacketID).Records[9].Values["metric"] != "equal" || reviewPacket(t, in, c.PacketID).Records[9].Values["value"] != json.Number("1") {
+		if !slices.Contains(in.Artifact.Sources[0].Columns, "first") || !slices.Contains(in.Artifact.Sources[0].Columns, "second") || slices.Contains(in.Analysis.Sources[0].Fields, "first") || c.Request.Compare.Checks[0].Left.Fields[1] != "second" {
+			t.Fatal("comparison-only metadata/recipe lost or promoted to computational participation")
+		}
+		if !c.Proposed || len(c.Targets) != 1 || c.Targets[0] != "o1" || c.Source.Delivery != "DERIVED" || reviewPacket(t, in, c.PacketID).Records[9].Values["metric"] != "equal" || reviewPacket(t, in, c.PacketID).Records[9].Values["value"] != json.Number("1") {
 			t.Fatalf("lost computed/proposed separation: %+v", c)
 		}
 		wire, _ = json.Marshal(in)
@@ -405,5 +423,104 @@ func TestSourceComparisonSupportCarriesBothRevisionsWithoutChangingTheResult(t *
 	v, err := e.Advance(context.Background(), e.View().Revision, goalwork.Decision{Action: "review_result", CompositionID: p.ID})
 	if err != nil || calls != 1 || len(v.Reviews) != 1 || v.Status == "output_ready" {
 		t.Fatalf("comparison context did not reach separate review: calls=%d gaps=%+v err=%v", calls, v.Gaps, err)
+	}
+	if v.Observations[2].Comparison == nil || !reflect.DeepEqual(v.Observations[2].Comparison.Recipe, *s.Compare) {
+		t.Fatal("review projection modified the immutable comparison observation")
+	}
+}
+
+func TestComparisonReviewSharesEitherParentAndRejectsInputMutation(t *testing.T) {
+	for _, variant := range []string{"right shared", "both shared", "reference mutation", "recipe mutation", "trace mutation", "inline request mutation"} {
+		t.Run(variant, func(t *testing.T) {
+			calls := 0
+			e := comparisonFixture(t, []goalwork.Row{{"code": "001", "first": "1", "second": "2"}}, []goalwork.Row{{"code": "001", "label": "Private label (001)", "total": "3"}}, func(_ context.Context, in goalwork.ReviewInput) (goalwork.ReviewAssessment, error) {
+				calls++
+				c := &in.Analysis.SourceContext[0]
+				if c.ComparisonSources[1].ArtifactSource != "o2" || c.ComparisonSources[1].Source != nil || c.ComparisonSources[1].Request != nil {
+					t.Fatal("right parent did not reuse the exact artifact source/request")
+				}
+				if variant == "both shared" {
+					if c.ComparisonSources[0].ArtifactSource != "o1" || c.ComparisonSources[0].Source != nil || len(in.Artifact.Sources) != 2 {
+						t.Fatal("both computational parents should be references")
+					}
+				} else if c.ComparisonSources[0].Source == nil || c.ComparisonSources[0].Source.ID != "o1" || c.ComparisonSources[0].Request == nil || c.ComparisonSources[0].Request.PK != "left" || len(in.Artifact.Sources) != 1 {
+					t.Fatal("nonparticipating left parent must stay inline and outside computation")
+				}
+				for i, source := range in.Artifact.Sources {
+					if in.Artifact.Requests[i].PK != source.PK || !slices.Contains(source.Columns, "code") || source.ID == "o2" && (!slices.Contains(source.Columns, "label") || !slices.Contains(source.Columns, "total")) {
+						t.Fatal("shared request pairing or comparison-only field metadata changed")
+					}
+				}
+				a := supportedAnalysisReview(in)
+				switch variant {
+				case "reference mutation":
+					c.ComparisonSources[1].ArtifactSource = "invented"
+				case "recipe mutation":
+					c.Request.Compare.Checks[0].Left.Unit = "invented"
+				case "trace mutation":
+					c.Comparison.Pairs[0][0] = 99
+				case "inline request mutation":
+					c.ComparisonSources[0].Request.Asset = "invented.csv"
+				}
+				return a, nil
+			})
+			s := comparisonRequest(t, e)
+			advanceUnmatched(t, e, goalwork.Decision{Action: "sample", Sample: &s})
+			readComparisonSummary(t, e)
+			base := "o2"
+			if variant == "both shared" {
+				base = "o1"
+				advanceUnmatched(t, e, goalwork.Decision{Action: "read_evidence", Evidence: &goalwork.EvidenceRequest{Observation: "o1", RowsSHA256: e.View().Observations[0].RowsSHA256, Rows: []int{1}, Fields: []string{"code"}}})
+			}
+			advanceUnmatched(t, e, goalwork.Decision{Action: "read_evidence", Evidence: &goalwork.EvidenceRequest{Observation: "o2", RowsSHA256: e.View().Observations[1].RowsSHA256, Rows: []int{1}, Fields: []string{"code"}}})
+			p := goalwork.Composition{ID: "report", Base: base, Purpose: "fixture source report with comparison context", Select: []string{base + ".code"}, Roles: []goalwork.RoleBinding{{Role: "r", Observation: base}}, Outputs: []goalwork.OutputBinding{{Output: "value", Field: base + ".code"}}, Assumptions: []string{"fixture verdict is not real meaning validation"}, Support: []goalwork.SupportBinding{{PacketID: e.View().Evidence[0].ID, Targets: []string{base}, Purpose: "Check applicability"}}}
+			if variant == "both shared" {
+				p.Joins = []goalwork.Join{{Right: "o2", LeftKeys: []string{"o1.code"}, RightKeys: []string{"code"}}}
+			}
+			advanceUnmatched(t, e, goalwork.Decision{Action: "compose", Composition: &p})
+			advanceUnmatched(t, e, goalwork.Decision{Action: "execute", CompositionID: p.ID})
+			before := e.View()
+			v, err := e.Advance(context.Background(), before.Revision, goalwork.Decision{Action: "review_result", CompositionID: p.ID})
+			mutated := strings.HasSuffix(variant, "mutation")
+			if err != nil || calls != 1 || len(v.Reviews) != 1 || (v.Status == "output_ready") == mutated || !reflect.DeepEqual(v.Observations, before.Observations) || !reflect.DeepEqual(v.Artifact.Requests, before.Artifact.Requests) {
+				t.Fatalf("shared context or mutation isolation failed: status=%s calls=%d gaps=%+v err=%v", v.Status, calls, v.Gaps, err)
+			}
+			if mutated && (len(v.Gaps) != 1 || !strings.Contains(v.Gaps[0].Detail, "changed its input")) {
+				t.Fatal("changed comparison input was not rejected before approval")
+			}
+		})
+	}
+}
+
+func TestComparisonReviewStillRejectsAnOversizedCompleteInput(t *testing.T) {
+	left := goalwork.Row{"code": "001"}
+	right := goalwork.Row{"label": "Original (001)"}
+	var fields []string
+	for i := range 48 {
+		field := fmt.Sprintf("%s_%02d", strings.Repeat("measurement", 19), i)
+		fields = append(fields, field)
+		left[field], right[field] = "1", "1"
+	}
+	called := false
+	e := comparisonFixture(t, []goalwork.Row{left}, []goalwork.Row{right}, func(context.Context, goalwork.ReviewInput) (goalwork.ReviewAssessment, error) {
+		called = true
+		return goalwork.ReviewAssessment{}, fmt.Errorf("must not receive an oversized input")
+	})
+	s := comparisonRequest(t, e)
+	s.Compare.Checks = nil
+	for i, field := range fields {
+		operand := goalwork.Measure{Field: field, Format: "decimal_v1", Unit: "units"}
+		s.Compare.Checks = append(s.Compare.Checks, goalwork.NumericComparison{ID: fmt.Sprintf("check_%d", i), Left: operand, Right: operand})
+	}
+	advanceUnmatched(t, e, goalwork.Decision{Action: "sample", Sample: &s})
+	readComparisonSummary(t, e)
+	advanceUnmatched(t, e, goalwork.Decision{Action: "read_evidence", Evidence: &goalwork.EvidenceRequest{Observation: "o1", RowsSHA256: e.View().Observations[0].RowsSHA256, Rows: []int{1}, Fields: []string{"code"}}})
+	p := goalwork.Composition{ID: "report", Base: "o1", Purpose: "report with a large explicit comparison", Select: []string{"o1.code"}, Roles: []goalwork.RoleBinding{{Role: "r", Observation: "o1"}}, Outputs: []goalwork.OutputBinding{{Output: "value", Field: "o1.code"}}, Assumptions: []string{"full input must fit without removing comparison metadata"}, Support: []goalwork.SupportBinding{{PacketID: e.View().Evidence[0].ID, Targets: []string{"o1"}, Purpose: "Check comparison applicability"}}}
+	advanceUnmatched(t, e, goalwork.Decision{Action: "compose", Composition: &p})
+	advanceUnmatched(t, e, goalwork.Decision{Action: "execute", CompositionID: p.ID})
+	before := e.View()
+	v, err := e.Advance(context.Background(), before.Revision, goalwork.Decision{Action: "review_result", CompositionID: p.ID})
+	if err != nil || called || len(v.Gaps) != 1 || !strings.Contains(v.Gaps[0].Detail, "96 KiB") || len(v.Reviews) != 0 || !reflect.DeepEqual(v.Evidence, before.Evidence) || !reflect.DeepEqual(v.Observations, before.Observations) || v.Budget.EvidencePacketsRemaining != before.Budget.EvidencePacketsRemaining {
+		t.Fatalf("oversized comparison reached review, lost evidence or changed budgets: %+v %v", v.Gaps, err)
 	}
 }

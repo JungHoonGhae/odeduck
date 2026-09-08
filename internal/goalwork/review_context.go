@@ -21,6 +21,7 @@ type SupportBinding struct {
 // the same file revision, or explicitly proposed supporting records. Neither
 // association proves applicability, identity, or computational participation.
 type SourceContext struct {
+	Comparison        *ComparisonReviewTrace    `json:"comparison,omitempty"`
 	ComparisonSources []ComparisonContextSource `json:"comparisonSources,omitempty"`
 	Targets           []string                  `json:"targets"`
 	Source            Observation               `json:"source"`
@@ -30,11 +31,23 @@ type SourceContext struct {
 	Purpose           string                    `json:"purpose,omitempty"`
 }
 
-// Computed support names both original revisions and acquisition conditions.
-// These metadata contain no automatically disclosed original row values.
+// ComparisonReviewTrace retains complete positional provenance; its one recipe
+// is the context's actual Request.Compare. Runtime observations are unchanged.
+type ComparisonReviewTrace struct {
+	Method  string             `json:"method"`
+	Left    ComparisonRevision `json:"left"`
+	Right   ComparisonRevision `json:"right"`
+	Pairs   [][2]int           `json:"pairs"`
+	Records []ComparisonOrigin `json:"records"`
+}
+
+// A comparison parent is either an existing Artifact source ID (and its paired
+// request), or an inline original source/request. Neither form discloses values
+// or changes computational participation.
 type ComparisonContextSource struct {
-	Source  Observation   `json:"source"`
-	Request SampleRequest `json:"request"`
+	ArtifactSource string         `json:"artifactSource,omitempty"`
+	Source         *Observation   `json:"source,omitempty"`
+	Request        *SampleRequest `json:"request,omitempty"`
 }
 
 func (e *Engine) supportContext(p Composition) (map[string]SourceContext, error) {
@@ -84,6 +97,13 @@ func (e *Engine) supportContext(p Composition) (map[string]SourceContext, error)
 					return nil, fmt.Errorf("comparison support lost its original source revision")
 				}
 				fields := map[string]bool{}
+				request := e.requests[parent.ID]
+				for field := range request.Where {
+					fields[field] = true
+				}
+				for field := range request.WhereIn {
+					fields[field] = true
+				}
 				for _, key := range selection.Keys {
 					fields[key.Field] = true
 				}
@@ -104,7 +124,8 @@ func (e *Engine) supportContext(p Composition) (map[string]SourceContext, error)
 					names = append(names, field)
 				}
 				slices.Sort(names)
-				c.ComparisonSources = append(c.ComparisonSources, ComparisonContextSource{Source: projectReviewSource(parent, names), Request: e.requests[parent.ID]})
+				projected := projectReviewSource(parent, names)
+				c.ComparisonSources = append(c.ComparisonSources, ComparisonContextSource{Source: &projected, Request: &request})
 			}
 		}
 		out[binding.PacketID] = c
@@ -221,4 +242,50 @@ func projectReviewSource(source Observation, fields []string) Observation {
 		source.ColumnTypes[field], source.ColumnProfiles[field] = types[field], profiles[field]
 	}
 	return source
+}
+
+// Normalize only comparison context in the detached review projection. Shared
+// original metadata is unioned, not promoted into computational field usage.
+func (e *Engine) projectComparisonReview(in *ReviewInput) error {
+	observed := map[string]Observation{}
+	for _, source := range e.state.Observations {
+		observed[source.ID] = source
+	}
+	for i := range in.Analysis.SourceContext {
+		c := &in.Analysis.SourceContext[i]
+		p := c.Source.Comparison
+		if p == nil {
+			continue
+		}
+		if c.Request.Compare == nil || digest(c.Request.Compare) != digest(p.Recipe) || digest(c.Request) != c.Source.RequestSHA256 || len(c.ComparisonSources) != 2 {
+			return fmt.Errorf("comparison review lost its exact request or original revisions")
+		}
+		c.Comparison = &ComparisonReviewTrace{Method: p.Method, Left: p.Left, Right: p.Right, Pairs: p.Pairs, Records: p.Records}
+		c.Source.Comparison = nil // Request.Compare is the one recipe in this wire contract.
+		for j := range c.ComparisonSources {
+			parent := &c.ComparisonSources[j]
+			if parent.Source == nil || parent.Request == nil || parent.ArtifactSource != "" {
+				return fmt.Errorf("comparison review requires both original source/request pairs")
+			}
+			source := *parent.Source
+			raw, exists := observed[source.ID]
+			if !exists || digest(projectReviewSource(raw, source.Columns)) != digest(source) || digest(parent.Request) != source.RequestSHA256 {
+				return fmt.Errorf("comparison review original metadata or request changed")
+			}
+			for k, shared := range in.Artifact.Sources {
+				if shared.ID != source.ID {
+					continue
+				}
+				if k >= len(in.Artifact.Requests) || digest(in.Artifact.Requests[k]) != source.RequestSHA256 || digest(projectReviewSource(raw, shared.Columns)) != digest(shared) {
+					return fmt.Errorf("comparison review cannot reference inconsistent artifact metadata")
+				}
+				fields := append(slices.Clone(shared.Columns), source.Columns...)
+				slices.Sort(fields)
+				in.Artifact.Sources[k] = projectReviewSource(raw, slices.Compact(fields))
+				*parent = ComparisonContextSource{ArtifactSource: source.ID}
+				break
+			}
+		}
+	}
+	return nil
 }

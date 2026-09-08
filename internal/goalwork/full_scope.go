@@ -10,7 +10,7 @@ import (
 	"github.com/JungHoonGhae/odeduck/internal/dataset"
 )
 
-const FullScopeReviewMethod = "independent_model_full_scope_analysis_v2"
+const FullScopeReviewMethod = "independent_model_full_scope_analysis_v3"
 
 // FullScopeContext records acquisition eligibility, never semantic completeness.
 // Counts, selectors and original positions remain in the referenced observations.

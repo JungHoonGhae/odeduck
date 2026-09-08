@@ -2,6 +2,7 @@ package goalwork_test
 
 import (
 	"bytes"
+	"context"
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
@@ -23,6 +24,17 @@ import (
 // inspectors, scanners and Engine. Portal listing/resolver metadata is a fixture,
 // not a new historical lookup, live acquisition or autonomous discovery result.
 func TestSourceComparisonReplaysOriginalG4Bytes(t *testing.T) {
+	replayOriginalG4Comparison(t)
+}
+
+type originalG4ComparisonReplay struct {
+	Original, Export goalwork.Acquired
+	ExportRequest    goalwork.SampleRequest
+	Comparison       goalwork.SourceComparison
+}
+
+func replayOriginalG4Comparison(t *testing.T) originalG4ComparisonReplay {
+	t.Helper()
 	paths := []string{os.Getenv("ODEDUCK_COMPARISON_ORIGINAL_CSV"), os.Getenv("ODEDUCK_COMPARISON_EXPORT_CSV"), os.Getenv("ODEDUCK_COMPARISON_EXPORT_HTML")}
 	if paths[0] == "" && paths[1] == "" && paths[2] == "" {
 		t.Skip("set all three ODEDUCK_COMPARISON_* source paths for preserved-byte replay")
@@ -79,7 +91,21 @@ func TestSourceComparisonReplaysOriginalG4Bytes(t *testing.T) {
 		return &http.Response{StatusCode: 200, Header: http.Header{"Content-Type": {contentType}}, Body: io.NopCloser(bytes.NewReader(body))}, nil
 	})}))
 	policy := goalwork.Policy{EvidenceRecipient: "claude"}
-	e, err := goalwork.Start("Diagnostic of the original G4 source applicability, not goal completion", policy, goalwork.LiveDependencies(client, "", nil, catalog.Searcher{}, policy))
+	deps := goalwork.LiveDependencies(client, "", nil, catalog.Searcher{}, policy)
+	var replay originalG4ComparisonReplay
+	acquire := deps.Sample
+	deps.Sample = func(ctx context.Context, request goalwork.SampleRequest, inspection goalwork.Inspection) (goalwork.Acquired, error) {
+		a, err := acquire(ctx, request, inspection)
+		if err == nil {
+			if request.PK == "15097972" {
+				replay.Original = a
+			} else {
+				replay.Export, replay.ExportRequest = a, request
+			}
+		}
+		return a, err
+	}
+	e, err := goalwork.Start("Diagnostic of the original G4 source applicability, not goal completion", policy, deps)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -172,6 +198,8 @@ func TestSourceComparisonReplaysOriginalG4Bytes(t *testing.T) {
 		t.Fatal("comparison leaked source rows or became goal completion")
 	}
 	t.Log("preserved-byte product replay: 162/177 original rows, 162 unique pairs, 42 checks, 6804 equal positions, 15 right-only originals, four township branches retained; no autonomous/model/G4 completion claim")
+	replay.Comparison = comparison
+	return replay
 }
 
 func equalJSON(a, b any) bool {

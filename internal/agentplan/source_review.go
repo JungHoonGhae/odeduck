@@ -45,7 +45,7 @@ func ReviewGoal(ctx context.Context, in goalwork.ReviewInput, requested string) 
 	}
 	guide := sourceReviewGuide
 	if in.Analysis != nil {
-		if in.Analysis.Method != "engine_relational_replay_v2" {
+		if in.Analysis.Method != "engine_relational_replay_v3" {
 			return GoalReviewResponse{}, fmt.Errorf("unsupported analysis replay contract")
 		}
 		guide = analysisReviewGuide

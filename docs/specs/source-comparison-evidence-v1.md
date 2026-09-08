@@ -69,6 +69,48 @@ rules apply. Support does not alter the result, required roles, periods, populat
 approval policy. Numeric agreement is evidence to interpret, not automatic definition applicability.
 Comparison observations cannot become base/join/reduction/spatial inputs in this support-only version.
 
+### Analysis review projection v3
+
+The complete original G4 comparison input initially used eight packets but serialized to about
+107,207 bytes, exceeding the unchanged 96 KiB review limit. The comparison recipe appeared both in
+the computed Observation and its SampleRequest (about 9 KiB twice); its left original also appeared
+in Artifact.Sources and ComparisonSources. This is a delivery failure, not a model judgement.
+
+Keep immutable observations, requests, packets and execution artifacts unchanged. Project only the
+analysis review input. A comparison SourceContext keeps the exact request, with the recipe once in
+`request.compare`; `comparison` retains method, both revision records, all pairs and all record origins.
+Its projected `source` retains its other metadata but omits the duplicate `source.comparison`.
+Before removing that copy, verify recipe equality and the exact request hash.
+
+In left/right order, each `comparisonSources` entry is exactly one of:
+
+- `{artifactSource: "existing observation ID"}`: resolve to Artifact.Sources by ID and its same-index
+  Artifact.Requests entry. Verify both projected metadata and request against the immutable original.
+- `{source, request}`: inline both when the original does not already participate in the artifact.
+
+For a shared source, union the metadata fields needed by computation/disclosure and by comparison
+keys, operands and original selection predicates. AnalysisSource.Fields keeps the computational-use
+projection; the union neither discloses extra cells nor changes participation. All declarations,
+selection/export conditions, hashes and original CSV/XLSX positions remain reachable. Do not use
+an equal PK/content/value to share distinct observation IDs, or hide discrepancies to fit a budget.
+
+Compared a review-wide canonical source registry, a role-specific registry with field-use references,
+and this comparison-only projection. Choose the latter: it removes the observed duplication behind
+the existing in-process review seam without migrating unrelated source-report/ordinary context
+contracts or adding a store, generic graph serializer, action or adapter.
+
+Active analysis replay/result methods and CLI/MCP guides use v3 together. No legacy active fallback
+or custom serializer that silently expands the model input. Source-report v1 and historical archives
+remain unchanged; explicit archive decoder tests remain response replays, not new model trials.
+Detachment, credential checking, full-input hashing, canonical evidence deduplication, fixed recipients,
+expiry and all existing budgets still apply after projection.
+
+The complete stored-byte G4 replay now reaches the fixture reviewer in about 91,325 bytes (timestamp
+formatting can vary by a few bytes), with eight packets, all prior 157 disclosed cells, 13 comparison
+summary rows, 162 pairs/42 checks/6,804 equal positions, and all 15 right-only originals. This proves
+delivery and retained-source replay, not new acquisition, independent model accuracy or G4 completion.
+School-boundary/applicability evidence and requested final explanations remain open.
+
 ## Verification
 
 Use the delegated public Engine Start/Advance/View/PlanningView, CLI and MCP seams. Substitute external

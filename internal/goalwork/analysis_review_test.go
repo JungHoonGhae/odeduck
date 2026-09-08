@@ -12,7 +12,7 @@ import (
 
 func TestAnalysisReviewUsesDisclosedGroupsWithoutSendingAllContributors(t *testing.T) {
 	e := analysisReviewEngine(t, func(_ context.Context, in goalwork.ReviewInput) (goalwork.ReviewAssessment, error) {
-		if in.Analysis == nil || in.Analysis.Method != "engine_relational_replay_v2" || len(in.Analysis.AdditionalEvidence) != 2 || len(in.Analysis.Sources) != 3 {
+		if in.Analysis == nil || in.Analysis.Method != "engine_relational_replay_v3" || len(in.Analysis.AdditionalEvidence) != 2 || len(in.Analysis.Sources) != 3 {
 			t.Fatal("review lacks reproducible computation and multiple sources")
 		}
 		b, _ := json.Marshal(in)

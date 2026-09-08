@@ -13,9 +13,29 @@ import (
 )
 
 func TestMCPComparisonUsesOriginalRevisionsAndExplicitComputedDisclosure(t *testing.T) {
+	reviewed := false
 	s := mcp.NewServer(&mcp.Implementation{Name: "test", Version: "0"}, nil)
-	registerGoalTool(s, goalwork.Policy{EvidenceRecipient: "mcp_host"}, func(goalwork.Policy) goalwork.Dependencies {
+	registerGoalTool(s, goalwork.Policy{EvidenceRecipient: "mcp_host", ReviewRecipient: "claude", ReviewAnalyses: true}, func(goalwork.Policy) goalwork.Dependencies {
 		return goalwork.Dependencies{
+			Review: func(_ context.Context, in goalwork.ReviewInput) (goalwork.ReviewAssessment, error) {
+				if in.Analysis == nil || in.Analysis.Method != "engine_relational_replay_v3" || len(in.Analysis.SourceContext) != 1 {
+					return goalwork.ReviewAssessment{}, fmt.Errorf("MCP did not deliver comparison review v3")
+				}
+				c := in.Analysis.SourceContext[0]
+				if c.Comparison == nil || c.Source.Comparison != nil || c.Request.Compare == nil || c.ComparisonSources[0].ArtifactSource != "o1" || c.ComparisonSources[1].Source == nil || c.ComparisonSources[1].Request == nil || c.ComparisonSources[1].Request.Delivery != "standard" || len(in.Artifact.Sources) != 1 {
+					return goalwork.ReviewAssessment{}, fmt.Errorf("MCP lost single-copy comparison or both original contracts")
+				}
+				reviewed = true
+				f := goalwork.ReviewFinding{Verdict: "insufficient", Reason: "fixture: comparison is not a meaning verdict"}
+				for _, packet := range in.EvidencePackets() {
+					f.PacketIDs = append(f.PacketIDs, packet.ID)
+				}
+				a := goalwork.ReviewAssessment{GoalFit: f, Outputs: []goalwork.OutputReview{{Output: "code", Finding: f}}}
+				for _, topic := range []string{"relations", "periods", "measurements", "coverage"} {
+					a.AnalysisChecks = append(a.AnalysisChecks, goalwork.AnalysisCheck{Topic: topic, Finding: f})
+				}
+				return a, nil
+			},
 			Search: func(context.Context, string) (catalog.Result, error) {
 				return catalog.Result{Hits: []catalog.Hit{{PK: "left"}, {PK: "right"}}}, nil
 			},
@@ -87,12 +107,20 @@ func TestMCPComparisonUsesOriginalRevisionsAndExplicitComputedDisclosure(t *test
 			t.Fatalf("MCP lost matching and both unmatched sides: %+v", record)
 		}
 	}
+	advance(goalwork.Decision{Action: "read_evidence", Evidence: &goalwork.EvidenceRequest{Observation: "o1", RowsSHA256: v.State.Observations[0].RowsSHA256, Rows: []int{1, 2}, Fields: []string{"code"}}})
+	report := goalwork.Composition{ID: "report", Base: "o1", Purpose: "report identifiers with proposed comparison support", Select: []string{"o1.code"}, Roles: []goalwork.RoleBinding{{Role: "r", Observation: "o1"}}, Outputs: []goalwork.OutputBinding{{Output: "code", Field: "o1.code"}}, Assumptions: []string{"comparison is not applicability approval"}, Support: []goalwork.SupportBinding{{PacketID: v.State.Evidence[0].ID, Targets: []string{"o1"}, Purpose: "Check source interpretation"}}}
+	advance(goalwork.Decision{Action: "compose", Composition: &report})
+	advance(goalwork.Decision{Action: "execute", CompositionID: report.ID})
+	advance(goalwork.Decision{Action: "review_result", CompositionID: report.ID})
+	if !reviewed || len(v.State.Reviews) != 1 || v.State.Status == "output_ready" || len(v.State.Artifact.Sources) != 1 || v.State.Observations[2].Comparison == nil {
+		t.Fatal("MCP omitted review, promoted support or changed stored comparison provenance")
+	}
 	// Optional wire aliases are for comparison operands only. An ordinary output
 	// measure still requires its own alias under the Engine's execution contract.
 	p := goalwork.Composition{ID: "missing-alias", Base: "o1", Purpose: "ordinary numeric output", Select: []string{"o1.value"}, Assumptions: []string{"explicit output measures require an alias"}, Measures: []goalwork.Measure{{Field: "o1.value", Format: "decimal_v1", Unit: "units"}}}
 	advance(goalwork.Decision{Action: "compose", Composition: &p})
 	v = call(map[string]any{"sessionId": v.SessionID, "revision": v.State.Revision, "decision": goalwork.Decision{Action: "execute", CompositionID: p.ID}})
-	if len(v.State.Gaps) != 1 || v.State.Artifact != nil || len(v.State.Executions) != 1 || v.State.Executions[0].Status != "failed" {
+	if len(v.State.Gaps) != 1 || v.State.Artifact != nil || len(v.State.Executions) != 2 || v.State.Executions[1].Status != "failed" {
 		t.Fatal("comparison operand schema relaxed the output-measure contract")
 	}
 }

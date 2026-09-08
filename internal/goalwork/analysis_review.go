@@ -7,11 +7,12 @@ import (
 	"strings"
 )
 
-const AnalysisReviewMethod = "independent_model_relational_analysis_v2"
+const AnalysisReviewMethod = "independent_model_relational_analysis_v3"
 
-// AnalysisReviewContext v2 adds original-cell attribution and context references
-// to one packet collection. Source-report v1 remains unchanged. Replay attests
-// execution, not independent arithmetic or meaning.
+// AnalysisReviewContext v3 adds single-copy comparison recipes and references to
+// shared original metadata. The v2 single packet collection and original-cell
+// attribution remain. Source-report v1 is unchanged. Replay attests execution,
+// not independent arithmetic or meaning.
 type AnalysisReviewContext struct {
 	Method             string            `json:"method"`
 	OutputSHA256       string            `json:"outputSha256"`
@@ -142,7 +143,7 @@ func (e *Engine) analysisReviewInput(ctx context.Context, id string, sourceConte
 	if err != nil || digest(replayedUnmatched) != digest(a.Unmatched) {
 		return ReviewInput{}, fmt.Errorf("unmatched result cannot be reproduced from disclosed source values")
 	}
-	in := ReviewInput{Recipient: e.state.Policy.ReviewRecipient, Goal: e.state.Goal, Contract: *e.state.Contract, Artifact: *a, Evidence: packets[0], Analysis: &AnalysisReviewContext{Method: "engine_relational_replay_v2", OutputSHA256: digest(a.Rows), AdditionalEvidence: packets[1:]}}
+	in := ReviewInput{Recipient: e.state.Policy.ReviewRecipient, Goal: e.state.Goal, Contract: *e.state.Contract, Artifact: *a, Evidence: packets[0], Analysis: &AnalysisReviewContext{Method: "engine_relational_replay_v3", OutputSHA256: digest(a.Rows), AdditionalEvidence: packets[1:]}}
 	in.Analysis.SourceContext = sourceContext
 	in.Analysis.FullScope = a.Evaluation.FullScope
 	in.Artifact.Sources = slices.Clone(a.Sources)
@@ -168,6 +169,9 @@ func (e *Engine) analysisReviewInput(ctx context.Context, id string, sourceConte
 		slices.Sort(participating)
 		in.Analysis.Sources = append(in.Analysis.Sources, AnalysisSource{Observation: o.ID, RowsSHA256: o.RowsSHA256, RowCount: o.RowCount, Fields: fields, DirectRows: participating, Disclosure: disclosure.uses[o.ID]})
 		in.Artifact.Sources[i] = projectReviewSource(o, fields)
+	}
+	if err := e.projectComparisonReview(&in); err != nil {
+		return ReviewInput{}, err
 	}
 	if err := ctx.Err(); err != nil {
 		return ReviewInput{}, err

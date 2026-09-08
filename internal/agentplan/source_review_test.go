@@ -92,8 +92,8 @@ func replayArchivedReview(t *testing.T, folder, file string, wantReady, wantTria
 }
 
 // Adapt historical v1 input in memory solely to replay its recorded response
-// through the current public decoder. The original model saw v1, not v2; this
-// conversion is neither a new model trial nor Engine-produced v2 attribution.
+// through the current public decoder. The original model saw v1, not v3; this
+// conversion is neither a new model trial nor Engine-produced v3 attribution.
 // Archives and their recorded findings remain unchanged.
 func decodeLegacyReviewInput(t *testing.T, raw json.RawMessage) goalwork.ReviewInput {
 	t.Helper()
@@ -122,7 +122,7 @@ func decodeLegacyReviewInput(t *testing.T, raw json.RawMessage) goalwork.ReviewI
 	if legacy.Analysis.Method != "engine_relational_replay_v1" {
 		t.Fatal("expected an explicitly archived v1 analysis")
 	}
-	in.Analysis.Method = "engine_relational_replay_v2"
+	in.Analysis.Method = "engine_relational_replay_v3"
 	in.Analysis.SourceContext = nil
 	for _, context := range legacy.Analysis.SourceContext {
 		if context.Evidence.ID == "" {
@@ -204,15 +204,25 @@ func TestReviewGoalSelectsAnalysisContractWithoutChangingSourceReportGuide(t *te
 		t.Fatal(err)
 	}
 	t.Setenv("PATH", dir)
-	in := goalwork.ReviewInput{Recipient: "claude", Goal: "compare recorded totals", Contract: goalwork.GoalContract{Outputs: []goalwork.OutputRequirement{{ID: "total"}}}, Evidence: goalwork.EvidencePacket{ID: "ep_one"}, Analysis: &goalwork.AnalysisReviewContext{Method: "engine_relational_replay_v2", AdditionalEvidence: []goalwork.EvidencePacket{{ID: "ep_two"}, {ID: "ep_context", Records: []goalwork.EvidenceRecord{{RetainedRow: 1, Values: goalwork.Row{"A": "SOURCE_HEADER_FIXTURE"}}}}, {ID: "ep_definitions", Records: []goalwork.EvidenceRecord{{RetainedRow: 1, Values: goalwork.Row{"term": "SEPARATE_DEFINITION_FIXTURE"}}}}}}}
+	in := goalwork.ReviewInput{Recipient: "claude", Goal: "compare recorded totals", Contract: goalwork.GoalContract{Outputs: []goalwork.OutputRequirement{{ID: "total"}}}, Evidence: goalwork.EvidencePacket{ID: "ep_one"}, Analysis: &goalwork.AnalysisReviewContext{Method: "engine_relational_replay_v3", AdditionalEvidence: []goalwork.EvidencePacket{{ID: "ep_two"}, {ID: "ep_context", Records: []goalwork.EvidenceRecord{{RetainedRow: 1, Values: goalwork.Row{"A": "SOURCE_HEADER_FIXTURE"}}}}, {ID: "ep_definitions", Records: []goalwork.EvidenceRecord{{RetainedRow: 1, Values: goalwork.Row{"term": "SEPARATE_DEFINITION_FIXTURE"}}}}}}}
 	in.Analysis.SourceContext = []goalwork.SourceContext{{Targets: []string{"o1"}, PacketID: "ep_context"}}
 	in.Analysis.SourceContext = append(in.Analysis.SourceContext, goalwork.SourceContext{Targets: []string{"o1"}, Proposed: true, Purpose: "Check definition applicability", Source: goalwork.Observation{ID: "o3", PK: "definitions"}, PacketID: "ep_definitions"})
+	in.Artifact.Sources = []goalwork.Observation{{ID: "o1", PK: "left"}}
+	in.Artifact.Requests = []goalwork.SampleRequest{{PK: "left", Delivery: "file", Asset: "left.csv"}}
+	in.Analysis.AdditionalEvidence = append(in.Analysis.AdditionalEvidence, goalwork.EvidencePacket{ID: "ep_comparison"})
+	in.Analysis.SourceContext = append(in.Analysis.SourceContext, goalwork.SourceContext{
+		Targets: []string{"o1"}, PacketID: "ep_comparison", Proposed: true, Purpose: "Check comparison applicability",
+		Source:            goalwork.Observation{ID: "o4", Delivery: "DERIVED"},
+		Request:           goalwork.SampleRequest{PK: "left", Delivery: "file", Compare: &goalwork.SourceComparison{Checks: []goalwork.NumericComparison{{ID: "COMPARISON_RECIPE_FIXTURE"}}}},
+		Comparison:        &goalwork.ComparisonReviewTrace{Method: "source_comparison_v1", Pairs: [][2]int{{1, 2}}},
+		ComparisonSources: []goalwork.ComparisonContextSource{{ArtifactSource: "o1"}, {Source: &goalwork.Observation{ID: "o5", PK: "right"}, Request: &goalwork.SampleRequest{PK: "right", Delivery: "file", Asset: "right.csv"}}},
+	})
 	response, err := ReviewGoal(context.Background(), in, "claude")
 	if err != nil || len(response.Assessment.AnalysisChecks) != 4 {
 		t.Fatalf("analysis response: %v", err)
 	}
 	prompt, err := os.ReadFile(promptPath)
-	if err != nil || !strings.Contains(string(prompt), "RELATIONAL_ANALYSIS_V2") || strings.Contains(string(prompt), "No semantic approval of joins") {
+	if err != nil || !strings.Contains(string(prompt), "RELATIONAL_ANALYSIS_V3") || strings.Contains(string(prompt), "No semantic approval of joins") {
 		t.Fatal("analysis sent to source-only reviewer instructions")
 	}
 	if !strings.Contains(string(prompt), "SOURCE_HEADER_FIXTURE") || !strings.Contains(string(prompt), "same-file association") {
@@ -221,11 +231,25 @@ func TestReviewGoalSelectsAnalysisContractWithoutChangingSourceReportGuide(t *te
 	if strings.Count(string(prompt), "SOURCE_HEADER_FIXTURE") != 1 || strings.Count(string(prompt), "SEPARATE_DEFINITION_FIXTURE") != 1 {
 		t.Fatal("analysis prompt duplicates selected context packet bodies")
 	}
+	_, inputJSON, found := strings.Cut(string(prompt), "REVIEW_INPUT_JSON:\n")
+	var delivered goalwork.ReviewInput
+	if !found || json.Unmarshal([]byte(inputJSON), &delivered) != nil || len(delivered.Analysis.SourceContext) != 3 {
+		t.Fatal("review adapter did not deliver a self-contained v3 input")
+	}
+	c := delivered.Analysis.SourceContext[2]
+	if c.Comparison == nil || c.Source.Comparison != nil || c.Request.Compare == nil || c.ComparisonSources[0].ArtifactSource != "o1" || c.ComparisonSources[1].Request.Asset != "right.csv" || strings.Count(inputJSON, "COMPARISON_RECIPE_FIXTURE") != 1 {
+		t.Fatal("adapter expanded or lost comparison references, recipe or original request")
+	}
 	for _, required := range []string{"SEPARATE_DEFINITION_FIXTURE", `"proposed":true`, `"purpose":"Check definition applicability"`, "UNTRUSTED PROPOSALS"} {
 		if !strings.Contains(string(prompt), required) {
 			t.Fatalf("proposed support or its interpretation was lost: %s", required)
 		}
 	}
+	in.Analysis.Method = "engine_relational_replay_v2"
+	if _, err := ReviewGoal(context.Background(), in, "claude"); err == nil || !strings.Contains(err.Error(), "unsupported analysis replay contract") {
+		t.Fatal("legacy analysis input was sent under current instructions")
+	}
+	in.Analysis.Method = "engine_relational_replay_v3"
 	// The same adapter must require per-source findings for the additional
 	// full-scope contract, not accept its ordinary analysis response unchanged.
 	in.Contract.Coverage = "population"
