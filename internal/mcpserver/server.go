@@ -5,7 +5,6 @@ package mcpserver
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -244,32 +243,11 @@ func New(deps Deps) *mcp.Server {
 			Axes: in.Axes, AnchorPKs: in.AnchorPKs, BridgeSelections: in.BridgeSelections,
 			MaxConnections: in.MaxConnections,
 		}
-		var res catalog.Result
-		if !in.semanticEnabled() {
-			res = cat.SearchPlan(plan)
-		} else {
-			index, embedder := deps.SemanticIndex, deps.Embedder
-			if index == nil {
-				loaded, loadErr := catalog.LoadSemanticIndex(cat)
-				switch {
-				case loadErr == nil:
-					index = loaded
-				case errors.Is(loadErr, catalog.ErrSemanticIndexStale):
-					res = cat.SearchPlan(plan)
-					catalog.RecordSemanticOutcome(&res, catalog.SemanticInfo{Status: catalog.SemanticUnavailable, Detail: "카탈로그 갱신 후 semantic-build 가 필요함"})
-				case errors.Is(loadErr, catalog.ErrSemanticIndexNotBuilt):
-					res = cat.SearchHybrid(ctx, plan, nil, nil)
-				default:
-					res = cat.SearchPlan(plan)
-					catalog.RecordSemanticOutcome(&res, catalog.SemanticInfo{Status: catalog.SemanticUnavailable, Detail: "의미 인덱스 로드 실패: " + loadErr.Error()})
-				}
-			}
-			if index != nil {
-				if embedder == nil {
-					embedder = catalog.NewOllamaEmbedder(catalog.OllamaURLFromEnv(), index.Model)
-				}
-				res = cat.SearchHybrid(ctx, plan, index, embedder)
-			}
+		res, err := (catalog.Searcher{Index: deps.SemanticIndex, Embedder: deps.Embedder}).Search(ctx, cat, plan, catalog.SearchOptions{
+			Semantic: in.semanticEnabled(), RequireSemantic: in.RequireSemantic,
+		})
+		if err != nil {
+			return errResult(err.Error()), nil, nil
 		}
 		hits := res.Hits
 		out := &catalogOut{
@@ -280,13 +258,6 @@ func New(deps Deps) *mcp.Server {
 			Hits: hits, Semantic: res.Semantic, Anchors: res.Anchors,
 			ConnectionOptions: res.ConnectionOptions, Connections: res.Connections,
 			Warnings: res.Warnings, Abstention: res.Abstention,
-		}
-		if in.RequireSemantic {
-			if err := catalog.RequireSemantic(res); err != nil {
-				// Strict callers must not accidentally consume the lexical candidates
-				// that were computed only to diagnose the degraded semantic path.
-				return errResult(err.Error()), nil, nil
-			}
 		}
 		return nil, out, nil
 	})

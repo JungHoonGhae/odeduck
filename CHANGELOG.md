@@ -9,6 +9,8 @@ section matching a `vX.Y.Z` tag as the GitHub release notes.
 
 ### Fixed
 
+- Share semantic-search policy across CLI and MCP, keeping degraded retrieval
+  visible and preserving the connection limit through progressive discovery.
 - Strengthen credential isolation at the shared REST and LINK response boundaries;
   withhold unsafe responses without creating replacement source observations.
 
