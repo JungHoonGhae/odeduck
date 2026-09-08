@@ -59,6 +59,7 @@ type GoalEvaluation struct {
 	Temporal            TemporalEvaluation    `json:"temporal"`
 	Explanations        []EvidenceExplanation `json:"explanations,omitempty"`
 	Review              *ResultReview         `json:"review,omitempty"`
+	FullScope           *FullScopeContext     `json:"fullScope,omitempty"`
 }
 
 func validateContract(c GoalContract) error {
@@ -109,7 +110,7 @@ func validRequirementID(id string) bool {
 	return strings.TrimSpace(id) == id && id != "" && len(id) <= 100 && !strings.ContainsAny(id, ".\n\r\t")
 }
 
-func evaluateRequirements(c GoalContract, p Composition, rows []Row, observations []Observation, nodes []Node) GoalEvaluation {
+func evaluateRequirements(c GoalContract, p Composition, rows []Row, observations []Observation, nodes []Node, fullScope bool) GoalEvaluation {
 	result := GoalEvaluation{Status: "requirements_met", CompositionID: p.ID, NeedsSemanticReview: true, ReviewReason: "Contract interpretation, regional/temporal scope, identifier meaning and measure units remain explicit review items; structural checks do not prove causality, identity or usefulness."}
 	check := func(kind, id string, passed bool, detail string) {
 		result.Checks = append(result.Checks, RequirementCheck{Kind: kind, ID: id, Passed: passed, Detail: detail})
@@ -181,7 +182,12 @@ func evaluateRequirements(c GoalContract, p Composition, rows []Row, observation
 		}
 		check("output", o.ID, ok, detail)
 	}
-	check("coverage", c.Coverage, c.Coverage == "sample", "acquired bounded samples cannot establish population coverage")
+	if c.Coverage == "population" && fullScope {
+		result.FullScope = fullScopeExtents(observations, used)
+		check("coverage", c.Coverage, result.FullScope.Eligible, "acquisition extent eligibility only; every original source's applicability to the full requested scope requires separate review")
+	} else {
+		check("coverage", c.Coverage, c.Coverage == "sample", "acquired bounded samples cannot establish population coverage")
+	}
 	if c.TimeWindow != nil {
 		check("time_window", "requested", p.Time != nil && p.Time.Window != nil && *p.Time.Window == *c.TimeWindow, "composition must use the immutable requested inclusive date window and observed record time fields")
 	}

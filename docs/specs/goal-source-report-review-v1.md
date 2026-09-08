@@ -116,7 +116,8 @@ typed 관계·계산을 별도 opt-in으로 확장한다. 이는 I6/I7/M4의 후
   근거에 대한 판단이며 source truth, canonical identity, 현장 검증 또는 모집단 인증이 아니다.
 - 부족한 헤더 문맥, 미대응 지역, 불분명한 단위·시점은 이유와 함께 남기고 같은 목표에서 추가 근거를
   찾는다. 원래 목표보다 약한 Contract나 면책 문구만으로 완료하지 않는다. 기존 population 구조
-  검사를 검토자가 우회하지 못한다. 새 실행에는 이전 검토를 이월하지 않는다.
+  검사를 검토자가 우회하지 못한다. 아래 추가 full-scope 계약 없이 기존 population 차단은 유지한다.
+  새 실행에는 이전 검토를 이월하지 않는다.
 
 검증 seam은 위임된 기존 Start/Advance/Run·CLI·MCP·ReviewGoal이다. 공개된 계산 그룹과 비공개 원본을
 분리하는 양성부터 구현하고, 근거 누락·가짜 인용·단위/관계/기간/범위 거절·예산/만료를 회귀로 고정한다.
@@ -170,6 +171,37 @@ Composition의 `support:[{packetId,targets,purpose}]`로 실제 공개한 Eviden
 역할 대체 차단을 검증한다. fixture 판정은 전달·상태 검증일 뿐 의미 정확도나 G4 완주가 아니다.
 외부 웹의 공식 정의를 원천 revision에 연결하는 취득과 전체 범위 수용 계약은 후속으로 남는다.
 
+### 전체 요청 범위의 추가 검토 — 2026-09-08 후속 계약
+
+`population`은 사용자 요청의 전체 범위를 뜻한다. 파일을 다 읽은 사실과 그 파일이 요청 대상을
+모두 포괄한다는 판단은 다르다. 둘을 무조건 차단 하나로 합치지 않고 취득 전제와 의미 검토로 나눈다.
+기존 목표·원천 oracle·기본 권한은 유지한다. 모든 실제 대상의 현장 조사·통계적 인증을 보증하지 않는다.
+
+- 신뢰된 시작 정책 `ReviewFullScope`가 `ReviewAnalyses`와 기존 수신자·공개 권한에 추가로 필요하다.
+  CLI `--review-full-scope`, MCP 시작 `--review-goal-full-scope`로만 켠다. 모델 decision은 변경할 수 없다.
+- 실행기는 계산의 모든 원본 lineage에 대해 실제 취득 범위를 기록한다. FILE content/contract hash와
+  원본 위치가 있어야 한다. CSV는 끝까지 검사하고 조건 일치 행을 전부 보관해야 한다. 전체 스캔이어도
+  matched > returned이면 거부한다. XLSX는 정확한 선택 rectangle의 모든 행을 보관해야 한다.
+  rectangle은 시트·파일·목표의 전체가 아니므로 별도 원천 근거로 해석해야 한다. API/STD의 페이지,
+  공간 stream, 취득 범위가 미상인 원본은 이 버전에서 eligible하지 않다. 원천 그룹은 원본을 검사한다.
+- 이 전제가 통과하면 구조 coverage 검사는 검토 자격만 충족한다. `needsSemanticReview`와 원래
+  population 목표는 유지하며 아직 완료가 아니다. 나머지 역할·출력·시간 요구도 종전대로 충족해야 한다.
+- `analysis.fullScope`에 원본별 취득 종류·관측 revision·범위와 자격을 담는다. 별도 검토는 기존
+  네 분석 축·모든 출력·원래 GoalFit에 더해 `sourceCoverage:[{observation,finding}]`을 각 원본에
+  한 번씩 반환한다. 원본의 선택 근거 또는 그 원본을 target으로 삼은 문맥을 인용해야 한다.
+  선택 조건의 누락 대상, 시트의 논리적 표 범위, join/시간 제외와 요청한 미대응 설명을 함께 판단한다.
+  범위 밖 원천의 부재를 0이나 부정 사실로 만들지 않는다. 원천별 적용을 입증하지 못하면 insufficient다.
+- 모든 항목이 supported여야 `independent_model_full_scope_analysis_v1` 검토를 붙여 output_ready가
+  된다. 이것은 제한된 모델의 원천 기반 전체 범위 판단이며 모집단 인증·실세계 진실·고비용 행동 승인이
+  아니다. source-report/일반 analysis 권한만으로 이 경로를 열지 않고, 기존 예산·revision·공개 상한을 유지한다.
+
+기존 Start/Advance/Run·CLI/MCP·ReviewGoal seam에서 실제 CSV reader의 완전/잘린 선택, XLSX 범위,
+원본 lineage, 추가 권한, 원본별 누락·위조·거부 판정과 변조·재검토를 검증한다. 양성 fixture 승인은
+새 모델 정확도 증거가 아니다. G4의 실제 전체 범위와 정의·명칭 근거는 독립 원천 대조 후 검토하며,
+현재 sample 진단을 population 완주로 재분류하거나 기존 실패·정답을 변경하지 않는다.
+이 후속 검토의 실제 모델 정확도는 별도 검증 전까지 미확인이다. 종전 분석 calibration을 새 계약의
+통과로 간주하지 않는다.
+
 ### 원래 G4의 실제 검토 진단
 
 위임된 Start/Advance·ReviewGoal seam에서 원래 G4 질문과 독립 citywide reference를 재사용한다.
@@ -178,7 +210,9 @@ Composition의 `support:[{packetId,targets,purpose}]`로 실제 공개한 Eviden
 hash·행 위치·합계와 대조한다. 인구는 기존 전체 CSV scanner로 검사/보관 범위를 추가 확인한다.
 기본 `live`의 최신 파일 hash 불일치를 자동 복구하거나 과거 실패를 숨기지 않는다.
 보존 reference 재생은 별도 명시 모드로만 선택하고 새 취득·자율 발견으로 세지 않는다. 원 질문과
-기존 기대값은 유지하며 baseline과 분교 출력 추가의 진단 recipe를 구분한다. 모델에 기대 verdict나
+기존 기대값은 유지하며 baseline, 분교 출력 추가, 별도 전체 범위 권한을 켠 진단 recipe를 구분한다.
+`with-branches-full-scope`는 원래 population 계약을 보존하며 실제 취득이 없는 reference 재생은
+자격 검사에서 중단한다. 과거 archive는 그대로 보존한다. 모델에 기대 verdict나
 oracle 해석을 보내지 않는다. 각 시도의 입력·원 응답·Engine 결과와 준비 실패를 보존한다.
 결과와 한계는 [실행 검증](../research/goal-result-execution-validation-2026-09-08.md#원래-g4의-실제-모델-진단)에
 둔다. 이 진단의 예상 보류나 단일 전후 관측은 양성 목표 완주·모델 정확도 통과선이 아니다.

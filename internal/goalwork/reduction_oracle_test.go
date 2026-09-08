@@ -76,6 +76,7 @@ func checkCitywideReduction(t *testing.T, live bool, reviewer *citywideModelRevi
 	policy := goalwork.Policy{EvidenceRecipient: "claude", ReviewRecipient: "claude", ReviewAnalyses: true}
 	if reviewer != nil {
 		policy.EvidenceRecipient, policy.ReviewRecipient = reviewer.recipient, reviewer.recipient
+		policy.ReviewFullScope = reviewer.fullScope
 	}
 	reviewCalls := 0
 	deps := goalwork.Dependencies{
@@ -155,6 +156,9 @@ func checkCitywideReduction(t *testing.T, live bool, reviewer *citywideModelRevi
 		return v
 	}
 	c := goalwork.GoalContract{Outcome: goal, Region: "인천광역시", Period: "원천별 인구·학교 기준일", Coverage: "sample", Roles: []goalwork.RoleRequirement{{ID: "people", Description: "만 6–17세 주민 인구"}, {ID: "schools", Description: "학교 규모"}}, Outputs: []goalwork.OutputRequirement{{ID: "population", Description: "학령인구", Role: "people", Type: "number"}, {ID: "schools", Description: "학교 수, 분교 별도", Role: "schools", Type: "string"}, {ID: "enrolled", Description: "재적 학생, 분교 별도", Role: "schools", Type: "string"}}}
+	if reviewer != nil && reviewer.fullScope {
+		c.Coverage = "population"
+	}
 	schoolFields := []string{"A", "AG", "AK"}
 	if reviewer != nil && reviewer.branches {
 		c.Outputs = append(c.Outputs, goalwork.OutputRequirement{ID: "branch_schools", Description: "별도 분교 학교 수", Role: "schools", Type: "string"}, goalwork.OutputRequirement{ID: "branch_students", Description: "별도 분교 학생 수", Role: "schools", Type: "string"})
@@ -270,7 +274,7 @@ func checkCitywideReduction(t *testing.T, live bool, reviewer *citywideModelRevi
 	if live {
 		t.Logf("actual Engine: 162 population records → 11 source groups, total ages 6–17 = %d; all district counts match independent reference", total)
 	}
-	p := goalwork.Composition{ID: "compare", Base: "o3", Purpose: "retain actual labels, census counts and population date", Joins: []goalwork.Join{{Right: "o2", LeftKeys: []string{"o3.시군구명"}, RightKeys: []string{"A"}}}, Select: []string{"o3.시군구명", "o3.기준연월", "o3.residents", "o2.A", "o2.AG", "o2.AK"}, Roles: []goalwork.RoleBinding{{Role: "people", Observation: "o3"}, {Role: "schools", Observation: "o2"}}, Outputs: []goalwork.OutputBinding{{Output: "population", Field: "o3.residents"}, {Output: "schools", Field: "o2.AG"}, {Output: "enrolled", Field: "o2.AK"}}, Assumptions: []string{"Known label disagreement 서해구/서구 remains unresolved; no global alias or old-to-new geography equivalence. April census and July population do not share reference dates or age universes. This replay is NOT G4 completion."}}
+	p := goalwork.Composition{ID: "compare", Base: "o3", Purpose: "retain actual labels, census counts and population date", Joins: []goalwork.Join{{Right: "o2", LeftKeys: []string{"o3.시군구명"}, RightKeys: []string{"A"}}}, Select: []string{"o3.시군구명", "o3.기준연월", "o3.residents", "o2.A", "o2.AG", "o2.AK"}, Roles: []goalwork.RoleBinding{{Role: "people", Observation: "o3"}, {Role: "schools", Observation: "o2"}}, Outputs: []goalwork.OutputBinding{{Output: "population", Field: "o3.residents"}, {Output: "schools", Field: "o2.AG"}, {Output: "enrolled", Field: "o2.AK"}}, Assumptions: []string{"Known label disagreement 서해구/서구 remains unresolved; no global alias or old-to-new geography equivalence. April census and July population do not share reference dates or age universes."}}
 	if reviewer != nil {
 		// Do not send the scripted test's expected verdict or interpretation to the model.
 		p.Assumptions = []string{"Use the selected source revisions and declared district-label normalization. Report source-defined counts; do not infer capacity, identical age universes or contemporaneous observations."}

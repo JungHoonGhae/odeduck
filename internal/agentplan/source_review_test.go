@@ -23,7 +23,7 @@ func TestReviewGoalReplaysArchivedCodexCalibration(t *testing.T) {
 		file   string
 		ready  int
 		trials int
-	}{{"source-report-review-20260908", "codex-raw.jsonl.gz", 6, 12}, {"analysis-review-20260908", "codex-raw.jsonl.gz", 3, 12}, {"analysis-review-20260908", "live-codex-raw.jsonl.gz", 6, 12}, {"citywide-review-20260908", "baseline-codex.json.gz", 0, 1}, {"citywide-review-20260908", "with-branches-codex.json.gz", 0, 1}, {"citywide-review-20260908", "historical-codex.json.gz", 0, 1}} {
+	}{{"source-report-review-20260908", "codex-raw.jsonl.gz", 6, 12}, {"analysis-review-20260908", "codex-raw.jsonl.gz", 3, 12}, {"analysis-review-20260908", "live-codex-raw.jsonl.gz", 6, 12}, {"citywide-review-20260908", "baseline-codex.json.gz", 0, 1}, {"citywide-review-20260908", "with-branches-codex.json.gz", 0, 1}, {"citywide-review-20260908", "historical-codex.json.gz", 0, 1}, {"citywide-review-20260908", "full-scope-codex.json.gz", 0, 1}} {
 		t.Run(archive.folder+"/"+archive.file, func(t *testing.T) {
 			replayArchivedReview(t, archive.folder, archive.file, archive.ready, archive.trials)
 		})
@@ -166,5 +166,27 @@ func TestReviewGoalSelectsAnalysisContractWithoutChangingSourceReportGuide(t *te
 		if !strings.Contains(string(prompt), required) {
 			t.Fatalf("proposed support or its interpretation was lost: %s", required)
 		}
+	}
+	// The same adapter must require per-source findings for the additional
+	// full-scope contract, not accept its ordinary analysis response unchanged.
+	in.Contract.Coverage = "population"
+	in.Evidence.Selection.Observation = "o1"
+	in.Analysis.FullScope = &goalwork.FullScopeContext{Method: "bounded_source_extent_v1", Eligible: true, Sources: []goalwork.SourceExtent{{Observation: "o1", Complete: true, Kind: "complete_csv_selection"}}}
+	if _, err := ReviewGoal(context.Background(), in, "claude"); err == nil {
+		t.Fatal("full-scope adapter accepted missing original-source coverage")
+	}
+	a.SourceCoverage = []goalwork.SourceCoverageReview{{Observation: "o1", Finding: f}}
+	body, _ = json.Marshal(a)
+	script = "#!/bin/sh\n/bin/cat > '" + strings.ReplaceAll(promptPath, "'", "'\\''") + "'\nprintf '%s' '" + strings.ReplaceAll(string(body), "'", "'\\''") + "'\n"
+	if err := os.WriteFile(filepath.Join(dir, "claude"), []byte(script), 0700); err != nil {
+		t.Fatal(err)
+	}
+	response, err = ReviewGoal(context.Background(), in, "claude")
+	if err != nil || len(response.Assessment.SourceCoverage) != 1 {
+		t.Fatalf("full-scope provider contract lost: %v", err)
+	}
+	prompt, err = os.ReadFile(promptPath)
+	if err != nil || !strings.Contains(string(prompt), `"fullScope":`) || !strings.Contains(string(prompt), "EVERY fullScope.sources") {
+		t.Fatal("full-scope evidence or review contract not sent")
 	}
 }

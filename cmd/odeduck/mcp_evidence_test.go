@@ -20,6 +20,8 @@ func TestMCPReviewNeedsSeparateStartupDisclosure(t *testing.T) {
 		{[]string{"--share-goal-evidence", "--review-goals-with=claude"}, true},
 		{[]string{"--review-goal-analyses", "--share-goal-evidence"}, false},
 		{[]string{"--review-goal-analyses", "--share-goal-evidence", "--review-goals-with=claude"}, true},
+		{[]string{"--review-goal-full-scope", "--share-goal-evidence", "--review-goals-with=claude"}, false},
+		{[]string{"--review-goal-full-scope", "--review-goal-analyses", "--share-goal-evidence", "--review-goals-with=claude"}, true},
 	} {
 		called := false
 		cmd := mcpCommand(func(_ context.Context, d mcpserver.Deps) error {
@@ -29,6 +31,9 @@ func TestMCPReviewNeedsSeparateStartupDisclosure(t *testing.T) {
 			}
 			if d.ReviewGoalAnalyses != strings.Contains(strings.Join(tc.args, " "), "--review-goal-analyses") {
 				t.Fatal("analysis startup authority changed")
+			}
+			if d.ReviewGoalFullScope != strings.Contains(strings.Join(tc.args, " "), "--review-goal-full-scope") {
+				t.Fatal("full-scope startup authority changed")
 			}
 			return nil
 		})

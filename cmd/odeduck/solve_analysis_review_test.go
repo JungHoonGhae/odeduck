@@ -8,13 +8,15 @@ import (
 	"testing"
 
 	"github.com/JungHoonGhae/odeduck/internal/catalog"
+	"github.com/JungHoonGhae/odeduck/internal/dataset"
 	"github.com/JungHoonGhae/odeduck/internal/goalwork"
 )
 
 func TestSolveAnalysisReviewRunsTheActualEngineWithAdditionalAuthority(t *testing.T) {
-	for _, flag := range []string{"--review-analyses", "--review-source-reports"} {
+	for _, flag := range []string{"--review-analyses", "--review-source-reports", "--review-full-scope"} {
+		fullScope := flag == "--review-full-scope"
 		cmd := solveCommand(func(ctx context.Context, goal string, policy goalwork.Policy, provider string, progress func(goalwork.View)) (goalwork.View, error) {
-			if policy.ReviewAnalyses != (flag == "--review-analyses") || policy.ReviewRecipient != "claude" {
+			if policy.ReviewAnalyses != (flag != "--review-source-reports") || policy.ReviewFullScope != fullScope || policy.ReviewRecipient != "claude" {
 				t.Fatal("analysis authorization was widened or lost")
 			}
 			e, err := goalwork.Start(goal, policy, goalwork.Dependencies{
@@ -31,7 +33,7 @@ func TestSolveAnalysisReviewRunsTheActualEngineWithAdditionalAuthority(t *testin
 					if !r.ScanCSV || len(r.WhereIn["n"]) != 2 {
 						t.Fatal("CLI calculation lost its source value-set request")
 					}
-					return goalwork.Acquired{Delivery: "FILE", Rows: []goalwork.Row{{"n": "9007199254740993"}, {"n": "1"}}}, nil
+					return goalwork.Acquired{Delivery: "FILE", Rows: []goalwork.Row{{"n": "9007199254740993"}, {"n": "1"}}, ContentSHA256: strings.Repeat("a", 64), ContractSHA256: strings.Repeat("b", 64), CSV: &dataset.CSVProvenance{DataRecords: []int{1, 2}, StartLines: []int{2, 3}}, Selection: &dataset.SelectionReport{Mode: "exact_string_sets_full_scan_v1", ScannedRows: 2, MatchedRows: 2, ReturnedRows: 2, Exhausted: true}}, nil
 				},
 				Review: func(_ context.Context, in goalwork.ReviewInput) (goalwork.ReviewAssessment, error) {
 					if in.Analysis == nil || in.Artifact.Rows[0]["total"] != json.Number("9007199254740994") {
@@ -45,6 +47,12 @@ func TestSolveAnalysisReviewRunsTheActualEngineWithAdditionalAuthority(t *testin
 					for _, topic := range []string{"relations", "periods", "measurements", "coverage"} {
 						a.AnalysisChecks = append(a.AnalysisChecks, goalwork.AnalysisCheck{Topic: topic, Finding: f})
 					}
+					if fullScope {
+						if in.Contract.Coverage != "population" || in.Analysis.FullScope == nil {
+							t.Fatal("CLI narrowed full requested scope")
+						}
+						a.SourceCoverage = []goalwork.SourceCoverageReview{{Observation: "o1", Finding: f}}
+					}
 					return a, nil
 				},
 			})
@@ -52,8 +60,11 @@ func TestSolveAnalysisReviewRunsTheActualEngineWithAdditionalAuthority(t *testin
 				return goalwork.View{}, err
 			}
 			c := goalwork.GoalContract{Outcome: goal, Region: "fixture", Period: "source snapshot", Coverage: "sample", Roles: []goalwork.RoleRequirement{{ID: "r", Description: "values"}}, Outputs: []goalwork.OutputRequirement{{ID: "total", Role: "r", Type: "number", Description: "sum"}}}
+			if fullScope {
+				c.Coverage = "population"
+			}
 			p := goalwork.Composition{ID: "sum", Base: "o1", Purpose: "sum recorded values", Select: []string{"total"}, Measures: []goalwork.Measure{{As: "n", Field: "o1.n", Format: "decimal_v1", Unit: "fixture"}}, Aggregates: []goalwork.Aggregate{{As: "total", Op: "sum", Field: "n"}}, Roles: []goalwork.RoleBinding{{Role: "r", Observation: "o1"}}, Outputs: []goalwork.OutputBinding{{Output: "total", Field: "total"}}, Assumptions: []string{"fixture calculation"}}
-			decisions := []goalwork.Decision{{Action: "define", Contract: &c}, {Action: "search", Query: "values", Role: "r"}, {Action: "inspect", PK: "values"}, {Action: "sample", Sample: &goalwork.SampleRequest{PK: "values", Delivery: "file", ScanCSV: true, WhereIn: map[string][]string{"n": {"1", "9007199254740993"}}}}, {Action: "compose", Composition: &p}, {Action: "execute", CompositionID: "sum"}}
+			decisions := []goalwork.Decision{{Action: "define", Contract: &c}, {Action: "search", Query: "values", Role: "r"}, {Action: "inspect", PK: "values"}, {Action: "sample", Sample: &goalwork.SampleRequest{PK: "values", Delivery: "file", Asset: "values.csv", ScanCSV: true, WhereIn: map[string][]string{"n": {"1", "9007199254740993"}}}}, {Action: "compose", Composition: &p}, {Action: "execute", CompositionID: "sum"}}
 			if policy.ReviewAnalyses {
 				decisions = append(decisions[:4], goalwork.Decision{Action: "search", Query: "definitions", Role: "context"}, goalwork.Decision{Action: "inspect", PK: "definitions"}, goalwork.Decision{Action: "sample", Sample: &goalwork.SampleRequest{PK: "definitions", Delivery: "standard"}})
 			}
@@ -85,10 +96,13 @@ func TestSolveAnalysisReviewRunsTheActualEngineWithAdditionalAuthority(t *testin
 		})
 		var out bytes.Buffer
 		cmd.SetArgs([]string{"관측한 수치의 합계를 계산해줘", flag, "--agent=claude", "--share-evidence", "--require-semantic=false"})
+		if fullScope {
+			cmd.SetArgs([]string{"요청 범위의 모든 원천 수치를 합산해줘", flag, "--review-analyses", "--agent=claude", "--share-evidence", "--require-semantic=false"})
+		}
 		cmd.SetOut(&out)
 		cmd.SetErr(&bytes.Buffer{})
 		err := cmd.Execute()
-		if (err == nil) != (flag == "--review-analyses") {
+		if (err == nil) != (flag != "--review-source-reports") {
 			t.Fatalf("%s: %v", flag, err)
 		}
 		var v goalwork.View
@@ -99,6 +113,9 @@ func TestSolveAnalysisReviewRunsTheActualEngineWithAdditionalAuthority(t *testin
 		}
 		if flag == "--review-analyses" && (v.Status != "output_ready" || v.Evaluation.Review.Method != goalwork.AnalysisReviewMethod) {
 			t.Fatal("CLI did not return reviewed calculation")
+		}
+		if fullScope && (v.Status != "output_ready" || v.Evaluation.Review.Method != goalwork.FullScopeReviewMethod) {
+			t.Fatal("CLI lost the additional full-scope review contract")
 		}
 	}
 }

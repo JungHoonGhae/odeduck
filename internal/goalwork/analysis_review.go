@@ -12,11 +12,12 @@ const AnalysisReviewMethod = "independent_model_relational_analysis_v1"
 // AnalysisReviewContext supplements the v1 primary packet without changing its
 // wire contract. Replay attests execution, not independent arithmetic/meaning.
 type AnalysisReviewContext struct {
-	Method             string           `json:"method"`
-	OutputSHA256       string           `json:"outputSha256"`
-	Sources            []AnalysisSource `json:"sources"`
-	AdditionalEvidence []EvidencePacket `json:"additionalEvidence,omitempty"`
-	SourceContext      []SourceContext  `json:"sourceContext,omitempty"`
+	Method             string            `json:"method"`
+	OutputSHA256       string            `json:"outputSha256"`
+	Sources            []AnalysisSource  `json:"sources"`
+	AdditionalEvidence []EvidencePacket  `json:"additionalEvidence,omitempty"`
+	SourceContext      []SourceContext   `json:"sourceContext,omitempty"`
+	FullScope          *FullScopeContext `json:"fullScope,omitempty"`
 }
 
 type AnalysisSource struct {
@@ -164,6 +165,7 @@ func (e *Engine) analysisReviewInput(ctx context.Context, id string, sourceConte
 	}
 	in := ReviewInput{Recipient: e.state.Policy.ReviewRecipient, Goal: e.state.Goal, Contract: *e.state.Contract, Artifact: *a, Evidence: packets[0], Analysis: &AnalysisReviewContext{Method: "engine_relational_replay_v1", OutputSHA256: digest(a.Rows), AdditionalEvidence: packets[1:]}}
 	in.Analysis.SourceContext = sourceContext
+	in.Analysis.FullScope = a.Evaluation.FullScope
 	in.Artifact.Sources = slices.Clone(a.Sources)
 	for i, o := range in.Artifact.Sources {
 		contextFields := map[string]bool{}

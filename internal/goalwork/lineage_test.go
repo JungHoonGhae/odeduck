@@ -67,7 +67,7 @@ func TestSpatialOutputRoleFollowsCopiedFieldOrigin(t *testing.T) {
 	}
 	c := GoalContract{Outcome: "facility identifier", Region: "fixture", Period: "historic", Coverage: "sample", Roles: []RoleRequirement{{ID: "facility", Description: "facility"}}, Outputs: []OutputRequirement{{ID: "code", Role: "facility", Description: "facility code", Type: "string"}}}
 	p := Composition{Base: "o3", Roles: []RoleBinding{{Role: "facility", Observation: "o1"}}, Outputs: []OutputBinding{{Output: "code", Field: "o3.anchor.id"}}}
-	result := evaluateRequirements(c, p, []Row{{"o3.anchor.id": "001"}}, v.Observations, v.Nodes)
+	result := evaluateRequirements(c, p, []Row{{"o3.anchor.id": "001"}}, v.Observations, v.Nodes, false)
 	if result.Status != "requirements_met" || !result.NeedsSemanticReview {
 		t.Fatal("indirect original role was lost or meaning approved")
 	}
@@ -75,7 +75,7 @@ func TestSpatialOutputRoleFollowsCopiedFieldOrigin(t *testing.T) {
 	// originated in the transit source, even though the outer column prefix fits.
 	c.Roles[0].ID, c.Outputs[0].Role = "transit", "transit"
 	p.Roles = []RoleBinding{{Role: "transit", Observation: "o3"}}
-	if r := evaluateRequirements(c, p, []Row{{"o3.anchor.id": "001"}}, v.Observations, v.Nodes); r.Status != "partial" {
+	if r := evaluateRequirements(c, p, []Row{{"o3.anchor.id": "001"}}, v.Observations, v.Nodes, false); r.Status != "partial" {
 		t.Fatal("copied anchor laundered as transit-origin output")
 	}
 }

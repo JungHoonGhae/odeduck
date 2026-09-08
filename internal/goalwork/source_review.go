@@ -32,9 +32,10 @@ type OutputReview struct {
 	Finding ReviewFinding `json:"finding"`
 }
 type ReviewAssessment struct {
-	GoalFit        ReviewFinding   `json:"goalFit"`
-	Outputs        []OutputReview  `json:"outputs"`
-	AnalysisChecks []AnalysisCheck `json:"analysisChecks,omitempty"`
+	GoalFit        ReviewFinding          `json:"goalFit"`
+	Outputs        []OutputReview         `json:"outputs"`
+	AnalysisChecks []AnalysisCheck        `json:"analysisChecks,omitempty"`
+	SourceCoverage []SourceCoverageReview `json:"sourceCoverage,omitempty"`
 }
 type ResultReview struct {
 	Method            string           `json:"method"`
@@ -69,7 +70,7 @@ func (e *Engine) reviewResult(ctx context.Context, id string) error {
 		if contextErr != nil {
 			return contextErr
 		}
-		if err != nil || len(sourceContext) > 0 {
+		if err != nil || len(sourceContext) > 0 || e.state.Contract != nil && e.state.Contract.Coverage == "population" {
 			in, err = e.analysisReviewInput(ctx, id, sourceContext)
 		}
 	}
@@ -108,6 +109,9 @@ func (e *Engine) reviewResult(ctx context.Context, id string) error {
 	review := &ResultReview{Method: SourceReportReviewMethod, Provider: in.Recipient, InputSHA256: inputHash, ExecutionRevision: in.Artifact.Evaluation.ExecutionRevision, Revision: e.state.Revision, Assessment: assessment}
 	if in.Analysis != nil {
 		review.Method = AnalysisReviewMethod
+		if in.Analysis.FullScope != nil {
+			review.Method = FullScopeReviewMethod
+		}
 	}
 	e.state.Evaluation.Review = review
 	e.state.Evaluation.ReviewReason = "Separate bounded model judgement of source support and original goal fit; not human/publisher approval, field verification or a guarantee of truth."
@@ -119,6 +123,9 @@ func (e *Engine) reviewResult(ctx context.Context, id string) error {
 		supported = supported && output.Finding.Verdict == "supported"
 	}
 	for _, check := range assessment.AnalysisChecks {
+		supported = supported && check.Finding.Verdict == "supported"
+	}
+	for _, check := range assessment.SourceCoverage {
 		supported = supported && check.Finding.Verdict == "supported"
 	}
 	e.state.Evaluation.NeedsSemanticReview = !supported
@@ -158,14 +165,8 @@ func reviewEvidenceHash(in ReviewInput) string {
 // ValidateReviewAssessment validates completeness and real references, not
 // natural-language entailment or model accuracy. Live adapters use this too.
 func ValidateReviewAssessment(a ReviewAssessment, in ReviewInput) error {
-	valid := func(f ReviewFinding) bool {
-		if !slices.Contains([]string{"supported", "unsupported", "insufficient"}, f.Verdict) || strings.TrimSpace(f.Reason) == "" || len(f.Reason) > 2000 || credentialText(f.Reason) {
-			return false
-		}
-		if in.Analysis != nil {
-			return validAnalysisCitations(f, in)
-		}
-		return len(f.PacketIDs) == 0 && f.PacketID == in.Evidence.ID && f.PacketID != ""
+	if err := validateSourceCoverage(a, in); err != nil {
+		return err
 	}
 	if in.Analysis == nil && len(a.AnalysisChecks) != 0 {
 		return fmt.Errorf("source report v1 cannot supply analysis findings")
@@ -173,7 +174,7 @@ func ValidateReviewAssessment(a ReviewAssessment, in ReviewInput) error {
 	if in.Analysis != nil {
 		topics := map[string]bool{}
 		for _, check := range a.AnalysisChecks {
-			if topics[check.Topic] || !slices.Contains([]string{"relations", "periods", "measurements", "coverage"}, check.Topic) || !valid(check.Finding) {
+			if topics[check.Topic] || !slices.Contains([]string{"relations", "periods", "measurements", "coverage"}, check.Topic) || !validReviewFinding(check.Finding, in) {
 				return fmt.Errorf("analysis requires distinct relation, period, measurement and coverage findings with actual citations")
 			}
 			topics[check.Topic] = true
@@ -182,17 +183,27 @@ func ValidateReviewAssessment(a ReviewAssessment, in ReviewInput) error {
 			return fmt.Errorf("analysis requires every semantic dimension, not only output support")
 		}
 	}
-	if !valid(a.GoalFit) || len(a.Outputs) != len(in.Contract.Outputs) {
+	if !validReviewFinding(a.GoalFit, in) || len(a.Outputs) != len(in.Contract.Outputs) {
 		return fmt.Errorf("review requires bounded goal fit and every output, each citing the actual evidence packet")
 	}
 	seen := map[string]bool{}
 	for _, output := range a.Outputs {
-		if seen[output.Output] || !valid(output.Finding) || !slices.ContainsFunc(in.Contract.Outputs, func(r OutputRequirement) bool { return r.ID == output.Output }) {
+		if seen[output.Output] || !validReviewFinding(output.Finding, in) || !slices.ContainsFunc(in.Contract.Outputs, func(r OutputRequirement) bool { return r.ID == output.Output }) {
 			return fmt.Errorf("review has a missing, duplicated, unknown or invalid output finding")
 		}
 		seen[output.Output] = true
 	}
 	return nil
+}
+
+func validReviewFinding(f ReviewFinding, in ReviewInput) bool {
+	if !slices.Contains([]string{"supported", "unsupported", "insufficient"}, f.Verdict) || strings.TrimSpace(f.Reason) == "" || len(f.Reason) > 2000 || credentialText(f.Reason) {
+		return false
+	}
+	if in.Analysis != nil {
+		return validAnalysisCitations(f, in)
+	}
+	return len(f.PacketIDs) == 0 && f.PacketID == in.Evidence.ID && f.PacketID != ""
 }
 
 func (e *Engine) sourceReviewInput(id string) (ReviewInput, error) {

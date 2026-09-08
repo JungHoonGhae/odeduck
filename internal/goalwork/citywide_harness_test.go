@@ -26,7 +26,7 @@ func TestCitywideReviewDiagnosticPreservesFailures(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, kind := range []string{"existing-output", "provider-error", "false-approval", "missing-reference", "invalid-provider", "invalid-mode"} {
+	for _, kind := range []string{"existing-output", "provider-error", "false-approval", "missing-reference", "unproven-full-scope", "invalid-provider", "invalid-mode"} {
 		t.Run(kind, func(t *testing.T) {
 			dir := t.TempDir()
 			output := filepath.Join(dir, "diagnostic.json")
@@ -47,7 +47,10 @@ func TestCitywideReviewDiagnosticPreservesFailures(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
-			provider, mode := "codex", "reference"
+			provider, mode, variant := "codex", "reference", "baseline"
+			if kind == "unproven-full-scope" {
+				variant = "with-branches-full-scope"
+			}
 			if kind == "invalid-provider" {
 				provider = "auto"
 			}
@@ -62,7 +65,7 @@ func TestCitywideReviewDiagnosticPreservesFailures(t *testing.T) {
 					cmd.Env = append(cmd.Env, env)
 				}
 			}
-			cmd.Env = append(cmd.Env, "PATH="+dir, "ODEDUCK_CITYWIDE_REVIEW="+provider, "ODEDUCK_CITYWIDE_ACQUISITION="+mode, "ODEDUCK_CITYWIDE_RESULT=baseline", "ODEDUCK_CITYWIDE_REVIEW_OUTPUT="+output)
+			cmd.Env = append(cmd.Env, "PATH="+dir, "ODEDUCK_CITYWIDE_REVIEW="+provider, "ODEDUCK_CITYWIDE_ACQUISITION="+mode, "ODEDUCK_CITYWIDE_RESULT="+variant, "ODEDUCK_CITYWIDE_REVIEW_OUTPUT="+output)
 			if kind == "missing-reference" {
 				cmd.Dir = dir // The declared source reference is genuinely unavailable.
 			}
@@ -99,6 +102,12 @@ func TestCitywideReviewDiagnosticPreservesFailures(t *testing.T) {
 			if kind == "missing-reference" {
 				if record.Input != nil || record.Response != nil || record.Result.Status != "not_run" {
 					t.Fatal("preparation failure invented a model execution")
+				}
+				return
+			}
+			if kind == "unproven-full-scope" {
+				if record.Input != nil || record.Response != nil || record.Result.Contract == nil || record.Result.Contract.Coverage != "population" || record.Result.Evaluation == nil || record.Result.Evaluation.FullScope == nil || record.Result.Evaluation.FullScope.Eligible {
+					t.Fatal("reference replay manufactured acquisition evidence or called the reviewer")
 				}
 				return
 			}

@@ -31,6 +31,26 @@ values are also checked against retained originals and disclosed packets. Interp
 the complete reported comparison, including these records, when assessing coverage
 and original goal fit; reporting a gap does not prove that the goal is answered.
 
+Only when analysis.fullScope is present is source-supported full-scope review
+authorized. The immutable Contract.coverage remains population. Add to your JSON:
+"sourceCoverage":[{"observation":"actual original observation ID","finding":
+{"verdict":"supported|unsupported|insufficient","reason":"...","packetIds":["actual packet ID"]}}].
+Return one finding for EVERY fullScope.sources entry, no others. Cite that original
+observation's packet or sourceContext explicitly targeting it. Without fullScope,
+omit sourceCoverage; ordinary analysis authority cannot approve population goals.
+fullScope eligibility proves only acquisition extent: complete_csv_selection means
+EOF plus retention of all predicate matches; xlsx_rectangle means all rows of the
+chosen rectangle, NOT an entire worksheet or logical table. Use the referenced
+source's actual selection counts, predicates, table/record positions, declaration,
+original selected evidence and applicable context. Establish WHY each selection
+covers the original requested subjects, regions and periods, including source
+exclusions, then evaluate join/time exclusions and any requested unmatched report.
+A full file, plausible row count, caller-selected rectangle, proposed target or
+coverage disclaimer alone is insufficient. Counts of publisher-listed facilities,
+for example, need not count currently operating facilities. Source-supported full
+coverage can answer a source-bound question but cannot certify all real-world
+members, field conditions or absence outside the source's stated universe.
+
 analysis.sourceContext contains additional already-disclosed packets from separate
 original observations. Each entry includes evidence, projected source metadata,
 the acquisition request and targets naming participating observations. An entry
@@ -84,7 +104,8 @@ Support historical/source-bound comparisons and calculations when the evidence
 supports that requested strength. Do not add causal, payment or present-day field
 inspection requirements to a question asking only for such a comparison. Conversely,
 this version cannot approve spatial/route analysis, current safety, causal effects,
-population certification or business hypotheses. Mark a stronger goal unsupported
+population certification or business hypotheses. Full-scope review when explicitly
+authorized above is a source-supported judgement, not such certification. Mark a stronger goal unsupported
 or insufficient even when the bounded calculated values are supported.
 
 Use supported for sufficient supplied support at the requested strength, unsupported

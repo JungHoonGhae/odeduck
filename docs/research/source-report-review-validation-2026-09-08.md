@@ -272,3 +272,30 @@ CLI 실제 Engine/Run은 STD 보조 근거, MCP JSON-RPC는 API 보조 근거를
 원래 작업 공간과 깨끗한 detached 후보에서 tidy/vet/전체 test/build/브랜드 검사를 통과했고,
 goalwork·agentplan·MCP·CLI race도 통과했다. 독립 Standards 검토는 규칙 위반·중요 smell 각 0건,
 Spec 검토는 지적 0건이며 각 축의 최고 심각도는 해당 없음이다. 후보 이후에는 이 검증 기록만 추가했다.
+
+## 후속 구현: 전체 요청 범위의 추가 검토
+
+원래 `population` 계약을 유지하면서 실제 취득 범위를 먼저 검사하고, 원본별 범위 판단을 별도 검토한다.
+추가 시작 권한 `ReviewFullScope`에는 기존 analysis·수신자·선택 공개 권한이 필요하다. CSV의 EOF와
+모든 조건 일치 행 보관, XLSX의 정확한 rectangle 취득은 검토 자격일 뿐 요청한 모집단의 증명이 아니다.
+API/STD 페이지·공간 stream·미상/잘린 취득은 이 경로를 열지 않는다. 모든 원본의 실제 인용과
+기존 네 분석 축·모든 출력·GoalFit이 지지돼야 한정된 full-scope 모델 검토로 완료 후보가 된다.
+
+Start/Advance 양성의 기존 population 차단과 CLI/MCP 새 설정의 실패를 먼저 확인한 뒤 구현했다.
+실제 CSV reader의 끝까지 검사/잘린 보관, 실제 XLSX reader의 원본 좌표, 선집계의 원본 범위,
+별도 권한·누락/중복/위조/다른 원본 인용·거부 판정·입력 변조를 검사했다. CLI/MCP 및 외부 모델
+adapter fixture도 원래 범위와 원본별 판정 전달을 검증한다. 실제 취득 없는 reference 재생은
+새 진단 모드에서 모델 호출 전 실패하며, 기존 실패 archive를 덮어쓰지 않는 회귀를 유지한다.
+
+이 fixture 검사는 상태·전달 계약이며 새 모델 의미 정확도 증거가 아니다. 종전 12/12 배치를 재분류하지
+않는다. 실제 G4 진단은 [실행 검증](goal-result-execution-validation-2026-09-08.md)에 별도로 기록한다.
+진단 recipe에서 검토자에게 기대 완료 상태를 알려주던 문장도 제거했다. 과거 원 응답·입력과 독립
+oracle은 변경하지 않았으므로, 종전 진단과 새 시도를 동등 조건의 비교로 제시하지 않는다.
+
+검증 기준점은 `349ecb3`, 최종 코드·archive 후보는 `553e245cc5fc4d697ed6ecb85fed8f15ee0324ca`다.
+깨끗한 detached 후보에서 tidy/vet/전체 test/build/브랜드 검사를 통과했고, 원래 작업 공간의 동일
+코드에서 goalwork·agentplan·MCP·CLI race도 통과했다. 보존 모델 응답 40건을 공개 adapter로 재생했으며
+새 full-scope 원본별 판정과 과거 응답의 구분을 유지한다. 이는 decoder 회귀이지 40회 새 모델 실행이 아니다.
+독립 Standards 검토의 P3 중복 판정 검증을 공통 함수로 정리한 뒤, 후속 Standards 규칙 위반·중요 smell
+각 0건, Spec 지적 0건을 확인했다. 두 축의 남은 최고 심각도는 해당 없음이다.
+후보 뒤에는 이 검증 기록만 추가했다. 원래 목표의 원천 적용·자율 양성 완주는 계속 미완료다.

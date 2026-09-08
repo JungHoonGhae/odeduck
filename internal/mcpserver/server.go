@@ -24,15 +24,16 @@ import (
 
 // Deps carries the collaborators the server needs.
 type Deps struct {
-	Fetch              *fetch.Client
-	BaseURL            string // data.go.kr root for search/describe (override in tests)
-	SemanticIndex      *catalog.SemanticIndex
-	Embedder           catalog.Embedder
-	Caller             datasetCallExecutor
-	Ledger             *connectionledger.Store
-	ShareGoalEvidence  bool   // trusted startup setting; never a model tool argument
-	GoalReviewProvider string // additional explicit disclosure to a separate reviewer
-	ReviewGoalAnalyses bool   // additional review scope, fixed at trusted startup
+	Fetch               *fetch.Client
+	BaseURL             string // data.go.kr root for search/describe (override in tests)
+	SemanticIndex       *catalog.SemanticIndex
+	Embedder            catalog.Embedder
+	Caller              datasetCallExecutor
+	Ledger              *connectionledger.Store
+	ShareGoalEvidence   bool   // trusted startup setting; never a model tool argument
+	GoalReviewProvider  string // additional explicit disclosure to a separate reviewer
+	ReviewGoalAnalyses  bool   // additional review scope, fixed at trusted startup
+	ReviewGoalFullScope bool   // additional source-supported population-goal review authority
 }
 
 type datasetCallExecutor interface {
@@ -496,7 +497,7 @@ func New(deps Deps) *mcp.Server {
 			return response.Assessment, err
 		}
 	}
-	goalPolicy := goalwork.Policy{ReviewRecipient: deps.GoalReviewProvider, ReviewAnalyses: deps.ReviewGoalAnalyses}
+	goalPolicy := goalwork.Policy{ReviewRecipient: deps.GoalReviewProvider, ReviewAnalyses: deps.ReviewGoalAnalyses, ReviewFullScope: deps.ReviewGoalFullScope}
 	if deps.ShareGoalEvidence {
 		goalPolicy.EvidenceRecipient = "mcp_host"
 	}

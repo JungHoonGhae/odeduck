@@ -22,6 +22,7 @@ type Policy struct {
 	EvidenceRecipient string `json:"evidenceRecipient,omitempty"` // empty disables selected value disclosure
 	ReviewRecipient   string `json:"reviewRecipient,omitempty"`   // explicit second disclosure/authority; never a planner input
 	ReviewAnalyses    bool   `json:"reviewAnalyses,omitempty"`    // additional trusted opt-in; source-report permission alone is insufficient
+	ReviewFullScope   bool   `json:"reviewFullScope,omitempty"`   // additional opt-in for source-supported population goals, not population certification
 }
 
 const (
@@ -272,6 +273,9 @@ func Start(goal string, policy Policy, deps Dependencies) (*Engine, error) {
 	}
 	if policy.ReviewAnalyses && policy.ReviewRecipient == "" {
 		return nil, fmt.Errorf("analysis review requires an explicitly authorized reviewer")
+	}
+	if policy.ReviewFullScope && !policy.ReviewAnalyses {
+		return nil, fmt.Errorf("full-scope review requires authorized analysis review")
 	}
 	return &Engine{deps: deps, state: View{Goal: goal, Status: "exploring", Policy: policy, ExpiresAt: time.Now().UTC().Add(time.Hour)}, rows: map[string][]Row{}, requests: map[string]SampleRequest{}, seen: map[string]bool{}}, nil
 }
@@ -767,7 +771,7 @@ func (e *Engine) act(ctx context.Context, d Decision) error {
 					requests = append(requests, e.requests[o.ID])
 				}
 			}
-			e.state.Artifact = &Artifact{Status: "sample_executed", Recipe: p, Sources: sources, Requests: requests, Layouts: e.state.Layouts, Metrics: metrics, Rows: rows, Limitations: []string{"Bounded observed sample only; not population coverage.", "Namespace, time, representativeness and usefulness remain declared assumptions, not verified identity or causality.", "Reacquisition may change source bytes; hashes identify the observed revision, not an archived copy.", "Not connection-ledger sample_verified. No automatic claim promotion."}}
+			e.state.Artifact = &Artifact{Status: "sample_executed", Recipe: p, Sources: sources, Requests: requests, Layouts: e.state.Layouts, Metrics: metrics, Rows: rows, Limitations: []string{"Bounded acquisition only; full requested coverage needs separately authorized source review.", "Namespace, time, representativeness and usefulness remain declared assumptions, not verified identity or causality.", "Reacquisition may change source bytes; hashes identify the observed revision, not an archived copy.", "Not connection-ledger sample_verified. No automatic claim promotion."}}
 			e.state.Artifact.Unmatched = unmatched
 			if len(p.Joins) > 0 {
 				e.state.Artifact.Limitations = append(e.state.Artifact.Limitations, "Inner joins omit unmatched rows from the result table; metrics retain stage-local source addresses for selected evidence and replanning, not proof of absence.")
@@ -775,7 +779,7 @@ func (e *Engine) act(ctx context.Context, d Decision) error {
 					e.state.Artifact.Limitations = append(e.state.Artifact.Limitations, "Explicitly selected unmatched values are reported separately in unmatched; stage-local tuples do not enter calculations and may repeat sources across stages, not distinct entities or a complete population.")
 				}
 			}
-			evaluation := evaluateRequirements(*e.state.Contract, p, rows, e.state.Observations, e.state.Nodes)
+			evaluation := evaluateRequirements(*e.state.Contract, p, rows, e.state.Observations, e.state.Nodes, e.state.Policy.ReviewFullScope)
 			evaluation.ExecutionRevision = e.state.Revision
 			for _, o := range sources {
 				if o.Spatial != nil {

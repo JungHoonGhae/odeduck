@@ -9,6 +9,12 @@ section matching a `vX.Y.Z` tag as the GitHub release notes.
 
 ### Added
 
+- Additional opt-in full-scope goal review (`solve --review-full-scope`, MCP startup
+  `--review-goal-full-scope`), requiring existing analysis/disclosure authorization.
+  Complete CSV retention or exact XLSX rectangle acquisition enables review, not
+  population approval. Every original source needs a separately cited scope finding;
+  missing evidence, truncated selections and unsupported acquisition types remain incomplete.
+
 - Optional `composition.support` links already-disclosed evidence from another
   original observation to proposed interpretation targets in analysis review.
   Exact packets and acquisition provenance are preserved; support does not change

@@ -17,6 +17,7 @@ type citywideModelReview struct {
 	recipient  string
 	branches   bool
 	historical bool
+	fullScope  bool
 	call       func(context.Context, goalwork.ReviewInput) (goalwork.ReviewAssessment, error)
 	observe    func(goalwork.View)
 }
@@ -73,8 +74,8 @@ func TestLiveCitywideGoalAnalysisReview(t *testing.T) {
 	if variant == "" {
 		variant = "baseline"
 	}
-	if variant != "baseline" && variant != "with-branches" {
-		t.Fatal("result variant must be baseline or with-branches")
+	if variant != "baseline" && variant != "with-branches" && variant != "with-branches-full-scope" {
+		t.Fatal("result variant must be baseline, with-branches or with-branches-full-scope")
 	}
 	f, err := os.OpenFile(os.Getenv("ODEDUCK_CITYWIDE_REVIEW_OUTPUT"), os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
 	if err != nil {
@@ -111,7 +112,7 @@ func TestLiveCitywideGoalAnalysisReview(t *testing.T) {
 			t.Error(err)
 		}
 	})
-	reviewer := &citywideModelReview{recipient: provider, historical: mode == "historical", branches: variant == "with-branches", observe: func(v goalwork.View) { record.Result = v }, call: func(ctx context.Context, in goalwork.ReviewInput) (goalwork.ReviewAssessment, error) {
+	reviewer := &citywideModelReview{recipient: provider, historical: mode == "historical", branches: variant != "baseline", fullScope: variant == "with-branches-full-scope", observe: func(v goalwork.View) { record.Result = v }, call: func(ctx context.Context, in goalwork.ReviewInput) (goalwork.ReviewAssessment, error) {
 		record.Input = &in
 		response, err := agentplan.ReviewGoal(ctx, in, provider)
 		record.Response = &response

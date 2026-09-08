@@ -110,7 +110,7 @@ func TestRequirementsRejectUnusedObservationsAndWrongOutputLineage(t *testing.T)
 	p := Composition{Base: "o1", Joins: []Join{{Right: "o2"}}, Roles: []RoleBinding{{Role: "people", Observation: "o1"}, {Role: "shelters", Observation: "o3"}}, Outputs: []OutputBinding{{Output: "capacity", Field: "o1.value"}}}
 	observations := []Observation{{ID: "o1", PK: "people"}, {ID: "o2", PK: "map"}, {ID: "o3", PK: "shelters"}}
 	nodes := []Node{{Hit: catalog.Hit{PK: "people"}, Roles: []string{"people"}}, {Hit: catalog.Hit{PK: "shelters"}, Roles: []string{"shelters"}}}
-	result := evaluateRequirements(c, p, []Row{{"o1.value": float64(100)}}, observations, nodes)
+	result := evaluateRequirements(c, p, []Row{{"o1.value": float64(100)}}, observations, nodes, false)
 	if result.Status != "partial" {
 		t.Fatalf("unused source or mislabelled output passed: %+v", result)
 	}
@@ -118,7 +118,7 @@ func TestRequirementsRejectUnusedObservationsAndWrongOutputLineage(t *testing.T)
 
 func TestRequirementsNeverTurnSampleIntoPopulationProof(t *testing.T) {
 	c := GoalContract{Coverage: "population", Roles: []RoleRequirement{{ID: "one"}}}
-	r := evaluateRequirements(c, Composition{}, []Row{{"x": "1"}}, nil, nil)
+	r := evaluateRequirements(c, Composition{}, []Row{{"x": "1"}}, nil, nil, false)
 	if r.Status != "partial" {
 		t.Fatal("sample promoted to population")
 	}
@@ -134,7 +134,7 @@ func TestRequiredOutputsRejectBlankStringsWithoutRejectingZeroOrFalse(t *testing
 		t.Run(tc.name, func(t *testing.T) {
 			c := GoalContract{Coverage: "sample", Roles: []RoleRequirement{{ID: "shelters"}}, Outputs: []OutputRequirement{{ID: "value", Role: "shelters", Type: tc.kind}}}
 			p := Composition{Base: "o1", Roles: []RoleBinding{{Role: "shelters", Observation: "o1"}}, Outputs: []OutputBinding{{Output: "value", Field: "o1.value"}}}
-			result := evaluateRequirements(c, p, []Row{{"o1.value": tc.value}}, []Observation{{ID: "o1", PK: "s"}}, []Node{{Hit: catalog.Hit{PK: "s"}, Roles: []string{"shelters"}}})
+			result := evaluateRequirements(c, p, []Row{{"o1.value": tc.value}}, []Observation{{ID: "o1", PK: "s"}}, []Node{{Hit: catalog.Hit{PK: "s"}, Roles: []string{"shelters"}}}, false)
 			if got := result.Status == "requirements_met"; got != tc.met {
 				t.Fatalf("requirements met=%v want=%v: %+v", got, tc.met, result)
 			}
