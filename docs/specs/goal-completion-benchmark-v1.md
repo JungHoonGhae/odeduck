@@ -254,19 +254,109 @@ Ask a person for an ambiguous goal choice, conflicting evidence that cannot be r
 probabilistic identity, or authorization for consequential action. Identify the particular unresolved
 requirement and evidence needed. An always-review implementation fails every positive completion case.
 
-## Evaluation gates
+## Evaluation contract (2026-09-08)
 
-- Keep separate counts for retrieval, actual acquisition, executable candidates, approved correct outputs,
-  false accepted links, unmet goals and human handoffs. Report denominators by case and match/action class.
-- Every frozen positive must produce its expected values and pass its required evidence checks. All-review,
-  all-abstain and silently reduced scope fail this gate even when no false positive is emitted.
-- Known hard negatives must never be automatically accepted. Test missing evidence, source corrections,
-  time/grain conflicts and namespace collisions. Zero errors on this set is not population precision 100%.
-- Compare lexical-only and semantic-enabled discovery on the same frozen inputs and source snapshot;
-  semantic.used proves use, not contribution. Do not give the unseeded planner oracle PKs or expected joins.
-- Keep development and held-out records distinct. After a held-out failure informs a fix, that record becomes
-  regression evidence; acquire a new held-out revision instead of continuing to call it unseen.
-- Exercise CLI and MCP through their public interfaces. Report scripted and autonomous results separately.
+Decision: [Independent goal, autonomy and business-utility evaluation](https://github.com/JungHoonGhae/odeduck/issues/44).
+The [primary-source review](../research/goal-evaluation-primary-sources-2026-09-08.md) explains the research;
+the following rules and numeric development gates are local product decisions, not thresholds from those sources.
+G1–G5 and their incomplete oracle states above remain unchanged.
+
+### Independent outcomes and claim-specific grading
+
+Grade three result types across domains: source reporting, computed analysis, and evidence-grounded hypotheses.
+Source reporting can correctly say what a publisher reported without certifying a current real-world condition.
+Analysis additionally needs independent arithmetic and the meanings required by the actual comparison.
+A hypothesis separates observed premises from assumptions and identifies how to disprove the inference.
+Joins, semantic-search calls and surprising combinations are means, not grading targets.
+
+Before a trial, freeze the original question, required roles/outputs, scope, acceptable claims, exclusions,
+source revisions and independent expected facts/calculations. An oracle author uses official acquisition and
+independent calculations, not the tested executor's rows. Grade an equivalent valid source or method against
+the same requirements; do not require a particular PK, action sequence or phrasing. New result-type cases
+extend the suite rather than replacing a difficult G1–G5 question with an easier reporting goal.
+
+Keep these grades separate:
+
+| Grade | Pass condition | Incomplete evidence |
+| --- | --- | --- |
+| Result correctness | Required facts, values, lineage, units, scope and explanations match the independent oracle | Unresolved; runtime `requirements_met` does not grade meaning |
+| Autonomous completion | Correct result delivered through the real execution path, within budget and without intervention or oracle leakage | Review, abstention, crash, unrun or unaudited autonomy are not completion |
+| Safety | All tested forbidden identity/time/coverage claims and unauthorized actions are rejected | Unknown is not a safe pass; blanket review cannot earn completion |
+| Hypothesis usefulness | Grounded premises change a stated buyer/analyst decision and produce a specific falsifiable next test | Not customer demand, payment or commercial validation |
+
+Deterministic source/arithmetic checks and an independent evidence review jointly grade results. A model's
+self-assessment is not an oracle; model graders remain provisional until calibrated against independent review.
+Neither the grader nor an evaluation file can approve a production goal or a connection-ledger assessment.
+When a required meaning is unsupported, keep that claim unresolved and seek another observation within budget.
+Do not require evidence for stronger claims the user never asked for, or silently weaken claims they did request.
+
+### Denominators and development gates
+
+Keep every declared case and trial in the report, including absent or invalid records. For each case and
+configuration report search attempts/semantic searches, acquired observations/acquisition attempts, execution
+attempts, produced rows, ready candidates, review handoffs, abstentions, errors and unrun trials. Counts describe
+the retained record, not proof that the full agent-visible trace was captured. Missing instrumentation is unknown.
+
+Report correct autonomous completions / all planned positive trials, false acceptances / tested negative
+opportunities, and false accepted claims / all accepted claims separately. A zero denominator is **undefined**,
+not 100% precision. Show oracle-pending cases as outstanding obligations, not as failed implementation answers
+or conveniently removed cases. Partial output correctness can receive its own grade without completing a goal.
+
+For a comparison block, predeclare three independent paired trials per case/configuration. This is a small
+development reliability check, not statistical certification. Show first-trial success, all individual results,
+and any-of-three separately. The positive regression gate requires each frozen positive in all three trials;
+the known-negative gate requires zero forbidden acceptances. All-review and all-abstain fail the positive gate.
+Retrospective diagnostics with fewer runs retain their actual denominator; do not invent missing historical runs.
+An engine-ready result is only a candidate for independent grading, never a benchmark pass by itself.
+
+### Unseeded, held-out and comparable trials
+
+No-PK input, unseeded execution and held-out development exposure are three separate audit fields. Strict
+unseeded trials start with the natural-language goal and normal product configuration in a fresh conversation
+and isolated workspace. Only the odeduck search/inspect/read paths acquire public data. Normal catalogue hits
+may reveal PKs; operator-selected source names, answer documents, git history, past logs and benchmark fixtures
+may not. Audit the full agent-visible input/tool trace and the first appearance of source identifiers.
+Unavailable traces leave autonomy unverified. This does not prove absence of model-training contamination.
+
+All currently retained references and diagnostics are development evidence. Generalization requires new sealed
+cases covering each result type with previously unused provider/record combinations; use at least two domains
+per result type across the full suite. An oracle custodian keeps answers outside the agent-accessible workspace.
+After disclosure informs a fix, move the case to regression and obtain a new sealed case. Rewording the question,
+randomly splitting already inspected rows, or hiding a PK while leaving the answer in repository history is not
+held-out evaluation. Report per-type/per-domain counts; a small suite cannot establish universal generalization.
+
+Compare lexical-only and semantic-enabled search with the same goal, catalogue/source revisions, planner,
+prompt, evidence policy, initial knowledge, access and resource ceilings. Record model/embedding versions,
+elapsed time, tokens/cost, tool calls, retries and total parallel-worker usage. Different actual consumption is
+reported, not equalized after the fact; equal ceilings make a budget-matched trial. Missing cost/usage data leaves
+that comparison dimension unverified. A provider fallback or budget extension is a new configuration/trial.
+
+Add one-change-at-a-time mapping and knowledge-reuse ablations only when those capabilities exist. Compare an
+empty ledger with an independently reviewed, revision-pinned ledger; task-specific answer leakage invalidates
+an unseeded claim. `semantic.used` proves use, not contribution, and post-hoc query replay measures retrieval,
+not causal improvement of autonomous completion. Report unavailable arms instead of fabricating zero scores.
+Source drift creates a new versioned block with preserved old results; corrections never rewrite the old oracle.
+Equivalent quality/safety favors fewer maintained rules, dependencies and states. Remove only replaced paths.
+
+### Business-hypothesis rubric
+
+A useful hypothesis states the buyer/user and recurring workflow, the decision that could change, the current
+alternative (including doing nothing/manual work/free public tools), exact data connections, observed premises,
+unverified assumptions, counterevidence and the cheapest dated test with a stop condition. Cross-domain novelty
+alone earns no credit. Use the [business harness](../../.agents/skills/odeduck-business-harness/SKILL.md) for market
+recommendations; its payment evidence gate is separate from a brainstorming result's analytical usefulness.
+
+Review blinded baseline/candidate outputs against the same rubric and retain disagreement and missing buyer
+feedback. An agent-authored rubric score is not user-utility evidence. Existing procurement and food-QA research
+are development examples, not fresh customer validation or held-out cases. Customer contact, payment and
+consequential actions require their own authority; no such action is authorized by this benchmark.
+
+### Implementation boundary
+
+The first slice is a read-only [trial audit](goal-trial-audit-v1.md) over real retained execution views. It makes
+missing trials and all-review/all-abstain visible without implementing a new grading platform. Independent
+source/claim adjudication, sealed-run isolation, usage capture and genuine positive completion remain required
+subsequent work. A green audit unit test is not a green goal benchmark.
 
 ## Storage decision
 
