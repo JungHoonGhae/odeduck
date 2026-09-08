@@ -93,6 +93,43 @@ portal filter endpoint. The provider describes currently existing codes and expl
 processed K-GeoP codes can differ from the administrative-standard-code source. Current membership and
 creation dates alone do not validate a historical crosswalk or prove 행정동/법정동 equivalence.
 
+## Historical FILE editions (verified 2026-09-08)
+
+The public [file-detail script](https://www.data.go.kr/js/biz/datset/script_fileDetail.js),
+`fn_histAndCsvData`, loads the portal's “주기성 과거 데이터” section. Unauthenticated
+POSTs and actual old-file acquisition verified this path for PK 15097972:
+
+| Method/path | Observed contract |
+| --- | --- |
+| POST `/tcs/dss/selectHistAndCsvData.do` | `publicDataPk` and the current page's `publicDataDetailPk`; `#tab-layer-file-05 h3 span` count, `a.openFileDetailPopup` with `data-public-pk` and `data-public-detail-sn` |
+| POST `/tcs/dss/selectDpkDetailInfo.do` | Listed `publicDataDetailPk` and `publicDataHistSn`; `#file-detail-popup`, its own metadata and explicit `fn_fileDataDown(pk, detailPk, attachment, serial, format)` buttons |
+| POST `/tcs/dss/selectFileDataDownload.do` | Existing resolver: exact listed/button IDs plus `publicDataTyCode=PR0051`; then existing `/cmm/cmm/fileDownload.do` GET |
+
+Accept at most 8 MiB listing and 2 MiB popup responses under the fetcher's existing
+buffer bound. Require a single history section and agreement between declared and
+recognized counts; selector drift is unknown coverage, not zero history. Expose
+the first 32 editions in portal order, total recognized count and truncation.
+Select only from that prefix after fresh membership validation. Resolve 1–8
+explicit attachments and reject changed PK/detail/attachment IDs, malformed IDs,
+duplicate asset names and disagreement between button format and filename.
+Repeated buttons for the same attachment/serial may deduplicate only when their
+advertised formats agree case-insensitively; conflicting declarations are rejected.
+
+The July popup advertised CSV and JSON. The JSON resolver returned a `.json`
+filename but `atchFileExtsn=csv`; preserve the matching button/filename JSON format
+and report that discrepancy. This does not validate content or enable JSON sampling.
+Historical metadata comes only from the selected popup, never the latest edition.
+Membership and popup POST URL/forms are retained as inspection evidence. They
+contain public IDs, not keys. Registration and modification dates are not row dates.
+
+The current page listed 54 editions; the July selection was
+`uddi:95f114ef-87c9-4669-971d-aab9aff9d7d4/2`, attachment `FILE_000000003807403/1`.
+Actual re-acquisition matched the original July hash; see the
+[G4 diagnostic](../research/goal-result-execution-validation-2026-09-08.md#과거-버전의-실취득-복구).
+No historical-date URL synthesis, latest fallback, archive guarantee or population
+approval is provided. CLI/MCP behavior is defined in the
+[shared inspection contract](../specs/goal-integration-and-cleanup-v1.md#과거-file-버전-선택--2026-09-08-추가-계약).
+
 ## Preconditions worth remembering
 
 - **`currentMyMenuId=M020105` cookie** before the apply form, or the portal

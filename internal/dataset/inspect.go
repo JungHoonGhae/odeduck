@@ -50,22 +50,26 @@ type Ref struct {
 
 // Contract is the observed delivery contract for one Data Node.
 type Contract struct {
-	Ref             Ref               `json:"ref"`
-	Name            string            `json:"name,omitempty"`
-	Provider        string            `json:"provider,omitempty"`
-	UpdateCycle     string            `json:"updateCycle,omitempty"`
-	ModifiedAt      string            `json:"modifiedAt,omitempty"`
-	DeclaredFormat  string            `json:"declaredFormat,omitempty"`
-	SourceURL       string            `json:"sourceUrl"`
-	AdapterID       string            `json:"adapterId"`
-	AdapterRevision int               `json:"adapterRevision"`
-	VerifiedAt      string            `json:"verifiedAt"`
-	Capability      string            `json:"capability"`
-	Evidence        []Evidence        `json:"evidence,omitempty"`
-	Alternatives    []Alternative     `json:"alternatives,omitempty"`
-	Metadata        map[string]string `json:"metadata,omitempty"`
-	Assets          []Asset           `json:"assets,omitempty"`
-	Warnings        []string          `json:"warnings,omitempty"`
+	Ref                  Ref               `json:"ref"`
+	Name                 string            `json:"name,omitempty"`
+	Provider             string            `json:"provider,omitempty"`
+	UpdateCycle          string            `json:"updateCycle,omitempty"`
+	ModifiedAt           string            `json:"modifiedAt,omitempty"`
+	DeclaredFormat       string            `json:"declaredFormat,omitempty"`
+	SourceURL            string            `json:"sourceUrl"`
+	AdapterID            string            `json:"adapterId"`
+	AdapterRevision      int               `json:"adapterRevision"`
+	VerifiedAt           string            `json:"verifiedAt"`
+	Capability           string            `json:"capability"`
+	Evidence             []Evidence        `json:"evidence,omitempty"`
+	Alternatives         []Alternative     `json:"alternatives,omitempty"`
+	Metadata             map[string]string `json:"metadata,omitempty"`
+	Assets               []Asset           `json:"assets,omitempty"`
+	Warnings             []string          `json:"warnings,omitempty"`
+	FileVersions         []FileVersion     `json:"fileVersions,omitempty"`
+	FileHistoryCount     int               `json:"fileHistoryCount,omitempty"`
+	FileHistoryTruncated bool              `json:"fileHistoryTruncated,omitempty"`
+	SelectedFileVersion  *FileVersion      `json:"selectedFileVersion,omitempty"`
 }
 
 // Alternative is a provider-advertised representation of the same logical
@@ -80,10 +84,11 @@ type Alternative struct {
 // standardized interface and which part depends on a first-party web contract.
 // This prevents a working fallback from being mistaken for a stable public API.
 type Evidence struct {
-	Purpose   string `json:"purpose"`
-	Kind      string `json:"kind"`
-	URL       string `json:"url"`
-	Stability string `json:"stability"`
+	Purpose   string   `json:"purpose"`
+	Kind      string   `json:"kind"`
+	URL       string   `json:"url"`
+	Stability string   `json:"stability"`
+	Request   *Request `json:"request,omitempty"` // exact non-secret portal history request
 }
 
 // Asset is one immutable-looking provider file advertised by a detail page.
@@ -163,6 +168,10 @@ var seoulDownload = regexp.MustCompile(`downloadFile\(\s*'([0-9]+)'\s*\)`)
 // instructions. Other delivery kinds will be added through this same interface;
 // unsupported kinds fail closed today.
 func (i *Inspector) Inspect(ctx context.Context, ref Ref) (*Contract, error) {
+	return i.inspect(ctx, ref, false, "")
+}
+
+func (i *Inspector) inspect(ctx context.Context, ref Ref, history bool, version string) (*Contract, error) {
 	if err := portal.ValidatePublicDataPK(ref.PK); err != nil {
 		return nil, err
 	}
@@ -227,6 +236,9 @@ func (i *Inspector) Inspect(ctx context.Context, ref Ref) (*Contract, error) {
 	}
 
 	if source := externalSourceURL(doc, htmlMetadata); source != "" {
+		if history {
+			return nil, fmt.Errorf("historical FILE inspection supports portal-hosted files only")
+		}
 		if normalized, ok := normalizeSeoulDatasetURL(source); ok {
 			return i.inspectSeoul(ctx, contract, normalized)
 		}
@@ -236,8 +248,14 @@ func (i *Inspector) Inspect(ctx context.Context, ref Ref) (*Contract, error) {
 
 	match := portalDownload.FindStringSubmatch(string(res.Body))
 	if len(match) != 6 {
+		if history {
+			return nil, fmt.Errorf("portal FILE history requires the current dataset download contract")
+		}
 		contract.Warnings = append(contract.Warnings, "포털 다운로드 계약을 확인하지 못했습니다")
 		return contract, nil
+	}
+	if history {
+		return i.inspectHistory(ctx, contract, match, version)
 	}
 	asset, err := i.resolvePortalAsset(ctx, match)
 	if err != nil {

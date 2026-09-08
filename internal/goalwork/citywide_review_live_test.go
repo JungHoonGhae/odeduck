@@ -14,10 +14,11 @@ import (
 )
 
 type citywideModelReview struct {
-	recipient string
-	branches  bool
-	call      func(context.Context, goalwork.ReviewInput) (goalwork.ReviewAssessment, error)
-	observe   func(goalwork.View)
+	recipient  string
+	branches   bool
+	historical bool
+	call       func(context.Context, goalwork.ReviewInput) (goalwork.ReviewAssessment, error)
+	observe    func(goalwork.View)
 }
 
 func TestCitywideComparisonPreservesSeparateBranchCounts(t *testing.T) {
@@ -65,8 +66,8 @@ func TestLiveCitywideGoalAnalysisReview(t *testing.T) {
 	if mode == "" {
 		mode = "live"
 	}
-	if mode != "live" && mode != "reference" {
-		t.Fatal("acquisition must be live or explicit reference replay; no automatic fallback")
+	if mode != "live" && mode != "reference" && mode != "historical" {
+		t.Fatal("acquisition must be live, explicit historical portal selection or reference replay; no automatic fallback")
 	}
 	variant := os.Getenv("ODEDUCK_CITYWIDE_RESULT")
 	if variant == "" {
@@ -110,7 +111,7 @@ func TestLiveCitywideGoalAnalysisReview(t *testing.T) {
 			t.Error(err)
 		}
 	})
-	reviewer := &citywideModelReview{recipient: provider, branches: variant == "with-branches", observe: func(v goalwork.View) { record.Result = v }, call: func(ctx context.Context, in goalwork.ReviewInput) (goalwork.ReviewAssessment, error) {
+	reviewer := &citywideModelReview{recipient: provider, historical: mode == "historical", branches: variant == "with-branches", observe: func(v goalwork.View) { record.Result = v }, call: func(ctx context.Context, in goalwork.ReviewInput) (goalwork.ReviewAssessment, error) {
 		record.Input = &in
 		response, err := agentplan.ReviewGoal(ctx, in, provider)
 		record.Response = &response
@@ -119,7 +120,7 @@ func TestLiveCitywideGoalAnalysisReview(t *testing.T) {
 		}
 		return response.Assessment, err
 	}}
-	record.Result = checkCitywideReduction(t, mode == "live", reviewer)
+	record.Result = checkCitywideReduction(t, mode != "reference", reviewer)
 	if record.Input == nil || record.Response == nil || record.Error != "" {
 		t.Fatal("actual model review was not completed; retain this failed attempt")
 	}

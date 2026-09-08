@@ -23,7 +23,7 @@ func TestReviewGoalReplaysArchivedCodexCalibration(t *testing.T) {
 		file   string
 		ready  int
 		trials int
-	}{{"source-report-review-20260908", "codex-raw.jsonl.gz", 6, 12}, {"analysis-review-20260908", "codex-raw.jsonl.gz", 3, 12}, {"analysis-review-20260908", "live-codex-raw.jsonl.gz", 6, 12}, {"citywide-review-20260908", "baseline-codex.json.gz", 0, 1}, {"citywide-review-20260908", "with-branches-codex.json.gz", 0, 1}} {
+	}{{"source-report-review-20260908", "codex-raw.jsonl.gz", 6, 12}, {"analysis-review-20260908", "codex-raw.jsonl.gz", 3, 12}, {"analysis-review-20260908", "live-codex-raw.jsonl.gz", 6, 12}, {"citywide-review-20260908", "baseline-codex.json.gz", 0, 1}, {"citywide-review-20260908", "with-branches-codex.json.gz", 0, 1}, {"citywide-review-20260908", "historical-codex.json.gz", 0, 1}} {
 		t.Run(archive.folder+"/"+archive.file, func(t *testing.T) {
 			replayArchivedReview(t, archive.folder, archive.file, archive.ready, archive.trials)
 		})

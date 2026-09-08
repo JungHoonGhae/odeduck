@@ -5,6 +5,7 @@ import "github.com/JungHoonGhae/odeduck/internal/dataset"
 // SourceDeclaration is bounded publisher metadata, NOT a verified record
 // namespace, period or geographic scope. Missing values remain unknown.
 type SourceDeclaration struct {
+	FileVersionID    string   `json:"fileVersionId,omitempty"`
 	Status           string   `json:"status"`
 	SourceURL        string   `json:"sourceUrl,omitempty"`
 	Name             string   `json:"name,omitempty"`
@@ -29,6 +30,10 @@ func sourceDeclarations(result *dataset.InspectionResult) map[string]SourceDecla
 			return bounded(s, n)
 		}
 		d.SourceURL, d.Name, d.Provider = clip(f.SourceURL, 1000), clip(f.Name, 400), clip(f.Provider, 400)
+		if f.SelectedFileVersion != nil {
+			d.FileVersionID = f.SelectedFileVersion.ID
+			d.Notices = append(d.Notices, "Metadata is from this selected historical FILE edition, not the current edition; missing declarations remain unknown.")
+		}
 		d.ModifiedAt = clip(f.ModifiedAt, 100)
 		description := f.Metadata["description"]
 		if description == "" {

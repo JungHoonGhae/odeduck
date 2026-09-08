@@ -23,10 +23,12 @@ const (
 )
 
 type InspectionRequest struct {
-	PK       string
-	Delivery DeliverySelection // auto (default) | api | file; auto returns every available representation
-	Observe  bool
-	Asset    string
+	PK          string
+	Delivery    DeliverySelection // auto (default) | api | file; auto returns every available representation
+	Observe     bool
+	Asset       string
+	FileHistory bool   // list advertised portal FILE editions without resolving assets
+	FileVersion string // exact ID from the bounded history, never a URL or guessed date
 }
 
 type InspectionResult struct {
@@ -68,6 +70,15 @@ func (i *UnifiedInspector) Inspect(ctx context.Context, request InspectionReques
 		return nil, fmt.Errorf("현재 카탈로그에 없는 pk입니다 — `odeduck catalog sync` 후 다시 검색하세요")
 	}
 	selection := DeliverySelection(strings.ToLower(strings.TrimSpace(string(request.Delivery))))
+	if request.FileHistory || request.FileVersion != "" {
+		if selection != "" && selection != DeliverySelectionAuto && selection != DeliverySelectionFile {
+			return nil, fmt.Errorf("FILE history cannot inspect API or STD delivery")
+		}
+		selection = DeliverySelectionFile
+		if request.FileVersion == "" && (request.Observe || request.Asset != "") {
+			return nil, fmt.Errorf("select a fileVersion before observing a historical FILE asset")
+		}
+	}
 	isStandard := entry.SvcType == catalog.SvcSTD || containsFold(entry.DataTypes, "STD")
 	legacyUnknown := entry.SvcType == "" && len(entry.DataTypes) == 0
 	if (selection == "" || selection == DeliverySelectionAuto || selection == "all" || selection == DeliverySelectionStandard) && (isStandard || legacyUnknown) {
@@ -123,7 +134,12 @@ func (i *UnifiedInspector) Inspect(ctx context.Context, request InspectionReques
 	if !wantFile {
 		return result, nil
 	}
-	contract, err := i.files.Inspect(ctx, Ref{PK: request.PK, Delivery: DeliveryFile})
+	var contract *Contract
+	if request.FileHistory || request.FileVersion != "" {
+		contract, err = i.files.InspectHistory(ctx, Ref{PK: request.PK, Delivery: DeliveryFile}, request.FileVersion)
+	} else {
+		contract, err = i.files.Inspect(ctx, Ref{PK: request.PK, Delivery: DeliveryFile})
+	}
 	if err != nil {
 		return nil, err
 	}

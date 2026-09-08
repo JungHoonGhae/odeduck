@@ -131,6 +131,33 @@ tidy/브랜드 일치/vet/전체 test/build와 goalwork·agentplan·MCP·CLI rac
 새 원천을 호출하지 않는 fixture 검증이며, 이전 dirty foundation을 포함한 통합 기준점을 남긴 것이다.
 이 통합으로 최근 두 기능의 커밋 대기는 해소하지만 I1–I10/G1–G5의 미완료 상태는 유지한다.
 
+### 과거 FILE 버전 선택 — 2026-09-08 추가 계약
+
+G4의 최신 파일 교체가 과거 파일 삭제를 뜻하지 않았다. 기존 Unified Inspector에 포털이 실제
+나열한 과거 버전의 발견·선택을 추가한다. 최신 검사는 기본 그대로이며 provider/인증 계약을 바꾸지 않는다.
+외부 요청·파서·범위의 단일 소스는 [portal catalog](../reverse-engineering/portal-catalog.md#historical-file-editions-verified-2026-09-08)다.
+
+- CLI `inspect --file-history`, MCP `inspect_dataset(fileHistory:true)`는 파일 취득 없이 제한된 목록을
+  반환한다. FILE 제공형을 선택하며 API/STD 지정이나 버전 없는 observe/asset 조합은 거부한다.
+- `--file-version` / `fileVersion`은 실제 목록의 정확한 ID만 받는다. 선택 시 membership를 다시 확인하고
+  그 버전만 검사한다. 사라진 버전·범위 밖 ID·깨진 포털 계약에서 최신 파일로 전환하지 않는다.
+  목록은 구조 검사나 `sample_verified` 영수증이 아니다. 실제 asset 검사 이후의 기존 장부 규칙은 유지한다.
+- Goal은 기존 `inspect` 행동의 `fileHistory` / `fileVersion`으로 같은 경로를 쓴다. 선택하려면 이 목표에서
+  먼저 해당 ID를 발견해야 한다. 선택 검사도 갱신된 목록을 유지해 다른 버전을 비교·재계획할 수 있다.
+  반환 PK·선택 버전을 요청과 대조하고 실패 시 이전 Inspection을 보존한다.
+- FILE `sample`과 `layout`은 선택 검사와 같은 `fileVersion`을 명시한다. 최신 파일은 생략한다.
+  요청 hash·중복 방지·layout pin/refresh에도 버전이 포함된다. Live adapter는 private contract와 다시 대조한다.
+  기존 관측은 후속 검사로 덮어쓰지 않는다. `sample.reduce`는 fileVersion을 생략하고 불변 원본 관측을
+  가리키며 새 취득이나 최신 원천 metadata를 상속하지 않는다.
+- 선택 버전의 원천 선언과 실제 content/contract hash를 결과·검토까지 유지한다. 목록의 이름·등록일이나
+  전체 스캔만으로 행의 기간·모집단·동일성을 승인하지 않는다. 예산·공개 상한·승인 규칙을 높이지 않는다.
+
+검증은 위의 동일 public seam에서 최소 익명 HTTP fixture와 실제 공통 Engine으로 수행한다.
+CLI/MCP 목록→선택→관찰 및 잘못된 조합 거부, 형식/식별 drift, 목록 한도·fresh membership,
+재검사 후 과거 관측의 선집계·결과를 검사한다. 원래 G4 질문·7월 oracle을 보존한 실제 역사 버전 취득과
+별도 모델 진단은 [실행 기록](../research/goal-result-execution-validation-2026-09-08.md#과거-버전의-실취득-복구)에 둔다.
+이는 I4/I9/M3의 부분 진전이며 I1–I10·G1–G5 완주를 뜻하지 않는다.
+
 ## Out of Scope
 
 이번 통합 단계에는 추가 저장소·임의 코드 실행·새 portal·원천 scope 확대·자동 신청·배포가 없다.

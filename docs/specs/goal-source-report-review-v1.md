@@ -150,6 +150,9 @@ fixture 승인만으로 모델 정확도나 원래 G1–G5의 자율 완주를 �
 
 위임된 Start/Advance·ReviewGoal seam에서 원래 G4 질문과 독립 citywide reference를 재사용한다.
 명시적 provider와 새 출력 경로가 있어야 실행하며, 실제 취득은 원천 hash가 바뀌면 멈춘다.
+`historical` 모드는 실제 과거 목록에서 기존 publication 이름의 유일한 버전을 선택해 취득하고 원래
+hash·행 위치·합계와 대조한다. 인구는 기존 전체 CSV scanner로 검사/보관 범위를 추가 확인한다.
+기본 `live`의 최신 파일 hash 불일치를 자동 복구하거나 과거 실패를 숨기지 않는다.
 보존 reference 재생은 별도 명시 모드로만 선택하고 새 취득·자율 발견으로 세지 않는다. 원 질문과
 기존 기대값은 유지하며 baseline과 분교 출력 추가의 진단 recipe를 구분한다. 모델에 기대 verdict나
 oracle 해석을 보내지 않는다. 각 시도의 입력·원 응답·Engine 결과와 준비 실패를 보존한다.

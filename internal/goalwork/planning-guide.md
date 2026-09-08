@@ -24,6 +24,8 @@ FILE XLSX exception: sample may include xlsx:{sheet:"exact observed sheet",range
 
 {"action":"inspect","pk":"PK from state.nodes"}
 
+When a required past edition is no longer the current FILE, use {"action":"inspect","pk":"known PK","fileHistory":true}. It lists at most 32 portal-advertised editions with fileHistoryCount/fileHistoryTruncated, without downloading. Then inspect the exact returned ID with fileVersion instead of fileHistory. Selection revalidates membership; no guessed date, URL or latest fallback. Use the same fileVersion on subsequent FILE sample/layout requests and their layout pins/refreshes. Current-edition requests omit it. Local sample.reduce omits it too and pins the retained original observation. Reinspection never changes earlier observations. Source declaration.fileVersionId identifies the selected edition; missing historical metadata stays unknown, and registration/modification dates are not record dates. History and selection share existing inspection budgets. Version listing is discovery metadata, not schema verification or goal completion.
+
 {"action":"layout","layout":{"pk":"inspected PK","asset":"exact inspected XLSX asset name"}}
 
 {"action":"layout","layout":{"pk":"inspected PK","asset":"exact inspected XLSX asset name","sheet":"exact name from state.layouts"}}

@@ -35,25 +35,30 @@ var ErrActionAlreadyAttempted = errors.New("action already attempted")
 // Dependencies are acquisition seams, not planner authority. Implementations
 // must use catalogued PKs and official inspected contracts, never arbitrary URLs.
 type Dependencies struct {
-	Review  func(context.Context, ReviewInput) (ReviewAssessment, error) // trusted startup adapter; separate tool-free context
-	Search  func(context.Context, string) (catalog.Result, error)
-	Inspect func(context.Context, string) (Inspection, error)
-	Sample  func(context.Context, SampleRequest, Inspection) (Acquired, error)
-	Layout  func(context.Context, LayoutRequest, Inspection) (dataset.FileLayout, error)
-	ScanCSV func(context.Context, SampleRequest, Inspection, func(dataset.CSVScanRecord) error) (dataset.CSVScanReport, string, error) // complete stream and inspected contract hash
+	Review             func(context.Context, ReviewInput) (ReviewAssessment, error) // trusted startup adapter; separate tool-free context
+	Search             func(context.Context, string) (catalog.Result, error)
+	Inspect            func(context.Context, string) (Inspection, error)
+	InspectFileVersion func(context.Context, string, string) (Inspection, error) // empty edition lists bounded portal history; exact listed edition selects it
+	Sample             func(context.Context, SampleRequest, Inspection) (Acquired, error)
+	Layout             func(context.Context, LayoutRequest, Inspection) (dataset.FileLayout, error)
+	ScanCSV            func(context.Context, SampleRequest, Inspection, func(dataset.CSVScanRecord) error) (dataset.CSVScanReport, string, error) // complete stream and inspected contract hash
 }
 
 // Inspection separates request parameters from observed response fields. The
 // opaque handle is never serialized or supplied by a model.
 type Inspection struct {
-	PK              string                       `json:"pk"`
-	Deliveries      []string                     `json:"deliveries"`
-	Operations      []Operation                  `json:"operations,omitempty"`
-	Assets          []string                     `json:"assets,omitempty"`
-	DeclaredColumns []DeclaredColumn             `json:"declaredColumns,omitempty"`
-	Warnings        []string                     `json:"warnings,omitempty"`
-	Declarations    map[string]SourceDeclaration `json:"declarations,omitempty"` // keyed by request delivery
-	handle          any
+	FileVersions         []dataset.FileVersion        `json:"fileVersions,omitempty"`
+	FileHistoryCount     int                          `json:"fileHistoryCount,omitempty"`
+	FileHistoryTruncated bool                         `json:"fileHistoryTruncated,omitempty"`
+	SelectedFileVersion  *dataset.FileVersion         `json:"selectedFileVersion,omitempty"`
+	PK                   string                       `json:"pk"`
+	Deliveries           []string                     `json:"deliveries"`
+	Operations           []Operation                  `json:"operations,omitempty"`
+	Assets               []string                     `json:"assets,omitempty"`
+	DeclaredColumns      []DeclaredColumn             `json:"declaredColumns,omitempty"`
+	Warnings             []string                     `json:"warnings,omitempty"`
+	Declarations         map[string]SourceDeclaration `json:"declarations,omitempty"` // keyed by request delivery
+	handle               any
 }
 type DeclaredColumn struct {
 	Field       string `json:"field"`
@@ -72,20 +77,21 @@ type Parameter struct {
 }
 
 type SampleRequest struct {
-	Reduce    *SourceReduction       `json:"reduce,omitempty"`  // local pre-join aggregation of an exact retained source revision
-	Nearest   *NearestSelection      `json:"nearest,omitempty"` // local reduction using retained observations, never caller coordinates
-	ScanCSV   bool                   `json:"scanCsv,omitempty"` // complete bounded direct-CSV scan; retain only a prefix
-	PK        string                 `json:"pk"`
-	Delivery  string                 `json:"delivery"` // api, file or standard
-	Operation string                 `json:"operation,omitempty"`
-	Params    map[string]string      `json:"params,omitempty"`
-	Asset     string                 `json:"asset,omitempty"`
-	Member    string                 `json:"member,omitempty"`   // exact CSV path inside a ZIP asset
-	RowPath   string                 `json:"rowPath,omitempty"`  // API JSON Pointer
-	Where     map[string]string      `json:"where,omitempty"`    // FILE only; conjunctive exact string selection before row limit
-	WhereIn   map[string][]string    `json:"whereIn,omitempty"`  // direct CSV full scan only; OR within each exact value set, AND across fields
-	XLSX      *dataset.XLSXSelection `json:"xlsx,omitempty"`     // FILE only; exact original worksheet rectangle
-	LayoutID  string                 `json:"layoutId,omitempty"` // optional same-source-file pin from layout discovery
+	FileVersion string                 `json:"fileVersion,omitempty"` // must equal the selected inspected FILE edition; empty for current files
+	Reduce      *SourceReduction       `json:"reduce,omitempty"`      // local pre-join aggregation of an exact retained source revision
+	Nearest     *NearestSelection      `json:"nearest,omitempty"`     // local reduction using retained observations, never caller coordinates
+	ScanCSV     bool                   `json:"scanCsv,omitempty"`     // complete bounded direct-CSV scan; retain only a prefix
+	PK          string                 `json:"pk"`
+	Delivery    string                 `json:"delivery"` // api, file or standard
+	Operation   string                 `json:"operation,omitempty"`
+	Params      map[string]string      `json:"params,omitempty"`
+	Asset       string                 `json:"asset,omitempty"`
+	Member      string                 `json:"member,omitempty"`   // exact CSV path inside a ZIP asset
+	RowPath     string                 `json:"rowPath,omitempty"`  // API JSON Pointer
+	Where       map[string]string      `json:"where,omitempty"`    // FILE only; conjunctive exact string selection before row limit
+	WhereIn     map[string][]string    `json:"whereIn,omitempty"`  // direct CSV full scan only; OR within each exact value set, AND across fields
+	XLSX        *dataset.XLSXSelection `json:"xlsx,omitempty"`     // FILE only; exact original worksheet rectangle
+	LayoutID    string                 `json:"layoutId,omitempty"` // optional same-source-file pin from layout discovery
 }
 type Acquired struct {
 	Reduction      *ReductionProvenance
@@ -102,8 +108,10 @@ type Acquired struct {
 	CSV            *dataset.CSVProvenance
 }
 type Decision struct {
-	Action        string           `json:"action"`            // define | search | inspect | layout | sample | retry_sample | read_evidence | compose | execute | review_result | abstain
-	RetryOf       int              `json:"retryOf,omitempty"` // latest failed SampleAttempt revision; never a replacement request
+	FileHistory   bool             `json:"fileHistory,omitempty"` // inspect only: list advertised historical FILE editions
+	FileVersion   string           `json:"fileVersion,omitempty"` // inspect only: exact edition ID from prior history inspection
+	Action        string           `json:"action"`                // define | search | inspect | layout | sample | retry_sample | read_evidence | compose | execute | review_result | abstain
+	RetryOf       int              `json:"retryOf,omitempty"`     // latest failed SampleAttempt revision; never a replacement request
 	Contract      *GoalContract    `json:"contract,omitempty"`
 	Query         string           `json:"query,omitempty"`
 	Role          string           `json:"role,omitempty"`
@@ -369,6 +377,8 @@ func (e *Engine) Advance(ctx context.Context, revision int, d Decision) (View, e
 		keyDecision.Role = strings.TrimSpace(d.Role)
 	case "inspect":
 		keyDecision.PK = d.PK
+		keyDecision.FileVersion = d.FileVersion
+		keyDecision.FileHistory = d.FileHistory && d.FileVersion == ""
 	case "layout":
 		keyDecision.Layout = d.Layout
 	case "sample":
@@ -497,15 +507,42 @@ func (e *Engine) act(ctx context.Context, d Decision) error {
 			return fmt.Errorf("inspection budget exhausted")
 		}
 		e.inspections++
-		if e.deps.Inspect == nil {
-			return fmt.Errorf("inspection unavailable")
+		var i Inspection
+		var err error
+		if d.FileHistory || d.FileVersion != "" {
+			if e.deps.InspectFileVersion == nil {
+				return fmt.Errorf("historical FILE inspection unavailable; no latest fallback")
+			}
+			if d.FileVersion != "" {
+				found := false
+				if n.Inspection != nil {
+					for _, version := range n.Inspection.FileVersions {
+						found = found || version.ID == d.FileVersion
+					}
+				}
+				if !found {
+					return fmt.Errorf("select fileVersion from this goal's prior fileHistory inspection")
+				}
+			}
+			i, err = e.deps.InspectFileVersion(ctx, d.PK, d.FileVersion)
+		} else {
+			if e.deps.Inspect == nil {
+				return fmt.Errorf("inspection unavailable")
+			}
+			i, err = e.deps.Inspect(ctx, d.PK)
 		}
-		i, err := e.deps.Inspect(ctx, d.PK)
 		if err != nil {
 			return err
 		}
 		if i.PK != d.PK {
 			return fmt.Errorf("inspection PK mismatch")
+		}
+		selectedVersion := ""
+		if i.SelectedFileVersion != nil {
+			selectedVersion = i.SelectedFileVersion.ID
+		}
+		if selectedVersion != d.FileVersion || (d.FileHistory && d.FileVersion == "" && len(i.Assets) != 0) {
+			return fmt.Errorf("inspection substituted the requested FILE version or history listing")
 		}
 		b, _ := json.Marshal(i)
 		if len(b) > 32<<10 {
@@ -540,6 +577,15 @@ func (e *Engine) act(ctx context.Context, d Decision) error {
 		}
 		if s.Delivery != "api" && s.Delivery != "file" && s.Delivery != "standard" {
 			return fmt.Errorf("sample delivery must be api, file or standard")
+		}
+		if s.Delivery == "file" && s.Reduce == nil {
+			selected := ""
+			if n.Inspection.SelectedFileVersion != nil {
+				selected = n.Inspection.SelectedFileVersion.ID
+			}
+			if s.FileVersion != selected {
+				return fmt.Errorf("sample fileVersion must equal the selected inspected FILE edition")
+			}
 		}
 		if e.samples >= 8 {
 			return fmt.Errorf("sample budget exhausted")

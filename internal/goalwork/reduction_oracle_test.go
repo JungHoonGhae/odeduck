@@ -3,6 +3,7 @@ package goalwork_test
 import (
 	"context"
 	"encoding/json"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -136,6 +137,7 @@ func checkCitywideReduction(t *testing.T, live bool, reviewer *citywideModelRevi
 	if live {
 		runtime := goalwork.LiveDependencies(fetch.New(), "https://www.data.go.kr", nil, catalog.Searcher{}, policy)
 		deps.Inspect, deps.Sample = runtime.Inspect, runtime.Sample
+		deps.InspectFileVersion = runtime.InspectFileVersion
 	}
 	e, err := goalwork.Start(goal, policy, deps)
 	if err != nil {
@@ -163,8 +165,31 @@ func checkCitywideReduction(t *testing.T, live bool, reviewer *citywideModelRevi
 	for i, role := range []string{"people", "schools"} {
 		pk := ref.Sources[i].PK
 		step(goalwork.Decision{Action: "search", Query: pk, Role: role})
-		inspected := step(goalwork.Decision{Action: "inspect", PK: pk})
+		historical := live && i == 0 && reviewer != nil && reviewer.historical
+		inspected := step(goalwork.Decision{Action: "inspect", PK: pk, FileHistory: historical})
 		s := goalwork.SampleRequest{PK: pk, Delivery: "file"}
+		if historical {
+			u, err := url.Parse(ref.Sources[i].URL)
+			if err != nil || u.Query().Get("dataNm") == "" {
+				t.Fatal("original reference has no publication name")
+			}
+			for _, node := range inspected.Nodes {
+				if node.Hit.PK == pk && node.Inspection != nil {
+					for _, version := range node.Inspection.FileVersions {
+						if version.Name == u.Query().Get("dataNm") {
+							if s.FileVersion != "" {
+								t.Fatal("ambiguous publication label; retain the old oracle")
+							}
+							s.FileVersion = version.ID
+						}
+					}
+				}
+			}
+			if s.FileVersion == "" {
+				t.Fatal("original publication not in the actual bounded portal history; no fallback")
+			}
+			inspected = step(goalwork.Decision{Action: "inspect", PK: pk, FileVersion: s.FileVersion})
+		}
 		if i == 1 && !live {
 			s.Asset = "reference.xlsx"
 			s.XLSX = &dataset.XLSXSelection{Sheet: "구·군별", Range: "A27:AM37"}
@@ -192,6 +217,7 @@ func checkCitywideReduction(t *testing.T, live bool, reviewer *citywideModelRevi
 			}
 			if i == 0 {
 				s.Where = map[string]string{"시도명": "인천광역시"}
+				s.ScanCSV = historical // Explicit diagnostic variant; old live/reference trials stay unchanged.
 			} else {
 				s.XLSX = &dataset.XLSXSelection{Sheet: "구·군별", Range: "A27:AM37"}
 			}
@@ -205,6 +231,16 @@ func checkCitywideReduction(t *testing.T, live bool, reviewer *citywideModelRevi
 		}
 		if live {
 			t.Logf("official acquisition pk=%s rows=%d contentSha256=%s", pk, observed.RowCount, observed.ContentSHA256)
+		}
+		if historical {
+			if observed.CSV == nil || observed.Selection == nil || !observed.Selection.Exhausted || observed.Selection.ScannedRows != 3619 || observed.Selection.MatchedRows != 162 || observed.Selection.ReturnedRows != 162 || len(observed.CSV.DataRecords) != 162 {
+				t.Fatal("historical acquisition did not preserve full scan coverage")
+			}
+			for row, record := range ref.Sources[i].Records {
+				if observed.CSV.DataRecords[row] != record.CSVRecord-1 {
+					t.Fatal("historical selection differs from the independent source row positions")
+				}
+			}
 		}
 	}
 	r := goalwork.SourceReduction{Observation: "o1", RowsSHA256: e.View().Observations[0].RowsSHA256, GroupBy: []string{"시도명", "시군구명", "기준연월"}, Measures: []goalwork.Measure{{As: "ages_6_17", Op: "sum_fields", Fields: oracle.Sources[0].AgeFields, Format: "decimal_v1", Unit: "persons"}}, Aggregates: []goalwork.Aggregate{{As: "residents", Op: "sum", Field: "ages_6_17"}}}

@@ -102,6 +102,8 @@ func describeCmd() *cobra.Command {
 
 func inspectCmd() *cobra.Command {
 	var observe bool
+	var fileHistory bool
+	var fileVersion string
 	var assetName string
 	var delivery string
 	c := &cobra.Command{
@@ -114,7 +116,7 @@ func inspectCmd() *cobra.Command {
 				base = portal.BaseURL
 			}
 			result, err := dataset.NewUnifiedInspector(newFetchClient(), base).Inspect(cmd.Context(), dataset.InspectionRequest{
-				PK: args[0], Delivery: dataset.DeliverySelection(delivery), Observe: observe, Asset: assetName,
+				PK: args[0], Delivery: dataset.DeliverySelection(delivery), Observe: observe, Asset: assetName, FileHistory: fileHistory, FileVersion: fileVersion,
 			})
 			if err != nil {
 				return err
@@ -123,6 +125,8 @@ func inspectCmd() *cobra.Command {
 		},
 	}
 	c.Flags().BoolVar(&observe, "observe", false, "FILE 자산 또는 STD 첫 페이지를 bounded 다운로드해 실제 컬럼과 SHA-256 검사")
+	c.Flags().BoolVar(&fileHistory, "file-history", false, "포털 FILE의 과거 버전 목록 조회 (최대 32개, 파일 취득 없음)")
+	c.Flags().StringVar(&fileVersion, "file-version", "", "과거 목록에 실제로 나온 버전 ID의 계약 검사; 최신 파일로 폴백하지 않음")
 	c.Flags().StringVar(&assetName, "asset", "", "검사할 FILE 자산의 정확한 이름 (기본: 목록 첫 번째 최신 자산)")
 	c.Flags().StringVar(&delivery, "delivery", "auto", "검사할 제공형: auto | api | file | standard (auto는 복수 제공형을 모두 반환)")
 	return c

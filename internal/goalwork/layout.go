@@ -11,10 +11,11 @@ import (
 )
 
 type LayoutRequest struct {
-	PK        string `json:"pk"`
-	Asset     string `json:"asset"`
-	Sheet     string `json:"sheet,omitempty"`
-	RefreshOf string `json:"refreshOf,omitempty"`
+	PK          string `json:"pk"`
+	Asset       string `json:"asset"`
+	FileVersion string `json:"fileVersion,omitempty"`
+	Sheet       string `json:"sheet,omitempty"`
+	RefreshOf   string `json:"refreshOf,omitempty"`
 }
 type LayoutObservation struct {
 	ID            string             `json:"id"`
@@ -32,6 +33,13 @@ func (e *Engine) discoverLayout(ctx context.Context, r *LayoutRequest) error {
 	if n == nil || n.Inspection == nil {
 		return fmt.Errorf("inspect known PK before layout discovery")
 	}
+	version := ""
+	if n.Inspection.SelectedFileVersion != nil {
+		version = n.Inspection.SelectedFileVersion.ID
+	}
+	if len(r.FileVersion) > 100 || r.FileVersion != version {
+		return fmt.Errorf("layout fileVersion must equal the selected inspected FILE edition")
+	}
 	found := false
 	for _, a := range n.Inspection.Assets {
 		found = found || a == r.Asset
@@ -41,7 +49,7 @@ func (e *Engine) discoverLayout(ctx context.Context, r *LayoutRequest) error {
 	}
 	if r.RefreshOf != "" {
 		previous := e.layoutByID(r.RefreshOf)
-		if previous == nil || previous.Request.PK != r.PK || previous.Request.Asset != r.Asset || previous.Request.Sheet != r.Sheet {
+		if previous == nil || previous.Request.PK != r.PK || previous.Request.Asset != r.Asset || previous.Request.Sheet != r.Sheet || previous.Request.FileVersion != r.FileVersion {
 			return fmt.Errorf("refreshOf must match an earlier layout request for the same asset and sheet")
 		}
 	}
@@ -89,7 +97,7 @@ func (e *Engine) sampleLayoutHash(s SampleRequest) (string, error) {
 		return "", fmt.Errorf("layoutId is supported only for XLSX or ZIP member sampling")
 	}
 	l := e.layoutByID(s.LayoutID)
-	if l == nil || l.Request.PK != s.PK || l.Request.Asset != s.Asset {
+	if l == nil || l.Request.PK != s.PK || l.Request.Asset != s.Asset || l.Request.FileVersion != s.FileVersion {
 		return "", fmt.Errorf("layoutId must identify the same inspected asset")
 	}
 	if s.Member != "" {

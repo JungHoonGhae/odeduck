@@ -314,3 +314,56 @@ go test ./internal/goalwork -run '^TestLiveCitywideGoalAnalysisReview$' -count=1
 명령 진입점과 cleanup을 자식 프로세스로 실행하고 외부 CLI만 fixture로 대체한다. 기존 파일
 비덮어쓰기, provider 오류 원문, 잘못된 승인 상태·실패 표시, 원천 reference 부재, 잘못된 provider와
 취득 모드 거부를 검사한다. 자식 실행은 30초로 제한하며 실제 모델 호출 없이 일반/race 회귀를 수행한다.
+
+## 과거 버전의 실취득 복구
+
+2026-09-08 10:00:12 UTC에 원래 G4 질문·7월 oracle·분교 포함 recipe로 `historical` 진단을
+실행했다. 포털의 최신 항목 교체와 원본 삭제를 구분한 후속이다. 실제 포털 목록에서 July publication을
+선택하고 같은 Unified Inspector/LiveDependencies/Engine으로 읽었다. PK·publication 이름·recipe를
+사람이 고정한 개발 진단이며 자율 발견이 아니다. 기본 `live`와 명시 `reference` 모드 및 이전 실패는 유지한다.
+
+현재 포털의 과거 목록은 54개, 노출은 첫 32개다. July ID는
+`uddi:95f114ef-87c9-4669-971d-aab9aff9d7d4/2`이며 2,568,212-byte CSV의 hash는 기존
+`6920fdafd269554d259e8498301f004c9799f499c38832de9352a0e7def916c5`와 일치했다.
+전체 3,619개 데이터 행을 검사하고 인천 조건의 162행을 모두 보관했다. 원본 행 위치와
+11개 지역의 6–17세 남녀 합계 **304,280명**을 기존 독립 reference에 대조했다.
+학교 11행과 헤더도 원래 hash `c8f57fc8e3bd7e70175ff0debd1529a17539e526e436dc244fcea39ed9a0f695`로
+실취득했다. 최신 metadata나 합성 scanner 영수증을 과거 원본에 붙이지 않았다.
+
+선택 집계·헤더와 실제 취득 범위/metadata를 같은 Codex CLI 0.153.4의 별도 tool-free 요청으로
+전송했다. 전체 소요 102.64초, 예정 1회/실제 모델 1회, 결과 `review_required`다. 다섯 출력 및
+periods/measurements는 supported, relations/coverage/GoalFit은 insufficient였다. 서해구 인구와
+서구 학교 행은 미대응으로 유지하며 명칭 대응의 근거를 요구했다. 모델이 인정한 6–17세 필드의
+의미는 독립적인 만 나이 정의 검증이 아니며, 전체 스캔도 모집단 포괄성 승인으로 세지 않는다.
+
+이 한 번의 판정 변화는 취득 입력 차이를 동반한 관측이며 모델 변동성과 효과를 분리한 대조 실험이
+아니다. 앞선 네 시도를 합치면 G4 진단은 **5시도/3모델 호출/목표 완료 0회**다. 보류를 정확도나
+양성 완주 성공으로 세지 않는다. 다음은 원래 요청의 기준일·집계 대상·행정개편 대응 근거와 전체
+설명을 연결하는 작업이다. 새 graph DB나 계산 연산을 추가할 이유가 확인된 것은 아니다.
+
+원 입력·원 응답·Engine View는 기존 archive의 `historical-codex.json.gz`로 보존했다.
+압축 해제 SHA256은 `3840b8cc0d4d59198f8036374631fa5526bbe722fa5651e51e3906b3f6665224`다.
+검토 지침 hash는 앞선 두 실행과 동일하다. 이 원 응답도 공개 ReviewGoal adapter의 오프라인 재생
+회귀에 추가했다. 제품 기본 전송 권한이나 검토 정책은 변경하지 않았다.
+
+```sh
+ODEDUCK_CITYWIDE_REVIEW=codex ODEDUCK_CITYWIDE_ACQUISITION=historical \
+ODEDUCK_CITYWIDE_RESULT=with-branches ODEDUCK_CITYWIDE_REVIEW_OUTPUT=/tmp/odeduck-g4-historical-new.json \
+go test ./internal/goalwork -run '^TestLiveCitywideGoalAnalysisReview$' -count=1 -v
+```
+
+공개 seam 회귀에서 JSON 변환 파일의 잘못된 CSV 표시, 원 요청과 다른 버전 응답, 파서 drift의 빈 목록
+오인, popup 밖 metadata 혼입, 중복 asset 이름, 잘못된 attachment ID, 목록만 본 뒤 structural 장부
+검증을 허용하던 실패를 먼저 재현했다. 공통 검사와 실제 CLI/MCP·Engine 경계에서 이를 차단했다.
+한도/사라진 membership, 현재 재검사 후 과거 관측의 로컬 합계 보존도 fixture로 검사한다.
+최신 파일 경로는 기본 동작으로 유지하되 과거 취득을 위해 최신 metadata를 재사용하는 경로는 두지 않는다.
+SSO·신청·배포·외부 tracker 쓰기는 하지 않았다.
+
+과거 FILE 구현의 독립 Spec 검토는 첫 candidate `036ea438`에서 같은 attachment/serial에 CSV와
+JSON을 중복 선언하면 뒤의 형식이 무시되는 P2 한 건을 찾았다. 공개 Inspector seam에서 실패를
+재현한 후 충돌 선언을 거부하도록 수정했다. 대소문자만 다른 동일 형식의 반복 버튼은 계속 허용한다.
+기준점 `8e19bff` 대비 수정 candidate `01152035`(tree
+`1d087abad717932fa9a37491aa9329b73d27fbc4`)의 후속 검토는 Standards 0건, Spec 미해결 0건이다.
+분리된 깨끗한 worktree에서 tidy/vet/전체 test/build/브랜드 일치를 통과했고, 원래 worktree에서
+dataset·goalwork·agentplan·MCP·CLI race 검사를 통과했다. 검토 이후 변경은 이 검증 기록뿐이다.
+이는 구현 계약 검증이며 추가 모델 호출이나 G4 의미 승인 증거가 아니다.

@@ -30,6 +30,13 @@ func LiveDependencies(client *fetch.Client, base string, caller Caller, searcher
 	var once sync.Once
 	var cat *catalog.Catalog
 	var loadErr error
+	inspect := func(ctx context.Context, pk string, history bool, version string) (Inspection, error) {
+		res, err := inspector.Inspect(ctx, dataset.InspectionRequest{PK: pk, FileHistory: history, FileVersion: version})
+		if err != nil {
+			return Inspection{}, err
+		}
+		return projectInspection(pk, res), nil
+	}
 	return Dependencies{
 		Search: func(ctx context.Context, query string) (catalog.Result, error) {
 			once.Do(func() { cat, loadErr = catalog.Load() })
@@ -39,53 +46,18 @@ func LiveDependencies(client *fetch.Client, base string, caller Caller, searcher
 			return searcher.Search(ctx, cat, catalog.QueryPlan{Intent: query, Limit: maxSearchHits, IncludePreviews: true}, catalog.SearchOptions{Semantic: true, RequireSemantic: policy.RequireSemantic})
 		},
 		Inspect: func(ctx context.Context, pk string) (Inspection, error) {
-			res, err := inspector.Inspect(ctx, dataset.InspectionRequest{PK: pk})
-			if err != nil {
-				return Inspection{}, err
-			}
-			out := Inspection{PK: pk, Deliveries: res.Deliveries, Declarations: sourceDeclarations(res), handle: res}
-			appendOperation := func(name, title string, params []apicall.Param) {
-				if name == "" {
-					return // A title without an invocation identifier is not a callable operation.
-				}
-				op := Operation{Name: name, Title: bounded(title, 400)}
-				for _, p := range params {
-					if sensitiveParameter(p.Name) {
-						continue
-					}
-					op.Parameters = append(op.Parameters, Parameter{Name: p.Name, Required: p.Required, Description: bounded(p.Desc, 400), Example: bounded(p.Sample, 200)})
-				}
-				out.Operations = append(out.Operations, op)
-			}
-			if res.API != nil {
-				for _, op := range res.API.Operations {
-					appendOperation(apicall.OperationName(op), op.Name, op.Params)
-				}
-				if res.API.Handoff != nil && res.API.Handoff.Contract != nil {
-					for _, op := range res.API.Handoff.Contract.Operations {
-						appendOperation(op.Name, op.Description, op.Params)
-					}
-				}
-				out.Warnings = append(out.Warnings, res.API.Warnings...)
-			}
-			if res.File != nil {
-				for _, a := range res.File.Assets {
-					out.Assets = append(out.Assets, a.Name)
-				}
-				out.Warnings = append(out.Warnings, res.File.Warnings...)
-			}
-			if res.Standard != nil {
-				for _, column := range res.Standard.Columns {
-					out.DeclaredColumns = append(out.DeclaredColumns, DeclaredColumn{Field: column.Code, Description: column.Name})
-				}
-				out.Warnings = append(out.Warnings, res.Standard.Warnings...)
-			}
-			return out, nil
+			return inspect(ctx, pk, false, "")
+		},
+		InspectFileVersion: func(ctx context.Context, pk, version string) (Inspection, error) {
+			return inspect(ctx, pk, true, version)
 		},
 		Layout: func(ctx context.Context, r LayoutRequest, i Inspection) (dataset.FileLayout, error) {
 			res, ok := i.handle.(*dataset.InspectionResult)
 			if !ok || i.PK != r.PK || res.File == nil {
 				return dataset.FileLayout{}, fmt.Errorf("missing trusted FILE inspection handle")
+			}
+			if !selectedFileVersion(r.FileVersion, res.File) {
+				return dataset.FileLayout{}, fmt.Errorf("layout fileVersion differs from its inspected contract")
 			}
 			for _, asset := range res.File.Assets {
 				if asset.Name == r.Asset {
@@ -101,6 +73,9 @@ func LiveDependencies(client *fetch.Client, base string, caller Caller, searcher
 			res, ok := i.handle.(*dataset.InspectionResult)
 			if !ok || i.PK != s.PK || res.File == nil || s.Delivery != "file" || !s.ScanCSV {
 				return dataset.CSVScanReport{}, "", fmt.Errorf("missing trusted direct CSV scan contract")
+			}
+			if !selectedFileVersion(s.FileVersion, res.File) {
+				return dataset.CSVScanReport{}, "", fmt.Errorf("scan fileVersion differs from its inspected contract")
 			}
 			for _, asset := range res.File.Assets {
 				if asset.Name == s.Asset {
@@ -139,6 +114,9 @@ func LiveDependencies(client *fetch.Client, base string, caller Caller, searcher
 			if s.Delivery == "file" {
 				if res.File == nil {
 					return Acquired{}, fmt.Errorf("no inspected FILE contract")
+				}
+				if !selectedFileVersion(s.FileVersion, res.File) {
+					return Acquired{}, fmt.Errorf("sample fileVersion must match its selected inspected FILE contract")
 				}
 				if s.Asset == "" {
 					return Acquired{}, fmt.Errorf("select an exact inspected asset name")
@@ -203,6 +181,48 @@ func LiveDependencies(client *fetch.Client, base string, caller Caller, searcher
 	}
 }
 
+func projectInspection(pk string, res *dataset.InspectionResult) Inspection {
+	out := Inspection{PK: pk, Deliveries: res.Deliveries, Declarations: sourceDeclarations(res), handle: res}
+	appendOperation := func(name, title string, params []apicall.Param) {
+		if name == "" {
+			return
+		}
+		op := Operation{Name: name, Title: bounded(title, 400)}
+		for _, p := range params {
+			if sensitiveParameter(p.Name) {
+				continue
+			}
+			op.Parameters = append(op.Parameters, Parameter{Name: p.Name, Required: p.Required, Description: bounded(p.Desc, 400), Example: bounded(p.Sample, 200)})
+		}
+		out.Operations = append(out.Operations, op)
+	}
+	if res.API != nil {
+		for _, op := range res.API.Operations {
+			appendOperation(apicall.OperationName(op), op.Name, op.Params)
+		}
+		if res.API.Handoff != nil && res.API.Handoff.Contract != nil {
+			for _, op := range res.API.Handoff.Contract.Operations {
+				appendOperation(op.Name, op.Description, op.Params)
+			}
+		}
+		out.Warnings = append(out.Warnings, res.API.Warnings...)
+	}
+	if res.File != nil {
+		out.FileVersions, out.FileHistoryCount, out.FileHistoryTruncated, out.SelectedFileVersion = res.File.FileVersions, res.File.FileHistoryCount, res.File.FileHistoryTruncated, res.File.SelectedFileVersion
+		for _, a := range res.File.Assets {
+			out.Assets = append(out.Assets, a.Name)
+		}
+		out.Warnings = append(out.Warnings, res.File.Warnings...)
+	}
+	if res.Standard != nil {
+		for _, column := range res.Standard.Columns {
+			out.DeclaredColumns = append(out.DeclaredColumns, DeclaredColumn{Field: column.Code, Description: column.Name})
+		}
+		out.Warnings = append(out.Warnings, res.Standard.Warnings...)
+	}
+	return out
+}
+
 // Classify typed transport/credential evidence, never provider body strings.
 // HTTP throttling/server errors stay unclassified: CallResult currently lacks
 // Retry-After, so this seam cannot safely offer immediate retries for those.
@@ -228,6 +248,9 @@ func classifyLiveAcquisitionError(err error, result *apicall.CallResult) error {
 }
 
 func validateSampleSelection(s SampleRequest) error {
+	if len(s.FileVersion) > 100 || (s.FileVersion != "" && (s.Delivery != "file" || s.Reduce != nil)) {
+		return fmt.Errorf("fileVersion is a bounded inspected FILE acquisition ID; local reductions use their retained source revision")
+	}
 	if s.Reduce != nil {
 		if s.Nearest != nil || s.ScanCSV || s.LayoutID != "" || s.Asset != "" || s.Member != "" || s.XLSX != nil || len(s.Where)+len(s.WhereIn) != 0 || len(s.Params) != 0 || s.Operation != "" || s.RowPath != "" {
 			return fmt.Errorf("reduce accepts only pk, original delivery and the retained source reduction; no new acquisition selectors")
@@ -281,6 +304,13 @@ func validateSampleSelection(s SampleRequest) error {
 		}
 	}
 	return (dataset.CSVSelection{Equals: s.Where, In: s.WhereIn}).Validate()
+}
+
+func selectedFileVersion(version string, c *dataset.Contract) bool {
+	if c.SelectedFileVersion == nil {
+		return version == ""
+	}
+	return version == c.SelectedFileVersion.ID
 }
 
 func sensitiveParameter(name string) bool {

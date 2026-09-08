@@ -54,10 +54,12 @@ type describeIn struct {
 	PK string `json:"pk" jsonschema:"publicDataPk of an OpenAPI dataset"`
 }
 type inspectDatasetIn struct {
-	PK       string `json:"pk" jsonschema:"publicDataPk returned by catalog_search"`
-	Delivery string `json:"delivery,omitempty" jsonschema:"representation to inspect: auto (default, returns API and FILE when both exist), api, file, or standard. STD returns first-party schema and optionally a bounded first-page observation"`
-	Observe  bool   `json:"observe,omitempty" jsonschema:"for FILE data, download the newest or selected asset within safety limits and return observed CSV/DBF/XLSX worksheet columns and content hash; for STD, observe only the bounded first page"`
-	Asset    string `json:"asset,omitempty" jsonschema:"exact FILE asset name to observe; omit to use the newest asset listed first"`
+	FileHistory bool   `json:"fileHistory,omitempty" jsonschema:"list at most 32 portal-advertised historical FILE versions without downloading; implies file delivery"`
+	FileVersion string `json:"fileVersion,omitempty" jsonschema:"exact fileVersions.id from inspection; revalidates membership and selects only that edition, with no latest-file fallback"`
+	PK          string `json:"pk" jsonschema:"publicDataPk returned by catalog_search"`
+	Delivery    string `json:"delivery,omitempty" jsonschema:"representation to inspect: auto (default, returns API and FILE when both exist), api, file, or standard. STD returns first-party schema and optionally a bounded first-page observation"`
+	Observe     bool   `json:"observe,omitempty" jsonschema:"for FILE data, download the newest or selected asset within safety limits and return observed CSV/DBF/XLSX worksheet columns and content hash; for STD, observe only the bounded first page"`
+	Asset       string `json:"asset,omitempty" jsonschema:"exact FILE asset name to observe; omit to use the newest asset listed first"`
 }
 
 type inspectDatasetOut = dataset.InspectionResult
@@ -276,10 +278,15 @@ func New(deps Deps) *mcp.Server {
 			return errResult("pk 가 필요합니다 — catalog_search에서 Data Node를 먼저 고르세요"), nil, nil
 		}
 		out, err := dataset.NewUnifiedInspector(deps.Fetch, base).Inspect(ctx, dataset.InspectionRequest{
-			PK: in.PK, Delivery: dataset.DeliverySelection(in.Delivery), Observe: in.Observe, Asset: in.Asset,
+			PK: in.PK, Delivery: dataset.DeliverySelection(in.Delivery), Observe: in.Observe, Asset: in.Asset, FileHistory: in.FileHistory, FileVersion: in.FileVersion,
 		})
 		if err != nil {
 			return errResult(err.Error()), nil, nil
+		}
+		if in.FileHistory && in.FileVersion == "" {
+			// Version labels are discovery metadata, not an inspected asset's
+			// structural contract. Preserve the existing ledger trust boundary.
+			return nil, out, nil
 		}
 		for _, delivery := range out.Deliveries {
 			if delivery == "API" && out.API != nil {

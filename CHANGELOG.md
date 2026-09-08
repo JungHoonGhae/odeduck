@@ -9,6 +9,11 @@ section matching a `vX.Y.Z` tag as the GitHub release notes.
 
 ### Added
 
+- Bounded portal FILE history discovery and exact edition selection through CLI,
+  MCP and goal inspection. Historical requests retain edition-specific metadata
+  and acquisition provenance, reject latest-file fallback and preserve old
+  observations across reinspection. Listing versions grants no ledger verification.
+
 - Optional `composition.reportUnmatched` projects selected excluded source fields
   into a separate goal result table, retaining stage-local record addresses and
   missing/null distinctions. It shares result limits, does not change calculations,
