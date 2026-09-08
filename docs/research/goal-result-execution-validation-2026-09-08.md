@@ -754,3 +754,25 @@ Spec은 수치 범위 오류를 버린 뒤 비교하는 P1 한 건을 찾았다.
 보고서의 `invalid`로 남는다. 실제 보존 CSV 재생도 162쌍·42항목·6,804일치·15미대응 위치를 유지했다.
 수정 후 tidy/vet/test/build·brand·diff 검사는 통과했다. 새 live 취득이나 모델 호출은 하지 않았으며
 원래 G4의 8시도/6실제 모델 호출/완료 0회는 변하지 않았다.
+
+`c4eaf0f...94c6dd1`의 독립 재검토는 Spec의 남은 P2 해결을 확인했고 새 지적 0건이었다.
+Standards도 문서화 위반 0건·조치할 설계 휴리스틱 0건이었다. 주 에이전트가 실행한
+goalwork/mcpserver/agentplan race 검사도 통과했다. 검토자는 테스트를 직접 재실행하지 않았다.
+
+### 원본 셀 공개 재사용의 실현 가능성 — 2026-09-09
+
+원래 `age-definition-codex.json.gz`의 비압축 SHA256
+`0946308262f2509367e48877de88e2b940986bcd578afd906eb0e0c1a8b9927d`를 먼저 확인했다.
+학교 계산 관측 o2의 27–37행과 문맥 o4의 22–26/38–40행은 같은 다섯 필드의 서로 다른 95셀이다.
+기존 두 packet은 11,787 bytes이며 같은 값·명시적 null·원본 위치를 o4의 19행 선택으로 공개하면
+11,522 bytes다. 단순 wire 계산 뒤 `TestOriginalG4SchoolDisclosureFitsOnePacketWithoutLosingCells`가
+실제 Engine의 sample/read_evidence를 통해 같은 크기와 한 packet·잔여 7개를 확인했다.
+취득 dependency는 과거 공개 셀을 재생하는 fixture이며 실제 파일 reader/다운로드의 새 검증은 아니다.
+이 테스트는 원래 goal/contract를 유지하지만 결과 계산이나 모델을 호출하지 않는다.
+
+원래 8 packet을 7개로 구성할 여지가 있으며 대조 요약을 추가한 개수는 8개다. 다만 현재 계산 검토는
+observation ID가 다른 셀을 재사용하지 못하므로 전체 검토 입력 전달을 통과했다고 주장하지 않는다.
+`codebase-design`의 세 독립 설계를 비교해 [원본 셀 재사용](../specs/original-cell-evidence-reuse-v1.md)의
+내부 공개 해석안을 선택했다. 명시적 새 binding은 호출자 부담을 늘리고, 취득 통합은 헤더·합계·주석을
+계산에 섞을 수 있어 선택하지 않았다. 원본 주소 검증·단일 packet 본문·재포장 검토 차단을 함께 구현할
+계획이며 아직 제품 지침이나 실행기를 변경하지 않았다. 학교 구역 근거와 최종 산출물은 계속 미완료다.

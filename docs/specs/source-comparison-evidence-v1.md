@@ -1,7 +1,7 @@
 # Computed source-comparison evidence
 
 Status: local calculation, selected support, CLI/MCP regression and fixed-source replay implemented;
-independent code review pending. Advances I5/I6/I7 through the original G4 source-applicability gap;
+independent review fixes verified through `94c6dd1`. Advances I5/I6/I7 through the original G4 source-applicability gap;
 it does not replace the original goal, sources, oracle or autonomous completion gates.
 
 ## Interface and choice
