@@ -22,6 +22,15 @@ entities or absence facts. Their direct comparison fields must be disclosed and
 join metrics replayed; unrelated excluded output values need not be sent. Use the
 packets to interpret excluded records, not only the matching result table.
 
+When recipe.reportUnmatched selects fields, artifact.unmatched is a separate
+output table of stage-local excluded tuples, not arithmetic/join input. joinIndex
+is 1-based; side and positions identify the excluded source records. Only fields
+on present sources have values or missing entries. No counterpart is not a null
+or zero measurement, nonidentity proof or evidence of real-world absence. These
+values are also checked against retained originals and disclosed packets. Interpret
+the complete reported comparison, including these records, when assessing coverage
+and original goal fit; reporting a gap does not prove that the goal is answered.
+
 analysis.sourceContext contains additional already-disclosed packets from separate
 original FILE observations. Each entry includes evidence, projected source metadata,
 the acquisition request and targets naming participating source observations with

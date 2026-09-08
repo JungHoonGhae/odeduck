@@ -165,6 +165,7 @@ type Artifact struct {
 	Layouts     []LayoutObservation `json:"layouts,omitempty"`
 	Metrics     []JoinMetric        `json:"metrics"`
 	Rows        []Row               `json:"rows"`
+	Unmatched   []UnmatchedTuple    `json:"unmatched,omitempty"`
 	Limitations []string            `json:"limitations"`
 	Evaluation  GoalEvaluation      `json:"evaluation"`
 }
@@ -646,6 +647,9 @@ func (e *Engine) act(ctx context.Context, d Decision) error {
 		if len(p.Roles) > 8 || len(p.Outputs) > 16 {
 			return fmt.Errorf("composition role/output binding limit exceeded")
 		}
+		if len(p.ReportUnmatched) > 16 {
+			return fmt.Errorf("unmatched report supports at most 16 selected fields")
+		}
 		if p.ID == "" || p.Purpose == "" || len(p.Assumptions) == 0 || len(p.Joins) > 7 || len(p.Select) > 64 || len(p.GroupBy) > 8 || len(p.Aggregates) > 8 || len(p.Measures) > 16 {
 			return fmt.Errorf("composition needs id, purpose, explicit namespace/time/coverage assumptions and at most 7 joins")
 		}
@@ -686,8 +690,18 @@ func (e *Engine) act(ctx context.Context, d Decision) error {
 				e.state.Executions[attempt].Error = bounded(err.Error(), 2000)
 				return err
 			}
+			unmatched, err := reportUnmatched(p, e.rows, metrics, 1000-len(rows), e.state.Observations...)
+			if err != nil {
+				e.state.Executions[attempt].Error = bounded(err.Error(), 2000)
+				return err
+			}
 			b, _ := json.Marshal(rows)
-			if len(b) > 2<<20 {
+			resultBytes := len(b)
+			if len(unmatched) > 0 {
+				b, _ := json.Marshal(unmatched)
+				resultBytes += len(b)
+			}
+			if resultBytes > 2<<20 {
 				e.state.Executions[attempt].Error = "artifact byte limit exceeded; project fewer columns"
 				return fmt.Errorf("artifact byte limit exceeded; project fewer columns")
 			}
@@ -705,8 +719,12 @@ func (e *Engine) act(ctx context.Context, d Decision) error {
 				}
 			}
 			e.state.Artifact = &Artifact{Status: "sample_executed", Recipe: p, Sources: sources, Requests: requests, Layouts: e.state.Layouts, Metrics: metrics, Rows: rows, Limitations: []string{"Bounded observed sample only; not population coverage.", "Namespace, time, representativeness and usefulness remain declared assumptions, not verified identity or causality.", "Reacquisition may change source bytes; hashes identify the observed revision, not an archived copy.", "Not connection-ledger sample_verified. No automatic claim promotion."}}
+			e.state.Artifact.Unmatched = unmatched
 			if len(p.Joins) > 0 {
 				e.state.Artifact.Limitations = append(e.state.Artifact.Limitations, "Inner joins omit unmatched rows from the result table; metrics retain stage-local source addresses for selected evidence and replanning, not proof of absence.")
+				if len(p.ReportUnmatched) > 0 {
+					e.state.Artifact.Limitations = append(e.state.Artifact.Limitations, "Explicitly selected unmatched values are reported separately in unmatched; stage-local tuples do not enter calculations and may repeat sources across stages, not distinct entities or a complete population.")
+				}
 			}
 			evaluation := evaluateRequirements(*e.state.Contract, p, rows, e.state.Observations, e.state.Nodes)
 			evaluation.ExecutionRevision = e.state.Revision

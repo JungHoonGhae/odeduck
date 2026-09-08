@@ -114,6 +114,7 @@ func TestGoalToolProducesSameArtifactAsStandaloneEngine(t *testing.T) {
 	p.Measures = []goalwork.Measure{{As: "capacity_number", Op: "sum_fields", Fields: []string{"o2.capacity", "o2.adjustment"}, Format: "decimal_v1", Unit: "persons"}}
 	p.Time = &goalwork.TemporalAlignment{Window: contract.TimeWindow, Bindings: []goalwork.TimeBinding{{Observation: "o1", FromField: "year", Format: "year_v1", Meaning: "reference_period"}, {Observation: "o2", FromField: "year", Format: "year_v1", Meaning: "reference_period"}}}
 	p.Outputs = append(p.Outputs, goalwork.OutputBinding{Output: "capacity", Field: "capacity_number"})
+	p.ReportUnmatched = []string{"o1.id", "o2.id", "o2.capacity"}
 	partial := p
 	partial.ID = "missing_output"
 	partial.Outputs = partial.Outputs[:1]
@@ -139,6 +140,9 @@ func TestGoalToolProducesSameArtifactAsStandaloneEngine(t *testing.T) {
 		t.Fatalf("%+v %+v %v", local, remote, err)
 	}
 	for _, result := range []goalwork.View{local, remote.State} {
+		if len(result.Artifact.Unmatched) != 2 || result.Artifact.Unmatched[0].Values["o1.id"] != "people-unmatched" || result.Artifact.Unmatched[1].Values["o2.id"] != "shelters-unmatched" || result.Artifact.Unmatched[1].Values["o2.capacity"] != "1" {
+			t.Fatal("MCP lost selected unmatched values or mixed them with calculated output")
+		}
 		m := result.Artifact.Metrics[0]
 		if len(m.UnmatchedLeft) != 1 || m.UnmatchedLeft[0]["o1"] != 2 || len(m.UnmatchedRight) != 1 || m.UnmatchedRight[0] != 2 {
 			t.Fatalf("public transports lost unmatched retained addresses: %+v", m)

@@ -23,18 +23,19 @@ type Join struct {
 }
 
 type Composition struct {
-	ID          string             `json:"id"`
-	Purpose     string             `json:"purpose"`
-	Base        string             `json:"base"` // observation ID
-	Joins       []Join             `json:"joins"`
-	Select      []string           `json:"select,omitempty"` // qualified observation.field
-	GroupBy     []string           `json:"groupBy,omitempty"`
-	Aggregates  []Aggregate        `json:"aggregates,omitempty"`
-	Measures    []Measure          `json:"measures,omitempty"`
-	Time        *TemporalAlignment `json:"time,omitempty"`
-	Assumptions []string           `json:"assumptions"` // namespace, time, coverage; assertions, not verification
-	Roles       []RoleBinding      `json:"roles,omitempty"`
-	Outputs     []OutputBinding    `json:"outputs,omitempty"`
+	ID              string             `json:"id"`
+	Purpose         string             `json:"purpose"`
+	Base            string             `json:"base"` // observation ID
+	Joins           []Join             `json:"joins"`
+	Select          []string           `json:"select,omitempty"`          // qualified observation.field
+	ReportUnmatched []string           `json:"reportUnmatched,omitempty"` // separate projection of stage-local excluded tuples
+	GroupBy         []string           `json:"groupBy,omitempty"`
+	Aggregates      []Aggregate        `json:"aggregates,omitempty"`
+	Measures        []Measure          `json:"measures,omitempty"`
+	Time            *TemporalAlignment `json:"time,omitempty"`
+	Assumptions     []string           `json:"assumptions"` // namespace, time, coverage; assertions, not verification
+	Roles           []RoleBinding      `json:"roles,omitempty"`
+	Outputs         []OutputBinding    `json:"outputs,omitempty"`
 }
 
 type Aggregate struct {

@@ -22,12 +22,15 @@ func TestReviewGoalReplaysArchivedCodexCalibration(t *testing.T) {
 		folder string
 		file   string
 		ready  int
-	}{{"source-report-review-20260908", "codex-raw.jsonl.gz", 6}, {"analysis-review-20260908", "codex-raw.jsonl.gz", 3}, {"analysis-review-20260908", "live-codex-raw.jsonl.gz", 6}} {
-		t.Run(archive.folder+"/"+archive.file, func(t *testing.T) { replayArchivedReview(t, archive.folder, archive.file, archive.ready) })
+		trials int
+	}{{"source-report-review-20260908", "codex-raw.jsonl.gz", 6, 12}, {"analysis-review-20260908", "codex-raw.jsonl.gz", 3, 12}, {"analysis-review-20260908", "live-codex-raw.jsonl.gz", 6, 12}, {"citywide-review-20260908", "baseline-codex.json.gz", 0, 1}, {"citywide-review-20260908", "with-branches-codex.json.gz", 0, 1}} {
+		t.Run(archive.folder+"/"+archive.file, func(t *testing.T) {
+			replayArchivedReview(t, archive.folder, archive.file, archive.ready, archive.trials)
+		})
 	}
 }
 
-func replayArchivedReview(t *testing.T, folder, file string, wantReady int) {
+func replayArchivedReview(t *testing.T, folder, file string, wantReady, wantTrials int) {
 	t.Helper()
 	f, err := os.Open(filepath.Join("../goalwork/testdata/goalbench-v1", folder, file))
 	if err != nil {
@@ -48,6 +51,7 @@ func replayArchivedReview(t *testing.T, folder, file string, wantReady int) {
 			Repeat                          int
 			Input                           goalwork.ReviewInput
 			Result                          goalwork.View
+			Response                        GoalReviewResponse // single-diagnostic envelope
 		}
 		if err := d.Decode(&trial); err == io.EOF {
 			break
@@ -55,6 +59,9 @@ func replayArchivedReview(t *testing.T, folder, file string, wantReady int) {
 			t.Fatal(err)
 		}
 		count++
+		if trial.ProviderResponse == "" {
+			trial.ProviderResponse = trial.Response.RawResponse
+		}
 		if trial.Result.Status == "output_ready" {
 			ready++
 		}
@@ -78,7 +85,7 @@ func replayArchivedReview(t *testing.T, folder, file string, wantReady int) {
 			}
 		})
 	}
-	if count != 12 || ready != wantReady {
+	if count != wantTrials || ready != wantReady {
 		t.Fatalf("archive denominator changed: %d trials, %d ready", count, ready)
 	}
 }

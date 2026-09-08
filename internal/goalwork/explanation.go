@@ -51,6 +51,9 @@ func explainEvidence(c GoalContract, p Composition, sources []Observation, rowCo
 					report.Text += fmt.Sprintf(" %s 결합 단계에서 왼쪽 입력 %d개·오른쪽 원천 기록 %d개가 대응하지 않았습니다.", metric.Right, len(metric.UnmatchedLeft), len(metric.UnmatchedRight))
 				}
 				report.Text += " metrics의 unmatchedLeft/unmatchedRight는 단계별 보유 행 주소입니다. 선택 근거 읽기로 원문을 확인할 수 있으며, 단계 간 중복·후속 제외가 가능하므로 합산한 고유 대상 수나 사건 부재로 해석하지 않습니다."
+				if len(p.ReportUnmatched) > 0 {
+					report.Text += " 요청한 미대응 원천 값은 artifact.unmatched의 별도 표에 보존했습니다. 이 값은 결합·시간·집계 계산에 추가되지 않으며, 상대 기록이 없다고 원천 값 0이나 null을 만들지 않습니다."
+				}
 			}
 		case "temporal":
 			if temporal.Status == "checked" {

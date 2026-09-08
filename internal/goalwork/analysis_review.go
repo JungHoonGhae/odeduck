@@ -62,6 +62,10 @@ func (e *Engine) analysisReviewInput(ctx context.Context, id string, sourceConte
 	if err != nil || digest(actual) != digest(a.Rows) {
 		return ReviewInput{}, fmt.Errorf("current result cannot be reproduced from retained sources")
 	}
+	unmatched, err := reportUnmatched(a.Recipe, e.rows, actualMetrics, 1000-len(actual), a.Sources...)
+	if err != nil || digest(unmatched) != digest(a.Unmatched) {
+		return ReviewInput{}, fmt.Errorf("unmatched result cannot be reproduced from retained sources")
+	}
 	needed := analysisFields(a.Recipe, observed, e.requests)
 	selected := map[string][]Row{}
 	cells := map[string][]map[string]bool{}
@@ -108,9 +112,9 @@ func (e *Engine) analysisReviewInput(ctx context.Context, id string, sourceConte
 			mark(metric.Right, position)
 		}
 	}
-	// A matched-only replay can hide excluded regions while reproducing every
-	// output value. Require their comparison context, not unrelated output cells.
-	for _, field := range analysisComparisonFields(a.Recipe) {
+	// Excluded comparison context and explicitly reported values need disclosure;
+	// unrelated excluded output cells still remain private.
+	for _, field := range append(analysisComparisonFields(a.Recipe), a.Recipe.ReportUnmatched...) {
 		id, name, _ := strings.Cut(field, ".")
 		if !direct[id] {
 			continue // original reduction members remain local
@@ -153,6 +157,10 @@ func (e *Engine) analysisReviewInput(ctx context.Context, id string, sourceConte
 	}
 	if len(a.Recipe.Joins) > 0 && digest(replayedMetrics) != digest(actualMetrics) {
 		return ReviewInput{}, fmt.Errorf("analysis join exclusions cannot be reproduced from disclosed comparison evidence")
+	}
+	replayedUnmatched, err := reportUnmatched(a.Recipe, inputs, replayedMetrics, 1000-len(replayed), a.Sources...)
+	if err != nil || digest(replayedUnmatched) != digest(a.Unmatched) {
+		return ReviewInput{}, fmt.Errorf("unmatched result cannot be reproduced from disclosed source values")
 	}
 	in := ReviewInput{Recipient: e.state.Policy.ReviewRecipient, Goal: e.state.Goal, Contract: *e.state.Contract, Artifact: *a, Evidence: packets[0], Analysis: &AnalysisReviewContext{Method: "engine_relational_replay_v1", OutputSHA256: digest(a.Rows), AdditionalEvidence: packets[1:]}}
 	in.Analysis.SourceContext = sourceContext

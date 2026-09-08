@@ -9,6 +9,11 @@ section matching a `vX.Y.Z` tag as the GitHub release notes.
 
 ### Added
 
+- Optional `composition.reportUnmatched` projects selected excluded source fields
+  into a separate goal result table, retaining stage-local record addresses and
+  missing/null distinctions. It shares result limits, does not change calculations,
+  and requires selected evidence before analysis review.
+
 - Already-disclosed same-file header/context evidence in opt-in goal analysis
   review, pinned to source content and contract revisions. Context keeps its
   selected cells, original addresses and acquisition request separate from
