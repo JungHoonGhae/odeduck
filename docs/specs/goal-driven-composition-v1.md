@@ -530,11 +530,12 @@ exploring with gaps; a different composition can complete missing outputs. `requ
 structural checks only. If `needsSemanticReview=true`, the session enters `review_required` and can continue
 under the [review-continuation contract](goal-result-execution-v1.md#검토-중-재계획--2026-09-08-추가-계약).
 CLI reports a non-success exit while approval is missing. Review is not a verified
-connection or a detection of every contradiction. The current evaluator always requires semantic review:
-region, time, namespace meaning and goal interpretation are not independently verified. Therefore current
-composition does not produce `output_ready`; that status is reserved for a future evidence-backed acceptance
-path. There is no planner-controlled approval or review-clearing action. This deliberately does not claim
-that identity reasoning is implemented merely because unsafe completion is now blocked.
+connection or a detection of every contradiction. The structural evaluator always requires semantic review:
+region, time, namespace meaning and goal interpretation are not independently verified. A separate,
+trusted opt-in [result review](goal-source-report-review-v1.md) can produce `output_ready` for its supported
+source reports and relational analyses. That contract owns the review scope, evidence, authority and
+limitations; planner proposals cannot supply approval. Blocking unsafe completion by itself does not
+establish identity reasoning or completion of the original user goal.
 Current bounded acquisition cannot pass population coverage. Neither status promotes ledger evidence to
 `sample_verified` or authorizes consequential decisions.
 
