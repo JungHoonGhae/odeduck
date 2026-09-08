@@ -5,6 +5,10 @@
 [주장별 근거·재계획 결정](https://github.com/JungHoonGhae/odeduck/issues/51)의 원천 보고 부분이며,
 G1–G5의 범위나 전체 완료 기준을 바꾸지 않는다.
 
+분석 검토의 현재 입력은 [원본 셀 재사용 v2 계약](original-cell-evidence-reuse-v1.md)을 따른다.
+본문은 primary evidence와 analysis.additionalEvidence에 한 번만 두고 sourceContext는 packetId로
+참조한다. 기존 원천 보고 v1과 과거 검토 archive는 그대로 보존한다.
+
 ## Problem Statement
 
 실제로 실행한 원천 보고도 영구적인 단일 의미 검토 값 때문에 완료될 수 없다. 반대로 계획기의
@@ -133,7 +137,7 @@ fixture 승인만으로 모델 정확도나 원래 G1–G5의 자율 완주를 �
 
 - 연관 조건은 계산 원천의 원본 FILE과 같은 PK, 비어 있지 않은 asset, 같은 ZIP member와 유효한
   SHA256 형식의 content/contract hash다. 다른 파일·revision, hash 누락, 파생/공간 관측은 제외한다.
-- 문맥마다 기존 packet, 선택 필드에 투영한 원천 metadata, 실제 sample request와 연결 대상
+- 문맥마다 기존 packetId 참조, 선택 필드에 투영한 원천 metadata, 실제 sample request와 연결 대상
   observation ID(`targets`)를 보존한다. 원문 선택·주소·수신자는 기존 근거 공개 계약을 따른다.
   계산의 `artifact.sources`/`analysis.sources`와 문맥은 구분하며 원래 관측을 변경하지 않는다.
 - 같은 파일이라는 연관은 특정 표/시트에 대한 헤더 적용, 필드 의미, entity identity의 증명이 아니다.
@@ -158,7 +162,7 @@ Composition의 `support:[{packetId,targets,purpose}]`로 실제 공개한 Eviden
 - 최대 8개 서로 다른 packet, 각 1–8개 중복 없는 target 관측과 1–1000 UTF-8 byte purpose를 받는다.
   target은 계산의 직접 원천 또는 그 원본 lineage에 속해야 한다. 근거 자체는 계산에 참여하지 않는
   원본 관측이며 파생/공간 기록이나 다른 목표의 packet은 거부한다. credential material은 받지 않는다.
-- `analysis.sourceContext`에 실제 packet·투영 metadata·요청·target과 `proposed:true`, purpose를
+- `analysis.sourceContext`에 실제 packetId 참조·투영 metadata·요청·target과 `proposed:true`, purpose를
   전달한다. purpose와 target은 계획기의 가설이지 출처의 진술이나 적용 승인 값이 아니다.
   같은 파일 자동 문맥은 종전대로 유지하고, 명시한 packet은 그 제안 한 번만 전달한다.
 - 문맥은 원래 계산·행 수·원본 lineage·역할·출력·시간·모집단 검사를 변경하지 않는다. 적용되는
@@ -192,7 +196,7 @@ Composition의 `support:[{packetId,targets,purpose}]`로 실제 공개한 Eviden
   한 번씩 반환한다. 원본의 선택 근거 또는 그 원본을 target으로 삼은 문맥을 인용해야 한다.
   선택 조건의 누락 대상, 시트의 논리적 표 범위, join/시간 제외와 요청한 미대응 설명을 함께 판단한다.
   범위 밖 원천의 부재를 0이나 부정 사실로 만들지 않는다. 원천별 적용을 입증하지 못하면 insufficient다.
-- 모든 항목이 supported여야 `independent_model_full_scope_analysis_v1` 검토를 붙여 output_ready가
+- 모든 항목이 supported여야 `independent_model_full_scope_analysis_v2` 검토를 붙여 output_ready가
   된다. 이것은 제한된 모델의 원천 기반 전체 범위 판단이며 모집단 인증·실세계 진실·고비용 행동 승인이
   아니다. source-report/일반 analysis 권한만으로 이 경로를 열지 않고, 기존 예산·revision·공개 상한을 유지한다.
 

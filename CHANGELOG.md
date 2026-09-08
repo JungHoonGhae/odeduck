@@ -9,6 +9,12 @@ section matching a `vX.Y.Z` tag as the GitHub release notes.
 
 ### Added
 
+- Goal analysis review reuses already-disclosed original XLSX cells across verified
+  overlapping observations, without another disclosure or broader authority.
+  Analysis v2 carries one packet collection with context references and cell
+  attribution; conflicting provenance/values fail, and repackaging cannot buy
+  another review. Source-report v1 and historical review archives stay unchanged.
+
 - Local `sample.compare` through the shared CLI/MCP goal engine compares explicit
   keys and numeric measures from two retained original revisions. Exact decimal
   checks preserve duplicates, discrepancies and both unmatched sides. Selected

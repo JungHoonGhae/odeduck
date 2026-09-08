@@ -385,7 +385,7 @@ func TestSourceComparisonSupportCarriesBothRevisionsWithoutChangingTheResult(t *
 				t.Fatalf("comparison provenance lost: %+v", source)
 			}
 		}
-		if !c.Proposed || len(c.Targets) != 1 || c.Targets[0] != "o1" || c.Source.Delivery != "DERIVED" || c.Source.Comparison == nil || c.Evidence.Records[9].Values["metric"] != "equal" || c.Evidence.Records[9].Values["value"] != json.Number("1") {
+		if !c.Proposed || len(c.Targets) != 1 || c.Targets[0] != "o1" || c.Source.Delivery != "DERIVED" || c.Source.Comparison == nil || reviewPacket(t, in, c.PacketID).Records[9].Values["metric"] != "equal" || reviewPacket(t, in, c.PacketID).Records[9].Values["value"] != json.Number("1") {
 			t.Fatalf("lost computed/proposed separation: %+v", c)
 		}
 		wire, _ = json.Marshal(in)

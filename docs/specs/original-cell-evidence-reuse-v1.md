@@ -1,6 +1,7 @@
 # Reuse disclosed original cells across observations
 
-Status: design selected, packet feasibility verified; runtime reuse is not implemented.
+Status: runtime reuse implemented; public-seam and original G4 disclosure replay
+verified. Complete comparison-support input and actual model validation remain open.
 Continues I5/I7/I9 through the original G4 evidence-delivery gap. The original question,
 population contract, source revisions, oracle and autonomous completion gates remain unchanged.
 Uses [selected evidence](selected-goal-evidence-v1.md),
@@ -14,9 +15,9 @@ and same-file context disclose 95 distinct original cells in two packets. Those 
 11,522-byte packet without losing values, nulls or worksheet positions. This is a disclosure
 feasibility result, not a new acquisition or a reviewed G4 result.
 
-Analysis currently reconstructs disclosed inputs only from matching observation IDs and row hashes.
-It cannot recognize the same physical cell disclosed through a different immutable observation.
-Adding the complete source-comparison summary therefore exceeds the packet count even though all
+Before this change analysis reconstructed disclosed inputs only from matching observation IDs and
+row hashes. It could not recognize the same physical cell in another immutable observation.
+Adding the complete source-comparison summary exceeded the packet count even though all
 required school cells fit one packet. Other source-applicability and school-boundary gaps remain.
 
 Compared three designs under `codebase-design`:
@@ -90,3 +91,25 @@ verify actual CLI/MCP delivery. Preserve every original G4 selected cell while c
 disclosure, then add the complete comparison summary and measure actual whole-input size. This
 does not by itself provide the still-missing school-boundary evidence or the final explanations.
 Independent source expectations, actual model judgement and autonomous completion remain separate.
+
+## Implementation evidence — 2026-09-09
+
+`ReviewInput.EvidencePackets()` enumerates the primary packet plus analysis.additionalEvidence;
+SourceContext holds packetId references and AnalysisSource.disclosure attributes packet rows/fields
+to participating retained rows. Active analysis replay and result methods use v2. Source-report v1
+and historical archives remain unchanged; archive response tests explicitly convert legacy context
+in memory and do not count those replays as actual v2 model observations.
+
+Public Engine tests cover overlapping physical positions, all-reused inputs, withholding, revision,
+sheet/member/range/type/presence conflicts, unsupported API/CSV correspondence, mutation, cancellation,
+expiry and canonical review deduplication without disclosure refunds. The full-scope test also cites
+cells supplied by another participating original, while an insufficient coverage finding still blocks
+completion. CLI command and MCP JSON-RPC fixtures exercise one-packet original-cell reuse; adapter
+tests confirm single-copy context delivery and retain all 42 historical response-decoder trials.
+
+`TestOriginalG4ReviewReusesSchoolCellsWithinDisclosureBudget` replays archived acquisition metadata
+and independent retained values through the Engine. It preserves the original population contract,
+157 disclosed cells (155 data cells plus two document blocks), ten matched rows and two unmatched
+tuples in seven packets, with a 57,280-byte review input. This is not fresh acquisition or a model
+trial. The complete comparison summary has not yet been added to that input; school-boundary and
+definition applicability, required explanations and original G4 completion remain unverified.

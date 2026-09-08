@@ -128,6 +128,31 @@ func TestFullScopeRequiresTheCitedEvidenceToBelongToEachOriginal(t *testing.T) {
 	}
 }
 
+func TestFullScopeAcceptsOriginalCellsDisclosedByAnotherParticipatingObservation(t *testing.T) {
+	called := false
+	e := fullScopeEngine(t, "xlsx", true, func(_ context.Context, in goalwork.ReviewInput) (goalwork.ReviewAssessment, error) {
+		called = true
+		if len(in.EvidencePackets()) != 1 || len(in.Analysis.SourceContext) != 0 || len(in.Analysis.FullScope.Sources) != 2 || in.Evidence.Selection.Observation != "o2" {
+			t.Fatal("reuse must preserve both original extents without invented interpretation context")
+		}
+		a := supportedFullScopeReview(in)
+		a.SourceCoverage[0].Finding.Verdict = "insufficient"
+		a.SourceCoverage = append(a.SourceCoverage, goalwork.SourceCoverageReview{Observation: "o2", Finding: a.SourceCoverage[0].Finding})
+		return a, nil // Original-cell attribution is not semantic coverage approval.
+	})
+	advanceUnmatched(t, e, goalwork.Decision{Action: "sample", Sample: &goalwork.SampleRequest{PK: "counts", Delivery: "file", Asset: "counts.xlsx", XLSX: &dataset.XLSXSelection{Sheet: "table", Range: "A1:C3"}}})
+	p := e.View().Compositions[0]
+	p.ID, p.Joins = "overlap", []goalwork.Join{{Right: "o2", LeftKeys: []string{"o1.B"}, RightKeys: []string{"B"}}}
+	advanceUnmatched(t, e, goalwork.Decision{Action: "compose", Composition: &p})
+	advanceUnmatched(t, e, goalwork.Decision{Action: "execute", CompositionID: p.ID})
+	o := e.View().Observations[1]
+	advanceUnmatched(t, e, goalwork.Decision{Action: "read_evidence", Evidence: &goalwork.EvidenceRequest{Observation: o.ID, RowsSHA256: o.RowsSHA256, Rows: []int{1, 2, 3}, Fields: []string{"A", "B", "C"}}})
+	v, err := e.Advance(context.Background(), e.View().Revision, goalwork.Decision{Action: "review_result", CompositionID: p.ID})
+	if err != nil || !called || len(v.Gaps) != 0 || len(v.Reviews) != 1 || v.Reviews[0].Status == "failed" || v.Status == "output_ready" {
+		t.Fatalf("valid original-cell citation was rejected or became coverage approval: called=%t gaps=%+v err=%v", called, v.Gaps, err)
+	}
+}
+
 func TestFullScopeAuthorityRequiresAnalysisAndDisclosure(t *testing.T) {
 	for _, policy := range []goalwork.Policy{{ReviewFullScope: true}, {ReviewFullScope: true, ReviewRecipient: "claude", EvidenceRecipient: "claude"}, {ReviewFullScope: true, ReviewAnalyses: true}} {
 		if _, err := goalwork.Start("report all source records", policy, goalwork.Dependencies{Review: func(context.Context, goalwork.ReviewInput) (goalwork.ReviewAssessment, error) {

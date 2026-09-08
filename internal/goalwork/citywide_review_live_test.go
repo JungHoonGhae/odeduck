@@ -38,10 +38,11 @@ func TestCitywideReviewReceivesAgeDefinitionWithoutLosingEvidence(t *testing.T) 
 		t.Fatal("registered age definition is missing from the existing citywide review")
 	}
 	doc := after.Analysis.SourceContext[1]
-	if !doc.Proposed || !slices.Equal(doc.Targets, []string{"o1"}) || doc.Source.Document == nil || doc.Source.Document.Reference.Basis != "adapter_reference" || doc.Request.Document == nil || doc.Request.Document.ReferenceID != "kosis-answer-22124" || len(doc.Evidence.Records) != 2 {
+	docPacket := reviewPacket(t, after, doc.PacketID)
+	if !doc.Proposed || !slices.Equal(doc.Targets, []string{"o1"}) || doc.Source.Document == nil || doc.Source.Document.Reference.Basis != "adapter_reference" || doc.Request.Document == nil || doc.Request.Document.ReferenceID != "kosis-answer-22124" || len(docPacket.Records) != 2 {
 		t.Fatal("definition lost its proposed target, actual request or registered origin")
 	}
-	for n, record := range doc.Evidence.Records {
+	for n, record := range docPacket.Records {
 		address := record.Origins["text"]
 		if address.Kind != "document_block" || address.Ordinal != n+1 || address.Locator == "" || record.Values["text"] == nil {
 			t.Fatal("definition lost its selected original block")
@@ -51,9 +52,10 @@ func TestCitywideReviewReceivesAgeDefinitionWithoutLosingEvidence(t *testing.T) 
 	// every original value, missing/null distinction and address must survive.
 	dataEvidence := func(in goalwork.ReviewInput) string {
 		cells := map[string]any{}
-		packets := append([]goalwork.EvidencePacket{in.Evidence}, in.Analysis.AdditionalEvidence...)
-		packets = append(packets, in.Analysis.SourceContext[0].Evidence)
-		for _, packet := range packets {
+		for _, packet := range in.EvidencePackets() {
+			if packet.Selection.Observation == "o5" {
+				continue // The added definition is not part of the unchanged data cells.
+			}
 			for _, record := range packet.Records {
 				for _, field := range packet.Selection.Fields {
 					key := packet.Selection.Observation + ":" + strconv.Itoa(record.RetainedRow) + ":" + field
@@ -90,11 +92,12 @@ func TestCitywideReviewReceivesTableContextWithoutChangingComparison(t *testing.
 	reviewer := &citywideModelReview{recipient: "codex", branches: true, tableContext: true, call: func(_ context.Context, in goalwork.ReviewInput) (goalwork.ReviewAssessment, error) {
 		called = true
 		c := in.Analysis.SourceContext[0]
-		if c.Request.XLSX.Range != "A22:AM40" || c.Source.ContentSHA256 != ref.ContentSHA256 || len(c.Evidence.Records) != 8 {
+		packet := reviewPacket(t, in, c.PacketID)
+		if c.Request.XLSX.Range != "A22:AM40" || c.Source.ContentSHA256 != ref.ContentSHA256 || len(packet.Records) != 8 {
 			t.Fatal("review is missing independently observed table footer context")
 		}
 		for i, want := range ref.Records {
-			got := c.Evidence.Records[5+i]
+			got := packet.Records[5+i]
 			if got.RetainedRow != want.Row-21 || len(got.Values) != 5 || len(got.Missing) != 0 {
 				t.Fatal("context did not preserve selected blank cells and original row positions")
 			}

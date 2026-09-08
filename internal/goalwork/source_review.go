@@ -78,7 +78,10 @@ func (e *Engine) reviewResult(ctx context.Context, id string) error {
 		return err
 	}
 	inputHash := digest(in)
-	evidenceHash := reviewEvidenceHash(in)
+	evidenceHash, err := e.reviewEvidenceHash(ctx, in)
+	if err != nil {
+		return err
+	}
 	for _, attempt := range e.state.Reviews {
 		if attempt.ExecutionRevision == in.Artifact.Evaluation.ExecutionRevision && attempt.EvidenceSHA256 == evidenceHash {
 			return fmt.Errorf("this execution and selected evidence were already reviewed; acquire new relevant evidence or correct the result")
@@ -141,25 +144,16 @@ func (e *Engine) reviewResult(ctx context.Context, id string) error {
 
 // Canonical cells ignore ordering, packet splitting and review kind. Repacking
 // the same disclosure cannot buy another review of the same execution.
-func reviewEvidenceHash(in ReviewInput) string {
+func (e *Engine) reviewEvidenceHash(ctx context.Context, in ReviewInput) (string, error) {
+	index, _, err := e.indexReviewDisclosure(ctx, in.EvidencePackets())
+	if err != nil {
+		return "", err
+	}
 	cells := map[string]any{}
-	packets := []EvidencePacket{in.Evidence}
-	if in.Analysis != nil {
-		packets = append(packets, in.Analysis.AdditionalEvidence...)
-		for _, context := range in.Analysis.SourceContext {
-			packets = append(packets, context.Evidence)
-		}
+	for key, cell := range index {
+		cells[digest([]any{key.scope, key.row, key.field})] = []any{cell.present, cell.value}
 	}
-	for _, packet := range packets {
-		for _, record := range packet.Records {
-			for _, field := range packet.Selection.Fields {
-				key, _ := json.Marshal([]any{packet.Selection.Observation, packet.Selection.RowsSHA256, record.RetainedRow, field})
-				value, exists := record.Values[field]
-				cells[string(key)] = []any{exists, value, record.Origins[field]}
-			}
-		}
-	}
-	return digest(cells)
+	return digest(cells), nil
 }
 
 // ValidateReviewAssessment validates completeness and real references, not

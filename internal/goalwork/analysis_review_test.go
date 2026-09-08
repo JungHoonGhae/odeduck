@@ -12,7 +12,7 @@ import (
 
 func TestAnalysisReviewUsesDisclosedGroupsWithoutSendingAllContributors(t *testing.T) {
 	e := analysisReviewEngine(t, func(_ context.Context, in goalwork.ReviewInput) (goalwork.ReviewAssessment, error) {
-		if in.Analysis == nil || in.Analysis.Method != "engine_relational_replay_v1" || len(in.Analysis.AdditionalEvidence) != 2 || len(in.Analysis.Sources) != 3 {
+		if in.Analysis == nil || in.Analysis.Method != "engine_relational_replay_v2" || len(in.Analysis.AdditionalEvidence) != 2 || len(in.Analysis.Sources) != 3 {
 			t.Fatal("review lacks reproducible computation and multiple sources")
 		}
 		b, _ := json.Marshal(in)
@@ -25,7 +25,7 @@ func TestAnalysisReviewUsesDisclosedGroupsWithoutSendingAllContributors(t *testi
 		return supportedAnalysisReview(in), nil
 	})
 	v, err := e.Advance(context.Background(), e.View().Revision, goalwork.Decision{Action: "review_result", CompositionID: "compare"})
-	if err != nil || v.Status != "output_ready" || v.Evaluation.Review == nil || v.Evaluation.Review.Method != "independent_model_relational_analysis_v1" || len(v.Reviews) != 1 {
+	if err != nil || v.Status != "output_ready" || v.Evaluation.Review == nil || v.Evaluation.Review.Method != goalwork.AnalysisReviewMethod || len(v.Reviews) != 1 {
 		t.Fatalf("analysis cannot complete through public engine: %v %+v", err, v.Gaps)
 	}
 }

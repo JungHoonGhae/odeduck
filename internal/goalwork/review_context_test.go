@@ -17,7 +17,7 @@ func TestReviewUsesExplicitSeparateSourceSupportWithoutChangingCalculation(t *te
 			t.Fatal("separately acquired and disclosed supporting record did not reach review")
 		}
 		c := in.Analysis.SourceContext[0]
-		if c.Source.PK != "other" || c.Source.ID != "o2" || len(c.Targets) != 1 || c.Targets[0] != "o1" || c.Evidence.Records[0].Values["A"] != "Snapshot 2024-04-01; geography effective 2024-07-01" {
+		if c.Source.PK != "other" || c.Source.ID != "o2" || len(c.Targets) != 1 || c.Targets[0] != "o1" || reviewPacket(t, in, c.PacketID).Records[0].Values["A"] != "Snapshot 2024-04-01; geography effective 2024-07-01" {
 			t.Fatal("support lost actual source, selected wording or target")
 		}
 		b, _ := json.Marshal(c)
@@ -29,7 +29,7 @@ func TestReviewUsesExplicitSeparateSourceSupportWithoutChangingCalculation(t *te
 		}
 		a := supportedAnalysisReview(in)
 		a.GoalFit.Verdict = "insufficient" // Boundary fixture, not source applicability approval.
-		a.GoalFit.PacketIDs = []string{in.Evidence.ID, c.Evidence.ID}
+		a.GoalFit.PacketIDs = []string{in.Evidence.ID, c.PacketID}
 		return a, nil
 	})
 	readContext(t, e)
@@ -174,7 +174,7 @@ func TestReviewUsesSelectedSameFileContextWithoutJoiningHeaderRows(t *testing.T)
 			t.Fatal("header missing or treated as contributing data")
 		}
 		c := in.Analysis.SourceContext[0]
-		if len(c.Targets) != 1 || c.Targets[0] != "o1" || c.Source.ID != "o2" || c.Request.XLSX.Range != "A1:C1" || c.Evidence.Records[0].Values["A"] != "Snapshot 2024-04-01; geography effective 2024-07-01" {
+		if len(c.Targets) != 1 || c.Targets[0] != "o1" || c.Source.ID != "o2" || c.Request.XLSX.Range != "A1:C1" || reviewPacket(t, in, c.PacketID).Records[0].Values["A"] != "Snapshot 2024-04-01; geography effective 2024-07-01" {
 			t.Fatal("context lost source request, selected values or target revision")
 		}
 		b, _ := json.Marshal(in)
@@ -185,7 +185,7 @@ func TestReviewUsesSelectedSameFileContextWithoutJoiningHeaderRows(t *testing.T)
 			t.Fatal("context widened disclosure")
 		}
 		a := supportedAnalysisReview(in)
-		a.GoalFit.PacketIDs = []string{in.Evidence.ID, c.Evidence.ID}
+		a.GoalFit.PacketIDs = []string{in.Evidence.ID, c.PacketID}
 		return a, nil
 	})
 	v := advanceUnmatched(t, e, goalwork.Decision{Action: "review_result", CompositionID: "report"})
@@ -306,7 +306,7 @@ func TestReviewContextCannotBeMutatedOrRepackedForAnotherReview(t *testing.T) {
 				a := supportedAnalysisReview(in)
 				a.GoalFit.Verdict = "insufficient"
 				if mutate {
-					in.Analysis.SourceContext[0].Evidence.Records[0].Values["A"] = "forged context"
+					reviewPacket(t, in, in.Analysis.SourceContext[0].PacketID).Records[0].Values["A"] = "forged context"
 				}
 				return a, nil
 			})

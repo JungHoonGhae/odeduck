@@ -17,7 +17,7 @@ type SupportBinding struct {
 	Purpose  string   `json:"purpose"`
 }
 
-// SourceContext contains already-disclosed records from another observation of
+// SourceContext references already-disclosed records from another observation of
 // the same file revision, or explicitly proposed supporting records. Neither
 // association proves applicability, identity, or computational participation.
 type SourceContext struct {
@@ -25,7 +25,7 @@ type SourceContext struct {
 	Targets           []string                  `json:"targets"`
 	Source            Observation               `json:"source"`
 	Request           SampleRequest             `json:"request"`
-	Evidence          EvidencePacket            `json:"evidence"`
+	PacketID          string                    `json:"packetId"`
 	Proposed          bool                      `json:"proposed,omitempty"`
 	Purpose           string                    `json:"purpose,omitempty"`
 }
@@ -76,7 +76,7 @@ func (e *Engine) supportContext(p Composition) (map[string]SourceContext, error)
 			}
 			seen[id] = true
 		}
-		c := SourceContext{Targets: binding.Targets, Source: projectReviewSource(source, packet.Selection.Fields), Request: e.requests[source.ID], Evidence: packet, Proposed: true, Purpose: binding.Purpose}
+		c := SourceContext{Targets: binding.Targets, Source: projectReviewSource(source, packet.Selection.Fields), Request: e.requests[source.ID], PacketID: packet.ID, Proposed: true, Purpose: binding.Purpose}
 		if source.Comparison != nil {
 			for side, selection := range []ComparisonSide{source.Comparison.Recipe.Left, source.Comparison.Recipe.Right} {
 				parent, exists := observed[selection.Observation]
@@ -109,7 +109,7 @@ func (e *Engine) supportContext(p Composition) (map[string]SourceContext, error)
 		}
 		out[binding.PacketID] = c
 	}
-	if err := completeComparisonSupport(out); err != nil {
+	if err := completeComparisonSupport(out, packets); err != nil {
 		return nil, err
 	}
 	return out, nil
@@ -117,7 +117,7 @@ func (e *Engine) supportContext(p Composition) (map[string]SourceContext, error)
 
 // Every proposed target must see the complete comparison denominator and
 // negative accounting, even if the disclosure was split across packets.
-func completeComparisonSupport(contexts map[string]SourceContext) error {
+func completeComparisonSupport(contexts map[string]SourceContext, packets map[string]EvidencePacket) error {
 	coverage := map[string]map[int]map[string]bool{}
 	for _, c := range contexts {
 		if c.Source.Comparison == nil {
@@ -128,7 +128,7 @@ func completeComparisonSupport(contexts map[string]SourceContext) error {
 			if coverage[key] == nil {
 				coverage[key] = map[int]map[string]bool{}
 			}
-			for _, record := range c.Evidence.Records {
+			for _, record := range packets[c.PacketID].Records {
 				if record.RetainedRow < 1 || record.RetainedRow > len(comparisonSummaryMetrics) {
 					continue
 				}
@@ -194,7 +194,7 @@ func (e *Engine) reviewSourceContext(ctx context.Context, a *Artifact) ([]Source
 			}
 		}
 		if len(targets) != 0 {
-			context = append(context, SourceContext{Targets: targets, Source: projectReviewSource(source, packet.Selection.Fields), Request: e.requests[source.ID], Evidence: packet})
+			context = append(context, SourceContext{Targets: targets, Source: projectReviewSource(source, packet.Selection.Fields), Request: e.requests[source.ID], PacketID: packet.ID})
 		}
 	}
 	return context, nil

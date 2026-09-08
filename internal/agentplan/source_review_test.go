@@ -1,6 +1,7 @@
 package agentplan
 
 import (
+	"bytes"
 	"compress/gzip"
 	"context"
 	"encoding/json"
@@ -49,7 +50,7 @@ func replayArchivedReview(t *testing.T, folder, file string, wantReady, wantTria
 		var trial struct {
 			Case, Variant, ProviderResponse string
 			Repeat                          int
-			Input                           goalwork.ReviewInput
+			Input                           json.RawMessage
 			Result                          goalwork.View
 			Response                        GoalReviewResponse // single-diagnostic envelope
 		}
@@ -79,7 +80,7 @@ func replayArchivedReview(t *testing.T, folder, file string, wantReady, wantTria
 				t.Fatal(err)
 			}
 			t.Setenv("PATH", dir)
-			response, err := ReviewGoal(context.Background(), trial.Input, "codex")
+			response, err := ReviewGoal(context.Background(), decodeLegacyReviewInput(t, trial.Input), "codex")
 			if err != nil || response.Truncated || response.RawResponse != trial.ProviderResponse || !reflect.DeepEqual(response.Assessment, trial.Result.Evaluation.Review.Assessment) {
 				t.Fatalf("archived response no longer decodes to its recorded findings: %v", err)
 			}
@@ -88,6 +89,61 @@ func replayArchivedReview(t *testing.T, folder, file string, wantReady, wantTria
 	if count != wantTrials || ready != wantReady {
 		t.Fatalf("archive denominator changed: %d trials, %d ready", count, ready)
 	}
+}
+
+// Adapt historical v1 input in memory solely to replay its recorded response
+// through the current public decoder. The original model saw v1, not v2; this
+// conversion is neither a new model trial nor Engine-produced v2 attribution.
+// Archives and their recorded findings remain unchanged.
+func decodeLegacyReviewInput(t *testing.T, raw json.RawMessage) goalwork.ReviewInput {
+	t.Helper()
+	decode := func(target any) {
+		d := json.NewDecoder(bytes.NewReader(raw))
+		d.UseNumber()
+		if err := d.Decode(target); err != nil {
+			t.Fatal(err)
+		}
+	}
+	var in goalwork.ReviewInput
+	decode(&in)
+	if in.Analysis == nil {
+		return in // The source-report v1 contract has not changed.
+	}
+	var legacy struct {
+		Analysis struct {
+			Method        string
+			SourceContext []struct {
+				goalwork.SourceContext
+				Evidence goalwork.EvidencePacket
+			}
+		}
+	}
+	decode(&legacy)
+	if legacy.Analysis.Method != "engine_relational_replay_v1" {
+		t.Fatal("expected an explicitly archived v1 analysis")
+	}
+	in.Analysis.Method = "engine_relational_replay_v2"
+	in.Analysis.SourceContext = nil
+	for _, context := range legacy.Analysis.SourceContext {
+		if context.Evidence.ID == "" {
+			t.Fatal("legacy context lost its embedded packet")
+		}
+		found := false
+		for _, packet := range in.EvidencePackets() {
+			if packet.ID == context.Evidence.ID {
+				if !reflect.DeepEqual(packet, context.Evidence) {
+					t.Fatal("legacy archive contains conflicting packet bodies")
+				}
+				found = true
+			}
+		}
+		if !found {
+			in.Analysis.AdditionalEvidence = append(in.Analysis.AdditionalEvidence, context.Evidence)
+		}
+		context.SourceContext.PacketID = context.Evidence.ID
+		in.Analysis.SourceContext = append(in.Analysis.SourceContext, context.SourceContext)
+	}
+	return in
 }
 
 func TestReviewGoalUsesAnIsolatedContextAndReturnsTypedFindings(t *testing.T) {
@@ -148,19 +204,22 @@ func TestReviewGoalSelectsAnalysisContractWithoutChangingSourceReportGuide(t *te
 		t.Fatal(err)
 	}
 	t.Setenv("PATH", dir)
-	in := goalwork.ReviewInput{Recipient: "claude", Goal: "compare recorded totals", Contract: goalwork.GoalContract{Outputs: []goalwork.OutputRequirement{{ID: "total"}}}, Evidence: goalwork.EvidencePacket{ID: "ep_one"}, Analysis: &goalwork.AnalysisReviewContext{Method: "engine_relational_replay_v1", AdditionalEvidence: []goalwork.EvidencePacket{{ID: "ep_two"}}}}
-	in.Analysis.SourceContext = []goalwork.SourceContext{{Targets: []string{"o1"}, Evidence: goalwork.EvidencePacket{ID: "ep_context", Records: []goalwork.EvidenceRecord{{RetainedRow: 1, Values: goalwork.Row{"A": "SOURCE_HEADER_FIXTURE"}}}}}}
-	in.Analysis.SourceContext = append(in.Analysis.SourceContext, goalwork.SourceContext{Targets: []string{"o1"}, Proposed: true, Purpose: "Check definition applicability", Source: goalwork.Observation{ID: "o3", PK: "definitions"}, Evidence: goalwork.EvidencePacket{ID: "ep_definitions", Records: []goalwork.EvidenceRecord{{RetainedRow: 1, Values: goalwork.Row{"term": "SEPARATE_DEFINITION_FIXTURE"}}}}})
+	in := goalwork.ReviewInput{Recipient: "claude", Goal: "compare recorded totals", Contract: goalwork.GoalContract{Outputs: []goalwork.OutputRequirement{{ID: "total"}}}, Evidence: goalwork.EvidencePacket{ID: "ep_one"}, Analysis: &goalwork.AnalysisReviewContext{Method: "engine_relational_replay_v2", AdditionalEvidence: []goalwork.EvidencePacket{{ID: "ep_two"}, {ID: "ep_context", Records: []goalwork.EvidenceRecord{{RetainedRow: 1, Values: goalwork.Row{"A": "SOURCE_HEADER_FIXTURE"}}}}, {ID: "ep_definitions", Records: []goalwork.EvidenceRecord{{RetainedRow: 1, Values: goalwork.Row{"term": "SEPARATE_DEFINITION_FIXTURE"}}}}}}}
+	in.Analysis.SourceContext = []goalwork.SourceContext{{Targets: []string{"o1"}, PacketID: "ep_context"}}
+	in.Analysis.SourceContext = append(in.Analysis.SourceContext, goalwork.SourceContext{Targets: []string{"o1"}, Proposed: true, Purpose: "Check definition applicability", Source: goalwork.Observation{ID: "o3", PK: "definitions"}, PacketID: "ep_definitions"})
 	response, err := ReviewGoal(context.Background(), in, "claude")
 	if err != nil || len(response.Assessment.AnalysisChecks) != 4 {
 		t.Fatalf("analysis response: %v", err)
 	}
 	prompt, err := os.ReadFile(promptPath)
-	if err != nil || !strings.Contains(string(prompt), "RELATIONAL_ANALYSIS_V1") || strings.Contains(string(prompt), "No semantic approval of joins") {
+	if err != nil || !strings.Contains(string(prompt), "RELATIONAL_ANALYSIS_V2") || strings.Contains(string(prompt), "No semantic approval of joins") {
 		t.Fatal("analysis sent to source-only reviewer instructions")
 	}
 	if !strings.Contains(string(prompt), "SOURCE_HEADER_FIXTURE") || !strings.Contains(string(prompt), "same-file association") {
 		t.Fatal("selected context or its association-only interpretation was lost in the adapter")
+	}
+	if strings.Count(string(prompt), "SOURCE_HEADER_FIXTURE") != 1 || strings.Count(string(prompt), "SEPARATE_DEFINITION_FIXTURE") != 1 {
+		t.Fatal("analysis prompt duplicates selected context packet bodies")
 	}
 	for _, required := range []string{"SEPARATE_DEFINITION_FIXTURE", `"proposed":true`, `"purpose":"Check definition applicability"`, "UNTRUSTED PROPOSALS"} {
 		if !strings.Contains(string(prompt), required) {

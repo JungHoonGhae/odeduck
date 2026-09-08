@@ -98,10 +98,10 @@ func TestOfficialDocumentReachesReviewOnlyAsSelectedExplicitSupport(t *testing.T
 				t.Fatal("missing supporting document")
 			}
 			c := in.Analysis.SourceContext[0]
-			if c.Source.Delivery != "DOCUMENT" || !c.Proposed || c.Targets[0] != "o1" || c.Evidence.Records[0].Values["text"] != "Definition of count Published records, not current capacity" {
+			if c.Source.Delivery != "DOCUMENT" || !c.Proposed || c.Targets[0] != "o1" || reviewPacket(t, in, c.PacketID).Records[0].Values["text"] != "Definition of count Published records, not current capacity" {
 				t.Fatalf("wrong document context: %+v", c)
 			}
-			origin := c.Evidence.Records[0].Origins["text"]
+			origin := reviewPacket(t, in, c.PacketID).Records[0].Origins["text"]
 			if origin.Kind != "document_block" || origin.Ordinal != 2 {
 				t.Fatalf("not original section address: %+v", origin)
 			}

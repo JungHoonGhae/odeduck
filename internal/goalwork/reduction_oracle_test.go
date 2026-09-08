@@ -163,11 +163,12 @@ func checkCitywideReduction(t *testing.T, live bool, reviewer *citywideModelRevi
 				t.Fatal("original goal, calculation or header context changed at review boundary")
 			}
 			c := in.Analysis.SourceContext[0]
-			if c.Source.ID != "o4" || len(c.Targets) != 1 || c.Targets[0] != "o2" || c.Request.XLSX.Range != contextRange || len(c.Evidence.Records) != len(contextRecords) {
+			packet := reviewPacket(t, in, c.PacketID)
+			if c.Source.ID != "o4" || len(c.Targets) != 1 || c.Targets[0] != "o2" || c.Request.XLSX.Range != contextRange || len(packet.Records) != len(contextRecords) {
 				t.Fatal("header was not associated with its actual school file")
 			}
-			for i, record := range c.Evidence.Records {
-				for _, field := range c.Evidence.Selection.Fields {
+			for i, record := range packet.Records {
+				for _, field := range packet.Selection.Fields {
 					if value, present := contextRecords[i].Cells[field]; present {
 						if record.Values[field] != value {
 							t.Fatal("header differs from independently frozen source cells")
@@ -182,7 +183,7 @@ func checkCitywideReduction(t *testing.T, live bool, reviewer *citywideModelRevi
 				return reviewer.call(ctx, in)
 			}
 			a := supportedAnalysisReview(in)
-			a.GoalFit = goalwork.ReviewFinding{Verdict: "insufficient", Reason: "Scripted boundary check, not an actual semantic reviewer: unmatched district, age universes and original full comparison remain unresolved", PacketIDs: []string{in.Evidence.ID, c.Evidence.ID}}
+			a.GoalFit = goalwork.ReviewFinding{Verdict: "insufficient", Reason: "Scripted boundary check, not an actual semantic reviewer: unmatched district, age universes and original full comparison remain unresolved", PacketIDs: []string{in.Evidence.ID, c.PacketID}}
 			return a, nil
 		},
 	}

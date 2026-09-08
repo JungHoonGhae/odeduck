@@ -3,8 +3,10 @@ package mcpserver
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/JungHoonGhae/odeduck/internal/catalog"
 	"github.com/JungHoonGhae/odeduck/internal/dataset"
@@ -151,23 +153,29 @@ func TestGoalMCPAnalysisReviewUsesTrustedPolicyAndActualCalculation(t *testing.T
 			},
 			Review: func(_ context.Context, in goalwork.ReviewInput) (goalwork.ReviewAssessment, error) {
 				if in.Recipient != "claude" || in.Analysis == nil || in.Artifact.Rows[0]["total"] != json.Number("9007199254740994") {
-					t.Fatal("MCP lost authorized actual calculation")
+					return goalwork.ReviewAssessment{}, fmt.Errorf("MCP lost authorized actual calculation")
 				}
-				if len(in.Analysis.SourceContext) != 1 || !in.Analysis.SourceContext[0].Proposed || in.Analysis.SourceContext[0].Source.PK != "definitions" || in.Analysis.SourceContext[0].Evidence.Records[0].Values["definition"] != "Recorded quantity in fixture units" || len(in.Artifact.Sources) != 1 {
-					t.Fatal("MCP lost explicit original API support or made it a calculation source")
+				packets := map[string]goalwork.EvidencePacket{}
+				var ids []string
+				for _, packet := range in.EvidencePackets() {
+					packets[packet.ID] = packet
+					ids = append(ids, packet.ID)
+				}
+				if len(in.Analysis.SourceContext) != 1 || !in.Analysis.SourceContext[0].Proposed || in.Analysis.SourceContext[0].Source.PK != "definitions" || len(packets) != 2 || len(packets[in.Analysis.SourceContext[0].PacketID].Records) != 1 || packets[in.Analysis.SourceContext[0].PacketID].Records[0].Values["definition"] != "Recorded quantity in fixture units" || len(in.Artifact.Sources) != 1 {
+					return goalwork.ReviewAssessment{}, fmt.Errorf("MCP lost explicit original API support or made it a calculation source")
 				}
 				b, _ := json.Marshal(in)
 				if strings.Contains(string(b), "UNSELECTED_DEFINITION") {
-					t.Fatal("MCP support widened disclosure")
+					return goalwork.ReviewAssessment{}, fmt.Errorf("MCP support widened disclosure")
 				}
-				f := goalwork.ReviewFinding{Verdict: "supported", Reason: "fixture calculation judgement", PacketIDs: []string{in.Evidence.ID}}
+				f := goalwork.ReviewFinding{Verdict: "supported", Reason: "fixture calculation judgement", PacketIDs: ids}
 				a := goalwork.ReviewAssessment{GoalFit: f, Outputs: []goalwork.OutputReview{{Output: "total", Finding: f}}}
 				for _, topic := range []string{"relations", "periods", "measurements", "coverage"} {
 					a.AnalysisChecks = append(a.AnalysisChecks, goalwork.AnalysisCheck{Topic: topic, Finding: f})
 				}
 				if fullScope {
 					if in.Analysis.FullScope == nil || in.Contract.Coverage != "population" {
-						t.Fatal("MCP narrowed original population scope")
+						return goalwork.ReviewAssessment{}, fmt.Errorf("MCP narrowed original population scope")
 					}
 					a.SourceCoverage = []goalwork.SourceCoverageReview{{Observation: "o1", Finding: f}}
 				}
@@ -224,5 +232,80 @@ func TestGoalMCPAnalysisReviewUsesTrustedPolicyAndActualCalculation(t *testing.T
 		if v.State.Status != "output_ready" || v.State.Evaluation.Review.Method != method || v.State.Artifact.Rows[0]["total"] != json.Number("9007199254740994") {
 			t.Fatal("MCP did not return reviewed exact result")
 		}
+	}
+}
+
+func TestGoalMCPReusesOriginalCellsWithOneSelectedPacket(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	deps := goalwork.Dependencies{
+		Search: func(context.Context, string) (catalog.Result, error) {
+			return catalog.Result{Hits: []catalog.Hit{{PK: "records"}}}, nil
+		},
+		Inspect: func(context.Context, string) (goalwork.Inspection, error) {
+			return goalwork.Inspection{PK: "records"}, nil
+		},
+		Sample: func(_ context.Context, r goalwork.SampleRequest, _ goalwork.Inspection) (goalwork.Acquired, error) {
+			a := goalwork.Acquired{Delivery: "FILE", ContentSHA256: strings.Repeat("a", 64), ContractSHA256: strings.Repeat("b", 64), Rows: []goalwork.Row{{"A": "001", "B": false, "C": "PRIVATE_CELL"}}, Table: &dataset.TableProvenance{Sheet: "table", Member: "xl/worksheets/sheet1.xml", Range: r.XLSX.Range, RowNumbers: []int{2}}}
+			if r.XLSX.Range == "A1:C2" {
+				a.Rows = append([]goalwork.Row{{"A": "Original code", "B": "Recorded flag", "C": "PRIVATE_CELL"}}, a.Rows...)
+				a.Table.RowNumbers = []int{1, 2}
+			}
+			return a, nil
+		},
+		Review: func(_ context.Context, in goalwork.ReviewInput) (goalwork.ReviewAssessment, error) {
+			if in.Recipient != "claude" || in.Analysis == nil || len(in.EvidencePackets()) != 1 || in.Evidence.Selection.Observation != "o2" || in.Analysis.Sources[0].Disclosure[0].PacketRow != 2 || in.Artifact.Rows[0]["o1.B"] != false {
+				return goalwork.ReviewAssessment{}, fmt.Errorf("MCP lost original-cell attribution or false value")
+			}
+			b, _ := json.Marshal(in)
+			if strings.Contains(string(b), "PRIVATE_CELL") || strings.Count(string(b), `"Original code"`) != 1 {
+				return goalwork.ReviewAssessment{}, fmt.Errorf("MCP duplicated context or disclosed private fields")
+			}
+			f := goalwork.ReviewFinding{Verdict: "supported", Reason: "Fixture source judgement, not real model calibration", PacketIDs: []string{in.Evidence.ID}}
+			a := goalwork.ReviewAssessment{GoalFit: f, Outputs: []goalwork.OutputReview{{Output: "flag", Finding: f}}}
+			for _, topic := range []string{"relations", "periods", "measurements", "coverage"} {
+				a.AnalysisChecks = append(a.AnalysisChecks, goalwork.AnalysisCheck{Topic: topic, Finding: f})
+			}
+			return a, nil
+		},
+	}
+	s := mcp.NewServer(&mcp.Implementation{Name: "test", Version: "0"}, nil)
+	registerGoalTool(s, goalwork.Policy{EvidenceRecipient: "mcp_host", ReviewRecipient: "claude", ReviewAnalyses: true}, func(goalwork.Policy) goalwork.Dependencies { return deps })
+	client := connectTestClient(t, s)
+	call := func(args map[string]any) goalOut {
+		t.Helper()
+		r, err := client.CallTool(ctx, &mcp.CallToolParams{Name: "advance_goal", Arguments: args})
+		if err != nil || r.IsError {
+			t.Fatalf("MCP reuse: %v %+v", err, r)
+		}
+		var out goalOut
+		if err := json.Unmarshal([]byte(r.Content[0].(*mcp.TextContent).Text), &out); err != nil {
+			t.Fatal(err)
+		}
+		return out
+	}
+	v := call(map[string]any{"goal": "원천에 기록된 상태를 보고해줘", "requireSemantic": false})
+	step := func(d goalwork.Decision) {
+		t.Helper()
+		v = call(map[string]any{"sessionId": v.SessionID, "revision": v.State.Revision, "decision": d})
+		if len(v.State.Gaps) != 0 {
+			t.Fatalf("%s: %+v", d.Action, v.State.Gaps)
+		}
+	}
+	c := goalwork.GoalContract{Outcome: v.State.Goal, Region: "source", Period: "source snapshot", Coverage: "sample", Roles: []goalwork.RoleRequirement{{ID: "r", Description: "record"}}, Outputs: []goalwork.OutputRequirement{{ID: "flag", Role: "r", Description: "recorded boolean", Type: "boolean"}}}
+	step(goalwork.Decision{Action: "define", Contract: &c})
+	step(goalwork.Decision{Action: "search", Query: "records", Role: "r"})
+	step(goalwork.Decision{Action: "inspect", PK: "records"})
+	for _, rectangle := range []string{"A2:C2", "A1:C2"} {
+		step(goalwork.Decision{Action: "sample", Sample: &goalwork.SampleRequest{PK: "records", Delivery: "file", Asset: "records.xlsx", XLSX: &dataset.XLSXSelection{Sheet: "table", Range: rectangle}}})
+	}
+	p := goalwork.Composition{ID: "record", Base: "o1", Purpose: "report recorded flag", Select: []string{"o1.A", "o1.B"}, Roles: []goalwork.RoleBinding{{Role: "r", Observation: "o1"}}, Outputs: []goalwork.OutputBinding{{Output: "flag", Field: "o1.B"}}, Assumptions: []string{"fixture source report only"}}
+	step(goalwork.Decision{Action: "compose", Composition: &p})
+	step(goalwork.Decision{Action: "execute", CompositionID: p.ID})
+	o := v.State.Observations[1]
+	step(goalwork.Decision{Action: "read_evidence", Evidence: &goalwork.EvidenceRequest{Observation: o.ID, RowsSHA256: o.RowsSHA256, Rows: []int{1, 2}, Fields: []string{"A", "B"}}})
+	step(goalwork.Decision{Action: "review_result", CompositionID: p.ID})
+	if v.State.Status != "output_ready" || len(v.State.Evidence) != 1 || v.State.Budget.EvidencePacketsRemaining != 7 || v.State.Evaluation.Review.Method != goalwork.AnalysisReviewMethod || v.State.Artifact.Rows[0]["o1.B"] != false {
+		t.Fatal("MCP lost the actual reused-evidence result or disclosure budget")
 	}
 }

@@ -7,10 +7,11 @@ import (
 	"strings"
 )
 
-const AnalysisReviewMethod = "independent_model_relational_analysis_v1"
+const AnalysisReviewMethod = "independent_model_relational_analysis_v2"
 
-// AnalysisReviewContext supplements the v1 primary packet without changing its
-// wire contract. Replay attests execution, not independent arithmetic/meaning.
+// AnalysisReviewContext v2 adds original-cell attribution and context references
+// to one packet collection. Source-report v1 remains unchanged. Replay attests
+// execution, not independent arithmetic or meaning.
 type AnalysisReviewContext struct {
 	Method             string            `json:"method"`
 	OutputSHA256       string            `json:"outputSha256"`
@@ -21,11 +22,12 @@ type AnalysisReviewContext struct {
 }
 
 type AnalysisSource struct {
-	Observation string   `json:"observation"`
-	RowsSHA256  string   `json:"rowsSha256"`
-	RowCount    int      `json:"rowCount"`
-	Fields      []string `json:"fields"`               // metadata projection, not a claim that every original cell was disclosed
-	DirectRows  []int    `json:"directRows,omitempty"` // actual contributing 1-based retained positions, before any final aggregate
+	Disclosure  []EvidenceUse `json:"disclosure,omitempty"`
+	Observation string        `json:"observation"`
+	RowsSHA256  string        `json:"rowsSha256"`
+	RowCount    int           `json:"rowCount"`
+	Fields      []string      `json:"fields"`               // metadata projection, not a claim that every original cell was disclosed
+	DirectRows  []int         `json:"directRows,omitempty"` // actual contributing 1-based retained positions, before any final aggregate
 }
 
 type AnalysisCheck struct {
@@ -68,34 +70,11 @@ func (e *Engine) analysisReviewInput(ctx context.Context, id string, sourceConte
 		return ReviewInput{}, fmt.Errorf("unmatched result cannot be reproduced from retained sources")
 	}
 	needed := analysisFields(a.Recipe, observed, e.requests)
-	selected := map[string][]Row{}
-	cells := map[string][]map[string]bool{}
-	for _, o := range a.Sources {
-		selected[o.ID] = make([]Row, o.RowCount)
-		cells[o.ID] = make([]map[string]bool, o.RowCount)
-		for i := range o.RowCount {
-			selected[o.ID][i], cells[o.ID][i] = Row{}, map[string]bool{}
-		}
+	disclosure, err := e.resolveReviewDisclosure(ctx, a, sourceContext)
+	if err != nil {
+		return ReviewInput{}, err
 	}
-	var packets []EvidencePacket
-	for _, packet := range e.state.Evidence {
-		o, exists := observed[packet.Selection.Observation]
-		if !exists || packet.Selection.RowsSHA256 != o.RowsSHA256 {
-			continue
-		}
-		packets = append(packets, packet)
-		for _, record := range packet.Records {
-			for _, field := range packet.Selection.Fields {
-				cells[o.ID][record.RetainedRow-1][field] = true
-				if value, exists := record.Values[field]; exists {
-					selected[o.ID][record.RetainedRow-1][field] = value
-				}
-			}
-		}
-	}
-	if len(packets) == 0 {
-		return ReviewInput{}, fmt.Errorf("read selected evidence before analysis review")
-	}
+	selected, cells, packets := disclosure.selected, disclosure.cells, disclosure.packets
 	excluded := map[string]map[int]bool{}
 	mark := func(id string, position int) {
 		if excluded[id] == nil {
@@ -163,7 +142,7 @@ func (e *Engine) analysisReviewInput(ctx context.Context, id string, sourceConte
 	if err != nil || digest(replayedUnmatched) != digest(a.Unmatched) {
 		return ReviewInput{}, fmt.Errorf("unmatched result cannot be reproduced from disclosed source values")
 	}
-	in := ReviewInput{Recipient: e.state.Policy.ReviewRecipient, Goal: e.state.Goal, Contract: *e.state.Contract, Artifact: *a, Evidence: packets[0], Analysis: &AnalysisReviewContext{Method: "engine_relational_replay_v1", OutputSHA256: digest(a.Rows), AdditionalEvidence: packets[1:]}}
+	in := ReviewInput{Recipient: e.state.Policy.ReviewRecipient, Goal: e.state.Goal, Contract: *e.state.Contract, Artifact: *a, Evidence: packets[0], Analysis: &AnalysisReviewContext{Method: "engine_relational_replay_v2", OutputSHA256: digest(a.Rows), AdditionalEvidence: packets[1:]}}
 	in.Analysis.SourceContext = sourceContext
 	in.Analysis.FullScope = a.Evaluation.FullScope
 	in.Artifact.Sources = slices.Clone(a.Sources)
@@ -172,11 +151,9 @@ func (e *Engine) analysisReviewInput(ctx context.Context, id string, sourceConte
 		for field := range needed[o.ID] {
 			contextFields[field] = true
 		}
-		for _, packet := range packets {
-			if packet.Selection.Observation == o.ID {
-				for _, field := range packet.Selection.Fields {
-					contextFields[field] = true
-				}
+		for _, use := range disclosure.uses[o.ID] {
+			for _, field := range use.Fields {
+				contextFields[field] = true
 			}
 		}
 		var fields []string
@@ -189,7 +166,7 @@ func (e *Engine) analysisReviewInput(ctx context.Context, id string, sourceConte
 			participating = append(participating, position+1)
 		}
 		slices.Sort(participating)
-		in.Analysis.Sources = append(in.Analysis.Sources, AnalysisSource{Observation: o.ID, RowsSHA256: o.RowsSHA256, RowCount: o.RowCount, Fields: fields, DirectRows: participating})
+		in.Analysis.Sources = append(in.Analysis.Sources, AnalysisSource{Observation: o.ID, RowsSHA256: o.RowsSHA256, RowCount: o.RowCount, Fields: fields, DirectRows: participating, Disclosure: disclosure.uses[o.ID]})
 		in.Artifact.Sources[i] = projectReviewSource(o, fields)
 	}
 	if err := ctx.Err(); err != nil {
@@ -292,12 +269,9 @@ func validAnalysisCitations(f ReviewFinding, in ReviewInput) bool {
 	if f.PacketID != "" || len(f.PacketIDs) < 1 || len(f.PacketIDs) > maxEvidencePackets {
 		return false
 	}
-	valid := map[string]bool{in.Evidence.ID: true}
-	for _, packet := range in.Analysis.AdditionalEvidence {
+	valid := map[string]bool{}
+	for _, packet := range in.EvidencePackets() {
 		valid[packet.ID] = true
-	}
-	for _, context := range in.Analysis.SourceContext {
-		valid[context.Evidence.ID] = true
 	}
 	seen := map[string]bool{}
 	for _, id := range f.PacketIDs {

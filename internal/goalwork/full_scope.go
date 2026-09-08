@@ -10,7 +10,7 @@ import (
 	"github.com/JungHoonGhae/odeduck/internal/dataset"
 )
 
-const FullScopeReviewMethod = "independent_model_full_scope_analysis_v1"
+const FullScopeReviewMethod = "independent_model_full_scope_analysis_v2"
 
 // FullScopeContext records acquisition eligibility, never semantic completeness.
 // Counts, selectors and original positions remain in the referenced observations.
@@ -107,14 +107,21 @@ func validateSourceCoverage(a ReviewAssessment, in ReviewInput) error {
 			return fmt.Errorf("source coverage requires bounded findings with actual citations")
 		}
 		grounded := false
-		for _, packet := range append([]EvidencePacket{in.Evidence}, in.Analysis.AdditionalEvidence...) {
+		for _, packet := range in.EvidencePackets() {
 			grounded = grounded || packet.Selection.Observation == review.Observation && slices.Contains(f.PacketIDs, packet.ID)
 		}
 		for _, context := range in.Analysis.SourceContext {
-			grounded = grounded || slices.Contains(context.Targets, review.Observation) && slices.Contains(f.PacketIDs, context.Evidence.ID)
+			grounded = grounded || slices.Contains(context.Targets, review.Observation) && slices.Contains(f.PacketIDs, context.PacketID)
+		}
+		for _, source := range in.Analysis.Sources {
+			if source.Observation == review.Observation {
+				for _, use := range source.Disclosure {
+					grounded = grounded || slices.Contains(f.PacketIDs, use.PacketID)
+				}
+			}
 		}
 		if !grounded {
-			return fmt.Errorf("source coverage must cite that original observation or its targeted context")
+			return fmt.Errorf("source coverage must cite that original observation's disclosed cells or its targeted context")
 		}
 	}
 	return nil
