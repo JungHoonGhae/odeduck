@@ -16,6 +16,7 @@ type AnalysisReviewContext struct {
 	OutputSHA256       string           `json:"outputSha256"`
 	Sources            []AnalysisSource `json:"sources"`
 	AdditionalEvidence []EvidencePacket `json:"additionalEvidence,omitempty"`
+	SourceContext      []SourceContext  `json:"sourceContext,omitempty"`
 }
 
 type AnalysisSource struct {
@@ -31,7 +32,7 @@ type AnalysisCheck struct {
 	Finding ReviewFinding `json:"finding"`
 }
 
-func (e *Engine) analysisReviewInput(ctx context.Context, id string) (ReviewInput, error) {
+func (e *Engine) analysisReviewInput(ctx context.Context, id string, sourceContext []SourceContext) (ReviewInput, error) {
 	a := e.state.Artifact
 	if a == nil || e.state.Evaluation == nil || id != a.Recipe.ID || e.state.Evaluation.Status != "requirements_met" || e.state.Evaluation.ExecutionRevision < 1 {
 		return ReviewInput{}, fmt.Errorf("analysis review requires the current structurally complete execution")
@@ -154,6 +155,7 @@ func (e *Engine) analysisReviewInput(ctx context.Context, id string) (ReviewInpu
 		return ReviewInput{}, fmt.Errorf("analysis join exclusions cannot be reproduced from disclosed comparison evidence")
 	}
 	in := ReviewInput{Recipient: e.state.Policy.ReviewRecipient, Goal: e.state.Goal, Contract: *e.state.Contract, Artifact: *a, Evidence: packets[0], Analysis: &AnalysisReviewContext{Method: "engine_relational_replay_v1", OutputSHA256: digest(a.Rows), AdditionalEvidence: packets[1:]}}
+	in.Analysis.SourceContext = sourceContext
 	in.Artifact.Sources = slices.Clone(a.Sources)
 	for i, o := range in.Artifact.Sources {
 		contextFields := map[string]bool{}
@@ -178,13 +180,7 @@ func (e *Engine) analysisReviewInput(ctx context.Context, id string) (ReviewInpu
 		}
 		slices.Sort(participating)
 		in.Analysis.Sources = append(in.Analysis.Sources, AnalysisSource{Observation: o.ID, RowsSHA256: o.RowsSHA256, RowCount: o.RowCount, Fields: fields, DirectRows: participating})
-		in.Artifact.Sources[i].Columns = fields
-		in.Artifact.Sources[i].ColumnTypes = map[string][]string{}
-		in.Artifact.Sources[i].ColumnProfiles = map[string]ColumnProfile{}
-		for _, field := range fields {
-			in.Artifact.Sources[i].ColumnTypes[field] = o.ColumnTypes[field]
-			in.Artifact.Sources[i].ColumnProfiles[field] = o.ColumnProfiles[field]
-		}
+		in.Artifact.Sources[i] = projectReviewSource(o, fields)
 	}
 	if err := ctx.Err(); err != nil {
 		return ReviewInput{}, err
@@ -289,6 +285,9 @@ func validAnalysisCitations(f ReviewFinding, in ReviewInput) bool {
 	valid := map[string]bool{in.Evidence.ID: true}
 	for _, packet := range in.Analysis.AdditionalEvidence {
 		valid[packet.ID] = true
+	}
+	for _, context := range in.Analysis.SourceContext {
+		valid[context.Evidence.ID] = true
 	}
 	seen := map[string]bool{}
 	for _, id := range f.PacketIDs {

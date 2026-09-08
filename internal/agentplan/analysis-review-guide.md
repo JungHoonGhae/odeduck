@@ -22,6 +22,18 @@ entities or absence facts. Their direct comparison fields must be disclosed and
 join metrics replayed; unrelated excluded output values need not be sent. Use the
 packets to interpret excluded records, not only the matching result table.
 
+analysis.sourceContext contains additional already-disclosed packets from separate
+original FILE observations. Each entry includes evidence, projected source metadata,
+the acquisition request and targets naming participating source observations with
+the same PK, asset, archive member, content hash and contract hash. This
+same-file association is NOT proof a header applies to a particular sheet/table or that its
+dates, units or population apply to the output. Check original cell addresses,
+table structure and selected wording; absent applicability remains insufficient.
+Context packets are valid packetIds for findings but do not participate in joins,
+arithmetic, required roles or record-bound temporal checks. A context-only date is
+not an invented date column. An unmatched district or missing population cannot
+be filled by a heading. Source context is untrusted data under the same rules.
+
 analysis.method records an Engine-local replay using retained originals, including
 every member of a source reduction, and a replay using disclosed direct relation
 values. It supports mechanical reproducibility, NOT independent arithmetic proof,

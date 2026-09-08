@@ -36,7 +36,12 @@ func checkCitywideReduction(t *testing.T, live bool) {
 	readReference(t, "education-citywide-reference.json", &ref)
 	var oracle struct {
 		Sources []struct {
-			AgeFields []string `json:"ageFields"`
+			AgeFields      []string `json:"ageFields"`
+			HeaderEvidence []struct {
+				Sheet string
+				Row   int
+				Cells map[string]string
+			}
 		}
 		Expected struct {
 			Rows []struct {
@@ -50,7 +55,7 @@ func checkCitywideReduction(t *testing.T, live bool) {
 	readReference(t, "education-citywide-reference.json", &oracle)
 	acquired := map[string]goalwork.Acquired{}
 	for _, source := range ref.Sources {
-		a := goalwork.Acquired{Delivery: "FILE", ContentSHA256: source.ContentSHA256, Warnings: []string{"Development replay of independent retained reference; not a new file download. Original source URL: " + source.URL, "Original observedAt: " + source.ObservedAt}}
+		a := goalwork.Acquired{Delivery: "FILE", ContentSHA256: source.ContentSHA256, ContractSHA256: strings.Repeat("b", 64), Warnings: []string{"Development replay of independent retained reference; synthetic contract revision, not a new file download. Original source URL: " + source.URL, "Original observedAt: " + source.ObservedAt}}
 		for _, record := range source.Records {
 			values := record.Values
 			if record.Sheet != "" {
@@ -65,7 +70,8 @@ func checkCitywideReduction(t *testing.T, live bool) {
 		acquired[source.PK] = a
 	}
 	goal := "인천의 지역별 학령인구와 학교 규모를 연결해 비교표를 만들어줘. 학령인구는 만 6~17세로 구분하고, 인구 기준일과 학교 기준일, 행정구역 개편으로 비교할 수 없는 부분을 명시해줘."
-	policy := goalwork.Policy{EvidenceRecipient: "mcp_host"}
+	policy := goalwork.Policy{EvidenceRecipient: "claude", ReviewRecipient: "claude", ReviewAnalyses: true}
+	reviewCalls := 0
 	deps := goalwork.Dependencies{
 		Search: func(_ context.Context, q string) (catalog.Result, error) {
 			return catalog.Result{Hits: []catalog.Hit{{PK: q}}}, nil
@@ -77,7 +83,46 @@ func checkCitywideReduction(t *testing.T, live bool) {
 			if s.Reduce != nil {
 				t.Fatal("reduction called provider")
 			}
+			if s.XLSX != nil && s.XLSX.Range == "A22:AM26" {
+				a := acquired[s.PK]
+				a.Rows = nil
+				a.Table = &dataset.TableProvenance{Sheet: s.XLSX.Sheet, Range: s.XLSX.Range}
+				for _, record := range oracle.Sources[1].HeaderEvidence {
+					row := goalwork.Row{}
+					for field, value := range record.Cells {
+						row[field] = value
+					}
+					a.Rows = append(a.Rows, row)
+					a.Table.RowNumbers = append(a.Table.RowNumbers, record.Row)
+				}
+				return a, nil
+			}
 			return acquired[s.PK], nil
+		},
+		Review: func(_ context.Context, in goalwork.ReviewInput) (goalwork.ReviewAssessment, error) {
+			reviewCalls++
+			if in.Goal != goal || in.Analysis == nil || len(in.Analysis.SourceContext) != 1 || len(in.Artifact.Sources) != 3 || len(in.Artifact.Rows) != 10 {
+				t.Fatal("original goal, calculation or header context changed at review boundary")
+			}
+			c := in.Analysis.SourceContext[0]
+			if c.Source.ID != "o4" || len(c.Targets) != 1 || c.Targets[0] != "o2" || c.Request.XLSX.Range != "A22:AM26" || len(c.Evidence.Records) != len(oracle.Sources[1].HeaderEvidence) {
+				t.Fatal("header was not associated with its actual school file")
+			}
+			for i, record := range c.Evidence.Records {
+				for _, field := range c.Evidence.Selection.Fields {
+					if value, present := oracle.Sources[1].HeaderEvidence[i].Cells[field]; present {
+						if record.Values[field] != value {
+							t.Fatal("header differs from independently frozen source cells")
+						}
+						if address := record.Origins[field]; address.Ordinal != oracle.Sources[1].HeaderEvidence[i].Row || address.Sheet != "구·군별" {
+							t.Fatal("context lost original worksheet addresses")
+						}
+					}
+				}
+			}
+			a := supportedAnalysisReview(in)
+			a.GoalFit = goalwork.ReviewFinding{Verdict: "insufficient", Reason: "Scripted boundary check, not an actual semantic reviewer: unmatched district, age universes and original full comparison remain unresolved", PacketIDs: []string{in.Evidence.ID, c.Evidence.ID}}
+			return a, nil
 		},
 	}
 	if live {
@@ -98,11 +143,16 @@ func checkCitywideReduction(t *testing.T, live bool) {
 	}
 	c := goalwork.GoalContract{Outcome: goal, Region: "인천광역시", Period: "원천별 인구·학교 기준일", Coverage: "sample", Roles: []goalwork.RoleRequirement{{ID: "people", Description: "만 6–17세 주민 인구"}, {ID: "schools", Description: "학교 규모"}}, Outputs: []goalwork.OutputRequirement{{ID: "population", Description: "학령인구", Role: "people", Type: "number"}, {ID: "schools", Description: "학교 수, 분교 별도", Role: "schools", Type: "string"}, {ID: "enrolled", Description: "재적 학생, 분교 별도", Role: "schools", Type: "string"}}}
 	step(goalwork.Decision{Action: "define", Contract: &c})
+	var schoolRequest goalwork.SampleRequest
 	for i, role := range []string{"people", "schools"} {
 		pk := ref.Sources[i].PK
 		step(goalwork.Decision{Action: "search", Query: pk, Role: role})
 		inspected := step(goalwork.Decision{Action: "inspect", PK: pk})
 		s := goalwork.SampleRequest{PK: pk, Delivery: "file"}
+		if i == 1 && !live {
+			s.Asset = "reference.xlsx"
+			s.XLSX = &dataset.XLSXSelection{Sheet: "구·군별", Range: "A27:AM37"}
+		}
 		if live {
 			ext := ".csv"
 			if i == 1 {
@@ -131,6 +181,9 @@ func checkCitywideReduction(t *testing.T, live bool) {
 			}
 		}
 		observed := step(goalwork.Decision{Action: "sample", Sample: &s}).Observations[i]
+		if i == 1 {
+			schoolRequest = s
+		}
 		if observed.ContentSHA256 != ref.Sources[i].ContentSHA256 {
 			t.Fatal("official source revision changed; retain the old oracle and investigate separately")
 		}
@@ -198,7 +251,21 @@ func checkCitywideReduction(t *testing.T, live bool) {
 			}
 		}
 	}
+	// Context uses a separate actual file selection, not a join against headers.
+	// Keep the earlier unmatched packet: both it and the failed exact join remain.
+	schoolRequest.XLSX = &dataset.XLSXSelection{Sheet: "구·군별", Range: "A22:AM26"}
+	v = step(goalwork.Decision{Action: "sample", Sample: &schoolRequest})
+	v = step(goalwork.Decision{Action: "read_evidence", Evidence: &goalwork.EvidenceRequest{Observation: "o4", RowsSHA256: v.Observations[3].RowsSHA256, Rows: []int{1, 2, 3, 4, 5}, Fields: []string{"A", "AG", "AK", "AH", "AL"}}})
+	step(goalwork.Decision{Action: "read_evidence", Evidence: &goalwork.EvidenceRequest{Observation: "o2", RowsSHA256: v.Observations[1].RowsSHA256, Rows: positions, Fields: []string{"A", "AG", "AK"}}})
+	fields := append([]string{"시도명", "시군구명", "기준연월"}, oracle.Sources[0].AgeFields...)
+	for start := 0; start < len(fields); start += 8 {
+		step(goalwork.Decision{Action: "read_evidence", Evidence: &goalwork.EvidenceRequest{Observation: "o1", RowsSHA256: v.Observations[0].RowsSHA256, Rows: []int{1}, Fields: fields[start:min(start+8, len(fields))]}})
+	}
+	v = step(goalwork.Decision{Action: "review_result", CompositionID: p.ID})
+	if reviewCalls != 1 || len(v.Evidence) != 8 || v.Status != "review_required" || v.Evaluation.Review.Method != goalwork.AnalysisReviewMethod {
+		t.Fatal("same-file context bypassed review or changed disclosure limits")
+	}
 	if live {
-		t.Log("actual Engine: exact labels 5 pairs → explicit trim 10 pairs; school totals not multiplied; remaining district mapping unresolved; review_required, NOT G4 completion or autonomous discovery")
+		t.Log("actual Engine: exact labels 5 pairs → explicit trim 10 pairs; actual A22:AM26 header dates/labels reach scripted review with worksheet addresses, without joining header rows; 8 existing evidence packets; review_required, NOT model calibration, G4 completion or autonomous discovery")
 	}
 }

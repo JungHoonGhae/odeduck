@@ -64,8 +64,11 @@ func (e *Engine) reviewResult(ctx context.Context, id string) error {
 		return fmt.Errorf("result review budget exhausted")
 	}
 	in, err := e.sourceReviewInput(id)
-	if err != nil && e.state.Policy.ReviewAnalyses {
-		in, err = e.analysisReviewInput(ctx, id)
+	if e.state.Policy.ReviewAnalyses {
+		sourceContext := e.reviewSourceContext(e.state.Artifact)
+		if err != nil || len(sourceContext) > 0 {
+			in, err = e.analysisReviewInput(ctx, id, sourceContext)
+		}
 	}
 	if err != nil {
 		return err
@@ -133,6 +136,9 @@ func reviewEvidenceHash(in ReviewInput) string {
 	packets := []EvidencePacket{in.Evidence}
 	if in.Analysis != nil {
 		packets = append(packets, in.Analysis.AdditionalEvidence...)
+		for _, context := range in.Analysis.SourceContext {
+			packets = append(packets, context.Evidence)
+		}
 	}
 	for _, packet := range packets {
 		for _, record := range packet.Records {

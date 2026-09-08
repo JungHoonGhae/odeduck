@@ -130,7 +130,7 @@ func TestReviewGoalRejectsInventedOrMalformedVerdicts(t *testing.T) {
 func TestReviewGoalSelectsAnalysisContractWithoutChangingSourceReportGuide(t *testing.T) {
 	dir := t.TempDir()
 	promptPath := filepath.Join(dir, "prompt.txt")
-	f := goalwork.ReviewFinding{Verdict: "supported", Reason: "typed fixture", PacketIDs: []string{"ep_one", "ep_two"}}
+	f := goalwork.ReviewFinding{Verdict: "supported", Reason: "typed fixture", PacketIDs: []string{"ep_one", "ep_two", "ep_context"}}
 	a := goalwork.ReviewAssessment{GoalFit: f, Outputs: []goalwork.OutputReview{{Output: "total", Finding: f}}}
 	for _, topic := range []string{"relations", "periods", "measurements", "coverage"} {
 		a.AnalysisChecks = append(a.AnalysisChecks, goalwork.AnalysisCheck{Topic: topic, Finding: f})
@@ -142,6 +142,7 @@ func TestReviewGoalSelectsAnalysisContractWithoutChangingSourceReportGuide(t *te
 	}
 	t.Setenv("PATH", dir)
 	in := goalwork.ReviewInput{Recipient: "claude", Goal: "compare recorded totals", Contract: goalwork.GoalContract{Outputs: []goalwork.OutputRequirement{{ID: "total"}}}, Evidence: goalwork.EvidencePacket{ID: "ep_one"}, Analysis: &goalwork.AnalysisReviewContext{Method: "engine_relational_replay_v1", AdditionalEvidence: []goalwork.EvidencePacket{{ID: "ep_two"}}}}
+	in.Analysis.SourceContext = []goalwork.SourceContext{{Targets: []string{"o1"}, Evidence: goalwork.EvidencePacket{ID: "ep_context", Records: []goalwork.EvidenceRecord{{RetainedRow: 1, Values: goalwork.Row{"A": "SOURCE_HEADER_FIXTURE"}}}}}}
 	response, err := ReviewGoal(context.Background(), in, "claude")
 	if err != nil || len(response.Assessment.AnalysisChecks) != 4 {
 		t.Fatalf("analysis response: %v", err)
@@ -149,5 +150,8 @@ func TestReviewGoalSelectsAnalysisContractWithoutChangingSourceReportGuide(t *te
 	prompt, err := os.ReadFile(promptPath)
 	if err != nil || !strings.Contains(string(prompt), "RELATIONAL_ANALYSIS_V1") || strings.Contains(string(prompt), "No semantic approval of joins") {
 		t.Fatal("analysis sent to source-only reviewer instructions")
+	}
+	if !strings.Contains(string(prompt), "SOURCE_HEADER_FIXTURE") || !strings.Contains(string(prompt), "same-file association") {
+		t.Fatal("selected context or its association-only interpretation was lost in the adapter")
 	}
 }

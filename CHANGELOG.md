@@ -9,6 +9,11 @@ section matching a `vX.Y.Z` tag as the GitHub release notes.
 
 ### Added
 
+- Already-disclosed same-file header/context evidence in opt-in goal analysis
+  review, pinned to source content and contract revisions. Context keeps its
+  selected cells, original addresses and acquisition request separate from
+  computational sources; file association is not proof of meaning or identity.
+
 - Stage-local unmatched record addresses in goal join metrics, including empty
   joins, for bounded evidence reading and replanning. Relational review now also
   requires disclosed comparison fields for excluded direct records and replays
