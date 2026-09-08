@@ -62,7 +62,7 @@ func exportEngine(t *testing.T) *goalwork.Engine {
 }
 
 func TestMonthlyExportRejectsMixedAndUnknownSelectorsBeforeAcquisition(t *testing.T) {
-	for _, variant := range []string{"asset", "fileVersion", "where", "scan", "document", "reduce", "endpoint", "missing", "age range", "unregistered"} {
+	for _, variant := range []string{"asset", "fileVersion", "where", "scan", "document", "reduce", "endpoint", "missing", "age range", "registration month", "unregistered"} {
 		t.Run(variant, func(t *testing.T) {
 			e := exportEngine(t)
 			var s goalwork.SampleRequest
@@ -88,6 +88,8 @@ func TestMonthlyExportRejectsMixedAndUnknownSelectorsBeforeAcquisition(t *testin
 				delete(s.Params, "registration")
 			case "age range":
 				s.Params["ageTo"] = "110"
+			case "registration month":
+				s.Params["registration"], s.Params["month"] = "resident", "2010-09"
 			case "unregistered":
 				s.Operation = "other-export"
 			}

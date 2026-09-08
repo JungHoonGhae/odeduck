@@ -32,6 +32,71 @@ func exportParams() map[string]string {
 	return map[string]string{"month": "2026-07", "registration": "all", "provinceCode": "2800000000", "ageFrom": "6", "ageTo": "7"}
 }
 
+func TestMonthlyExportEnforcesRegistrationStartMonth(t *testing.T) {
+	// Official form goSearch, preserved with its byte hash in the applicability
+	// research: all from 2008; Y/N from October 2010; O from January 2015.
+	for _, tc := range []struct {
+		registration, before, first string
+	}{
+		{"all", "2007-12", "2008-01"},
+		{"resident", "2010-09", "2010-10"},
+		{"unknown", "2010-09", "2010-10"},
+		{"overseas", "2014-12", "2015-01"},
+	} {
+		t.Run(tc.registration, func(t *testing.T) {
+			params := exportParams()
+			params["registration"], params["month"] = tc.registration, tc.before
+			if err := dataset.ValidateExportSelection("mois-monthly-age-csv", params); err == nil {
+				t.Errorf("unsupported registration/month passed: %s/%s", tc.registration, tc.before)
+			}
+			params["month"] = tc.first
+			if err := dataset.ValidateExportSelection("mois-monthly-age-csv", params); err != nil {
+				t.Errorf("first supported month rejected: %s/%s: %v", tc.registration, tc.first, err)
+			}
+		})
+	}
+}
+
+func TestMonthlyExportBoundsRetentionButScansAllRows(t *testing.T) {
+	lines := strings.Split(strings.TrimSpace(exportCSV), "\n")
+	for _, tc := range []struct {
+		name, row    string
+		count, limit int
+		tooLarge     bool
+	}{
+		{"one retained row", lines[3], 1001, 1, false},
+		{"maximum retained rows", lines[3], 1001, 1000, false},
+		{"retained byte limit", strings.Replace(lines[3], "Child", strings.Repeat("x", 60<<10), 1), 40, 1000, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			body := lines[0] + "\n" + lines[1] + "\n" + strings.Repeat(tc.row+"\n", tc.count)
+			i := documentInspector(t, monthlyDocumentURL, func(r *http.Request) (*http.Response, error) {
+				if r.URL.String() == monthlyDocumentURL {
+					return documentResponse(exportHTML), nil
+				}
+				return &http.Response{StatusCode: 200, Header: http.Header{"Content-Type": {"text/csv"}}, Body: io.NopCloser(strings.NewReader(body))}, nil
+			})
+			c, err := i.Inspect(context.Background(), dataset.Ref{PK: "12345678", Delivery: "FILE"})
+			if err != nil {
+				t.Fatal(err)
+			}
+			s, err := i.SampleExport(context.Background(), c, "mois-monthly-age-csv", exportParams(), tc.limit)
+			if tc.tooLarge {
+				if err == nil || !strings.Contains(err.Error(), "2 MiB") || len(s.Rows) != 0 || s.SHA256 != "" {
+					t.Fatalf("retained byte limit yielded a partial observation: %+v %v", s, err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(s.Rows) != tc.limit || !s.Prefix || s.Selection.ScannedRows != 1002 || s.Selection.MatchedRows != 1001 || s.Selection.ReturnedRows != tc.limit || !s.Selection.Exhausted || s.CSV.DataRecords[0] != 2 || s.CSV.DataRecords[tc.limit-1] != tc.limit+1 || s.SHA256 != fmt.Sprintf("%x", sha256.Sum256([]byte(body))) {
+				t.Fatalf("retained prefix confused with complete selection: rows=%d %+v", len(s.Rows), s.Selection)
+			}
+		})
+	}
+}
+
 func TestMonthlyExportRejectsUninspectedPublicReferences(t *testing.T) {
 	i := documentInspector(t, monthlyDocumentURL, nil)
 	c, err := i.Inspect(context.Background(), dataset.Ref{PK: "12345678", Delivery: "FILE"})

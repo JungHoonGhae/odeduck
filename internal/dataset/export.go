@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"crypto/sha256"
-	"encoding/json"
 	"fmt"
 	"io"
 	"mime"
@@ -24,6 +23,15 @@ import (
 const monthlyExportID = "mois-monthly-age-csv"
 const monthlyExportURL = "https://jumin.mois.go.kr/downloadCsvAge.do?searchYearMonth=month&xlsStats=3"
 const MonthlyExportSelectionMode = "mois_province_code_full_scan_v1"
+
+// Official monthly search-form contract; dates are support boundaries, not
+// evidence that a particular requested month has been published.
+var monthlyRegistrations = map[string]struct{ formValue, firstMonth string }{
+	"all":      {"", "2008-01"},
+	"resident": {"Y", "2010-10"},
+	"unknown":  {"N", "2010-10"},
+	"overseas": {"O", "2015-01"},
+}
 
 // ExportReference advertises a registered operation, not a downloadable asset.
 // Parameters describes its typed caller choices; raw form fields are private.
@@ -64,7 +72,11 @@ func fileExports(source, discovery string) []ExportReference {
 	if source != monthlyDocumentURL {
 		return nil
 	}
-	return []ExportReference{{ID: monthlyExportID, Title: "월간 행정동별 연령별 인구 CSV", AdvertisedURL: source, DiscoveryURL: discovery, AdapterID: "mois-monthly-export", AdapterRevision: 1, VerifiedAt: "2026-09-08", Parameters: "Required string params: month YYYY-MM (2008 onward, actual publication checked), registration all|resident|unknown|overseas, provinceCode ten-digit province code, ageFrom and ageTo inclusive integers 0–100 (100 means 100+). At most 83 ages per request under the existing column cap. One-year groups. Complete national CSV scan with local province-code selection; aggregates/zero/branch rows retained, not population approval."}}
+	registrations := make([]string, 0, len(monthlyRegistrations))
+	for _, name := range []string{"all", "resident", "unknown", "overseas"} {
+		registrations = append(registrations, name+" (from "+monthlyRegistrations[name].firstMonth+")")
+	}
+	return []ExportReference{{ID: monthlyExportID, Title: "월간 행정동별 연령별 인구 CSV", AdvertisedURL: source, DiscoveryURL: discovery, AdapterID: "mois-monthly-export", AdapterRevision: 2, VerifiedAt: "2026-09-08", Parameters: "Required string params: month YYYY-MM (actual publication checked), registration " + strings.Join(registrations, "|") + ", provinceCode ten-digit province code, ageFrom and ageTo inclusive integers 0–100 (100 means 100+). At most 83 ages per request under the existing column cap. One-year groups. Complete national CSV scan with local province-code selection; aggregates/zero/branch rows retained, not population approval."}}
 }
 
 var provinceCodePattern = regexp.MustCompile(`^[0-9]{2}00000000$`)
@@ -86,9 +98,13 @@ func parseExportChoices(operation string, params map[string]string) (ExportChoic
 			return c, fmt.Errorf("export requires bounded %s", key)
 		}
 	}
-	month, err := time.Parse("2006-01", c.Month)
-	if err != nil || month.Year() < 2008 || !provinceCodePattern.MatchString(c.ProvinceCode) || c.ProvinceCode == "0000000000" || !slices.Contains([]string{"all", "resident", "unknown", "overseas"}, c.Registration) {
-		return c, fmt.Errorf("export requires a month from 2008, a province code and a supported registration choice")
+	_, err := time.Parse("2006-01", c.Month)
+	registration, supported := monthlyRegistrations[c.Registration]
+	if err != nil || !provinceCodePattern.MatchString(c.ProvinceCode) || c.ProvinceCode == "0000000000" || !supported {
+		return c, fmt.Errorf("export requires a valid month, a province code and a supported registration choice")
+	}
+	if c.Month < registration.firstMonth {
+		return c, fmt.Errorf("export registration %s is supported from %s", c.Registration, registration.firstMonth)
 	}
 	for key, target := range map[string]*int{"ageFrom": &c.AgeFrom, "ageTo": &c.AgeTo} {
 		v, err := strconv.Atoi(params[key])
@@ -104,7 +120,7 @@ func parseExportChoices(operation string, params map[string]string) (ExportChoic
 }
 
 func (c ExportChoices) form() url.Values {
-	registration := map[string]string{"all": "", "resident": "Y", "unknown": "N", "overseas": "O"}[c.Registration]
+	registration := monthlyRegistrations[c.Registration].formValue
 	return url.Values{"sltOrgType": {"2"}, "sltOrgLvl1": {c.ProvinceCode}, "sltOrgLvl2": {"A"}, "sltUndefType": {registration}, "searchYearStart": {c.Month[:4]}, "searchYearEnd": {c.Month[:4]}, "searchMonthStart": {c.Month[5:]}, "searchMonthEnd": {c.Month[5:]}, "sum": {"sum"}, "gender": {"gender"}, "sltOrderType": {"1"}, "sltOrderValue": {"ASC"}, "sltArgTypes": {"1"}, "sltArgTypeA": {strconv.Itoa(c.AgeFrom)}, "sltArgTypeB": {strconv.Itoa(c.AgeTo)}, "category": {"month"}, "state": {"3"}}
 }
 
@@ -179,7 +195,7 @@ func (i *Inspector) SampleExport(ctx context.Context, c *Contract, operation str
 		return TableSample{}, fmt.Errorf("export requires a CSV download, not HTML or another response")
 	}
 	out := TableSample{CSV: &CSVProvenance{}}
-	retainedBytes, matches := 2, 0
+	retain, matches := csvSampleRetainer(&out, limit), 0
 	report, err := scanCSVResponse(ctx, res, nil, func(record CSVScanRecord) error {
 		code := exportedCodePattern.FindStringSubmatch(record.Values["행정구역"])
 		if len(code) != 2 {
@@ -189,25 +205,7 @@ func (i *Inspector) SampleExport(ctx context.Context, c *Contract, operation str
 			return nil
 		}
 		matches++
-		if len(out.Rows) == limit {
-			return nil
-		}
-		row := map[string]any{}
-		for k, v := range record.Values {
-			row[k] = v
-		}
-		encoded, err := json.Marshal(row)
-		if err != nil {
-			return err
-		}
-		retainedBytes += len(encoded) + 1
-		if retainedBytes > 2<<20 {
-			return fmt.Errorf("export retained rows exceed 2 MiB; preserve goal scope when selecting observations")
-		}
-		out.Rows = append(out.Rows, row)
-		out.CSV.DataRecords = append(out.CSV.DataRecords, record.DataRecord)
-		out.CSV.StartLines = append(out.CSV.StartLines, record.StartLine)
-		return nil
+		return retain(record)
 	})
 	if err != nil {
 		return TableSample{}, err

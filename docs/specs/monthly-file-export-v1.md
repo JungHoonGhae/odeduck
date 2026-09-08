@@ -1,6 +1,6 @@
 # Inspected monthly FILE export
 
-Status: bounded acquisition implemented; verification in progress. Connects I4/I7/I9 to the original G4 applicability gap;
+Status: bounded acquisition implemented and verified; source-comparison integration remains incomplete. Connects I4/I7/I9 to the original G4 applicability gap;
 it does not replace the goal, oracle, independent comparison or autonomous completion gates.
 
 ## Interface and choice
@@ -17,6 +17,10 @@ The initial operation is `mois-monthly-age-csv`. Its required parameters are `mo
 One request selects one month and one-year groups. Existing 256-column limits bound a single
 observation; at most 83 age columns per sex/total block fit. This is an odeduck limit, not a
 publisher limit or permission to drop requested ages. Missing or unsupported choices fail explicitly.
+The registered form supports `all` from 2008-01, `resident`/`unknown` from 2010-10,
+and `overseas` from 2015-01. Validate those boundaries before acquisition; the first supported
+month is not proof of publication. Adapter revision 2 shares registration mapping and start
+months between validation, form generation and the inspection's parameter description.
 
 The operation owns complete CSV scanning and province-code selection; it cannot combine with
 asset, fileVersion, rowPath, where/whereIn, scanCsv, ZIP/XLSX/layout or local reduction selectors.

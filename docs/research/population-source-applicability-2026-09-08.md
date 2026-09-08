@@ -273,6 +273,7 @@ typed adapter가 없다는 경고를 낸다. 이번 HTML/CSV 취득과 대조는
 | 요청 범위 반영 | 979–982행 `init2()`의 `selInitial` 값은 단위 1, 시작 6, 끝 17. 1444행 `#ageChange`는 `세` |
 | 100세 경계 | 182–189행은 끝 값 100일 때 `#ageChange`를 `세(이상)`으로 표시. 앞서 보존한 전체 연령 CSV의 실제 마지막 연령 헤더도 `100세 이상` |
 | 등록구분·월 | `select#register[name=sltUndefType]`의 빈 값=전체가 선택됨. `#searchYearStart/End`는 2026, `#searchMonthStart/End`는 07이 선택됨 |
+| 등록구분별 시작월 | 보존 HTML 391–406행의 `goSearch()`는 거주자(Y)·거주불명자(N)를 2010-10부터, 409–415행은 재외국민(O)을 2015-01부터 허용한다. 전체의 연도 선택지는 2008부터다. 검토 후 이 지원 경계를 typed validator에 반영했으며 과거 월의 새 HTTP 성공을 주장하지 않는다 |
 | 다운로드 폼 | 1460행 `form#formXlsDown[name=formXlsDown][method=post]`. 1462–1477행 hidden 필드가 인천 코드·전체·2026-07·단위 1·범위 6–17을 반영함 |
 | 출력 종류 | 1483행 `input#down3[name=state][value=3]`의 라벨이 전체읍면동현황. 기본 체크값 1에서 3을 선택하는 동작에 해당 |
 | CSV 목적지 | 48–60행 `#csvDown` click handler가 선택된 `state=3`을 읽어 `#formXlsDown`의 action을 `downloadCsvAge.do?searchYearMonth=month&xlsStats=3`으로 바꿔 submit함 |

@@ -173,28 +173,7 @@ func (i *Inspector) SampleCSVScanned(ctx context.Context, asset Asset, limit int
 		return TableSample{}, fmt.Errorf("sample row limit must be 1–1000")
 	}
 	out := TableSample{CSV: &CSVProvenance{Encoding: "utf-8"}}
-	retainedBytes := 2
-	report, err := i.ScanCSV(ctx, asset, selection, func(record CSVScanRecord) error {
-		if len(out.Rows) == limit {
-			return nil
-		}
-		row := map[string]any{}
-		for k, v := range record.Values {
-			row[k] = v
-		}
-		encoded, err := json.Marshal(row)
-		if err != nil {
-			return err
-		}
-		retainedBytes += len(encoded) + 1
-		if retainedBytes > 2<<20 {
-			return fmt.Errorf("CSV retained sample exceeds 2 MiB; narrow selection")
-		}
-		out.Rows = append(out.Rows, row)
-		out.CSV.DataRecords = append(out.CSV.DataRecords, record.DataRecord)
-		out.CSV.StartLines = append(out.CSV.StartLines, record.StartLine)
-		return nil
-	})
+	report, err := i.ScanCSV(ctx, asset, selection, csvSampleRetainer(&out, limit))
 	if err != nil {
 		return TableSample{}, err
 	}
@@ -210,6 +189,33 @@ func (i *Inspector) SampleCSVScanned(ctx context.Context, asset Asset, limit int
 	}
 	out.Warnings = []string{"Direct comma-delimited CSV fully scanned (64 MiB cap); all parsed rows checked, including excluded rows and the tail. The first physical header line selects UTF-8 or lossless EUC-KR, with no midstream fallback. Only the first matching rows are retained. Exhausted describes scanning, NOT retention of all matches or population completeness. Source bytes were hashed as a stream, not archived. No identity or geographic approval."}
 	return out, nil
+}
+
+// Full-scan consumers share retained-byte accounting, row copies and original
+// CSV positions. Selection and successful-EOF provenance remain with callers.
+func csvSampleRetainer(out *TableSample, limit int) func(CSVScanRecord) error {
+	retainedBytes := 2
+	return func(record CSVScanRecord) error {
+		if len(out.Rows) == limit {
+			return nil
+		}
+		row := map[string]any{}
+		for k, v := range record.Values {
+			row[k] = v
+		}
+		encoded, err := json.Marshal(row)
+		if err != nil {
+			return err
+		}
+		retainedBytes += len(encoded) + 1
+		if retainedBytes > 2<<20 {
+			return fmt.Errorf("CSV retained sample exceeds 2 MiB; preserve goal scope when selecting observations")
+		}
+		out.Rows = append(out.Rows, row)
+		out.CSV.DataRecords = append(out.CSV.DataRecords, record.DataRecord)
+		out.CSV.StartLines = append(out.CSV.StartLines, record.StartLine)
+		return nil
+	}
 }
 
 // Bounds both total transport bytes and bytes read during one csv.Read call.
