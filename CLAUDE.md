@@ -123,8 +123,8 @@ Go CLI + MCP. 사람은 정부 SSO 로그인 한 번만 하고 이후 포털 작
 ### Business opportunity research
 
 수익화, 사업 후보, 구매자 문제, 시장 선택, 경쟁 또는 GTM을 조사할 때는
-`.agents/skills/odeduck-business-harness/SKILL.md`를 따른다. 공공데이터의 연결 가능성만으로 결론내리지
-않고, 현재 대안·정확한 식별 edge·지불 증거·날짜가 있는 중단 조건까지 하나의 결정 기록으로 남긴다.
+`.agents/skills/odeduck-business-harness/SKILL.md`를 따른다. 아이데이션의 근거 있는 가설과 상업적
+검증을 구분하고, 사용자 요청 단계에 맞는 대안·데이터 근거·반증 기준을 적용한다.
 
 ### Graph engineering
 
