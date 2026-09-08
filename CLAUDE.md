@@ -128,9 +128,9 @@ Go CLI + MCP. 사람은 정부 SSO 로그인 한 번만 하고 이후 포털 작
 
 ### Graph engineering
 
-entity resolution, graph 모델, 식별자, provenance, 시간 유효성 또는 연결 신뢰도를 설계·검토할 때는
-`.agents/skills/odeduck-graph-engineering/SKILL.md`를 따른다. 저장 기술보다 source record·canonical
-entity·claim의 경계와 행동별 오탐 통과선을 먼저 고정한다.
+목표 기반 탐색·분석, 의미 검색·교차 데이터 발견, 온톨로지, entity resolution 또는 연결 근거를
+설계·검토할 때는 `.agents/skills/odeduck-graph-engineering/SKILL.md`를 따른다. 후보 발견과
+식별·provenance·시간에 근거한 연결 검증을 구분하고, `INTENT.md`의 산출물까지 확인한다.
 
 ### Issue tracker
 
