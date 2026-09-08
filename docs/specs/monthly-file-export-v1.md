@@ -67,7 +67,7 @@ separate from fixtures and model decisions.
 
 The official request/response and independent numeric comparison are recorded in
 [population source applicability](../research/population-source-applicability-2026-09-08.md).
-After acquisition, implement a bounded deterministic source comparison with explicit code/field
-transformations and both revisions. This computed evidence must not masquerade as a provider
+After acquisition, implement the [bounded source comparison](source-comparison-evidence-v1.md) with explicit
+code/field transformations and both revisions. This computed evidence must not masquerade as a provider
 document. Connect it and school-boundary evidence to the original G4 result/review, then test
 autonomous discovery independently. Successful export alone is not G4 or product completion.

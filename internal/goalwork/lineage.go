@@ -92,7 +92,7 @@ func prepareLineage(p Composition, inputs map[string][]Row, observed map[string]
 		}
 		if r := o.Reduction; r != nil {
 			parent, ok := observed[r.Recipe.Observation]
-			if !ok || parent.ID == id || parent.Reduction != nil || parent.Spatial != nil || r.Method != "source_group_v1" || r.Recipe.RowsSHA256 != parent.RowsSHA256 || r.SourceContentSHA256 != parent.ContentSHA256 || r.SourceRequestSHA256 != parent.RequestSHA256 || len(r.Groups) != len(rows) {
+			if !ok || parent.ID == id || parent.Reduction != nil || parent.Spatial != nil || parent.Comparison != nil || r.Method != "source_group_v1" || r.Recipe.RowsSHA256 != parent.RowsSHA256 || r.SourceContentSHA256 != parent.ContentSHA256 || r.SourceRequestSHA256 != parent.RequestSHA256 || len(r.Groups) != len(rows) {
 				return nil, fmt.Errorf("reduction source record lineage revision mismatch")
 			}
 			seen := map[int]bool{}
@@ -136,7 +136,7 @@ func prepareLineage(p Composition, inputs map[string][]Row, observed map[string]
 		}
 		a, aOK := observed[s.AnchorObservation]
 		c, cOK := observed[s.CandidateObservation]
-		if !aOK || !cOK || a.Spatial != nil || c.Spatial != nil || s.AnchorObservation == s.CandidateObservation || len(s.Pairs) != len(inputs[id]) || c.CSV == nil || len(c.CSV.DataRecords) == 0 {
+		if !aOK || !cOK || a.Spatial != nil || c.Spatial != nil || a.Comparison != nil || c.Comparison != nil || s.AnchorObservation == s.CandidateObservation || len(s.Pairs) != len(inputs[id]) || c.CSV == nil || len(c.CSV.DataRecords) == 0 {
 			return nil, fmt.Errorf("spatial source record lineage needs original anchor/candidate observations and one pair address per row")
 		}
 		if s.AnchorRowsSHA256 != a.RowsSHA256 || s.AnchorContentSHA256 != a.ContentSHA256 || s.AnchorRequestSHA256 != a.RequestSHA256 || s.CandidateRequestSHA256 != c.RequestSHA256 || s.Scan.SHA256 != c.ContentSHA256 || o.ContentSHA256 != c.ContentSHA256 || !s.Scan.Exhausted {

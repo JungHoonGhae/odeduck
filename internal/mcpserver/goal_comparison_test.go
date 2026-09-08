@@ -1,0 +1,98 @@
+package mcpserver
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"strings"
+	"testing"
+
+	"github.com/JungHoonGhae/odeduck/internal/catalog"
+	"github.com/JungHoonGhae/odeduck/internal/goalwork"
+	"github.com/modelcontextprotocol/go-sdk/mcp"
+)
+
+func TestMCPComparisonUsesOriginalRevisionsAndExplicitComputedDisclosure(t *testing.T) {
+	s := mcp.NewServer(&mcp.Implementation{Name: "test", Version: "0"}, nil)
+	registerGoalTool(s, goalwork.Policy{EvidenceRecipient: "mcp_host"}, func(goalwork.Policy) goalwork.Dependencies {
+		return goalwork.Dependencies{
+			Search: func(context.Context, string) (catalog.Result, error) {
+				return catalog.Result{Hits: []catalog.Hit{{PK: "left"}, {PK: "right"}}}, nil
+			},
+			Inspect: func(_ context.Context, pk string) (goalwork.Inspection, error) {
+				return goalwork.Inspection{PK: pk}, nil
+			},
+			Sample: func(_ context.Context, r goalwork.SampleRequest, _ goalwork.Inspection) (goalwork.Acquired, error) {
+				if r.Compare != nil {
+					t.Fatal("MCP comparison reached an external acquisition")
+				}
+				rows := []goalwork.Row{{"code": "001", "value": "1", "private": "UNSELECTED_ORIGINAL"}, {"code": "002", "value": "2"}}
+				if r.PK == "right" {
+					rows = []goalwork.Row{{"label": "Other name (001)", "value": "1"}, {"label": "Other record (003)", "value": "0"}}
+				}
+				return goalwork.Acquired{Rows: rows, Delivery: "STD"}, nil
+			},
+		}
+	})
+	client := connectTestClient(t, s)
+	call := func(args map[string]any) goalOut {
+		t.Helper()
+		res, err := client.CallTool(context.Background(), &mcp.CallToolParams{Name: "advance_goal", Arguments: args})
+		if err != nil || res.IsError {
+			if res != nil && len(res.Content) > 0 {
+				t.Logf("MCP response: %+v", res.Content[0])
+			}
+			t.Fatalf("MCP failure: %v", err)
+		}
+		var out goalOut
+		decoder := json.NewDecoder(strings.NewReader(res.Content[0].(*mcp.TextContent).Text))
+		decoder.UseNumber()
+		if err := decoder.Decode(&out); err != nil {
+			t.Fatal(err)
+		}
+		return out
+	}
+	v := call(map[string]any{"goal": "compare source measurements", "requireSemantic": false})
+	advance := func(d any) {
+		v = call(map[string]any{"sessionId": v.SessionID, "revision": v.State.Revision, "decision": d})
+		if len(v.State.Gaps) != 0 {
+			t.Fatalf("MCP comparison gaps: %+v", v.State.Gaps)
+		}
+	}
+	contract := goalwork.GoalContract{Outcome: "source comparison", Region: "fixture", Period: "source", Coverage: "sample", Roles: []goalwork.RoleRequirement{{ID: "r", Description: "records"}}, Outputs: []goalwork.OutputRequirement{{ID: "code", Role: "r", Type: "string", Description: "original code"}}}
+	advance(goalwork.Decision{Action: "define", Contract: &contract})
+	advance(goalwork.Decision{Action: "search", Query: "records", Role: "r"})
+	for _, pk := range []string{"left", "right"} {
+		advance(goalwork.Decision{Action: "inspect", PK: pk})
+		advance(goalwork.Decision{Action: "sample", Sample: &goalwork.SampleRequest{PK: pk, Delivery: "standard"}})
+	}
+	wire := fmt.Sprintf(`{"action":"sample","sample":{"pk":"left","delivery":"standard","compare":{"left":{"observation":"o1","rowsSha256":%q,"keys":[{"field":"code","rule":"exact"}]},"right":{"observation":"o2","rowsSha256":%q,"keys":[{"field":"label","rule":"trailing_parenthesized_digits_v1","digits":3}]},"checks":[{"id":"n","left":{"field":"value","format":"decimal_v1","unit":"units"},"right":{"field":"value","format":"decimal_v1","unit":"units"}}]}}}`, v.State.Observations[0].RowsSHA256, v.State.Observations[1].RowsSHA256)
+	var d map[string]any
+	if err := json.Unmarshal([]byte(wire), &d); err != nil {
+		t.Fatal(err)
+	}
+	advance(d)
+	body, _ := json.Marshal(v)
+	if strings.Contains(string(body), "UNSELECTED_ORIGINAL") || strings.Contains(string(body), "Other name") || len(v.State.Evidence) != 0 {
+		t.Fatal("MCP comparison disclosed original values without selection")
+	}
+	o := v.State.Observations[2]
+	advance(goalwork.Decision{Action: "read_evidence", Evidence: &goalwork.EvidenceRequest{Observation: o.ID, RowsSHA256: o.RowsSHA256, Rows: []int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13}, Fields: []string{"metric", "value"}}})
+	if len(v.State.Evidence) != 1 || len(v.State.Evidence[0].Records) != 13 || o.Comparison == nil || o.Comparison.Pairs[0] != [2]int{1, 1} || v.State.Status != "exploring" || v.State.Artifact != nil || v.State.SampleAttempts[2].Request.Compare == nil {
+		t.Fatal("MCP lost local comparison, recipe or incomplete status")
+	}
+	for _, index := range []int{2, 3, 4, 9} {
+		record := v.State.Evidence[0].Records[index]
+		if record.Values["value"] != json.Number("1") || record.Origins["value"].Kind != "computed_comparison" || record.Origins["value"].Observation != o.ID {
+			t.Fatalf("MCP lost matching and both unmatched sides: %+v", record)
+		}
+	}
+	// Optional wire aliases are for comparison operands only. An ordinary output
+	// measure still requires its own alias under the Engine's execution contract.
+	p := goalwork.Composition{ID: "missing-alias", Base: "o1", Purpose: "ordinary numeric output", Select: []string{"o1.value"}, Assumptions: []string{"explicit output measures require an alias"}, Measures: []goalwork.Measure{{Field: "o1.value", Format: "decimal_v1", Unit: "units"}}}
+	advance(goalwork.Decision{Action: "compose", Composition: &p})
+	v = call(map[string]any{"sessionId": v.SessionID, "revision": v.State.Revision, "decision": goalwork.Decision{Action: "execute", CompositionID: p.ID}})
+	if len(v.State.Gaps) != 1 || v.State.Artifact != nil || len(v.State.Executions) != 1 || v.State.Executions[0].Status != "failed" {
+		t.Fatal("comparison operand schema relaxed the output-measure contract")
+	}
+}

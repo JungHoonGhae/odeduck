@@ -66,7 +66,7 @@ func (e *Engine) reviewResult(ctx context.Context, id string) error {
 	}
 	in, err := e.sourceReviewInput(id)
 	if e.state.Policy.ReviewAnalyses {
-		sourceContext, contextErr := e.reviewSourceContext(e.state.Artifact)
+		sourceContext, contextErr := e.reviewSourceContext(ctx, e.state.Artifact)
 		if contextErr != nil {
 			return contextErr
 		}

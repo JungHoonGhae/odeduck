@@ -41,7 +41,7 @@ type EvidenceRecord struct {
 type EvidenceAddress struct {
 	Observation string `json:"observation"`
 	Field       string `json:"field"`
-	Kind        string `json:"kind"`    // retained_row | csv_data_record | worksheet_row | document_block | computed_pair | computed_group
+	Kind        string `json:"kind"`    // retained_row | csv_data_record | worksheet_row | document_block | computed_pair | computed_group | computed_comparison
 	Ordinal     int    `json:"ordinal"` // 1-based in the named coordinate system
 	Sheet       string `json:"sheet,omitempty"`
 	Locator     string `json:"locator,omitempty"` // original DOM path for document_block
@@ -132,6 +132,10 @@ func evidenceAddress(o Observation, field string, trace rowLineage, observed map
 		return EvidenceAddress{}, fmt.Errorf("evidence field has no original record address")
 	}
 	address := EvidenceAddress{Observation: slot.observation, Field: field, Kind: "retained_row", Ordinal: ordinal + 1}
+	if o.Comparison != nil {
+		address.Kind = "computed_comparison"
+		return address, nil
+	}
 	if o.Reduction != nil {
 		address.Kind = "computed_group"
 		return address, nil

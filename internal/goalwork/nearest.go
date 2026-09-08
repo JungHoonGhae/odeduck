@@ -112,7 +112,7 @@ func (e *Engine) sampleNearest(ctx context.Context, request SampleRequest, inspe
 			candidate = o
 		}
 	}
-	if anchor == nil || candidate == nil || anchor.Document != nil || candidate.Document != nil || anchor.Spatial != nil || candidate.Spatial != nil || anchor.Reduction != nil || candidate.Reduction != nil {
+	if anchor == nil || candidate == nil || anchor.Document != nil || candidate.Document != nil || anchor.Spatial != nil || candidate.Spatial != nil || anchor.Reduction != nil || candidate.Reduction != nil || anchor.Comparison != nil || candidate.Comparison != nil {
 		return Acquired{}, fmt.Errorf("nearest needs two retained original observations; nested spatial/group reduction is unsupported")
 	}
 	prior := e.requests[candidate.ID]

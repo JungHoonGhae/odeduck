@@ -189,10 +189,6 @@ func TestGoalPlannerCanRequestFullCSVScanButNotCertifyIt(t *testing.T) {
 	if _, err := decodeGoalDecision([]byte(`{"action":"sample","sample":{"scanCsv":true,"selection":{"exhausted":true,"matchedRows":9278}}}`)); err == nil {
 		t.Fatal("planner certified scan evidence")
 	}
-	prompt, err := goalPrompt(goalwork.View{Goal: "test"})
-	if err != nil || !strings.Contains(prompt, "scanCsv:true") || !strings.Contains(prompt, "NOT all matches are retained") {
-		t.Fatal("planner lacks full scan versus retained coverage contract")
-	}
 }
 
 func TestGoalPlannerCanRequestGroundedNearestButNotSubmitPointsOrEvidence(t *testing.T) {

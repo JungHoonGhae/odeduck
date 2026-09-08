@@ -674,3 +674,61 @@ prefix·원본 주소·전체 byte hash를 보존하는지 확인했다. 2 MiB �
 수정 후 `go mod tidy -diff`, `go vet ./...`, `go test ./...`, `go build ./...`, brand 동기화 검사,
 `git diff --check` 및 fetch/dataset/goalwork race 검사를 통과했다. 이 후속 검사는 offline이며
 위 실취득을 재실행하거나 새 모델 호출을 하지 않았다. 계산된 원천 대조·정의 적용 및 G4 완료는 남는다.
+
+독립 수정 재검토는 `1d6c6ba...d04de13`으로 고정했다. Spec의 지원 시작월 누락과 Standards의
+보관 중복 의견은 각각 해결됐으며 남은 지적은 0건이다. 이후의 계산 대조 구현을 검토한 결과는 아니다.
+
+### 계산된 원천 대조와 보존 원천 재생 — 2026-09-08
+
+[Source Comparison 계약](../specs/source-comparison-evidence-v1.md)은 별도 action/store와
+Composition 부속 계산을 비교한 뒤 기존 `sample`의 로컬 계산·수명·선택 공개를 재사용한다.
+명시된 두 원본 revision의 string key와 exact decimal 계산만 수행하며, 원본 필드를 바꾸거나
+동일성·정의 적용을 자동 승인하지 않는다. 일반 측정과 같은 수치 해석을 사용하고 별도 parser나
+수식 언어·그래프 저장소·원천 정답 recipe는 제품 코드에 넣지 않았다.
+
+Engine 공개 경계에서 대조가 외부 취득으로 흘러가던 실패, 선택적인 일치 수만 support로 제안할 수
+있던 실패, 계산 근거가 base/join/reduction으로 승격되던 실패, 검토 문맥에서 양쪽 원천 revision이
+빠지던 실패를 먼저 확인하고 연결했다. 중복키는 어느 쪽도 임의 선택하지 않으며 복합키·선행 0·
+큰 소수·null/형식 오류·양쪽 미대응·stale revision·전체 보고서 한도 초과를 확인한다. 요약 13개의
+항목/값은 한 기존 packet에 들어가고, 각 support 대상에 전체 요약이 없으면 거부한다. 공개량이나
+원래 결과·필수 역할은 바뀌지 않는다. 비교 결과와 provenance는 검토 전에 두 보유 원본에서 재현한다.
+
+CLI의 scripted runner와 실제 Engine을 연결한 회귀는 선택된 수치 차이만 반환하고 미검토 성공을
+거부했다. MCP JSON-RPC 회귀에서는 `Measure.as`가 항상 필수였던 스키마 불일치를 발견했다.
+비교 operand는 별칭을 생략할 수 있도록 수정했으며 일반 출력 계산의 별칭 요구는 실행기가 유지한다.
+이는 계획기의 자율 선택이나 실제 모델 판단을 검증한 테스트가 아니다. 공유 planning guide에 요청과
+대조의 근거 경계를 추가했고, `exhausted:true`를 보관 완료로 오해할 수 있던 문구도 실제 계약에 맞춰
+수정했다. 이 값은 EOF 검사이며 전체 일치 보관은 matchedRows/returnedRows로 따로 확인한다.
+
+`TestSourceComparisonReplaysOriginalG4Bytes`는 아래 세 보존 파일의 기존 SHA256을 먼저 확인한 뒤
+실제 Inspector·LiveDependencies·CSV scanner·Engine으로 계산한다. 카탈로그와 포털 목록/resolver는
+합성 HTTP fixture다. 원래 역사 버전 조회나 실시간 다운로드의 새 증거로 사용하지 않는다.
+
+```sh
+ODEDUCK_COMPARISON_ORIGINAL_CSV=/tmp/odeduck-population-applicability.KmYDur/population-july-original.csv \
+ODEDUCK_COMPARISON_EXPORT_CSV=/tmp/odeduck-monthly-export.fqn2uP/mois-july-all-eupmyeondong-6to17.csv \
+ODEDUCK_COMPARISON_EXPORT_HTML=/tmp/odeduck-monthly-export.fqn2uP/age-july-incheon-all-6to17.html \
+  go test ./internal/goalwork -run '^TestSourceComparisonReplaysOriginalG4Bytes$' -count=1 -v
+```
+
+초기 진단 테스트에서 EOF 필드를 반대로 기대한 오류를 바로잡았다. 실제 반환은 양쪽 EOF=true,
+전체 3,619/3,919행 검사 및 162/177행 일치·전부 보관이다. 원본/배포물 hash는 각각
+`6920fdafd269554d259e8498301f004c9799f499c38832de9352a0e7def916c5`와
+`911940f3c38ffb7ed487a820607560616dedd5d226dcec1c0b9d7ffb65c4e47f`다. 선택 페이지는
+`1a1423e466dbc572ebee91b7cfeabf5ee7ac39085dc44c2b91ce3b689bfef982`를 재생했다.
+
+제품 계산은 독립 `verify-range.mjs`의 원천별 대응에 따라 **162쌍·42항목·6,804개 수치 위치가
+일치**, 차이·결측·형식 오류·모호키·왼쪽 미대응은 0, 오른쪽 미대응은 15다. 13요약+42항목+15진단의
+70행을 보관했다. 미대응 원본 15곳과 출장소 네 쌍의 실제 CSV 물리적 시작 줄도 독립 기록과 같았다.
+계산 요약만 한 packet으로 공개했고 출장소 이름·개별 수치 등 미선택 값은 계획 입력에 포함하지 않았다.
+
+원래 G4 전체 산출물의 검토 입력은 아직 구성하지 않았다. 앞선 나이 정의 진단은 이미 8 packet을
+사용하므로 대조 요약을 그대로 더하면 기존 상한을 넘는다. 인구 원본의 필요한 의미 근거를 빼거나
+상한을 임의로 높이지 않고 전체 근거 전달 방식을 검증해야 한다. 학교 구역 근거·정의의 revision 적용·
+전체 산출물 검토·무힌트 분야 전이는 계속 남는다. **G4 누적 8시도/6실제 모델 호출/완료 0회**와
+기존 archive·oracle을 유지하며 로그인·신청·새 모델 호출·외부 배포는 하지 않았다.
+
+대조 구현의 `go mod tidy -diff`, `go vet ./...`, `go test ./...`, `go build ./...`, brand 동기화
+검사, `git diff --check`와 goalwork/mcpserver/agentplan race 검사를 통과했다. 오래된 안내 문구를
+그대로 요구하던 private prompt substring 검사는 제거하고, 공통 지침 전체의 실제 CLI subprocess·
+MCP resource 전달 회귀와 EOF/보관 수의 공개 실행 테스트를 유지했다. 기존 목표 oracle은 변경하지 않았다.

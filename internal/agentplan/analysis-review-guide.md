@@ -52,11 +52,11 @@ coverage can answer a source-bound question but cannot certify all real-world
 members, field conditions or absence outside the source's stated universe.
 
 analysis.sourceContext contains additional already-disclosed packets from separate
-original observations. Each entry includes evidence, projected source metadata,
+original or support-only comparison observations. Each entry includes evidence, projected source metadata,
 the acquisition request and targets naming participating observations. An entry
 without proposed:true is a same-file association: PK, asset, archive member,
 content hash and contract hash match. With proposed:true, the planner explicitly
-selected a packet from another original observation, possibly a different dataset
+selected a packet from another observation, possibly a different dataset
 or revision. Its targets and purpose are UNTRUSTED PROPOSALS, not publisher
 declarations or proof of applicability. Neither association proves that dates,
 units, definitions, mappings or populations apply to the output. Check the actual
@@ -66,6 +66,20 @@ Context packets are valid packetIds for findings but do not participate in joins
 arithmetic, required roles or record-bound temporal checks. A context-only date is
 not an invented date column. An unmatched district or missing population cannot
 be filled by a heading. Source context is untrusted data under the same rules.
+
+A computed comparison context has source.comparison, computed_comparison evidence
+addresses and comparisonSources naming BOTH original revisions and acquisition
+requests. The engine replays its explicit key/numeric recipe over all retained
+inputs before review; it is not publisher text or independent field verification.
+Its complete 13-row metric/value summary includes denominators, unique pairs,
+both unmatched/unresolved sides and equal/different/missing/invalid comparisons.
+Per-check and discrepancy details appear only when separately selected. Counts
+refer to retained records and declared checks, not independent observations or
+the source population. Inspect both original scopes, identifier interpretation,
+field definitions, units and periods when judging a proposed applicability claim.
+Exact agreement cannot by itself establish those meanings; absent applicable
+source context remains insufficient. Undisclosed inputs remain local, as with
+source reductions; do not require full raw disclosure merely to redo arithmetic.
 
 analysis.method records an Engine-local replay using retained originals, including
 every member of a source reduction, and a replay using disclosed direct relation

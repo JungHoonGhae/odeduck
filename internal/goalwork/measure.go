@@ -14,7 +14,7 @@ import (
 // records. Measures run after identity joins and cannot become their keys.
 // Unit is a declared interpretation, not evidence that the source uses it.
 type Measure struct {
-	As         string   `json:"as"`
+	As         string   `json:"as,omitempty"` // Required for output measures; absent for comparison operands.
 	Field      string   `json:"field,omitempty"`
 	Op         string   `json:"op,omitempty"` // convert (default) | sum_fields
 	Fields     []string `json:"fields,omitempty"`
@@ -34,15 +34,10 @@ func measureRows(rows []Row, specs []Measure) error {
 	}
 	aliases := map[string]bool{}
 	for _, s := range specs {
-		if !validRequirementID(s.As) || aliases[s.As] || strings.TrimSpace(s.Unit) == "" || len(s.Unit) > 100 || len(s.NullTokens) > 16 || (s.Format != "decimal_v1" && s.Format != "grouped_decimal_v1") {
-			return fmt.Errorf("measure requires a unique unqualified alias, original qualified field, declared unit and versioned decimal format")
+		if aliases[s.As] {
+			return fmt.Errorf("measure aliases must be unique")
 		}
-		for _, token := range s.NullTokens {
-			if len(token) > 100 {
-				return fmt.Errorf("measure null token exceeds 100 bytes")
-			}
-		}
-		fields, err := measureFields(s)
+		fields, err := validateMeasureDefinition(s)
 		if err != nil {
 			return err
 		}
@@ -66,6 +61,18 @@ func measureRows(rows []Row, specs []Measure) error {
 		}
 	}
 	return nil
+}
+
+func validateMeasureDefinition(s Measure) ([]string, error) {
+	if !validRequirementID(s.As) || strings.TrimSpace(s.Unit) == "" || len(s.Unit) > 100 || len(s.NullTokens) > 16 || (s.Format != "decimal_v1" && s.Format != "grouped_decimal_v1") {
+		return nil, fmt.Errorf("measure requires an unqualified alias, original qualified field, declared unit and versioned decimal format")
+	}
+	for _, token := range s.NullTokens {
+		if len(token) > 100 {
+			return nil, fmt.Errorf("measure null token exceeds 100 bytes")
+		}
+	}
+	return measureFields(s)
 }
 
 func measureFields(s Measure) ([]string, error) {

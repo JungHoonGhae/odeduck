@@ -1,8 +1,10 @@
 package goalwork
 
 import (
+	"context"
 	"encoding/hex"
 	"fmt"
+	"slices"
 	"strings"
 	"unicode/utf8"
 )
@@ -19,12 +21,20 @@ type SupportBinding struct {
 // the same file revision, or explicitly proposed supporting records. Neither
 // association proves applicability, identity, or computational participation.
 type SourceContext struct {
-	Targets  []string       `json:"targets"`
-	Source   Observation    `json:"source"`
-	Request  SampleRequest  `json:"request"`
-	Evidence EvidencePacket `json:"evidence"`
-	Proposed bool           `json:"proposed,omitempty"`
-	Purpose  string         `json:"purpose,omitempty"`
+	ComparisonSources []ComparisonContextSource `json:"comparisonSources,omitempty"`
+	Targets           []string                  `json:"targets"`
+	Source            Observation               `json:"source"`
+	Request           SampleRequest             `json:"request"`
+	Evidence          EvidencePacket            `json:"evidence"`
+	Proposed          bool                      `json:"proposed,omitempty"`
+	Purpose           string                    `json:"purpose,omitempty"`
+}
+
+// Computed support names both original revisions and acquisition conditions.
+// These metadata contain no automatically disclosed original row values.
+type ComparisonContextSource struct {
+	Source  Observation   `json:"source"`
+	Request SampleRequest `json:"request"`
 }
 
 func (e *Engine) supportContext(p Composition) (map[string]SourceContext, error) {
@@ -51,7 +61,7 @@ func (e *Engine) supportContext(p Composition) (map[string]SourceContext, error)
 		}
 		source, exists := observed[packet.Selection.Observation]
 		if !exists || source.RowsSHA256 != packet.Selection.RowsSHA256 || used[source.ID] || source.Reduction != nil || source.Spatial != nil {
-			return nil, fmt.Errorf("support must reference a nonparticipating original observation revision")
+			return nil, fmt.Errorf("support must reference a nonparticipating original or support-only comparison revision")
 		}
 		if !utf8.ValidString(binding.Purpose) || strings.TrimSpace(binding.Purpose) == "" || len(binding.Purpose) > 1000 || credentialText(binding.Purpose) {
 			return nil, fmt.Errorf("support purpose needs 1–1000 UTF-8 bytes without credential material; it is a proposal, not evidence")
@@ -66,12 +76,84 @@ func (e *Engine) supportContext(p Composition) (map[string]SourceContext, error)
 			}
 			seen[id] = true
 		}
-		out[binding.PacketID] = SourceContext{Targets: binding.Targets, Source: projectReviewSource(source, packet.Selection.Fields), Request: e.requests[source.ID], Evidence: packet, Proposed: true, Purpose: binding.Purpose}
+		c := SourceContext{Targets: binding.Targets, Source: projectReviewSource(source, packet.Selection.Fields), Request: e.requests[source.ID], Evidence: packet, Proposed: true, Purpose: binding.Purpose}
+		if source.Comparison != nil {
+			for side, selection := range []ComparisonSide{source.Comparison.Recipe.Left, source.Comparison.Recipe.Right} {
+				parent, exists := observed[selection.Observation]
+				if !exists || parent.RowsSHA256 != selection.RowsSHA256 {
+					return nil, fmt.Errorf("comparison support lost its original source revision")
+				}
+				fields := map[string]bool{}
+				for _, key := range selection.Keys {
+					fields[key.Field] = true
+				}
+				for _, check := range source.Comparison.Recipe.Checks {
+					operand := check.Left
+					if side == 1 {
+						operand = check.Right
+					}
+					if operand.Field != "" {
+						fields[operand.Field] = true
+					}
+					for _, field := range operand.Fields {
+						fields[field] = true
+					}
+				}
+				var names []string
+				for field := range fields {
+					names = append(names, field)
+				}
+				slices.Sort(names)
+				c.ComparisonSources = append(c.ComparisonSources, ComparisonContextSource{Source: projectReviewSource(parent, names), Request: e.requests[parent.ID]})
+			}
+		}
+		out[binding.PacketID] = c
+	}
+	if err := completeComparisonSupport(out); err != nil {
+		return nil, err
 	}
 	return out, nil
 }
 
-func (e *Engine) reviewSourceContext(a *Artifact) ([]SourceContext, error) {
+// Every proposed target must see the complete comparison denominator and
+// negative accounting, even if the disclosure was split across packets.
+func completeComparisonSupport(contexts map[string]SourceContext) error {
+	coverage := map[string]map[int]map[string]bool{}
+	for _, c := range contexts {
+		if c.Source.Comparison == nil {
+			continue
+		}
+		for _, target := range c.Targets {
+			key := c.Source.ID + "\x00" + target
+			if coverage[key] == nil {
+				coverage[key] = map[int]map[string]bool{}
+			}
+			for _, record := range c.Evidence.Records {
+				if record.RetainedRow < 1 || record.RetainedRow > len(comparisonSummaryMetrics) {
+					continue
+				}
+				if coverage[key][record.RetainedRow] == nil {
+					coverage[key][record.RetainedRow] = map[string]bool{}
+				}
+				for _, field := range []string{"metric", "value"} {
+					if _, exists := record.Values[field]; exists {
+						coverage[key][record.RetainedRow][field] = true
+					}
+				}
+			}
+		}
+	}
+	for _, rows := range coverage {
+		for ordinal := 1; ordinal <= len(comparisonSummaryMetrics); ordinal++ {
+			if !rows[ordinal]["metric"] || !rows[ordinal]["value"] {
+				return fmt.Errorf("comparison support requires all 13 summary metrics/values for each target; disclose denominators, unresolved records and numeric discrepancies")
+			}
+		}
+	}
+	return nil
+}
+
+func (e *Engine) reviewSourceContext(ctx context.Context, a *Artifact) ([]SourceContext, error) {
 	if a == nil {
 		return nil, nil
 	}
@@ -88,8 +170,16 @@ func (e *Engine) reviewSourceContext(a *Artifact) ([]SourceContext, error) {
 		observed[source.ID] = source
 	}
 	var context []SourceContext
+	replayed := map[string]bool{}
 	for _, packet := range e.state.Evidence {
 		if proposed, exists := explicit[packet.ID]; exists {
+			if o := proposed.Source; o.Comparison != nil && !replayed[o.ID] {
+				computed, err := e.sampleComparison(ctx, e.requests[o.ID])
+				if err != nil || digest(computed.Rows) != o.RowsSHA256 || digest(computed.Comparison) != digest(o.Comparison) {
+					return nil, fmt.Errorf("comparison support cannot be replayed from both retained original revisions")
+				}
+				replayed[o.ID] = true
+			}
 			context = append(context, proposed)
 			continue
 		}

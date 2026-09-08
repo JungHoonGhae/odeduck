@@ -63,6 +63,9 @@ func validateComputationalSources(p Composition, observations []Observation) err
 	}
 	for id := range compositionSources(p, observed) {
 		o := observed[id]
+		if o.Comparison != nil {
+			return fmt.Errorf("comparison observations are support-only, not computational sources")
+		}
 		if o.Document != nil || o.Delivery == "DOCUMENT" {
 			return fmt.Errorf("document observations are support-only, not computational sources")
 		}

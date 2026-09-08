@@ -9,6 +9,12 @@ section matching a `vX.Y.Z` tag as the GitHub release notes.
 
 ### Added
 
+- Local `sample.compare` through the shared CLI/MCP goal engine compares explicit
+  keys and numeric measures from two retained original revisions. Exact decimal
+  checks preserve duplicates, discrepancies and both unmatched sides. Selected
+  computed summaries can support interpretation review without replacing source
+  records, changing result roles or approving identity, applicability or coverage.
+
 - Registered monthly FILE export through the shared CLI/MCP goal `sample` path,
   with typed period/registration/province/age choices, credentialless no-redirect
   form POSTs and complete CSV scan provenance. Publisher rows and selected-age

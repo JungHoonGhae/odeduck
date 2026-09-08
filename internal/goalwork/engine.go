@@ -81,6 +81,7 @@ type Parameter struct {
 }
 
 type SampleRequest struct {
+	Compare     *SourceComparison          `json:"compare,omitempty"`     // local support-only comparison of two retained original revisions
 	FileVersion string                     `json:"fileVersion,omitempty"` // must equal the selected inspected FILE edition; empty for current files
 	Reduce      *SourceReduction           `json:"reduce,omitempty"`      // local pre-join aggregation of an exact retained source revision
 	Nearest     *NearestSelection          `json:"nearest,omitempty"`     // local reduction using retained observations, never caller coordinates
@@ -99,6 +100,7 @@ type SampleRequest struct {
 	LayoutID    string                     `json:"layoutId,omitempty"` // optional same-source-file pin from layout discovery
 }
 type Acquired struct {
+	Comparison     *ComparisonProvenance
 	Reduction      *ReductionProvenance
 	Spatial        *SpatialProvenance
 	Rows           []Row
@@ -135,6 +137,7 @@ type Node struct {
 	Inspection *Inspection `json:"inspection,omitempty"`
 }
 type Observation struct {
+	Comparison     *ComparisonProvenance       `json:"comparison,omitempty"`
 	Reduction      *ReductionProvenance        `json:"reduction,omitempty"`
 	Spatial        *SpatialProvenance          `json:"spatial,omitempty"`
 	ID             string                      `json:"id"`
@@ -588,7 +591,7 @@ func (e *Engine) act(ctx context.Context, d Decision) error {
 		if s.Delivery != "api" && s.Delivery != "file" && s.Delivery != "standard" && s.Delivery != "document" {
 			return fmt.Errorf("sample delivery must be api, file, standard or document")
 		}
-		if s.Delivery == "file" && s.Reduce == nil {
+		if s.Delivery == "file" && s.Reduce == nil && s.Compare == nil {
 			selected := ""
 			if n.Inspection.SelectedFileVersion != nil {
 				selected = n.Inspection.SelectedFileVersion.ID
@@ -603,13 +606,15 @@ func (e *Engine) act(ctx context.Context, d Decision) error {
 		e.samples++
 		attemptIndex := len(e.state.SampleAttempts)
 		e.state.SampleAttempts = append(e.state.SampleAttempts, SampleAttempt{Revision: e.state.Revision, StartedAt: time.Now().UTC().Format(time.RFC3339Nano), Request: cloneSampleRequest(s), RequestSHA256: digest(s), Status: "failed", FailureKind: FailureUnknown, RetryOf: d.RetryOf})
-		if s.Nearest == nil && s.Reduce == nil && e.deps.Sample == nil {
+		if s.Nearest == nil && s.Reduce == nil && s.Compare == nil && e.deps.Sample == nil {
 			return fmt.Errorf("sampling unavailable")
 		}
 		// An adapter may add private request state internally. Preserve only the
 		// validated original request, never the adapter's mutable parameter maps.
 		var acq Acquired
-		if s.Reduce != nil {
+		if s.Compare != nil {
+			acq, err = e.sampleComparison(ctx, cloneSampleRequest(s))
+		} else if s.Reduce != nil {
 			acq, err = e.sampleReduction(ctx, cloneSampleRequest(s))
 		} else if s.Nearest != nil {
 			acq, err = e.sampleNearest(ctx, cloneSampleRequest(s), *n.Inspection)
@@ -618,6 +623,9 @@ func (e *Engine) act(ctx context.Context, d Decision) error {
 		}
 		if err == nil && s.Reduce == nil && acq.Reduction != nil {
 			err = fmt.Errorf("external acquisition cannot supply local reduction provenance")
+		}
+		if err == nil && s.Compare == nil && acq.Comparison != nil {
+			err = fmt.Errorf("external acquisition cannot supply local comparison provenance")
 		}
 		if err == nil {
 			err = validateDocumentAcquisition(s, *n.Inspection, acq)
@@ -690,10 +698,10 @@ func (e *Engine) act(ctx context.Context, d Decision) error {
 		e.requests[id] = s
 		e.bytes += len(b)
 		var declaration *SourceDeclaration
-		if declared, ok := n.Inspection.Declarations[s.Delivery]; ok && s.Reduce == nil && s.Document == nil {
+		if declared, ok := n.Inspection.Declarations[s.Delivery]; ok && s.Reduce == nil && s.Compare == nil && s.Document == nil {
 			declaration = &declared
 		}
-		e.state.Observations = append(e.state.Observations, Observation{Reduction: acq.Reduction, Spatial: acq.Spatial, ID: id, PK: s.PK, Delivery: acq.Delivery, Operation: acq.Operation, Asset: s.Asset, RowPath: s.RowPath, RequestSHA256: digest(s), ContentSHA256: acq.ContentSHA256, ContractSHA256: acq.ContractSHA256, RowsSHA256: digest(rows), ObservedAt: time.Now().UTC().Format(time.RFC3339Nano), Columns: names, ColumnTypes: columnTypes, ColumnProfiles: profileColumns(rows, names), RowCount: len(rows), Warnings: acq.Warnings, Selection: acq.Selection, Table: cloneTableProvenance(acq.Table), Archive: cloneArchiveProvenance(acq.Archive), CSV: cloneCSVProvenance(acq.CSV), Document: cloneDocumentProvenance(acq.Document), Declaration: declaration})
+		e.state.Observations = append(e.state.Observations, Observation{Comparison: acq.Comparison, Reduction: acq.Reduction, Spatial: acq.Spatial, ID: id, PK: s.PK, Delivery: acq.Delivery, Operation: acq.Operation, Asset: s.Asset, RowPath: s.RowPath, RequestSHA256: digest(s), ContentSHA256: acq.ContentSHA256, ContractSHA256: acq.ContractSHA256, RowsSHA256: digest(rows), ObservedAt: time.Now().UTC().Format(time.RFC3339Nano), Columns: names, ColumnTypes: columnTypes, ColumnProfiles: profileColumns(rows, names), RowCount: len(rows), Warnings: acq.Warnings, Selection: acq.Selection, Table: cloneTableProvenance(acq.Table), Archive: cloneArchiveProvenance(acq.Archive), CSV: cloneCSVProvenance(acq.CSV), Document: cloneDocumentProvenance(acq.Document), Declaration: declaration})
 		e.state.SampleAttempts[attemptIndex].Status = "acquired"
 		e.state.SampleAttempts[attemptIndex].FailureKind = ""
 		e.state.SampleAttempts[attemptIndex].ObservationID = id

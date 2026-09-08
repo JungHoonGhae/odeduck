@@ -86,7 +86,7 @@ func LiveDependencies(client *fetch.Client, base string, caller Caller, searcher
 			return dataset.CSVScanReport{}, "", fmt.Errorf("scan asset not in inspected contract")
 		},
 		Sample: func(ctx context.Context, s SampleRequest, i Inspection) (Acquired, error) {
-			if s.Nearest != nil || s.Reduce != nil {
+			if s.Nearest != nil || s.Reduce != nil || s.Compare != nil {
 				return Acquired{}, fmt.Errorf("local reduction requires the shared engine's retained observations")
 			}
 			if err := validateSampleSelection(s); err != nil {
@@ -264,6 +264,13 @@ func classifyLiveAcquisitionError(err error, result *apicall.CallResult) error {
 }
 
 func validateSampleSelection(s SampleRequest) error {
+	if s.Compare != nil {
+		allowed := SampleRequest{PK: s.PK, Delivery: s.Delivery, Compare: s.Compare}
+		if digest(s) != digest(allowed) {
+			return fmt.Errorf("compare accepts only the left source PK, original delivery and retained comparison recipe; no acquisition selectors")
+		}
+		return nil
+	}
 	if s.Delivery == "file" && s.Operation != "" {
 		if s.Document != nil || s.FileVersion != "" || s.Reduce != nil || s.Nearest != nil || s.ScanCSV || s.LayoutID != "" || s.Asset != "" || s.Member != "" || s.XLSX != nil || len(s.Where)+len(s.WhereIn) != 0 || s.RowPath != "" {
 			return fmt.Errorf("FILE export accepts only pk, delivery:file, inspected operation and typed params; export owns scanning and selection")
