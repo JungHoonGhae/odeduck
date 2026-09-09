@@ -447,6 +447,9 @@ func (e *Engine) Advance(ctx context.Context, revision int, d Decision) (View, e
 		}
 		e.state.Gaps = append(e.state.Gaps, Gap{Revision: e.state.Revision, Action: d.Action, Target: target, Detail: bounded(err.Error(), 2000)})
 	}
+	// Acquisition can finish after the deadline. Purge retained values before
+	// returning this action's snapshot, including failure and cancellation paths.
+	e.expire()
 	if canAdvance(e.state.Status) && e.state.Revision >= e.state.Policy.MaxRounds {
 		e.state.Status = "budget_exhausted"
 	}
