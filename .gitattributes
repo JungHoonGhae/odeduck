@@ -1,0 +1,2 @@
+# Frozen vocabulary bytes are hashed and referenced by retained diagnostics.
+/internal/goalwork/vocabularies/*.json text eol=lf

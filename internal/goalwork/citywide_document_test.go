@@ -4,8 +4,10 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/JungHoonGhae/odeduck/internal/catalog"
 	"github.com/JungHoonGhae/odeduck/internal/fetch"
@@ -16,6 +18,13 @@ import (
 // sections test the registered reader, not the actual definition or G4 meaning.
 func citywideDocumentFixture(t *testing.T, policy goalwork.Policy) goalwork.Dependencies {
 	t.Helper()
+	configRoot := t.TempDir()
+	t.Setenv("HOME", configRoot)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(configRoot, ".config"))
+	t.Setenv("APPDATA", filepath.Join(configRoot, "AppData"))
+	if err := (&catalog.Catalog{SyncedAt: time.Now(), Type: "ALL", Entries: []catalog.Entry{{PK: "3033304", Title: "document fixture", SvcType: "FILE"}}}).Save(); err != nil {
+		t.Fatal(err)
+	}
 	client := fetch.New(fetch.WithDelay(0), fetch.WithHTTPClient(&http.Client{Transport: documentHTTP(func(r *http.Request) (*http.Response, error) {
 		if r.Header.Get("Cookie") != "" || r.Header.Get("Authorization") != "" {
 			t.Fatal("supporting document request exposed credentials")

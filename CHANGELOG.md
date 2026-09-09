@@ -116,6 +116,7 @@ goal completion, canonical entity identity, causal claims or field verification.
 
 ### Fixed
 
+- Keep frozen vocabulary hashes identical across platform checkouts.
 - Discard retained goal values before returning acquisitions that finish after
   session expiry, including source failures and cancellation.
 - Reject malformed UTF-8 before decoding goal-planner decisions, and return
