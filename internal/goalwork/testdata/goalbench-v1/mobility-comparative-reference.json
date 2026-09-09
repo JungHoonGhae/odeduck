@@ -1,0 +1,777 @@
+{
+  "case": "G2",
+  "kind": "independent_comparative_reference",
+  "status": "partial_oracle_not_goal_completion",
+  "method": "Independent Python standard-library ZIP/CSV and haversine calculation; production solve and acquisition were not used. Four public museum reference examples; nearest three source stop records among all Incheon records, not necessarily three distinct physical stops.",
+  "sources": [
+    {
+      "pk": "15109171",
+      "url": "https://www.data.go.kr/cmm/cmm/fileDownload.do?atchFileId=FILE_000000002671073&dataNm=%EC%9D%B8%EC%B2%9C%EA%B4%80%EA%B4%91%EA%B3%B5%EC%82%AC_%EA%B4%80%EA%B4%91_%EA%B4%80%EA%B4%91%EC%88%98%EC%9A%A9%ED%83%9C%EC%84%B8%EC%A0%95%EB%B3%B4_%EB%AC%B4%EC%9E%A5%EC%95%A0%EA%B4%80%EA%B4%91%EC%A0%95%EB%B3%B4_20221207&fileDetailSn=1",
+      "observedAt": "2026-09-07T04:39:23.343629+00:00",
+      "contentSha256": "204d7e775c1b8854d7aa1ca520685695303bad52e0d71edb4ef3baa540ac755f",
+      "license": "이용허락범위 제한 없음",
+      "licenseURL": "https://www.data.go.kr/catalog/15109171/fileData.json",
+      "records": [
+        {
+          "member": "인천관광공사_관광_관광수용태세정보_무장애관광정보/인천관광공사_관광_관광수용태세정보.csv",
+          "memberSha256": "9b59f631dc7a40ee2809c8e7db157c836336fd0f985fef9dfde7b91186ef4467",
+          "csvRecord": 134,
+          "values": {
+            "업체명": "인천광역시검단선사박물관",
+            "카테고리명": "관광",
+            "폐업": "N",
+            "비관광업": "N",
+            "시도명": "인천",
+            "시군구명": "서구",
+            "도로명": "고산후로121번길",
+            "건물번호": "7",
+            "법정읍면동리명칭": "",
+            "번지": "",
+            "경도": "126.69868239286",
+            "위도": "37.5944458440676",
+            "전화번호": "032-440-6790",
+            "홈페이지주소": "https://www.incheon.go.kr/museum/MU030101",
+            "화장실 유무": "Y",
+            "화장실 정보": "구분",
+            "주차장 유무": "Y",
+            "전기차충전소 유무": "N",
+            "관광안내소 유무": "Y",
+            "관광안내표지판 유무": "Y",
+            "물품보관소 유무": "N",
+            "예약 가능 여부": "Y",
+            "외국어안내 유무": "Y",
+            "외국어안내 종류": "영어,중국어,일어",
+            "와이파이 유무": "N",
+            "휴무일": "월요일",
+            "휴무일 기타": "",
+            "전자결제 가능 여부": "N",
+            "반려견 동반 가능 여부": "N",
+            "유무료": "N",
+            "입장료(체험료)_대인": "",
+            "입장료(체험료)_소인": ""
+          }
+        },
+        {
+          "member": "인천관광공사_관광_관광수용태세정보_무장애관광정보/인천관광공사_관광_무장애관광정보.csv",
+          "memberSha256": "1c7a03f4d5ac1476440032ff6efe55643eb4ce8484e88b54fc98fc272da152c2",
+          "csvRecord": 952,
+          "values": {
+            "업체명": "인천광역시검단선사박물관",
+            "카테고리명": "관광",
+            "폐업": "N",
+            "비관광업": "N",
+            "시도명": "인천",
+            "시군구명": "서구",
+            "도로명": "고산후로121번길",
+            "건물번호": "7",
+            "법정읍면동리명칭": "",
+            "번지": "",
+            "경도": "126.69868239286",
+            "위도": "37.5944458440676",
+            "엘리베이터 유무": "Y",
+            "출입구 경사로 유무": "Y",
+            "휠체어 대여 가능": "Y",
+            "유모차 대여 가능": "Y",
+            "수유실 유무": "Y",
+            "안내견 동반 가능": "Y",
+            "점자유도로 유무": "Y",
+            "점자안내문 유무": "N",
+            "화장실 유무": "Y",
+            "장애인화장실 유무": "Y",
+            "가족화장실 유무": "N",
+            "기저귀교환대 유무": "Y",
+            "주차장 유무": "Y",
+            "장애인전용 주차공간 유무": "Y"
+          }
+        },
+        {
+          "member": "인천관광공사_관광_관광수용태세정보_무장애관광정보/인천관광공사_관광_관광수용태세정보.csv",
+          "memberSha256": "9b59f631dc7a40ee2809c8e7db157c836336fd0f985fef9dfde7b91186ef4467",
+          "csvRecord": 143,
+          "values": {
+            "업체명": "인천광역시립박물관",
+            "카테고리명": "관광",
+            "폐업": "N",
+            "비관광업": "N",
+            "시도명": "인천",
+            "시군구명": "연수구",
+            "도로명": "청량로160번길",
+            "건물번호": "26",
+            "법정읍면동리명칭": "",
+            "번지": "",
+            "경도": "126.653179783488",
+            "위도": "37.4207092537534",
+            "전화번호": "032-440-6750",
+            "홈페이지주소": "https://www.incheon.go.kr/museum/index",
+            "화장실 유무": "Y",
+            "화장실 정보": "구분",
+            "주차장 유무": "Y",
+            "전기차충전소 유무": "Y",
+            "관광안내소 유무": "Y",
+            "관광안내표지판 유무": "Y",
+            "물품보관소 유무": "N",
+            "예약 가능 여부": "Y",
+            "외국어안내 유무": "Y",
+            "외국어안내 종류": "영어,중국어,일어",
+            "와이파이 유무": "N",
+            "휴무일": "월요일,기타",
+            "휴무일 기타": "공휴일 월요일 제외, 1/1",
+            "전자결제 가능 여부": "N",
+            "반려견 동반 가능 여부": "N",
+            "유무료": "N",
+            "입장료(체험료)_대인": "",
+            "입장료(체험료)_소인": ""
+          }
+        },
+        {
+          "member": "인천관광공사_관광_관광수용태세정보_무장애관광정보/인천관광공사_관광_무장애관광정보.csv",
+          "memberSha256": "1c7a03f4d5ac1476440032ff6efe55643eb4ce8484e88b54fc98fc272da152c2",
+          "csvRecord": 943,
+          "values": {
+            "업체명": "인천광역시립박물관",
+            "카테고리명": "관광",
+            "폐업": "N",
+            "비관광업": "N",
+            "시도명": "인천",
+            "시군구명": "연수구",
+            "도로명": "청량로160번길",
+            "건물번호": "26",
+            "법정읍면동리명칭": "",
+            "번지": "",
+            "경도": "126.653179783488",
+            "위도": "37.4207092537534",
+            "엘리베이터 유무": "Y",
+            "출입구 경사로 유무": "Y",
+            "휠체어 대여 가능": "Y",
+            "유모차 대여 가능": "Y",
+            "수유실 유무": "N",
+            "안내견 동반 가능": "Y",
+            "점자유도로 유무": "Y",
+            "점자안내문 유무": "Y",
+            "화장실 유무": "Y",
+            "장애인화장실 유무": "Y",
+            "가족화장실 유무": "N",
+            "기저귀교환대 유무": "N",
+            "주차장 유무": "Y",
+            "장애인전용 주차공간 유무": "Y"
+          }
+        },
+        {
+          "member": "인천관광공사_관광_관광수용태세정보_무장애관광정보/인천관광공사_관광_관광수용태세정보.csv",
+          "memberSha256": "9b59f631dc7a40ee2809c8e7db157c836336fd0f985fef9dfde7b91186ef4467",
+          "csvRecord": 149,
+          "values": {
+            "업체명": "인천도시역사관",
+            "카테고리명": "관광",
+            "폐업": "N",
+            "비관광업": "N",
+            "시도명": "인천",
+            "시군구명": "연수구",
+            "도로명": "인천타워대로",
+            "건물번호": "238",
+            "법정읍면동리명칭": "",
+            "번지": "",
+            "경도": "126.635889346901",
+            "위도": "37.3928128194922",
+            "전화번호": "032-850-6000",
+            "홈페이지주소": "https://www.incheon.go.kr/museum/index",
+            "화장실 유무": "Y",
+            "화장실 정보": "구분",
+            "주차장 유무": "Y",
+            "전기차충전소 유무": "N",
+            "관광안내소 유무": "Y",
+            "관광안내표지판 유무": "Y",
+            "물품보관소 유무": "N",
+            "예약 가능 여부": "Y",
+            "외국어안내 유무": "Y",
+            "외국어안내 종류": "영어,중국어",
+            "와이파이 유무": "N",
+            "휴무일": "",
+            "휴무일 기타": "",
+            "전자결제 가능 여부": "N",
+            "반려견 동반 가능 여부": "N",
+            "유무료": "N",
+            "입장료(체험료)_대인": "",
+            "입장료(체험료)_소인": ""
+          }
+        },
+        {
+          "member": "인천관광공사_관광_관광수용태세정보_무장애관광정보/인천관광공사_관광_무장애관광정보.csv",
+          "memberSha256": "1c7a03f4d5ac1476440032ff6efe55643eb4ce8484e88b54fc98fc272da152c2",
+          "csvRecord": 937,
+          "values": {
+            "업체명": "인천도시역사관",
+            "카테고리명": "관광",
+            "폐업": "N",
+            "비관광업": "N",
+            "시도명": "인천",
+            "시군구명": "연수구",
+            "도로명": "인천타워대로",
+            "건물번호": "238",
+            "법정읍면동리명칭": "",
+            "번지": "",
+            "경도": "126.635889346901",
+            "위도": "37.3928128194922",
+            "엘리베이터 유무": "Y",
+            "출입구 경사로 유무": "Y",
+            "휠체어 대여 가능": "Y",
+            "유모차 대여 가능": "Y",
+            "수유실 유무": "N",
+            "안내견 동반 가능": "Y",
+            "점자유도로 유무": "Y",
+            "점자안내문 유무": "Y",
+            "화장실 유무": "Y",
+            "장애인화장실 유무": "Y",
+            "가족화장실 유무": "N",
+            "기저귀교환대 유무": "N",
+            "주차장 유무": "Y",
+            "장애인전용 주차공간 유무": "N"
+          }
+        },
+        {
+          "member": "인천관광공사_관광_관광수용태세정보_무장애관광정보/인천관광공사_관광_관광수용태세정보.csv",
+          "memberSha256": "9b59f631dc7a40ee2809c8e7db157c836336fd0f985fef9dfde7b91186ef4467",
+          "csvRecord": 281,
+          "values": {
+            "업체명": "한국이민사박물관",
+            "카테고리명": "관광",
+            "폐업": "N",
+            "비관광업": "N",
+            "시도명": "인천",
+            "시군구명": "중구",
+            "도로명": "월미로",
+            "건물번호": "329",
+            "법정읍면동리명칭": "",
+            "번지": "",
+            "경도": "126.600271096232",
+            "위도": "37.4701430841284",
+            "전화번호": "032-440-4710",
+            "홈페이지주소": "https://www.incheon.go.kr/museum/MU040101",
+            "화장실 유무": "Y",
+            "화장실 정보": "구분",
+            "주차장 유무": "Y",
+            "전기차충전소 유무": "N",
+            "관광안내소 유무": "Y",
+            "관광안내표지판 유무": "Y",
+            "물품보관소 유무": "N",
+            "예약 가능 여부": "Y",
+            "외국어안내 유무": "N",
+            "외국어안내 종류": "",
+            "와이파이 유무": "N",
+            "휴무일": "월요일,기타",
+            "휴무일 기타": "공휴일 제외, 1/1",
+            "전자결제 가능 여부": "N",
+            "반려견 동반 가능 여부": "N",
+            "유무료": "N",
+            "입장료(체험료)_대인": "",
+            "입장료(체험료)_소인": ""
+          }
+        },
+        {
+          "member": "인천관광공사_관광_관광수용태세정보_무장애관광정보/인천관광공사_관광_무장애관광정보.csv",
+          "memberSha256": "1c7a03f4d5ac1476440032ff6efe55643eb4ce8484e88b54fc98fc272da152c2",
+          "csvRecord": 805,
+          "values": {
+            "업체명": "한국이민사박물관",
+            "카테고리명": "관광",
+            "폐업": "N",
+            "비관광업": "N",
+            "시도명": "인천",
+            "시군구명": "중구",
+            "도로명": "월미로",
+            "건물번호": "329",
+            "법정읍면동리명칭": "",
+            "번지": "",
+            "경도": "126.600271096232",
+            "위도": "37.4701430841284",
+            "엘리베이터 유무": "Y",
+            "출입구 경사로 유무": "Y",
+            "휠체어 대여 가능": "Y",
+            "유모차 대여 가능": "Y",
+            "수유실 유무": "N",
+            "안내견 동반 가능": "Y",
+            "점자유도로 유무": "N",
+            "점자안내문 유무": "Y",
+            "화장실 유무": "Y",
+            "장애인화장실 유무": "Y",
+            "가족화장실 유무": "N",
+            "기저귀교환대 유무": "Y",
+            "주차장 유무": "Y",
+            "장애인전용 주차공간 유무": "Y"
+          }
+        }
+      ],
+      "referenceDate": "2022-12-07",
+      "referenceDateMeaning": "Dataset title date; row observation and present operation are not established.",
+      "facilityMemberRows": 1083,
+      "accessibilityMemberRows": 1083,
+      "identity": {
+        "method": "deterministic",
+        "fields": [
+          "업체명",
+          "시도명",
+          "시군구명",
+          "도로명",
+          "건물번호",
+          "경도",
+          "위도"
+        ],
+        "ruleRevision": "same-publisher-zip-full-location-v1",
+        "scope": "Observed record association within this exact ZIP revision; not a permanent canonical entity."
+      },
+      "excludedRecords": [
+        {
+          "member": "인천관광공사_관광_관광수용태세정보_무장애관광정보/인천관광공사_관광_관광수용태세정보.csv",
+          "memberSha256": "9b59f631dc7a40ee2809c8e7db157c836336fd0f985fef9dfde7b91186ef4467",
+          "csvRecord": 158,
+          "values": {
+            "업체명": "인천시립박물관 관장실",
+            "카테고리명": "관광",
+            "폐업": "N",
+            "비관광업": "N",
+            "시도명": "인천",
+            "시군구명": "연수구",
+            "도로명": "청량로160번길",
+            "건물번호": "26",
+            "법정읍면동리명칭": "",
+            "번지": "",
+            "경도": "126.653179783488",
+            "위도": "37.4207092537534",
+            "전화번호": "032-832-2151",
+            "홈페이지주소": "https://www.incheon.go.kr/museum/index",
+            "화장실 유무": "Y",
+            "화장실 정보": "구분",
+            "주차장 유무": "Y",
+            "전기차충전소 유무": "Y",
+            "관광안내소 유무": "Y",
+            "관광안내표지판 유무": "Y",
+            "물품보관소 유무": "N",
+            "예약 가능 여부": "Y",
+            "외국어안내 유무": "Y",
+            "외국어안내 종류": "영어,중국어,일어",
+            "와이파이 유무": "N",
+            "휴무일": "월요일,기타",
+            "휴무일 기타": "공휴일 월요일 제외, 1/1",
+            "전자결제 가능 여부": "N",
+            "반려견 동반 가능 여부": "N",
+            "유무료": "N",
+            "입장료(체험료)_대인": "",
+            "입장료(체험료)_소인": ""
+          },
+          "reason": "Director office is not the museum as a whole, despite same address and coordinates."
+        }
+      ]
+    },
+    {
+      "pk": "15067528",
+      "url": "https://www.data.go.kr/cmm/cmm/fileDownload.do?atchFileId=FILE_000000003558143&dataNm=%EA%B5%AD%ED%86%A0%EA%B5%90%ED%86%B5%EB%B6%80_%EC%A0%84%EA%B5%AD+%EB%B2%84%EC%8A%A4%EC%A0%95%EB%A5%98%EC%9E%A5+%EC%9C%84%EC%B9%98%EC%A0%95%EB%B3%B4_20251031&fileDetailSn=1",
+      "observedAt": "2026-09-07T04:39:29.277796+00:00",
+      "contentSha256": "1db7e5d0cdc541e86a957b7584f2ddf8e4b1d29b02594984a01c5752ac13af06",
+      "license": "이용허락범위 제한 없음",
+      "licenseURL": "https://www.data.go.kr/catalog/15067528/fileData.json",
+      "records": [
+        {
+          "csvRecord": 65331,
+          "values": {
+            "정류장번호": "GGB168000447",
+            "정류장명": "원당사거리.검단선사박물관",
+            "위도": "37.5935333",
+            "경도": "126.6999333",
+            "정보수집일": "2025-10-31",
+            "모바일단축번호": "42447",
+            "도시코드": "23",
+            "도시명": "인천광역시",
+            "관리도시명": "경기BIS"
+          }
+        },
+        {
+          "csvRecord": 69251,
+          "values": {
+            "정류장번호": "GGB164000397",
+            "정류장명": "센트럴파크역",
+            "위도": "37.3923833",
+            "경도": "126.6357",
+            "정보수집일": "2025-10-31",
+            "모바일단축번호": "38397",
+            "도시코드": "23",
+            "도시명": "인천광역시",
+            "관리도시명": "경기BIS"
+          }
+        },
+        {
+          "csvRecord": 69266,
+          "values": {
+            "정류장번호": "GGB164000452",
+            "정류장명": "송도센트럴파크",
+            "위도": "37.3921667",
+            "경도": "126.6348833",
+            "정보수집일": "2025-10-31",
+            "모바일단축번호": "38452",
+            "도시코드": "23",
+            "도시명": "인천광역시",
+            "관리도시명": "경기BIS"
+          }
+        },
+        {
+          "csvRecord": 119310,
+          "values": {
+            "정류장번호": "ICB161000502",
+            "정류장명": "국립인천해양박물관",
+            "위도": "37.470531",
+            "경도": "126.597271",
+            "정보수집일": "2025-10-31",
+            "모바일단축번호": "35502",
+            "도시코드": "23",
+            "도시명": "인천광역시",
+            "관리도시명": "인천BIS"
+          }
+        },
+        {
+          "csvRecord": 119311,
+          "values": {
+            "정류장번호": "ICB161000503",
+            "정류장명": "해사고등학교",
+            "위도": "37.469131",
+            "경도": "126.600933",
+            "정보수집일": "2025-10-31",
+            "모바일단축번호": "35503",
+            "도시코드": "23",
+            "도시명": "인천광역시",
+            "관리도시명": "인천BIS"
+          }
+        },
+        {
+          "csvRecord": 121976,
+          "values": {
+            "정류장번호": "ICB161000126",
+            "정류장명": "해사고등학교.한국이민사박물관",
+            "위도": "37.469293",
+            "경도": "126.600852",
+            "정보수집일": "2025-10-31",
+            "모바일단축번호": "35126",
+            "도시코드": "23",
+            "도시명": "인천광역시",
+            "관리도시명": "인천BIS"
+          }
+        },
+        {
+          "csvRecord": 126157,
+          "values": {
+            "정류장번호": "ICB168000446",
+            "정류장명": "원당사거리.검단선사박물관",
+            "위도": "37.593308",
+            "경도": "126.699909",
+            "정보수집일": "2025-10-31",
+            "모바일단축번호": "42446",
+            "도시코드": "23",
+            "도시명": "인천광역시",
+            "관리도시명": "인천BIS"
+          }
+        },
+        {
+          "csvRecord": 126158,
+          "values": {
+            "정류장번호": "ICB168000447",
+            "정류장명": "원당사거리.검단선사박물관",
+            "위도": "37.593588",
+            "경도": "126.700006",
+            "정보수집일": "2025-10-31",
+            "모바일단축번호": "42447",
+            "도시코드": "23",
+            "도시명": "인천광역시",
+            "관리도시명": "인천BIS"
+          }
+        },
+        {
+          "csvRecord": 126667,
+          "values": {
+            "정류장번호": "ICB164000151",
+            "정류장명": "축현초등학교.인천시립박물관",
+            "위도": "37.423006",
+            "경도": "126.653982",
+            "정보수집일": "2025-10-31",
+            "모바일단축번호": "38151",
+            "도시코드": "23",
+            "도시명": "인천광역시",
+            "관리도시명": "인천BIS"
+          }
+        },
+        {
+          "csvRecord": 126668,
+          "values": {
+            "정류장번호": "ICB164000152",
+            "정류장명": "축현초등학교.인천시립박물관",
+            "위도": "37.423175",
+            "경도": "126.653824",
+            "정보수집일": "2025-10-31",
+            "모바일단축번호": "38152",
+            "도시코드": "23",
+            "도시명": "인천광역시",
+            "관리도시명": "인천BIS"
+          }
+        },
+        {
+          "csvRecord": 127353,
+          "values": {
+            "정류장번호": "ICB164000357",
+            "정류장명": "우성아파트",
+            "위도": "37.42262",
+            "경도": "126.649799",
+            "정보수집일": "2025-10-31",
+            "모바일단축번호": "38357",
+            "도시코드": "23",
+            "도시명": "인천광역시",
+            "관리도시명": "인천BIS"
+          }
+        },
+        {
+          "csvRecord": 127376,
+          "values": {
+            "정류장번호": "ICB164000397",
+            "정류장명": "센트럴파크역",
+            "위도": "37.392499",
+            "경도": "126.635758",
+            "정보수집일": "2025-10-31",
+            "모바일단축번호": "38397",
+            "도시코드": "23",
+            "도시명": "인천광역시",
+            "관리도시명": "인천BIS"
+          }
+        }
+      ],
+      "referenceDate": "2025-10-31",
+      "totalCSVRecords": 227065,
+      "incheonSourceRecords": 9278,
+      "selection": {
+        "도시명": "인천광역시"
+      },
+      "namespace": "Preserve source 정류장번호 and 관리도시명 together; ICB/GGB prefixes are not stripped. Records are not asserted to be distinct physical stops."
+    }
+  ],
+  "publicFacilityEvidence": {
+    "url": "https://www.incheon.go.kr/museum/index",
+    "observedAt": "2026-09-07T04:39:29.649919+00:00",
+    "interpretation": "Official city museum site lists the museum and its branches; names and road/building addresses corroborate the selected public facilities. Changed district labels are retained in the 2022 data, not silently modernised."
+  },
+  "expected": {
+    "rows": [
+      {
+        "facility": "인천광역시검단선사박물관",
+        "facilityCSVRecord": 134,
+        "accessibilityCSVRecord": 952,
+        "address": "인천 서구 고산후로121번길 7",
+        "observedAccessibility": {
+          "엘리베이터 유무": "Y",
+          "출입구 경사로 유무": "Y",
+          "휠체어 대여 가능": "Y",
+          "장애인화장실 유무": "Y",
+          "장애인전용 주차공간 유무": "Y"
+        },
+        "nearbyTransitRecords": [
+          {
+            "stopCSVRecord": 65331,
+            "stopID": "GGB168000447",
+            "manager": "경기BIS",
+            "name": "원당사거리.검단선사박물관",
+            "sphericalDistanceMeters": 149.80979638035268
+          },
+          {
+            "stopCSVRecord": 126158,
+            "stopID": "ICB168000447",
+            "manager": "인천BIS",
+            "name": "원당사거리.검단선사박물관",
+            "sphericalDistanceMeters": 150.66024651648777
+          },
+          {
+            "stopCSVRecord": 126157,
+            "stopID": "ICB168000446",
+            "manager": "인천BIS",
+            "name": "원당사거리.검단선사박물관",
+            "sphericalDistanceMeters": 166.39534736214395
+          }
+        ],
+        "routeAccessibility": "unknown",
+        "currentOperation": "unknown",
+        "facilityReferenceDate": "2022-12-07",
+        "transitReferenceDate": "2025-10-31"
+      },
+      {
+        "facility": "인천광역시립박물관",
+        "facilityCSVRecord": 143,
+        "accessibilityCSVRecord": 943,
+        "address": "인천 연수구 청량로160번길 26",
+        "observedAccessibility": {
+          "엘리베이터 유무": "Y",
+          "출입구 경사로 유무": "Y",
+          "휠체어 대여 가능": "Y",
+          "장애인화장실 유무": "Y",
+          "장애인전용 주차공간 유무": "Y"
+        },
+        "nearbyTransitRecords": [
+          {
+            "stopCSVRecord": 126667,
+            "stopID": "ICB164000151",
+            "manager": "인천BIS",
+            "name": "축현초등학교.인천시립박물관",
+            "sphericalDistanceMeters": 265.03057877905275
+          },
+          {
+            "stopCSVRecord": 126668,
+            "stopID": "ICB164000152",
+            "manager": "인천BIS",
+            "name": "축현초등학교.인천시립박물관",
+            "sphericalDistanceMeters": 280.0188160094611
+          },
+          {
+            "stopCSVRecord": 127353,
+            "stopID": "ICB164000357",
+            "manager": "인천BIS",
+            "name": "우성아파트",
+            "sphericalDistanceMeters": 366.4379860845382
+          }
+        ],
+        "routeAccessibility": "unknown",
+        "currentOperation": "unknown",
+        "facilityReferenceDate": "2022-12-07",
+        "transitReferenceDate": "2025-10-31"
+      },
+      {
+        "facility": "인천도시역사관",
+        "facilityCSVRecord": 149,
+        "accessibilityCSVRecord": 937,
+        "address": "인천 연수구 인천타워대로 238",
+        "observedAccessibility": {
+          "엘리베이터 유무": "Y",
+          "출입구 경사로 유무": "Y",
+          "휠체어 대여 가능": "Y",
+          "장애인화장실 유무": "Y",
+          "장애인전용 주차공간 유무": "N"
+        },
+        "nearbyTransitRecords": [
+          {
+            "stopCSVRecord": 127376,
+            "stopID": "ICB164000397",
+            "manager": "인천BIS",
+            "name": "센트럴파크역",
+            "sphericalDistanceMeters": 36.773888611865324
+          },
+          {
+            "stopCSVRecord": 69251,
+            "stopID": "GGB164000397",
+            "manager": "경기BIS",
+            "name": "센트럴파크역",
+            "sphericalDistanceMeters": 50.605078187335835
+          },
+          {
+            "stopCSVRecord": 69266,
+            "stopID": "GGB164000452",
+            "manager": "경기BIS",
+            "name": "송도센트럴파크",
+            "sphericalDistanceMeters": 114.28498244254924
+          }
+        ],
+        "routeAccessibility": "unknown",
+        "currentOperation": "unknown",
+        "facilityReferenceDate": "2022-12-07",
+        "transitReferenceDate": "2025-10-31"
+      },
+      {
+        "facility": "한국이민사박물관",
+        "facilityCSVRecord": 281,
+        "accessibilityCSVRecord": 805,
+        "address": "인천 중구 월미로 329",
+        "observedAccessibility": {
+          "엘리베이터 유무": "Y",
+          "출입구 경사로 유무": "Y",
+          "휠체어 대여 가능": "Y",
+          "장애인화장실 유무": "Y",
+          "장애인전용 주차공간 유무": "Y"
+        },
+        "nearbyTransitRecords": [
+          {
+            "stopCSVRecord": 121976,
+            "stopID": "ICB161000126",
+            "manager": "인천BIS",
+            "name": "해사고등학교.한국이민사박물관",
+            "sphericalDistanceMeters": 107.53254201012328
+          },
+          {
+            "stopCSVRecord": 119311,
+            "stopID": "ICB161000503",
+            "manager": "인천BIS",
+            "name": "해사고등학교",
+            "sphericalDistanceMeters": 126.79619765199679
+          },
+          {
+            "stopCSVRecord": 119310,
+            "stopID": "ICB161000502",
+            "manager": "인천BIS",
+            "name": "국립인천해양박물관",
+            "sphericalDistanceMeters": 268.25517984834926
+          }
+        ],
+        "routeAccessibility": "unknown",
+        "currentOperation": "unknown",
+        "facilityReferenceDate": "2022-12-07",
+        "transitReferenceDate": "2025-10-31"
+      }
+    ],
+    "distanceDefinition": {
+      "formula": "haversine",
+      "sphereRadiusMeters": 6371008.8,
+      "input": "source-declared latitude/longitude interpreted as degrees",
+      "datum": "not specified in acquired file metadata",
+      "status": "calculation_verified_datum_policy_pending",
+      "accuracy": "No positional accuracy or wheelchair route accuracy established.",
+      "comparison": "Geographic spherical approximation only; not a route length or real-world accessibility proof."
+    },
+    "requiredLimitations": [
+      "Not a census of all Incheon public facilities.",
+      "2022 facility records and 2025 transit records have different reference dates; catalogue update dates are not row survey dates.",
+      "Reported latitude/longitude columns are range-valid, but a shared datum and positional accuracy still need verification or explicit acceptance policy.",
+      "Nearest records may represent the same physical stop across BIS managers; retain their namespaces, do not count them as distinct physical stops.",
+      "Blank accessibility attributes mean unobserved, not absence. Y is a source observation, not a current operational guarantee.",
+      "Proximity does not establish the path, entrance, crossings, gradients, lifts, low-floor buses or actual wheelchair access."
+    ],
+    "reject": [
+      "swap invalid coordinates from 15074309",
+      "join ZIP members by row position",
+      "merge director office into museum by address alone",
+      "strip ICB/GGB namespace prefixes",
+      "claim geographical distance is accessible route distance",
+      "reinterpret catalogue modification date as accessibility observation date",
+      "treat the station venue closure as closure of the parent city museum",
+      "use a post publication date as a garden operating date",
+      "infer whole-museum or wheelchair-route availability from one subfacility reopening"
+    ],
+    "remainingGate": [
+      "common coordinate interpretation and approval policy",
+      "additional missing-value and same-name/different-address negatives",
+      "actual production execution and unseeded discovery"
+    ]
+  },
+  "operationEvents": [
+    {
+      "url": "https://www.incheon.go.kr/museum/MU060102/3067450",
+      "observedAt": "2026-09-07T04:40:00.867388+00:00",
+      "contentSha256": "3c004ce2396a5e32d6e6431a38657387ee07354179192ccd3d75ca47cf98e168",
+      "publishedAt": "2026-04-07",
+      "validFrom": "2026-09-01",
+      "validThrough": "2026-10-31",
+      "subject": "검단선사박물관 하늘정원",
+      "retainedExcerpt": " 담당부서 검단선사박물관 (032-440-6795) 작성일 2026-04-07 조회수 1147 2026년 검단선사박물관 <하늘정원 > 운영 안내 여름철 무더위로 인해 제한되었던 하늘정원 민속놀이터 운영을 재개합니다. 운영기간 : 2026. 9. 1.(화) ~ 2026. 10. 31.(토) 내용 : 제기, 투호 등 민속놀",
+      "interpretation": "Opening season of one museum subfacility, not present access to every museum area."
+    },
+    {
+      "url": "https://www.incheon.go.kr/museum/MU060102/3075576",
+      "observedAt": "2026-09-07T04:40:01.223451+00:00",
+      "contentSha256": "4ad0bcbb655f1b9ec81dd52022b62b7e52b28a1d37efa410f2aa654edd9c03bb",
+      "publishedAt": "2026-06-04",
+      "subject": "인천시청역 열린박물관",
+      "retainedExcerpt": "류 시립박물관 본관 담당부서 전시교육부 (032-440-6738) 작성일 2026-06-04 조회수 640 인천교통공사와의 업무협약 종료에 따라, 인천시청역 열린박물관의 대관 및 운영이 2026년 6월 30일자로 종료됩니다. 그동안 열린박물관을 찾아주신 시민 여러분께 깊이 감사드립니다. 전시교육부 032-440-6739 첨부파일",
+      "interpretation": "End of this named station exhibition venue, not closure of the city museum.",
+      "eventDate": "2026-06-30",
+      "timePrecision": "day; no exact closing time established"
+    }
+  ]
+}

@@ -1,0 +1,46 @@
+{
+  "schemaVersion": 1,
+  "cases": [
+    {
+      "id": "G1",
+      "goal": "폭염 때 어르신들이 쉴 곳을 찾는 데 도움이 되는 서로 다른 공공데이터를 연결해 표본 비교표를 보여줘. 전국 단위이며 지역과 연도 해석의 한계를 명시해줘.",
+      "expectation": "positive",
+      "trials": []
+    },
+    {
+      "id": "G2",
+      "goal": "인천의 공공 문화·관광시설을 휠체어 이용자가 비교할 수 있게, 시설의 접근성 정보와 주변 대중교통 정보를 연결해 표를 만들어줘. 자료별 기준일과 실제 이동 가능 여부를 확인하지 못한 부분도 보여줘.",
+      "expectation": "positive",
+      "trials": [
+        {
+          "id": "G2-diagnostic-20260907",
+          "path": "mobility-unseeded-diagnostic-20260907.json",
+          "format": "diagnostic"
+        },
+        {
+          "id": "G2-vocabulary-diagnostic-20260907",
+          "path": "mobility-unseeded-vocabulary-diagnostic-20260907.json",
+          "format": "diagnostic"
+        }
+      ]
+    },
+    {
+      "id": "G3",
+      "goal": "2024년 지역별 대기 관측값을 측정소 위치와 함께 비교할 수 있게 표로 보여줘. 관측 지점과 지역 통계의 차이, 단위, 결측 처리와 지역 내 관측 범위를 구분해줘.",
+      "expectation": "positive",
+      "trials": []
+    },
+    {
+      "id": "G4",
+      "goal": "인천의 지역별 학령인구와 학교 규모를 연결해 비교표를 만들어줘. 학령인구는 만 6~17세로 구분하고, 인구 기준일과 학교 기준일, 행정구역 개편으로 비교할 수 없는 부분을 명시해줘.",
+      "expectation": "positive",
+      "trials": []
+    },
+    {
+      "id": "G5",
+      "goal": "같은 제품에 관한 인증 정보와 회수 사건을 찾아 연결한 사례를 보여줘. 인증번호·모델·변형과 사건 날짜를 근거로 무엇이 같은 제품인지, 확인되지 않은 것은 무엇인지 구분해줘.",
+      "expectation": "positive",
+      "trials": []
+    }
+  ]
+}

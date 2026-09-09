@@ -1,0 +1,788 @@
+{
+  "case": "G1",
+  "kind": "historical_output_counterexample",
+  "status": "partial_oracle_not_goal_completion",
+  "method": "Archived prior false-success artifact, not reconstructed original source rows. Kimcheon Nam-myeon population and Yeosu Nam-myeon shelters are different municipalities; 2026 population does not establish 2019 shelter operation in 2026. Source row ordinals are unavailable in this artifact and must not be invented.",
+  "originalGoal": "폭염 때 어르신들이 쉴 곳을 찾는 데 도움이 되는 서로 다른 공공데이터를 연결해 표본 비교표를 보여줘. 전국 단위이며 지역과 연도 해석의 한계를 명시해줘.",
+  "historicalStatus": "output_ready",
+  "sourceObservations": [
+    {
+      "id": "o1",
+      "pk": "15013199",
+      "delivery": "STD",
+      "requestSha256": "1f92e8d815aa3f5c0878f1e8604e4c38c166166acebbad8c1dea4c08b3501cf1",
+      "contentSha256": "970077613bbc263a55df1acddc771773fcfaf2ca1bf3c83c9f36ab4409f7706f",
+      "contractSha256": "3508ac73f235be76b7202274c89f17cd82a61e02c4dfb143da7d3524fa8b85ae",
+      "rowsSha256": "e5b030b04f5fff19f1d9703fd3e168ef530aa1dc47cde6bdce2776f0423abcf3",
+      "observedAt": "2026-09-07T02:49:25.326202Z",
+      "columns": [
+        "ACEPTNC_POSBL_CO",
+        "ARCNDTN_HOLD_CO",
+        "FAN_HOLD_CO",
+        "FCLTY_AR",
+        "INSTITUTION_NM",
+        "INSTT_CODE",
+        "INSTT_NM",
+        "LATITUDE",
+        "LEGALDONG_NM",
+        "LNMADR",
+        "LONGITUDE",
+        "NIGHT_EXTN_YN",
+        "OPER_CLOSE_DATE",
+        "OPER_OPEN_DATE",
+        "PARTCLR",
+        "PHONE_NUMBER",
+        "RDNMADR",
+        "REFERENCE_DATE",
+        "SHLTR_NM",
+        "SHLTR_TYPE",
+        "STAYNG_YN",
+        "WKEND_USE_YN"
+      ],
+      "columnTypes": {
+        "ACEPTNC_POSBL_CO": [
+          "string"
+        ],
+        "ARCNDTN_HOLD_CO": [
+          "string"
+        ],
+        "FAN_HOLD_CO": [
+          "string"
+        ],
+        "FCLTY_AR": [
+          "string"
+        ],
+        "INSTITUTION_NM": [
+          "string"
+        ],
+        "INSTT_CODE": [
+          "string"
+        ],
+        "INSTT_NM": [
+          "string"
+        ],
+        "LATITUDE": [
+          "string"
+        ],
+        "LEGALDONG_NM": [
+          "string"
+        ],
+        "LNMADR": [
+          "string"
+        ],
+        "LONGITUDE": [
+          "string"
+        ],
+        "NIGHT_EXTN_YN": [
+          "string"
+        ],
+        "OPER_CLOSE_DATE": [
+          "string"
+        ],
+        "OPER_OPEN_DATE": [
+          "string"
+        ],
+        "PARTCLR": [
+          "string"
+        ],
+        "PHONE_NUMBER": [
+          "string"
+        ],
+        "RDNMADR": [
+          "string"
+        ],
+        "REFERENCE_DATE": [
+          "string"
+        ],
+        "SHLTR_NM": [
+          "string"
+        ],
+        "SHLTR_TYPE": [
+          "string"
+        ],
+        "STAYNG_YN": [
+          "string"
+        ],
+        "WKEND_USE_YN": [
+          "string"
+        ]
+      },
+      "columnProfiles": {
+        "ACEPTNC_POSBL_CO": {
+          "version": "shape_v1",
+          "strings": 1000,
+          "minTokens": 1,
+          "maxTokens": 1,
+          "decimal": 1000,
+          "groupedDecimal": 1000
+        },
+        "ARCNDTN_HOLD_CO": {
+          "version": "shape_v1",
+          "strings": 1000,
+          "minTokens": 1,
+          "maxTokens": 1,
+          "decimal": 1000,
+          "groupedDecimal": 1000
+        },
+        "FAN_HOLD_CO": {
+          "version": "shape_v1",
+          "strings": 1000,
+          "blank": 11,
+          "minTokens": 1,
+          "maxTokens": 1,
+          "decimal": 989,
+          "groupedDecimal": 989
+        },
+        "FCLTY_AR": {
+          "version": "shape_v1",
+          "strings": 1000,
+          "minTokens": 1,
+          "maxTokens": 1,
+          "decimal": 1000,
+          "groupedDecimal": 1000
+        },
+        "INSTITUTION_NM": {
+          "version": "shape_v1",
+          "strings": 1000,
+          "minTokens": 1,
+          "maxTokens": 4
+        },
+        "INSTT_CODE": {
+          "version": "shape_v1",
+          "strings": 1000,
+          "minTokens": 1,
+          "maxTokens": 1,
+          "decimal": 1000,
+          "groupedDecimal": 1000
+        },
+        "INSTT_NM": {
+          "version": "shape_v1",
+          "strings": 1000,
+          "minTokens": 2,
+          "maxTokens": 2
+        },
+        "LATITUDE": {
+          "version": "shape_v1",
+          "strings": 1000,
+          "blank": 36,
+          "minTokens": 1,
+          "maxTokens": 1,
+          "decimal": 964,
+          "groupedDecimal": 964
+        },
+        "LEGALDONG_NM": {
+          "version": "shape_v1",
+          "strings": 1000,
+          "minTokens": 1,
+          "maxTokens": 4
+        },
+        "LNMADR": {
+          "version": "shape_v1",
+          "strings": 1000,
+          "minTokens": 3,
+          "maxTokens": 9
+        },
+        "LONGITUDE": {
+          "version": "shape_v1",
+          "strings": 1000,
+          "blank": 36,
+          "minTokens": 1,
+          "maxTokens": 1,
+          "decimal": 964,
+          "groupedDecimal": 964
+        },
+        "NIGHT_EXTN_YN": {
+          "version": "shape_v1",
+          "strings": 1000,
+          "blank": 3,
+          "trimmed": 3,
+          "minTokens": 1,
+          "maxTokens": 1
+        },
+        "OPER_CLOSE_DATE": {
+          "version": "shape_v1",
+          "strings": 1000,
+          "minTokens": 1,
+          "maxTokens": 1
+        },
+        "OPER_OPEN_DATE": {
+          "version": "shape_v1",
+          "strings": 1000,
+          "minTokens": 1,
+          "maxTokens": 1
+        },
+        "PARTCLR": {
+          "version": "shape_v1",
+          "strings": 1000,
+          "blank": 791,
+          "minTokens": 1,
+          "maxTokens": 2
+        },
+        "PHONE_NUMBER": {
+          "version": "shape_v1",
+          "strings": 1000,
+          "blank": 333,
+          "minTokens": 1,
+          "maxTokens": 1
+        },
+        "RDNMADR": {
+          "version": "shape_v1",
+          "strings": 1000,
+          "blank": 4,
+          "minTokens": 3,
+          "maxTokens": 12
+        },
+        "REFERENCE_DATE": {
+          "version": "shape_v1",
+          "strings": 1000,
+          "minTokens": 1,
+          "maxTokens": 1
+        },
+        "SHLTR_NM": {
+          "version": "shape_v1",
+          "strings": 1000,
+          "minTokens": 1,
+          "maxTokens": 3
+        },
+        "SHLTR_TYPE": {
+          "version": "shape_v1",
+          "strings": 1000,
+          "minTokens": 1,
+          "maxTokens": 1
+        },
+        "STAYNG_YN": {
+          "version": "shape_v1",
+          "strings": 1000,
+          "blank": 333,
+          "trimmed": 333,
+          "minTokens": 1,
+          "maxTokens": 1
+        },
+        "WKEND_USE_YN": {
+          "version": "shape_v1",
+          "strings": 1000,
+          "blank": 4,
+          "trimmed": 4,
+          "minTokens": 1,
+          "maxTokens": 1
+        }
+      },
+      "rowCount": 1000,
+      "warnings": [
+        "First-party web contract, not a documented OpenAPI. Declared totalCount is not observed population coverage.",
+        "Rows can predate the catalogue modification date; inspect each record's reference/operation dates before temporal comparisons.",
+        "STD first page only (at most 1000 rows); not representative or population-verified. Original JSON types and record dates are preserved."
+      ],
+      "declaration": {
+        "status": "publisher_declared",
+        "sourceUrl": "https://www.data.go.kr/data/15013199/standard.do",
+        "name": "전국무더위쉼터표준데이터"
+      }
+    },
+    {
+      "id": "o2",
+      "pk": "15159663",
+      "delivery": "FILE",
+      "asset": "경상북도 김천시_65세이상 노인인구 현황_20260530.csv",
+      "requestSha256": "2636a02d2c97b3fb64e4e4e235ff897e872ba83854331daafc97e4a66d1e26b0",
+      "contentSha256": "44562395a3a1a9a43252b664b5352fa6b64b27e0cd693cbca3485a68b14e539b",
+      "contractSha256": "632ed41afa017e2ae107b2b9a40916cc2a5ff99d443b9b300d995ba9048ec5f4",
+      "rowsSha256": "55efa497e5daec77babc77b14c82aba149dc3cdc4ae0ce5f7cfedda5937a51a8",
+      "observedAt": "2026-09-07T02:50:28.753534Z",
+      "columns": [
+        "100세 이상 인구수",
+        "65-69세 인구수",
+        "70-74세 인구수",
+        "75-79세 인구수",
+        "80-84세 인구수",
+        "85-89세 인구수",
+        "90-94세 인구수",
+        "95-99세 인구수",
+        "남자인구수(65세이상)",
+        "데이터기준일",
+        "시군구",
+        "시도",
+        "여자인구수(65세이상)",
+        "총인구수(65세이상)",
+        "행정동명"
+      ],
+      "columnTypes": {
+        "100세 이상 인구수": [
+          "string"
+        ],
+        "65-69세 인구수": [
+          "string"
+        ],
+        "70-74세 인구수": [
+          "string"
+        ],
+        "75-79세 인구수": [
+          "string"
+        ],
+        "80-84세 인구수": [
+          "string"
+        ],
+        "85-89세 인구수": [
+          "string"
+        ],
+        "90-94세 인구수": [
+          "string"
+        ],
+        "95-99세 인구수": [
+          "string"
+        ],
+        "남자인구수(65세이상)": [
+          "string"
+        ],
+        "데이터기준일": [
+          "string"
+        ],
+        "시군구": [
+          "string"
+        ],
+        "시도": [
+          "string"
+        ],
+        "여자인구수(65세이상)": [
+          "string"
+        ],
+        "총인구수(65세이상)": [
+          "string"
+        ],
+        "행정동명": [
+          "string"
+        ]
+      },
+      "columnProfiles": {
+        "100세 이상 인구수": {
+          "version": "shape_v1",
+          "strings": 23,
+          "minTokens": 1,
+          "maxTokens": 1,
+          "decimal": 23,
+          "groupedDecimal": 23
+        },
+        "65-69세 인구수": {
+          "version": "shape_v1",
+          "strings": 23,
+          "minTokens": 1,
+          "maxTokens": 1,
+          "decimal": 23,
+          "groupedDecimal": 23
+        },
+        "70-74세 인구수": {
+          "version": "shape_v1",
+          "strings": 23,
+          "minTokens": 1,
+          "maxTokens": 1,
+          "decimal": 23,
+          "groupedDecimal": 23
+        },
+        "75-79세 인구수": {
+          "version": "shape_v1",
+          "strings": 23,
+          "minTokens": 1,
+          "maxTokens": 1,
+          "decimal": 23,
+          "groupedDecimal": 23
+        },
+        "80-84세 인구수": {
+          "version": "shape_v1",
+          "strings": 23,
+          "minTokens": 1,
+          "maxTokens": 1,
+          "decimal": 23,
+          "groupedDecimal": 23
+        },
+        "85-89세 인구수": {
+          "version": "shape_v1",
+          "strings": 23,
+          "minTokens": 1,
+          "maxTokens": 1,
+          "decimal": 23,
+          "groupedDecimal": 23
+        },
+        "90-94세 인구수": {
+          "version": "shape_v1",
+          "strings": 23,
+          "minTokens": 1,
+          "maxTokens": 1,
+          "decimal": 23,
+          "groupedDecimal": 23
+        },
+        "95-99세 인구수": {
+          "version": "shape_v1",
+          "strings": 23,
+          "minTokens": 1,
+          "maxTokens": 1,
+          "decimal": 23,
+          "groupedDecimal": 23
+        },
+        "남자인구수(65세이상)": {
+          "version": "shape_v1",
+          "strings": 23,
+          "minTokens": 1,
+          "maxTokens": 1,
+          "decimal": 23,
+          "groupedDecimal": 23
+        },
+        "데이터기준일": {
+          "version": "shape_v1",
+          "strings": 23,
+          "minTokens": 1,
+          "maxTokens": 1
+        },
+        "시군구": {
+          "version": "shape_v1",
+          "strings": 23,
+          "minTokens": 1,
+          "maxTokens": 1
+        },
+        "시도": {
+          "version": "shape_v1",
+          "strings": 23,
+          "minTokens": 1,
+          "maxTokens": 1
+        },
+        "여자인구수(65세이상)": {
+          "version": "shape_v1",
+          "strings": 23,
+          "minTokens": 1,
+          "maxTokens": 1,
+          "decimal": 23,
+          "groupedDecimal": 23
+        },
+        "총인구수(65세이상)": {
+          "version": "shape_v1",
+          "strings": 23,
+          "minTokens": 1,
+          "maxTokens": 1,
+          "decimal": 23,
+          "groupedDecimal": 23
+        },
+        "행정동명": {
+          "version": "shape_v1",
+          "strings": 23,
+          "minTokens": 1,
+          "maxTokens": 1
+        }
+      },
+      "rowCount": 23,
+      "warnings": [
+        "Direct CSV first-row header; string values are not implicitly converted to numeric identifiers or measures."
+      ],
+      "declaration": {
+        "status": "publisher_declared",
+        "sourceUrl": "https://www.data.go.kr/data/15159663/fileData.do",
+        "name": "경상북도 김천시_65세이상 노인인구 현황_20260530",
+        "provider": "경상북도 김천시",
+        "description": "김천시의 65세 이상 노인인구 현황 자료는 읍면동별로 65세 이상 노인 인구를 5세 단위로 세분화 하여 집계한 통계 자료입니다.  데이터 항목은, 행정동(1개 읍, 14개 면, 7개 동), 총계, 남자계, 여자계, 연령별(5세 기준)로 이뤄져 있습니다.  노인인구 현황 자료를 분석하여 다양한 인구통계, 정책수립, 노인 취업, 맞춤 돌봄 사업의 확충 등에 기초자료로 활용됩니다.  - 연령기준 (65~69세, 70~74세, 75~79세, 80~84세, 85~89세, 90~94세, 95~99세, 100세 이상) - 본 자료는 1년 주기로 업데이트하고, 매년 최신자료로 현행화할 예정입니다.",
+        "modifiedAt": "2026-05-30"
+      }
+    },
+    {
+      "id": "o5",
+      "pk": "15137835",
+      "delivery": "FILE",
+      "asset": "경기도 의정부시_빅데이터공유활용 시군구 코드_20250901.csv",
+      "requestSha256": "e683f2199b12cfb81e8766add678d860394324996a9aef91a19c1d28f9c865e2",
+      "contentSha256": "0eadd502d5dcdf4da71d22d1edd70e0104af8e19e722fd3cda78642639bbba5d",
+      "contractSha256": "173dfffec1e289f510c73d5b68efd071aece14aeaf2c18ed024e994948bcc5db",
+      "rowsSha256": "fe62245e98938ade509fe0d35aab65a9ecc4ebb2b715f87b08c787c59356a136",
+      "observedAt": "2026-09-07T02:52:17.62082Z",
+      "columns": [
+        "법정동명",
+        "법정동코드",
+        "시군구명",
+        "시도명",
+        "행정구역명",
+        "행정구역코드",
+        "행정기관생성일",
+        "행정동명",
+        "행정동명(영문)",
+        "행정동코드"
+      ],
+      "columnTypes": {
+        "법정동명": [
+          "string"
+        ],
+        "법정동코드": [
+          "string"
+        ],
+        "시군구명": [
+          "string"
+        ],
+        "시도명": [
+          "string"
+        ],
+        "행정구역명": [
+          "string"
+        ],
+        "행정구역코드": [
+          "string"
+        ],
+        "행정기관생성일": [
+          "string"
+        ],
+        "행정동명": [
+          "string"
+        ],
+        "행정동명(영문)": [
+          "string"
+        ],
+        "행정동코드": [
+          "string"
+        ]
+      },
+      "columnProfiles": {
+        "법정동명": {
+          "version": "shape_v1",
+          "strings": 186,
+          "minTokens": 1,
+          "maxTokens": 1
+        },
+        "법정동코드": {
+          "version": "shape_v1",
+          "strings": 186,
+          "minTokens": 1,
+          "maxTokens": 1,
+          "decimal": 186,
+          "groupedDecimal": 186
+        },
+        "시군구명": {
+          "version": "shape_v1",
+          "strings": 186,
+          "minTokens": 1,
+          "maxTokens": 1
+        },
+        "시도명": {
+          "version": "shape_v1",
+          "strings": 186,
+          "minTokens": 1,
+          "maxTokens": 1
+        },
+        "행정구역명": {
+          "version": "shape_v1",
+          "strings": 186,
+          "minTokens": 1,
+          "maxTokens": 1
+        },
+        "행정구역코드": {
+          "version": "shape_v1",
+          "strings": 186,
+          "minTokens": 1,
+          "maxTokens": 1,
+          "decimal": 186,
+          "groupedDecimal": 186
+        },
+        "행정기관생성일": {
+          "version": "shape_v1",
+          "strings": 186,
+          "minTokens": 1,
+          "maxTokens": 1
+        },
+        "행정동명": {
+          "version": "shape_v1",
+          "strings": 186,
+          "minTokens": 1,
+          "maxTokens": 1
+        },
+        "행정동명(영문)": {
+          "version": "shape_v1",
+          "strings": 186,
+          "minTokens": 1,
+          "maxTokens": 1
+        },
+        "행정동코드": {
+          "version": "shape_v1",
+          "strings": 186,
+          "minTokens": 1,
+          "maxTokens": 1,
+          "decimal": 186,
+          "groupedDecimal": 186
+        }
+      },
+      "rowCount": 186,
+      "warnings": [
+        "Direct CSV first-row header; string values are not implicitly converted to numeric identifiers or measures.",
+        "Exact string selection applied before the row limit. Scan coverage is only this downloaded asset, not dataset/population completeness or verified geographic scope."
+      ],
+      "selection": {
+        "mode": "exact_strings_v1",
+        "scannedRows": 21694,
+        "matchedRows": 186,
+        "returnedRows": 186,
+        "exhausted": true
+      },
+      "declaration": {
+        "status": "publisher_declared",
+        "sourceUrl": "https://www.data.go.kr/data/15137835/fileData.do",
+        "name": "경기도 의정부시_빅데이터공유활용 행정동 코드_20250901",
+        "provider": "경기도 의정부시",
+        "description": "의정부시에서 자체 운영중인 빅데이터 공유 활용시스템 내에서 수집한 전국 행정동 코드 데이터(행정동코드, 법정동코드,시도명,시군구명,행정구역명,행정동명 등) 입니다. 행정동 코드는 대한민국의 행정동(行政洞) 단위를 구분하기 위해 사용하는 표준화된 숫자 코드입니다. 이 코드는 통계청과 행정안전부 등에서 지역 데이터를 정확하게 관리하고 제공하기 위해 사용됩니다. 행정동 코드 앞 5자리: 시군구 코드 (예: 11110 → 서울 종로구), 다음 3자리: 행정동 코드 (예: 105 → 청운효자동), 마지막 2자리: 리 단위 (대부분 00으로 끝남) 행정동 코드는 주민등록지 관리, 공공 데이터 (통계청 인구 동향), 주소 정제 및 행정 서비스 제공, 지리정보시스템(GIS) 등에 활용됩니다.",
+        "modifiedAt": "2025-11-05"
+      }
+    }
+  ],
+  "counterexampleRows": [
+    {
+      "elderly_population_number": 1390,
+      "o1.INSTT_NM": "전라남도 여수시",
+      "o1.LNMADR": "전라남도 여수시 남면 두모리 1397-2",
+      "o1.OPER_CLOSE_DATE": "2019-09-30",
+      "o1.OPER_OPEN_DATE": "2019-05-15",
+      "o1.REFERENCE_DATE": "2019-03-06",
+      "o1.SHLTR_NM": "두포경로당",
+      "o2.데이터기준일": "2026-05-30",
+      "o2.시군구": "김천시",
+      "o2.시도": "경상북도",
+      "o2.행정동명": "남면",
+      "o5.법정동명": "남면",
+      "o5.법정동코드": "4715032000",
+      "o5.행정기관생성일": "1995-01-01",
+      "o5.행정동코드": "4715032000"
+    },
+    {
+      "elderly_population_number": 1390,
+      "o1.INSTT_NM": "전라남도 여수시",
+      "o1.LNMADR": "전라남도 여수시 남면 안도리 1006-3",
+      "o1.OPER_CLOSE_DATE": "2019-09-30",
+      "o1.OPER_OPEN_DATE": "2019-05-15",
+      "o1.REFERENCE_DATE": "2019-03-06",
+      "o1.SHLTR_NM": "이야포경로당",
+      "o2.데이터기준일": "2026-05-30",
+      "o2.시군구": "김천시",
+      "o2.시도": "경상북도",
+      "o2.행정동명": "남면",
+      "o5.법정동명": "남면",
+      "o5.법정동코드": "4715032000",
+      "o5.행정기관생성일": "1995-01-01",
+      "o5.행정동코드": "4715032000"
+    },
+    {
+      "elderly_population_number": 1390,
+      "o1.INSTT_NM": "전라남도 여수시",
+      "o1.LNMADR": "전라남도 여수시 남면 화태리 201",
+      "o1.OPER_CLOSE_DATE": "2019-09-30",
+      "o1.OPER_OPEN_DATE": "2019-05-15",
+      "o1.REFERENCE_DATE": "2019-03-06",
+      "o1.SHLTR_NM": "화태마을회관",
+      "o2.데이터기준일": "2026-05-30",
+      "o2.시군구": "김천시",
+      "o2.시도": "경상북도",
+      "o2.행정동명": "남면",
+      "o5.법정동명": "남면",
+      "o5.법정동코드": "4715032000",
+      "o5.행정기관생성일": "1995-01-01",
+      "o5.행정동코드": "4715032000"
+    },
+    {
+      "elderly_population_number": 1390,
+      "o1.INSTT_NM": "전라남도 여수시",
+      "o1.LNMADR": "전라남도 여수시 남면 우학리 680-17 내외진복지회관",
+      "o1.OPER_CLOSE_DATE": "2019-09-30",
+      "o1.OPER_OPEN_DATE": "2019-05-15",
+      "o1.REFERENCE_DATE": "2019-03-06",
+      "o1.SHLTR_NM": "내외진 마을회관",
+      "o2.데이터기준일": "2026-05-30",
+      "o2.시군구": "김천시",
+      "o2.시도": "경상북도",
+      "o2.행정동명": "남면",
+      "o5.법정동명": "남면",
+      "o5.법정동코드": "4715032000",
+      "o5.행정기관생성일": "1995-01-01",
+      "o5.행정동코드": "4715032000"
+    },
+    {
+      "elderly_population_number": 1390,
+      "o1.INSTT_NM": "전라남도 여수시",
+      "o1.LNMADR": "전라남도 여수시 남면 안도리 1141-2",
+      "o1.OPER_CLOSE_DATE": "2019-09-30",
+      "o1.OPER_OPEN_DATE": "2019-05-15",
+      "o1.REFERENCE_DATE": "2019-03-06",
+      "o1.SHLTR_NM": "서고지마을회관",
+      "o2.데이터기준일": "2026-05-30",
+      "o2.시군구": "김천시",
+      "o2.시도": "경상북도",
+      "o2.행정동명": "남면",
+      "o5.법정동명": "남면",
+      "o5.법정동코드": "4715032000",
+      "o5.행정기관생성일": "1995-01-01",
+      "o5.행정동코드": "4715032000"
+    },
+    {
+      "elderly_population_number": 1390,
+      "o1.INSTT_NM": "전라남도 여수시",
+      "o1.LNMADR": "전라남도 여수시 남면 연도리 1590-19",
+      "o1.OPER_CLOSE_DATE": "2019-09-30",
+      "o1.OPER_OPEN_DATE": "2019-05-15",
+      "o1.REFERENCE_DATE": "2019-03-06",
+      "o1.SHLTR_NM": "연도마을회관",
+      "o2.데이터기준일": "2026-05-30",
+      "o2.시군구": "김천시",
+      "o2.시도": "경상북도",
+      "o2.행정동명": "남면",
+      "o5.법정동명": "남면",
+      "o5.법정동코드": "4715032000",
+      "o5.행정기관생성일": "1995-01-01",
+      "o5.행정동코드": "4715032000"
+    },
+    {
+      "elderly_population_number": 1390,
+      "o1.INSTT_NM": "전라남도 여수시",
+      "o1.LNMADR": "전라남도 여수시 남면 안도리 888",
+      "o1.OPER_CLOSE_DATE": "2019-09-30",
+      "o1.OPER_OPEN_DATE": "2019-05-15",
+      "o1.REFERENCE_DATE": "2019-03-06",
+      "o1.SHLTR_NM": "안도마을회관",
+      "o2.데이터기준일": "2026-05-30",
+      "o2.시군구": "김천시",
+      "o2.시도": "경상북도",
+      "o2.행정동명": "남면",
+      "o5.법정동명": "남면",
+      "o5.법정동코드": "4715032000",
+      "o5.행정기관생성일": "1995-01-01",
+      "o5.행정동코드": "4715032000"
+    },
+    {
+      "elderly_population_number": 1390,
+      "o1.INSTT_NM": "전라남도 여수시",
+      "o1.LNMADR": "전라남도 여수시 남면 두모리 946",
+      "o1.OPER_CLOSE_DATE": "2019-09-30",
+      "o1.OPER_OPEN_DATE": "2019-05-15",
+      "o1.REFERENCE_DATE": "2019-03-06",
+      "o1.SHLTR_NM": "직포마을회관",
+      "o2.데이터기준일": "2026-05-30",
+      "o2.시군구": "김천시",
+      "o2.시도": "경상북도",
+      "o2.행정동명": "남면",
+      "o5.법정동명": "남면",
+      "o5.법정동코드": "4715032000",
+      "o5.행정기관생성일": "1995-01-01",
+      "o5.행정동코드": "4715032000"
+    },
+    {
+      "elderly_population_number": 1390,
+      "o1.INSTT_NM": "전라남도 여수시",
+      "o1.LNMADR": "전라남도 여수시 남면 우학리 649-3",
+      "o1.OPER_CLOSE_DATE": "2019-09-30",
+      "o1.OPER_OPEN_DATE": "2019-05-15",
+      "o1.REFERENCE_DATE": "2019-03-06",
+      "o1.SHLTR_NM": "남면사무소",
+      "o2.데이터기준일": "2026-05-30",
+      "o2.시군구": "김천시",
+      "o2.시도": "경상북도",
+      "o2.행정동명": "남면",
+      "o5.법정동명": "남면",
+      "o5.법정동코드": "4715032000",
+      "o5.행정기관생성일": "1995-01-01",
+      "o5.행정동코드": "4715032000"
+    }
+  ],
+  "expected": {
+    "rejectedCandidatePairs": 9,
+    "automaticAcceptance": false,
+    "reason": "cross_municipality_same_name_and_incompatible_reference_periods",
+    "positiveGoalOutput": "pending"
+  }
+}

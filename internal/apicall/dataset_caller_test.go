@@ -38,6 +38,32 @@ func (f *fakeCredentialSource) External(_ context.Context, provider, scope strin
 	return f.key, f.domain, f.externalErr
 }
 
+func TestDatasetCallerDefaultPortalBaseIsAbsoluteBeforeCredentialAccess(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, ".config"))
+	t.Setenv("APPDATA", filepath.Join(home, "AppData"))
+	for _, base := range []string{"", "https://portal.test/"} {
+		want := "https://www.data.go.kr"
+		if base != "" {
+			want = "https://portal.test"
+		}
+		requests := 0
+		f := fetch.New(fetch.WithDelay(0), fetch.WithHTTPClient(&http.Client{Transport: externalRoundTripFunc(func(r *http.Request) (*http.Response, error) {
+			requests++
+			if !strings.HasPrefix(r.URL.String(), want+"/data/123/") {
+				t.Errorf("relative or changed portal origin: %q", r.URL.String())
+			}
+			return &http.Response{StatusCode: 404, Header: make(http.Header), Body: io.NopCloser(strings.NewReader("not found")), Request: r}, nil
+		})}))
+		credentials := &fakeCredentialSource{}
+		_, err := NewDatasetCaller(f, base, credentials).Call(context.Background(), DatasetCallRequest{PK: "123"})
+		if err == nil || requests != 2 || credentials.dataGoReads != 0 || credentials.externalReads != 0 {
+			t.Fatalf("unexpected preflight: calls=%d err=%v credentials=%+v", requests, err, credentials)
+		}
+	}
+}
+
 func TestDatasetCallerDispatchesKnownLinkThroughTypedProvider(t *testing.T) {
 	const pk = "15116894"
 	portalServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

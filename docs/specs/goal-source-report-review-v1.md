@@ -1,0 +1,289 @@
+# 원천 보고의 분리 검토 v1
+
+상태: 제한된 원천 보고 경로 구현·개발 검증 완료. 실제 모델 응답과 실패를 포함한 분모는
+[검증 결과](../research/source-report-review-validation-2026-09-08.md)에 보존한다.
+[주장별 근거·재계획 결정](https://github.com/JungHoonGhae/odeduck/issues/51)의 원천 보고 부분이며,
+G1–G5의 범위나 전체 완료 기준을 바꾸지 않는다.
+
+분석 검토의 현재 입력은 [원본 셀 재사용](original-cell-evidence-reuse-v1.md)과
+[비교 근거 v3 투영](source-comparison-evidence-v1.md#analysis-review-projection-v3)을 따른다.
+본문은 primary evidence와 analysis.additionalEvidence에 한 번만 두고 sourceContext는 packetId로
+참조한다. 기존 원천 보고 v1과 과거 검토 archive는 그대로 보존한다.
+
+## 등록된 결정의 마감 경계 — 2026-09-09
+
+사용자가 현재 등록된 Wayfinder 티켓만 마치도록 범위를 고정했다. 최소 승인 계약은 아래 구현된
+원천 보고와 opt-in typed 분석·전체 범위·원천 설명 검토로 확정한다. 원천 revision·계산 재현,
+출력/설명별 지지와 원래 목표 적합성은 각각 남기며 하나의 인용이나 confidence로 합치지 않는다.
+부족한 근거의 재계획은 [같은 목표의 수정 실행](goal-result-execution-v1.md#검토-중-재계획--2026-09-08-추가-계약)을 따른다.
+
+사업 가설은 지지된 전제와 제안·가정·반증 방법을 구분해야 하지만 이 버전의 자동 완료 대상은 아니다.
+인과·현재 안전성·canonical identity·미지원 공간 분석 역시 승인 범위에 넣지 않는다. 더 강한 원래
+질문을 약한 원천 보고로 낮추어 완료하지 않는다. 이 **지원 경계의 결정**은 해당 기능의 구현이나
+G1–G5 완주가 아니며, 미완료 제품 검증은 [완료 계획](goal-driven-completion-plan.md)에 보존한다.
+이 경계를 넓히는 기능·검증은 이번 티켓 마감에 자동 추가하지 않는다.
+
+## Problem Statement
+
+실제로 실행한 원천 보고도 영구적인 단일 의미 검토 값 때문에 완료될 수 없다. 반대로 계획기의
+자기 승인이나 원천 인용의 존재만으로 질문에 맞는 답이라고 판정해서는 안 된다.
+
+## Solution
+
+신뢰된 시작 설정으로 선택한 검토자가 계획 이력 없는 별도 요청에서 원래 질문과 산출물을 검토한다.
+원천 지지와 원래 목표 충족을 따로 기록한다. 기본은 꺼짐이며, 승인 결과도 모델 판단이지 현장 검증이나
+진실 보증이 아니다. 검토 미충족·실패는 같은 목표의 추가 탐색으로 돌아간다.
+
+## User Stories
+
+1. As a 사용자, I want 자료에 실린 사실을 출처와 함께 받아, 불필요한 현실 효과 검증을 기다리지 않는다.
+2. As a 사용자, I want 원래 질문의 범위를 검토해, 계획기가 더 쉬운 질문으로 바꾸지 못하게 한다.
+3. As a 사용자, I want 필드별 지지 근거를 받아, 일부 맞는 값이 답 전체를 승인하지 않게 한다.
+4. As a 사용자, I want 원천 보고와 현재 상태·계산·가설을 구분해, 더 강한 결론을 오해하지 않는다.
+5. As a 사용자, I want 검토자와 한계를 확인해, 모델 검토를 사람/제공기관 승인으로 오해하지 않는다.
+6. As a 사용자, I want 외부 전송을 직접 설정해, 검토 도입이 원문 공개 범위를 넓히지 않게 한다.
+7. As a 사용자, I want 미지원 연산도 기존대로 실행·재계획해, 새 검토가 기능을 없애지 않게 한다.
+8. As a 운영자, I want 검토 비용·실패·근거 revision을 남겨, 무한 재검토와 오래된 승인을 막는다.
+9. As a CLI/MCP 사용자, I want 같은 실행·검토 판정을 받아, 인터페이스에 따라 신뢰가 달라지지 않는다.
+
+## Implementation Decisions
+
+- 기존 Engine에 `review_result` 행동을 추가한다. 모델 입력은 현재 composition ID뿐이며 판정·원문·
+  검토자 설정을 입력하지 못한다. Review는 신뢰된 dependency를 통해 실행하고 Engine이 결과에 묶는다.
+- 첫 지원은 한 관측의 원천 필드 보고다. join/aggregate/measure/spatial 결과의 의미 승인, 인과/현재
+  안전성·모집단/사업 가설은 이 검토 경로에서 승인하지 않는다. 기존 실행 기능은 유지한다.
+- 실행의 구조 검사가 모두 통과해야 한다. 원래 Goal와 불변 Contract를 함께 검토한다. 검토자는
+  원천 보고만으로 원래 질문이 충족되는지 따로 판단한다. 더 강한 요청을 보고로 낮추어 승인하지 않는다.
+- 입력은 최대 20개 retained record, 8개 관측 필드의 이미 공개 허용된 단일 Evidence Packet과 실제
+  원천 메타데이터·요청·recipe·실행 결과다. 모든 retained row와 선택/시간/선택조건 필드를 포함해야 한다.
+  결과 필드의 값은 이 packet으로 재현 가능해야 하며, 전체 표본을 새로 공개하거나 잘라 승인하지 않는다.
+- 별도 tool-free 요청은 기존 coding-agent CLI adapter를 재사용한다. 계획 이력·oracle·예전 검토 답을
+  보내지 않는다. 같은 provider도 별도 context일 뿐 통계적 독립·정답 보증은 아니다. 자동 fallback 없음.
+- 검토는 `source_report`의 출력별 지지와 원래 목표 적합성에 supported/unsupported/insufficient,
+  이유와 실제 packet ID를 반환한다. 빠진/중복/가짜 ID, 잘못된 형식, 원문 credential material, 실패는
+  승인하지 않는다. 모든 필수 출력과 목표가 supported여야 `output_ready`가 된다.
+- Engine이 검토 입력 hash, 실행 revision, 시도 revision, provider와 검토 계약 버전을 기록한다.
+  같은 실행+같은 근거로 재시도하지 못하며 행·필드 순서만 바꾸어도 같은 근거로 취급한다.
+  세션당 최대 세 번 호출한다. 만료/취소/오류를 승인으로 바꾸지 않는다.
+  새 실행은 이전 검토를 현재 결과에서 제거하고 시도 이력은 보존한다. 만료 시 검토 원문도 폐기한다.
+- CLI는 `--review-source-reports`와 명시적인 `--agent`/`--share-evidence`가 필요하다. MCP는 서버 시작
+  시 `--review-goals-with=<provider>` 및 `--share-goal-evidence`가 필요하다. MCP host 공개 허용을
+  다른 provider 전송 허용으로 재해석하지 않는다. 검토 provider를 모델 tool argument로 바꿀 수 없다.
+- `NeedsSemanticReview=false`는 이 제한된 검토를 통과했다는 호환 요약이다. Review의 method/범위/한계가
+  함께 출력되며 외부 현실 검증·sample_verified·장부 재사용 승인으로 승격하지 않는다.
+
+## Testing Decisions
+
+사용자 위임으로 기존 Start/Advance/Run, CLI command, MCP JSON-RPC와 외부 모델 adapter의 공개 함수를
+seam으로 선택한다. 원천 보고 양성부터 TDD로 구현하고, 입력 공개·revision·구조/목표/주장별 음성을 보강한다.
+모델 fixture로 상태 전이만 검증한 것은 실제 양성 검토 증거로 세지 않는다. 독립 원천에 고정된 최소 두 분야의
+양성/강한 결론 음성을 실제 격리 reviewer로 각각 세 번 실행하고 원 응답·전체 분모를 보존한다. 이는 개발
+calibration이지 held-out 평가/오류율 보증이 아니다. 실패 시 해당 경로를 유효하게 검증했다고 보고하지 않는다.
+G1–G5 원문 목표와 기존 oracle은 변경하지 않는다. 별도 단순 양성은 추가 개발 사례로 명시한다.
+
+개발 calibration 명령 handler도 사용자 위임에 따른 검증 seam이다. 외부 inspection/model만 대체하고
+실제 Engine으로 성공·모델 오류·오탐·원천 누락의 예정 12개 기록 및 기존 출력 파일 비덮어쓰기를 검사한다.
+검토 adapter는 calibration이 명시적으로 저장할 수 있는 원 응답을 별도로 반환하지만 CLI/MCP 목표에는
+구조화된 Assessment만 전달한다. 원 응답 보존 상한은 1 MiB이며 초과 시 잘림을 표시하고 승인하지 않는다.
+
+## Out of Scope
+
+이 slice 밖: 계산·가설의 자동 승인, 인물/시설 identity 승인, population 완전성 승인, 장부 재사용,
+외부 현장 진실 보증, 모든 G1–G5의 자율 완주. 제품 목표에서는 계속 미완료다.
+
+## Further Notes
+
+[원천 지지의 1차 자료 검토](../research/claim-scoped-evidence-primary-sources-2026-09-08.md)는 출처 지지와
+질문 적합성이 별개임을 뒷받침한다. 모델 검토의 실제 정확도는 그 문헌이 아니라 위 calibration으로 점검한다.
+
+## 관계·계산 검토 — 2026-09-08 후속 계약
+
+상태: 경로 구현. 최초 개발 calibration은 9/12로 미통과였고, 같은 질문·정답의 실제 취득 후속은
+12/12 기대 일치다. scanner의 선택/전체 검사/보관 근거로 환경 양성의 누락을 해결했다.
+[실패 포함 검증](../research/source-report-review-validation-2026-09-08.md#후속-관계계산-검토의-개발-검증)을
+보존하며 범용 의미 정확도·G1–G5 완료로 확대하지 않는다. 원천 보고 v1의 권한·검토 기록은 유지한다. 기존 제외 범위 중
+typed 관계·계산을 별도 opt-in으로 확장한다. 이는 I6/I7/M4의 후속이며 G1–G5와 모집단 통과선을 낮추지 않는다.
+
+- 같은 `review_result`와 검토 dependency를 사용한다. 신뢰된 시작 정책의 `ReviewAnalyses`가 켜져야
+  관계·계산 검토를 허용한다. CLI `--review-analyses`는 명시적 agent와 `--share-evidence`가 필요하고,
+  MCP `--review-goal-analyses`는 기존 수신 provider와 공개 설정에 추가한다. 원천 보고 설정만으로
+  계산 검토가 켜지지 않으며 두 종류가 세 번의 검토·같은 만료·실행 revision 예산을 공유한다.
+- 지원은 관측 원본과 Source Reduction에 대한 기존 typed 결합·수치 변환·집계·시간 비교다.
+  공간 결과와 그 후보 stream 검토, 인과·현재 안전성·사업 가설은 후속이다. 기존 연산은 계속 실행 가능하다.
+- Engine은 실제 보유 원본으로 각 Source Reduction과 현재 composition을 재실행해 결과를 대조한다.
+  이는 원천 revision에 대한 로컬 재현 검사이지 독립 검산이나 의미 승인이 아니다. 정답의 독립성은
+  별도의 원천 oracle 테스트가 담당한다. 원본 행을 검토자로 보내기 위한 우회로로 사용하지 않는다.
+- 실제 결과의 값을 이미 공개된 Evidence Packet들로 다시 계산할 수 있어야 한다. 직접 결합되는
+  관측은 실제 결합·시간 선택을 통과해 산술/집계에 기여한 모든 행의 필요한 필드를 공개해야 한다.
+  Engine이 원본 lineage에서 이 위치를 기록하며, 0이나 서로 상쇄되는 항도 포함한다. 기여하지 않은
+  출력 값을 추가 전송할 필요는 없고 전체 취득·결합 범위 지표는 유지한다. 다만 미대응 기록의 비교
+  필드와 지표 재현은 [미대응 추적 계약](goal-result-execution-v1.md#미대응-기록-추적--2026-09-08-추가-계약)을 따른다.
+  명시적으로 요청한 [미대응 결과 표](goal-result-execution-v1.md#미대응-원천-값의-결과-표)도
+  모든 보고 필드가 공개돼야 하며 보유 원본과 공개 근거로 각각 재현한다. 표는 계산 입력이 아니고
+  기존 검토 입력 hash에 함께 묶인다. `analysis.outputSha256`은 종전처럼 계산 행의 hash다.
+  계산된 그룹을 공개했다면 원본 구성원 전체를
+  추가 공개하지 않는다. 원본 구성원은 로컬에서 집계·시간·lineage 검사에만 사용한다. 계산에 쓰인
+  원본 필드마다 선택 근거가 있어야 하며 일부 예시 값은 전체 행을 검토했다는 뜻이 아니다.
+- 출력은 명시적 Select를 사용한다. 원천별 필드 의미·join key·단위·시간·선택 조건을 검토할 수 있도록
+  관련 필드 metadata, 원래 요청·선집계 recipe·모든 구성원 참조·실제 결합 지표를 보존한다. 무관한
+  필드 metadata는 검토 입력에서만 투영하고 관측 원본은 변경하지 않는다. 기존 8 packet/64 KiB와
+  검토 입력 96 KiB 한도를 유지하며 원문이나 결과를 자동으로 잘라 승인하지 않는다.
+- 별도 tool-free 검토는 원래 Goal와 불변 Contract, 출력별 지지 외에 `relations`, `periods`,
+  `measurements`, `coverage`를 각각 판정한다. 각 판정은 실제 공개 packet ID들을 인용한다.
+  모든 항목과 목표 적합성이 supported일 때만 `output_ready`가 된다. 모델의 판정은 필드 의미와
+  근거에 대한 판단이며 source truth, canonical identity, 현장 검증 또는 모집단 인증이 아니다.
+- 부족한 헤더 문맥, 미대응 지역, 불분명한 단위·시점은 이유와 함께 남기고 같은 목표에서 추가 근거를
+  찾는다. 원래 목표보다 약한 Contract나 면책 문구만으로 완료하지 않는다. 기존 population 구조
+  검사를 검토자가 우회하지 못한다. 아래 추가 full-scope 계약 없이 기존 population 차단은 유지한다.
+  새 실행에는 이전 검토를 이월하지 않는다.
+
+검증 seam은 위임된 기존 Start/Advance/Run·CLI·MCP·ReviewGoal이다. 공개된 계산 그룹과 비공개 원본을
+분리하는 양성부터 구현하고, 근거 누락·가짜 인용·단위/관계/기간/범위 거절·예산/만료를 회귀로 고정한다.
+개발에 쓴 실제 원천은 기존 독립 reference와 대조하고, 실제 모델 판정은 원 응답과 전체 예정 분모를 남긴다.
+fixture 승인만으로 모델 정확도나 원래 G1–G5의 자율 완주를 주장하지 않는다.
+
+### 같은 파일의 별도 문맥 근거
+
+계산에 쓰인 관측 밖의 헤더·주석은 실제로 읽었어도 기존 검토 입력에서 빠졌다. `ReviewAnalyses`가
+켜진 경우, 이미 공개한 다른 원본 FILE 관측의 packet을 `analysis.sourceContext`로 전달한다.
+새 행동·설정·임의 문맥 입력은 추가하지 않는다. 원천 보고 v1은 그대로 두되, 연관 문맥이 있으면
+별도 관계·계산 검토 계약을 선택해 네 의미 차원과 문맥 인용을 함께 검사한다.
+
+- 연관 조건은 계산 원천의 원본 FILE과 같은 PK, 비어 있지 않은 asset, 같은 ZIP member와 유효한
+  SHA256 형식의 content/contract hash다. 다른 파일·revision, hash 누락, 파생/공간 관측은 제외한다.
+- 문맥마다 기존 packetId 참조, 선택 필드에 투영한 원천 metadata, 실제 sample request와 연결 대상
+  observation ID(`targets`)를 보존한다. 원문 선택·주소·수신자는 기존 근거 공개 계약을 따른다.
+  계산의 `artifact.sources`/`analysis.sources`와 문맥은 구분하며 원래 관측을 변경하지 않는다.
+- 같은 파일이라는 연관은 특정 표/시트에 대한 헤더 적용, 필드 의미, entity identity의 증명이 아니다.
+  검토자는 실제 위치·주변 문구로 해석하며, 빠진 적용 근거는 insufficient로 남긴다. 문맥은 계산에
+  참여하거나 역할·출력·행 기반 시간 조건·모집단 검사를 충족하지 않는다.
+- 문맥 packet ID는 판정에서 인용할 수 있다. 새 문맥 셀은 새 검토 근거가 될 수 있지만, 같은 관측
+  revision의 같은 셀을 순서/packet만 바꿔 다시 보내면 추가 검토를 얻지 못한다. 세 번의 호출과
+  8 packet/64 KiB 공개·96 KiB 검토 입력 한도, 만료·변조 차단은 유지한다.
+
+기존 G4 독립 reference와 실제 재취득을 대조해 헤더 셀·원본 주소가 계산을 바꾸지 않고 검토에
+전달되는 것을 검사한다. 이것은 입력 경계 검증이며 실제 모델의 문맥 해석 calibration은 아니다.
+별도 파일의 법령/대응표 문맥, 전체 지역 결과와 의미 승인은 이 slice에서 완료하지 않는다.
+
+### 다른 관측의 선택 근거 연결 — 2026-09-08 후속 계약
+
+같은 파일 자동 연관만으로는 별도 대응표·정의 자료의 이미 취득한 기록을 검토할 수 없다. 기존
+Composition의 `support:[{packetId,targets,purpose}]`로 실제 공개한 Evidence Packet과 계산 원천
+관측 사이의 **제안된 적용 관계**를 명시한다. 새 저장소·임의 문서 원문 입력·URL 취득은 추가하지 않는다.
+
+- 기존 Start/Advance·CLI command·MCP JSON-RPC·ReviewGoal seam을 재사용한다. `ReviewAnalyses`와
+  기존 선택 공개가 켜진 목표에서만 사용한다. packet은 이 목표의 불변 관측 revision에 속해야 한다.
+- 최대 8개 서로 다른 packet, 각 1–8개 중복 없는 target 관측과 1–1000 UTF-8 byte purpose를 받는다.
+  target은 계산의 직접 원천 또는 그 원본 lineage에 속해야 한다. 근거 자체는 계산에 참여하지 않는
+  원본 관측이며 파생/공간 기록이나 다른 목표의 packet은 거부한다. credential material은 받지 않는다.
+- `analysis.sourceContext`에 실제 packetId 참조·투영 metadata·요청·target과 `proposed:true`, purpose를
+  전달한다. purpose와 target은 계획기의 가설이지 출처의 진술이나 적용 승인 값이 아니다.
+  같은 파일 자동 문맥은 종전대로 유지하고, 명시한 packet은 그 제안 한 번만 전달한다.
+- 문맥은 원래 계산·행 수·원본 lineage·역할·출력·시간·모집단 검사를 변경하지 않는다. 적용되는
+  필드·기간·대상은 원문과 원본 위치로 검토해야 한다. 독립 승인 없이 명칭 대응이나 정의를 사실로
+  사용하지 않는다. 검토 불가·누락 근거는 같은 목표의 추가 취득·재계획으로 남긴다.
+- 같은 실행과 같은 셀 근거의 재포장으로 검토를 충전하지 않는다. 새로운 적용 제안은 새 composition과
+  실행을 필요로 하며 기존 6조합·3검토·8 packet/64 KiB·96 KiB 입력·만료·수신자 상한을 유지한다.
+
+공개 seam에서 별도 파일 근거 전달과 무관한 값 비공개, 가짜/중복/비참여 target·권한·예산·변조·
+역할 대체 차단을 검증한다. fixture 판정은 전달·상태 검증일 뿐 의미 정확도나 G4 완주가 아니다.
+외부 HTML 정의의 취득은 [공식 보조 문서 관측](source-document-acquisition-v1.md), 전체 범위 수용은
+아래 후속 계약에 둔다. 취득 지원만으로 다른 원천 revision에 대한 적용이나 G4 완주가 검증되지는 않는다.
+
+### 전체 요청 범위의 추가 검토 — 2026-09-08 후속 계약
+
+`population`은 사용자 요청의 전체 범위를 뜻한다. 파일을 다 읽은 사실과 그 파일이 요청 대상을
+모두 포괄한다는 판단은 다르다. 둘을 무조건 차단 하나로 합치지 않고 취득 전제와 의미 검토로 나눈다.
+기존 목표·원천 oracle·기본 권한은 유지한다. 모든 실제 대상의 현장 조사·통계적 인증을 보증하지 않는다.
+
+- 신뢰된 시작 정책 `ReviewFullScope`가 `ReviewAnalyses`와 기존 수신자·공개 권한에 추가로 필요하다.
+  CLI `--review-full-scope`, MCP 시작 `--review-goal-full-scope`로만 켠다. 모델 decision은 변경할 수 없다.
+- 실행기는 계산의 모든 원본 lineage에 대해 실제 취득 범위를 기록한다. FILE content/contract hash와
+  원본 위치가 있어야 한다. CSV는 끝까지 검사하고 조건 일치 행을 전부 보관해야 한다. 전체 스캔이어도
+  matched > returned이면 거부한다. XLSX는 정확한 선택 rectangle의 모든 행을 보관해야 한다.
+  rectangle은 시트·파일·목표의 전체가 아니므로 별도 원천 근거로 해석해야 한다. API/STD의 페이지,
+  공간 stream, 취득 범위가 미상인 원본은 이 버전에서 eligible하지 않다. 원천 그룹은 원본을 검사한다.
+- 이 전제가 통과하면 구조 coverage 검사는 검토 자격만 충족한다. `needsSemanticReview`와 원래
+  population 목표는 유지하며 아직 완료가 아니다. 나머지 역할·출력·시간 요구도 종전대로 충족해야 한다.
+- `analysis.fullScope`에 원본별 취득 종류·관측 revision·범위와 자격을 담는다. 별도 검토는 기존
+  네 분석 축·모든 출력·원래 GoalFit에 더해 `sourceCoverage:[{observation,finding}]`을 각 원본에
+  한 번씩 반환한다. 원본의 선택 근거 또는 그 원본을 target으로 삼은 문맥을 인용해야 한다.
+  선택 조건의 누락 대상, 시트의 논리적 표 범위, join/시간 제외와 요청한 미대응 설명을 함께 판단한다.
+  범위 밖 원천의 부재를 0이나 부정 사실로 만들지 않는다. 원천별 적용을 입증하지 못하면 insufficient다.
+- 모든 항목이 supported여야 `independent_model_full_scope_analysis_v3` 검토를 붙여 output_ready가
+  된다. 이것은 제한된 모델의 원천 기반 전체 범위 판단이며 모집단 인증·실세계 진실·고비용 행동 승인이
+  아니다. source-report/일반 analysis 권한만으로 이 경로를 열지 않고, 기존 예산·revision·공개 상한을 유지한다.
+
+기존 Start/Advance/Run·CLI/MCP·ReviewGoal seam에서 실제 CSV reader의 완전/잘린 선택, XLSX 범위,
+원본 lineage, 추가 권한, 원본별 누락·위조·거부 판정과 변조·재검토를 검증한다. 양성 fixture 승인은
+새 모델 정확도 증거가 아니다. G4의 실제 전체 범위와 정의·명칭 근거는 독립 원천 대조 후 검토하며,
+현재 sample 진단을 population 완주로 재분류하거나 기존 실패·정답을 변경하지 않는다.
+이 후속 검토의 실제 모델 정확도는 별도 검증 전까지 미확인이다. 종전 분석 calibration을 새 계약의
+통과로 간주하지 않는다.
+
+### 원천 근거를 인용한 설명 — 2026-09-09
+
+원래 G4가 요청한 기준일·개편에 따른 비교 한계는 일반 실행 주의사항으로 답할 수 없다. 기존
+`ExplanationRequirement`의 `basis`를 생략하거나 `execution`으로 두면 종전 실행 사실 설명을
+유지하고, `source`이면 실제 원천 해석을 요구한다. 불변 계약에 필요한 설명을 명시하며 원래 Goal,
+데이터 출력·역할·기간·모집단 요구는 바꾸지 않는다. 설명용 가짜 데이터 컬럼이나 역할은 만들지 않는다.
+
+- 기존 `compose → execute → review_result`에서 `composition.explanations`의
+  `{id,text,citations:[{packetId,packetRow,field}]}`를 받는다. 기존 source 요구 ID당 하나이며 최대
+  8개, 문장 1–2000 UTF-8 bytes와 1–16개 중복 없는 선택 셀 참조다. credential material을 거부한다.
+  Go Engine 입력은 JSON 인코딩 전에, CLI planner의 원 응답은 JSON 디코딩 전에 유효하지 않은
+  UTF-8을 거부한다. MCP의 wire JSON 파싱은 SDK가 담당하므로 이 검사를 모든 transport의 손상
+  탐지로 표현하지 않는다.
+- 문장은 계획기의 **해석 제안**이다. 원천 인용문이나 승인 값을 제출하지 않는다. 인용은 같은 목표에서
+  이미 공개한 불변 packet의 실제 retained row·field를 가리킨다. 원천 revision과 값·존재 상태를
+  기존 공개 근거 색인으로 대조하고, 원본 위치는 packet의 `origins`로 추적한다. missing/null/빈 문구/
+  0을 구분하며 인용 확인이 의미의 지지나 날짜·구역 대응을 증명하지 않는다.
+- 실행된 제안은 `artifact.explanations`에 문장과 참조로 반환하고, 원문과 원천 metadata는 반환된
+  View의 `evidence`·`observations`에서 해석한다. `evaluation.explanations`에는 execution 요구의
+  실행 사실만 남는다. 필수 source 설명이 빠지면 계산된 데이터 행은 보존하되 구조 판정은 partial이다.
+  이미 제출한 설명을 수정하려면 새 조합·실행이 필요하며 이전 실행·검토 이력을 덮어쓰지 않는다.
+- 원천 설명이 포함되면 별도 분석 검토 권한이 필요하다. source-report v1만으로 승인하지 않는다.
+  인용 packet은 계산 원천이나 기존 동일 파일/명시적 support 문맥으로 실제 검토 입력에 들어와야 한다.
+  인용만으로 무관한 원천을 자동 첨부하거나 공개 권한을 늘리지 않는다. packet 본문은 기존 단일
+  컬렉션에만 있고, 설명·recipe·문맥을 포함한 전체 입력에 기존 96 KiB 상한을 적용한다.
+- 분석 v3의 선택형 `SOURCE_CITED_EXPLANATIONS_V1` 계약은
+  `assessment.explanations:[{explanation,finding}]`으로 모든 source 요구를 개별 판정한다.
+  각 finding은 실제 packet을 인용하고 supported이면 제안의 모든 근거 packet을 포함해야 한다.
+  설명 전체의 지지와 요구에 대한 응답을 검토하며, 문장을 몰래 고쳐 승인하지 않는다. 누락·중복·
+  알 수 없는 ID·위조 인용·변조는 거부한다. source 설명이 없던 v3·source-report v1 응답은 유지한다.
+- source 설명, 데이터 출력, 기존 분석 축·선택형 원본별 범위·원래 GoalFit가 모두 supported여야
+  output_ready가 된다. 인용 존재·면책 문구·검토자 승인만으로 독립 정답이나 자율 완주를 주장하지 않는다.
+  기존 6조합·3검토·8 packet/64 KiB 공개·만료를 유지한다. 만료 시 조합에 남은 설명 원문도 폐기한다.
+
+대안 중 원문 발췌만으로는 시점·구역 차이의 해석을 표현하기 어렵고, 인용·추론·실행 사실을 단계별로
+조립하는 문서 언어는 현재 필요보다 큰 interface였다. 명시적 문장과 선택 셀 참조를 기존 실행기에
+추가하고, 기계적 인용 확인과 별도 의미 검토를 나누는 안을 택했다. 새 저장소·adapter·설명 추론 언어는 없다.
+
+위임된 Engine·CLI·MCP·ReviewGoal seam에서 누락 설명의 부분 결과, 실제 인용 전달과 비참여 원천
+분리, 위조/미공개 셀·credential·판정 누락/거부·변조, 정정 revision·예산·만료를 검증한다. 기본 테스트의
+reviewer는 fixture이며 실제 원천 지지·모델 정확도·원래 G4 완주는 별도 검증이다.
+
+### 원래 G4의 실제 검토 진단
+
+위임된 Start/Advance·ReviewGoal seam에서 원래 G4 질문과 독립 citywide reference를 재사용한다.
+명시적 provider와 새 출력 경로가 있어야 실행하며, 실제 취득은 원천 hash가 바뀌면 멈춘다.
+`historical` 모드는 실제 과거 목록에서 기존 publication 이름의 유일한 버전을 선택해 취득하고 원래
+hash·행 위치·합계와 대조한다. 인구는 기존 전체 CSV scanner로 검사/보관 범위를 추가 확인한다.
+기본 `live`의 최신 파일 hash 불일치를 자동 복구하거나 과거 실패를 숨기지 않는다.
+보존 reference 재생은 별도 명시 모드로만 선택하고 새 취득·자율 발견으로 세지 않는다. 원 질문과
+기존 기대값은 유지하며 baseline, 분교 출력 추가, 별도 전체 범위 권한을 켠 진단 recipe를 구분한다.
+`with-branches-full-scope`는 원래 population 계약을 보존하며 실제 취득이 없는 reference 재생은
+자격 검사에서 중단한다. `with-table-context`는 같은 권한·질문·계산에 학교 원본의 헤더와 합계행·
+빈 경계행·주석을 선택한 별도 문맥을 추가한다. 기존 XLSX 읽기와 sparse 근거 선택을 사용하며
+rectangle의 모든 행을 공개하거나 합계행을 계산에 넣지 않는다. 새 셀의 독립 reference는 기존
+citywide oracle과 별도로 보존한다. sourceContext 전달과 실제 의미 판정은 구분한다.
+`with-age-definition`은 같은 전체 범위·계산·학교 문맥에 등록된 KOSIS 답변의 실제 문서 관측을
+인구 원본의 명시적 support로 추가한다. 미대응 학교 행의 선공개와 이후 전체 학교 공개를 하나로
+합쳐 기존 데이터 셀·원본 위치를 모두 유지하고 8 packet 예산을 지킨다. 과거 진단의 두 packet과
+실패는 그대로 보존한다. 문서 fixture는 전달 회귀에만 쓰며, 이 실제 모델 진단은 reference 재생을
+허용하지 않는다. 전체 취득·revision·집계·근거 입력 검사가 통과한 경우에만 모델을 호출한다.
+답변은 해당 통계 계열의 정의이며 특정 월 파일의 적용 선언으로 자동 승격하지 않는다.
+과거 archive는 그대로 보존한다. 모델에 기대 verdict나
+oracle 해석을 보내지 않는다. 각 시도의 입력·원 응답·Engine 결과와 준비 실패를 보존한다.
+결과와 한계는 [실행 검증](../research/goal-result-execution-validation-2026-09-08.md#원래-g4의-실제-모델-진단)에
+둔다. 이 진단의 예상 보류나 단일 전후 관측은 양성 목표 완주·모델 정확도 통과선이 아니다.

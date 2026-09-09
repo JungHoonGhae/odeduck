@@ -59,10 +59,10 @@ type SemanticInfo struct {
 	Detail string `json:"detail,omitempty"`
 }
 
-// RecordSemanticOutcome keeps degraded retrieval visible in both human and
+// recordSemanticOutcome keeps degraded retrieval visible in both human and
 // machine-readable outputs. A caller may still choose lexical/planned recall,
 // but it cannot mistake those candidates for a completed hybrid search.
-func RecordSemanticOutcome(result *Result, info SemanticInfo) {
+func recordSemanticOutcome(result *Result, info SemanticInfo) {
 	result.Semantic = &info
 	if info.Status == SemanticUsed {
 		return
@@ -80,9 +80,9 @@ func RecordSemanticOutcome(result *Result, info SemanticInfo) {
 	result.Warnings = append(result.Warnings, warning)
 }
 
-// RequireSemantic rejects a degraded result for research where vector recall
+// requireSemantic rejects a degraded result for research where vector recall
 // is part of the requested evidence standard.
-func RequireSemantic(result Result) error {
+func requireSemantic(result Result) error {
 	if result.Semantic != nil && result.Semantic.Status == SemanticUsed {
 		return nil
 	}
@@ -570,7 +570,7 @@ func (c *Catalog) SearchHybrid(ctx context.Context, plan QueryPlan, index *Seman
 	if index == nil || embedder == nil {
 		base.Hits = trimHits(base.Hits, want)
 		finalizeConnectionCandidates(normalizedPlan, &base, entries)
-		RecordSemanticOutcome(&base, SemanticInfo{Status: SemanticNotIndexed, Detail: "의미 인덱스가 준비되지 않음"})
+		recordSemanticOutcome(&base, SemanticInfo{Status: SemanticNotIndexed, Detail: "의미 인덱스가 준비되지 않음"})
 		return base
 	}
 
@@ -588,7 +588,7 @@ func (c *Catalog) SearchHybrid(ctx context.Context, plan QueryPlan, index *Seman
 	if len(queries) == 0 {
 		base.Hits = trimHits(base.Hits, want)
 		finalizeConnectionCandidates(normalizedPlan, &base, entries)
-		RecordSemanticOutcome(&base, SemanticInfo{Status: SemanticUnavailable, Model: index.Model, Detail: "검색할 문장이 비어 있음"})
+		recordSemanticOutcome(&base, SemanticInfo{Status: SemanticUnavailable, Model: index.Model, Detail: "검색할 문장이 비어 있음"})
 		return base
 	}
 	inputs := make([]string, len(queries))
@@ -599,7 +599,7 @@ func (c *Catalog) SearchHybrid(ctx context.Context, plan QueryPlan, index *Seman
 	if err != nil {
 		base.Hits = trimHits(base.Hits, want)
 		finalizeConnectionCandidates(normalizedPlan, &base, entries)
-		RecordSemanticOutcome(&base, SemanticInfo{Status: SemanticUnavailable, Model: index.Model, Detail: err.Error()})
+		recordSemanticOutcome(&base, SemanticInfo{Status: SemanticUnavailable, Model: index.Model, Detail: err.Error()})
 		return base
 	}
 	expectedDimensions := index.Dimensions
@@ -614,14 +614,14 @@ func (c *Catalog) SearchHybrid(ctx context.Context, plan QueryPlan, index *Seman
 	if len(vectors) != len(inputs) {
 		base.Hits = trimHits(base.Hits, want)
 		finalizeConnectionCandidates(normalizedPlan, &base, entries)
-		RecordSemanticOutcome(&base, SemanticInfo{Status: SemanticUnavailable, Model: index.Model, Detail: "query embedding count does not match inputs"})
+		recordSemanticOutcome(&base, SemanticInfo{Status: SemanticUnavailable, Model: index.Model, Detail: "query embedding count does not match inputs"})
 		return base
 	}
 	for _, vector := range vectors {
 		if !validSemanticVector(vector, expectedDimensions) {
 			base.Hits = trimHits(base.Hits, want)
 			finalizeConnectionCandidates(normalizedPlan, &base, entries)
-			RecordSemanticOutcome(&base, SemanticInfo{Status: SemanticUnavailable, Model: index.Model, Detail: "query embedding dimensions or values are invalid"})
+			recordSemanticOutcome(&base, SemanticInfo{Status: SemanticUnavailable, Model: index.Model, Detail: "query embedding dimensions or values are invalid"})
 			return base
 		}
 	}
@@ -659,7 +659,7 @@ func (c *Catalog) SearchHybrid(ctx context.Context, plan QueryPlan, index *Seman
 	base.ConnectionOptions = buildConnectionOptionsFromHits(fused, normalizedPlan.AnchorPKs, MaxOptionsPerRole)
 	finalizeConnectionCandidates(normalizedPlan, &base, entries)
 	base.Mode = SearchModeHybrid
-	RecordSemanticOutcome(&base, SemanticInfo{Status: SemanticUsed, Model: index.Model})
+	recordSemanticOutcome(&base, SemanticInfo{Status: SemanticUsed, Model: index.Model})
 	if len(base.Queries) == 0 {
 		base.Intent = strings.TrimSpace(plan.Intent)
 	}

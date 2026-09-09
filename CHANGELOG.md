@@ -5,7 +5,147 @@ All notable changes to odeduck are documented here. Format follows
 [SemVer](https://semver.org/). The release workflow uses the `## [X.Y.Z]`
 section matching a `vX.Y.Z` tag as the GitHub release notes.
 
-## [Unreleased]
+## [0.19.0] - 2026-09-09
+
+Start with a goal, inspect the actual sources, execute bounded analyses and review
+selected supporting evidence through the same CLI/MCP engine. Goal execution and
+model review are experimental: this release does not establish general autonomous
+goal completion, canonical entity identity, causal claims or field verification.
+
+### Added
+
+- Source-cited goal explanations through the shared CLI/MCP engine distinguish
+  required source dates/definitions/limits from engine-written execution notes.
+  Exact authorized packet-cell citations and a separate finding per explanation
+  accompany the result; missing or unsupported explanations cannot complete a goal.
+  Corrections retain execution/review history and expiry discards the draft prose.
+
+- Goal analysis review reuses already-disclosed original XLSX cells across verified
+  overlapping observations, without another disclosure or broader authority.
+  Analysis v3 carries one packet collection with context references and cell
+  attribution; conflicting provenance/values fail, and repackaging cannot buy
+  another review. Comparison context carries its recipe once and references
+  already-included original metadata, preserving complete provenance within the
+  unchanged review limit. Source-report v1 and historical review archives stay unchanged.
+
+- Local `sample.compare` through the shared CLI/MCP goal engine compares explicit
+  keys and numeric measures from two retained original revisions. Exact decimal
+  checks preserve duplicates, discrepancies and both unmatched sides. Selected
+  computed summaries can support interpretation review without replacing source
+  records, changing result roles or approving identity, applicability or coverage.
+
+- Registered monthly FILE export through the shared CLI/MCP goal `sample` path,
+  with typed period/registration/province/age choices, credentialless no-redirect
+  form POSTs and complete CSV scan provenance. Publisher rows and selected-age
+  columns stay original; source applicability and goal completion remain separate.
+
+- Registered supporting HTML documents in FILE inspection and goal `sample`
+  (`delivery:document`), with credentialless exact-origin acquisition, selected
+  original DOM addresses and page/text hashes. Explicit evidence disclosure and
+  `composition.support` carry document context into review; documents cannot
+  become computational data or certify applicability or population coverage.
+
+- Additional opt-in full-scope goal review (`solve --review-full-scope`, MCP startup
+  `--review-goal-full-scope`), requiring existing analysis/disclosure authorization.
+  Complete CSV retention or exact XLSX rectangle acquisition enables review, not
+  population approval. Every original source needs a separately cited scope finding;
+  missing evidence, truncated selections and unsupported acquisition types remain incomplete.
+
+- Optional `composition.support` links already-disclosed evidence from another
+  original observation to proposed interpretation targets in analysis review.
+  Exact packets and acquisition provenance are preserved; support does not change
+  calculations, satisfy required roles or certify applicability or population scope.
+
+- Bounded portal FILE history discovery and exact edition selection through CLI,
+  MCP and goal inspection. Historical requests retain edition-specific metadata
+  and acquisition provenance, reject latest-file fallback and preserve old
+  observations across reinspection. Listing versions grants no ledger verification.
+
+- Optional `composition.reportUnmatched` projects selected excluded source fields
+  into a separate goal result table, retaining stage-local record addresses and
+  missing/null distinctions. It shares result limits, does not change calculations,
+  and requires selected evidence before analysis review.
+
+- Already-disclosed same-file header/context evidence in opt-in goal analysis
+  review, pinned to source content and contract revisions. Context keeps its
+  selected cells, original addresses and acquisition request separate from
+  computational sources; file association is not proof of meaning or identity.
+
+- Stage-local unmatched record addresses in goal join metrics, including empty
+  joins, for bounded evidence reading and replanning. Relational review now also
+  requires disclosed comparison fields for excluded direct records and replays
+  exclusion metrics; unrelated excluded values remain private.
+
+- Bounded exact value-set selection (`sample.whereIn`) for full direct CSV scans,
+  preserving source record positions and separate scanned/matched/retained coverage.
+  Selection order cannot bypass acquisition replay limits, and both review kinds
+  require selected evidence for predicate fields. Development calibration can
+  now acquire inspected sources and check unchanged independent records before review.
+
+- Additional opt-in review of typed relational calculations via CLI
+  `--review-analyses` or MCP startup `--review-goal-analyses`. Local replay and
+  original record participation bind already-disclosed result values; separate
+  relation, period, measurement and coverage findings accompany goal/output checks.
+  Source-report authority does not enable this scope. Review budgets and canonical
+  evidence deduplication are shared; spatial, causal and hypothesis approval remain unsupported.
+
+- Source-grain aggregation of retained observations before cross-source joins via
+  goal `sample.reduce`. Exact sums, contributing-record groups, source revisions,
+  original-period checks and shared budgets survive CLI/MCP execution. Computed
+  groups remain distinct from publisher records and do not acquire source-report approval.
+
+- Opt-in, separately invoked model review for bounded source-field reports via
+  CLI `--review-source-reports` or MCP startup `--review-goals-with`. Original-goal
+  fit and every output's source support are assessed separately against already
+  authorized evidence; qualified completion carries reviewer/method/input/execution
+  provenance. This is not field verification or approval of joins, calculations,
+  population claims or hypotheses. Default-off disclosure and three-review limits apply.
+
+- Native STD inspection through CLI/MCP, plus bounded CSV, ZIP-member and exact
+  XLSX-rectangle readers with source hashes, original positions and explicit limits.
+- Optional, recipient-bound selected evidence for experimental goal planning:
+  CLI `--share-evidence` requires one explicit agent; MCP disclosure is fixed by
+  server startup `--share-goal-evidence`. Original record addresses, exact values,
+  missing/null states, cumulative disclosure budgets and session expiry are retained.
+  Default planning remains value-free; evidence access is not semantic approval.
+- Experimental shared goal-based discovery and bounded composition via CLI `solve`
+  and MCP `advance_goal`, with required-role/output checks, source-record lineage,
+  typed FILE/STD acquisition, explicit retries and versioned scope-label comparison.
+  Candidate artifacts remain distinct from goal completion; general semantic
+  approval and durable goal resumption are not implemented.
+
+### Fixed
+
+- Keep frozen vocabulary hashes identical across platform checkouts.
+- Discard retained goal values before returning acquisitions that finish after
+  session expiry, including source failures and cancellation.
+- Reject malformed UTF-8 before decoding goal-planner decisions, and return
+  bounded errors for oversized comparison numbers and result tables without panics.
+- Continue experimental goal planning after `review_required` within the original
+  contract, disclosure policy, budgets and expiry. Pin evaluations to execution
+  revisions and clear stale current results before a replacement execution.
+  Restarting the planning loop no longer refills its one replay correction.
+- Share semantic-search policy across CLI and MCP, keeping degraded retrieval
+  visible and preserving the connection limit through progressive discovery.
+- Strengthen credential isolation at the shared REST and LINK response boundaries;
+  withhold unsafe responses without creating replacement source observations.
+- Preserve empty CSV strings instead of inventing nulls; keep STD reads bound to
+  the first-party response and reject ambiguous JSON object members.
+- Allow ordinary single-source projection and aggregation through the shared goal
+  executor; remove the spatial-only zero-join restriction and unexecuted join explanations.
+- Rename the experimental goal artifact state from `sample_joined` to `sample_executed`
+  for all current operations. Historical diagnostics retain their original state;
+  this does not change semantic approval or CLI completion requirements.
+- Reject lossy Unicode decoding in native STD schema/row JSON before retaining
+  source identifiers. Preserve valid replacement characters and surrogate pairs.
+- Describe only executed key/measurement operations and preserve the conditional
+  source coverage of nearest-record calculations in goal evidence explanations.
+- Preserve original CSV empty strings in nearest-derived evidence and artifacts.
+
+### Changed
+
+- Share one engine-owned goal planning guide across CLI prompts and the MCP
+  resource; remove duplicate operator instructions and obsolete join requirements.
 
 ## [0.18.0] - 2026-09-05
 

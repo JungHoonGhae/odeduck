@@ -1,0 +1,468 @@
+{
+  "kind": "development_relational_analysis_calibration_not_G3_G4_completion",
+  "cases": [
+    {
+      "id": "RA-ENV-DEC2024",
+      "goal": "서울과 인천의 2024년 12월 도시대기 PM25 도시별 통계에, 2024년 12월 31일 측정소 정보 목록에서 도시별로 센 측정소 수를 붙여 비교해줘. 통계표에 실린 측정소수와 목록의 행 수가 다르면 그대로 보여줘. 도시 월평균과 말일 목록을 구분하고, 월중 실제 측정 참여나 개별 측정소 농도로 해석하지 말아줘.",
+      "negativeGoal": "서울과 인천의 각 개별 도시대기 측정소가 2024년 12월에 측정한 PM25 월평균 농도를 계산해줘. 두 도시의 도시별 평균을 각 측정소의 실제 농도로 사용해서 모든 측정소의 값을 확정해줘.",
+      "negativeReason": "도시별 평균과 말일 목록은 개별 측정소 농도나 월중 측정 참여를 입증하지 않는다.",
+      "analysis": {
+        "sources": [
+          {
+            "pk": "15150453",
+            "sourceSha256": "690a5ebb97b66295ad5cf6e0a96f0c0de078cfcb23207d3bba3239b879d334ab",
+            "records": [
+              412,
+              413,
+              414,
+              415,
+              416,
+              417,
+              418,
+              419,
+              420,
+              421,
+              422,
+              423,
+              424,
+              425,
+              426,
+              427,
+              428,
+              429,
+              430,
+              431,
+              432,
+              433,
+              434,
+              435,
+              436,
+              461,
+              462,
+              463,
+              464,
+              465,
+              466,
+              467,
+              468,
+              469,
+              470,
+              471,
+              472,
+              473,
+              474,
+              475,
+              476,
+              477,
+              478,
+              479,
+              480,
+              481,
+              482,
+              483,
+              484,
+              485,
+              486
+            ],
+            "reference": "environment-reference.json",
+            "role": "locations"
+          },
+          {
+            "pk": "15150551",
+            "sourceSha256": "9ef7791e5b26821c85e8dc766622f996f205f68c3bffa0cddf9f339ef2ea848d",
+            "records": [
+              12460,
+              12463
+            ],
+            "reference": "environment-reference.json",
+            "role": "statistics"
+          }
+        ],
+        "contract": {
+          "outcome": "서울과 인천의 2024년 12월 도시대기 PM25 도시별 통계에, 2024년 12월 31일 측정소 정보 목록에서 도시별로 센 측정소 수를 붙여 비교해줘. 통계표에 실린 측정소수와 목록의 행 수가 다르면 그대로 보여줘. 도시 월평균과 말일 목록을 구분하고, 월중 실제 측정 참여나 개별 측정소 농도로 해석하지 말아줘.",
+          "region": "서울과 인천",
+          "period": "2024-12 도시 통계 / 2024-12-31 목록 snapshot",
+          "coverage": "sample",
+          "roles": [
+            {
+              "id": "locations",
+              "description": "보존한 도시대기 측정소 목록"
+            },
+            {
+              "id": "statistics",
+              "description": "원천의 도시별 월간 PM25 통계"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "city",
+              "role": "locations",
+              "type": "string",
+              "description": "비교 대상 도시"
+            },
+            {
+              "id": "listed",
+              "role": "locations",
+              "type": "number",
+              "description": "말일 목록에 실린 측정소 행 수"
+            },
+            {
+              "id": "reported",
+              "role": "statistics",
+              "type": "string",
+              "description": "월간 통계표가 기록한 측정소수"
+            },
+            {
+              "id": "mean",
+              "role": "statistics",
+              "type": "string",
+              "description": "도시별 PM25 1시간 월평균의 원문 값"
+            },
+            {
+              "id": "month",
+              "role": "statistics",
+              "type": "string",
+              "description": "통계월"
+            }
+          ]
+        },
+        "decisions": [
+          {
+            "action": "sample",
+            "sample": {
+              "pk": "15150453",
+              "delivery": "file",
+              "reduce": {
+                "observation": "o1",
+                "rowsSha256": "",
+                "groupBy": [
+                  "시도",
+                  "도시",
+                  "측정소구분"
+                ],
+                "aggregates": [
+                  {
+                    "as": "location_count",
+                    "op": "count",
+                    "field": "측정소코드"
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "action": "compose",
+            "composition": {
+              "id": "city-comparison",
+              "base": "o3",
+              "purpose": "말일 도시별 목록 집계와 원천 월간 도시 통계의 차이를 보존한 비교",
+              "joins": [
+                {
+                  "right": "o2",
+                  "leftKeys": [
+                    "o3.시도",
+                    "o3.도시",
+                    "o3.측정소구분"
+                  ],
+                  "rightKeys": [
+                    "시도",
+                    "도시",
+                    "측정소구분"
+                  ]
+                }
+              ],
+              "select": [
+                "o3.도시",
+                "o3.location_count",
+                "o2.측정소수",
+                "o2.1시간 월평균",
+                "o2.통계월"
+              ],
+              "roles": [
+                {
+                  "role": "locations",
+                  "observation": "o1"
+                },
+                {
+                  "role": "statistics",
+                  "observation": "o2"
+                }
+              ],
+              "outputs": [
+                {
+                  "output": "city",
+                  "field": "o3.도시"
+                },
+                {
+                  "output": "listed",
+                  "field": "o3.location_count"
+                },
+                {
+                  "output": "reported",
+                  "field": "o2.측정소수"
+                },
+                {
+                  "output": "mean",
+                  "field": "o2.1시간 월평균"
+                },
+                {
+                  "output": "month",
+                  "field": "o2.통계월"
+                }
+              ],
+              "assumptions": [
+                "보존한 공개 원천의 두 도시 비교이며 전국 완주 평가는 아니다.",
+                "말일 측정소 목록의 행 수와 월중 도시 통계의 측정소수는 서로 다른 기록이다. 참여 측정소 동일성이나 개별 측정소 측정값을 추론하지 않는다."
+              ]
+            }
+          },
+          {
+            "action": "execute",
+            "compositionId": "city-comparison"
+          }
+        ],
+        "evidence": [
+          {
+            "observation": "o1",
+            "rows": [
+              1,
+              26
+            ],
+            "fields": [
+              "시도",
+              "도시",
+              "측정소구분",
+              "측정소코드"
+            ]
+          },
+          {
+            "observation": "o2",
+            "rows": [
+              1,
+              2
+            ],
+            "fields": [
+              "통계월",
+              "측정소구분",
+              "구분",
+              "오염물질명",
+              "시도",
+              "도시",
+              "측정소수",
+              "1시간 월평균"
+            ]
+          },
+          {
+            "observation": "o3",
+            "rows": [
+              1,
+              2
+            ],
+            "fields": [
+              "시도",
+              "도시",
+              "측정소구분",
+              "location_count"
+            ]
+          }
+        ],
+        "expectedRows": [
+          {
+            "o3.도시": "서울",
+            "o3.location_count": 25,
+            "o2.측정소수": "25",
+            "o2.1시간 월평균": "19",
+            "o2.통계월": "2024-12"
+          },
+          {
+            "o3.도시": "인천",
+            "o3.location_count": 26,
+            "o2.측정소수": "25",
+            "o2.1시간 월평균": "19",
+            "o2.통계월": "2024-12"
+          }
+        ]
+      }
+    },
+    {
+      "id": "RA-POP-BUPYEONG1-202605",
+      "goal": "부평구가 공개한 2026년 5월 31일 동별 연령별 인구자료에서 부평1동의 만 6세부터 17세까지 남녀 주민 인구를 합산해줘. 열두 연령과 두 성별의 기록을 모두 더한 인원수를 원천 기준일과 함께 알려줘. 재학생 수로 해석하지 말아줘.",
+      "negativeGoal": "2026년 5월 31일 부평1동에서 학교에 재학 중인 만 6세부터 17세까지 남녀 학생 수를 합산해줘. 주민 인구를 재학생 수로 사용해서 정확한 재학생 총수를 확정해줘.",
+      "negativeReason": "주민 인구 기록은 학교 재학 여부를 나타내지 않는다.",
+      "analysis": {
+        "sources": [
+          {
+            "reference": "education-reference.json",
+            "pk": "15085585",
+            "sourceSha256": "278ab42932b69f0725f899e429149bce23363cc424b3b73f70d82751704e5768",
+            "records": [
+              14,
+              15,
+              16,
+              17,
+              18,
+              19,
+              20,
+              21,
+              22,
+              23,
+              24,
+              25,
+              26,
+              27,
+              28,
+              29,
+              30,
+              31,
+              32,
+              33,
+              34,
+              35,
+              36,
+              37
+            ],
+            "role": "residents"
+          }
+        ],
+        "contract": {
+          "outcome": "부평구가 공개한 2026년 5월 31일 동별 연령별 인구자료에서 부평1동의 만 6세부터 17세까지 남녀 주민 인구를 합산해줘. 열두 연령과 두 성별의 기록을 모두 더한 인원수를 원천 기준일과 함께 알려줘. 재학생 수로 해석하지 말아줘.",
+          "region": "인천광역시 부평구 부평1동",
+          "period": "2026-05-31 원천 snapshot",
+          "coverage": "sample",
+          "roles": [
+            {
+              "id": "residents",
+              "description": "원천에 기록된 만 6–17세 남녀 인구 24행"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "total",
+              "role": "residents",
+              "type": "number",
+              "description": "만 6–17세 남녀 부평1동 주민 인구 기록 합계 (명)"
+            }
+          ]
+        },
+        "decisions": [
+          {
+            "action": "sample",
+            "sample": {
+              "pk": "15085585",
+              "delivery": "file",
+              "reduce": {
+                "observation": "o1",
+                "rowsSha256": "",
+                "measures": [
+                  {
+                    "as": "persons",
+                    "field": "부평1동인구수",
+                    "format": "decimal_v1",
+                    "unit": "persons"
+                  }
+                ],
+                "aggregates": [
+                  {
+                    "as": "total",
+                    "op": "sum",
+                    "field": "persons"
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "action": "compose",
+            "composition": {
+              "id": "age-total",
+              "base": "o2",
+              "purpose": "독립 보존한 만 6–17세 24개 연령·성별 인구 기록의 합계",
+              "select": [
+                "o2.total"
+              ],
+              "roles": [
+                {
+                  "role": "residents",
+                  "observation": "o1"
+                }
+              ],
+              "outputs": [
+                {
+                  "output": "total",
+                  "field": "o2.total"
+                }
+              ],
+              "assumptions": [
+                "2026-05-31 원천의 주민 인구 합계이며 재학 여부·현재 인구는 추론하지 않는다."
+              ]
+            }
+          },
+          {
+            "action": "execute",
+            "compositionId": "age-total"
+          }
+        ],
+        "evidence": [
+          {
+            "observation": "o1",
+            "rows": [
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              7,
+              8,
+              9,
+              10,
+              11,
+              12,
+              13,
+              14,
+              15,
+              16,
+              17,
+              18,
+              19,
+              20
+            ],
+            "fields": [
+              "연령(세)",
+              "성별",
+              "부평1동인구수"
+            ]
+          },
+          {
+            "observation": "o1",
+            "rows": [
+              21,
+              22,
+              23,
+              24
+            ],
+            "fields": [
+              "연령(세)",
+              "성별",
+              "부평1동인구수"
+            ]
+          },
+          {
+            "observation": "o2",
+            "rows": [
+              1
+            ],
+            "fields": [
+              "total"
+            ]
+          }
+        ],
+        "expectedRows": [
+          {
+            "o2.total": 2332
+          }
+        ]
+      }
+    }
+  ]
+}

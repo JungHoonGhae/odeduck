@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -10,16 +11,14 @@ import (
 
 	"github.com/JungHoonGhae/odeduck/internal/agentplan"
 	"github.com/JungHoonGhae/odeduck/internal/catalog"
+	"github.com/JungHoonGhae/odeduck/internal/discovery"
 	"github.com/JungHoonGhae/odeduck/internal/output"
 	"github.com/JungHoonGhae/odeduck/internal/portal"
 	"github.com/spf13/cobra"
 )
 
 var (
-	generateDiscoveryPlan = agentplan.Generate
-	expandDiscoveryPlan   = agentplan.Expand
-	composeDiscoveryPlan  = agentplan.Compose
-	newOfficialSource     = func(key string) catalog.SyncSource {
+	newOfficialSource = func(key string) catalog.SyncSource {
 		return catalog.NewOfficialSource(newFetchClient(), key)
 	}
 )
@@ -226,6 +225,10 @@ func catalogDiscoverCmd() *cobra.Command {
 }
 
 func catalogQueryCmd(discover bool) *cobra.Command {
+	return catalogQueryCommand(discover, nil)
+}
+
+func catalogQueryCommand(discover bool, planner discovery.Planner) *cobra.Command {
 	var limit int
 	var restOnly bool
 	var semantic bool
@@ -266,100 +269,29 @@ func catalogQueryCmd(discover bool) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			q := ""
-			for i, a := range args {
-				if i > 0 {
-					q += " "
-				}
-				q += a
-			}
-			var planner, bridgePlanner *agentplan.Plan
-			var selectionPlanner *agentplan.SelectionPlan
-			if len(concepts) == 0 && agent != "none" {
-				generated, planErr := generateDiscoveryPlan(cmd.Context(), q, agent)
-				if planErr != nil {
-					if agent != agentplan.ProviderAuto {
-						return planErr
+			runner := discovery.Runner{
+				Planner: planner,
+				Search: func(ctx context.Context, plan catalog.QueryPlan) (catalog.Result, error) {
+					result, err := (catalog.Searcher{}).Search(ctx, cat, plan, catalog.SearchOptions{Semantic: semantic, RequireSemantic: requireSemantic})
+					for _, warning := range result.Warnings {
+						fmt.Fprintln(cmd.ErrOrStderr(), "⚠ "+warning)
 					}
-					planner = &agentplan.Plan{Status: agentplan.StatusUnavailable, Detail: planErr.Error()}
-					fmt.Fprintf(cmd.ErrOrStderr(), "⚠ AI 검색 계획을 만들지 못해 원문 검색으로 폴백합니다: %v\n", planErr)
-				} else {
-					planner = &generated
-					concepts = generated.Concepts
-					fmt.Fprintf(cmd.ErrOrStderr(), "검색 계획 · %s: %s\n", generated.Provider, strings.Join(generated.Concepts, " · "))
-				}
+					return result, err
+				},
+				Progress: func(message string) { fmt.Fprintln(cmd.ErrOrStderr(), message) },
 			}
-			queryPlan := catalog.QueryPlan{
-				Intent: q, Concepts: concepts, Limit: limit, RESTOnly: restOnly,
-				IncludePreviews: previews, Ranking: ranking,
-			}
-			if planner != nil && len(planner.Axes) > 0 {
-				queryPlan.Axes = planner.Axes
-			}
-			res, err := runCatalogQuery(cmd, cat, queryPlan, semantic, requireSemantic)
+			out, err := runner.Run(cmd.Context(), discovery.Request{
+				Plan: catalog.QueryPlan{
+					Intent: strings.Join(args, " "), Concepts: concepts, Limit: limit, RESTOnly: restOnly,
+					IncludePreviews: previews, Ranking: ranking, MaxConnections: maxConnections,
+				},
+				Provider: agent, Connections: discover && connections,
+			})
 			if err != nil {
 				return err
 			}
-
-			// Structured discovery is progressive: plan and retrieve an Anchor,
-			// inspect results to retrieve Bridges, then select explicit PKs.
-			// Search can emit metadata-backed candidates, never verified joins.
-			if discover && connections && planner != nil && len(planner.Axes) > 0 {
-				anchors := selectAnchorHits(res.Hits, 1)
-				if len(anchors) == 0 {
-					res.Abstention = &catalog.Abstention{Reason: "초기 검색 결과에서 Anchor를 회수하지 못해 연결 후보를 만들지 않았습니다"}
-				}
-				if len(anchors) > 0 {
-					expanded, expandErr := expandDiscoveryPlan(cmd.Context(), q, planner.Provider, *planner, res.Hits)
-					bridgeAxes := mergeBridgeAxes(nil, nonAnchorAxes(planner.Axes), 7)
-					if expandErr != nil {
-						fmt.Fprintf(cmd.ErrOrStderr(), "⚠ 결과 기반 Bridge 재계획에 실패해 1차 역할축으로 계속합니다: %v\n", expandErr)
-					} else {
-						bridgePlanner = &expanded
-						bridgeAxes = mergeBridgeAxes(expanded.Axes, nonAnchorAxes(planner.Axes), 7)
-						if len(expanded.Axes) > 0 {
-							fmt.Fprintf(cmd.ErrOrStderr(), "Bridge 재계획 · %s: %s\n",
-								expanded.Provider, strings.Join(expanded.Concepts, " · "))
-						}
-					}
-					if len(bridgeAxes) > 0 {
-						progressiveAxes := append(anchorAxes(planner.Axes), bridgeAxes...)
-						anchorPKs := make([]string, 0, len(anchors))
-						for _, anchor := range anchors {
-							anchorPKs = append(anchorPKs, anchor.PK)
-						}
-						bridgePlan := catalog.QueryPlan{
-							Intent: q, Axes: progressiveAxes, AnchorPKs: anchorPKs,
-							Limit: limit, RESTOnly: restOnly, IncludePreviews: previews,
-							Ranking: ranking, MaxConnections: maxConnections,
-						}
-						res, err = runCatalogQuery(cmd, cat, bridgePlan, semantic, requireSemantic)
-						if err != nil {
-							return err
-						}
-						optionHits := connectionOptionHits(res.ConnectionOptions)
-						if len(optionHits) == 0 {
-							optionHits = res.Hits
-						}
-						selected, selectErr := composeDiscoveryPlan(cmd.Context(), q, planner.Provider, anchors, optionHits)
-						if selectErr != nil {
-							res.Abstention = &catalog.Abstention{Reason: "실제 Bridge PK 선택에 실패해 연결 카드를 만들지 않았습니다: " + selectErr.Error()}
-							fmt.Fprintf(cmd.ErrOrStderr(), "⚠ Bridge 후보 선택에 실패해 카드 생성을 중단합니다: %v\n", selectErr)
-						} else {
-							selectionPlanner = &selected
-							if len(selected.Selections) == 0 {
-								res.Abstention = &catalog.Abstention{Reason: selected.AbstentionReason}
-							} else {
-								bridgePlan.BridgeSelections = selected.Selections
-								res, err = runCatalogQuery(cmd, cat, bridgePlan, semantic, requireSemantic)
-								if err != nil {
-									return err
-								}
-							}
-						}
-					}
-				}
-			}
+			res := out.Result
+			planner, bridgePlanner, selectionPlanner := out.Planner, out.BridgePlanner, out.SelectionPlanner
 			hits, total := res.Hits, res.Total
 			if format != output.Table {
 				result := map[string]any{
@@ -457,108 +389,6 @@ func catalogQueryCmd(discover bool) *cobra.Command {
 	c.Flags().BoolVar(&connections, "connections", discover, "실제 1차 결과를 보고 Bridge 역할을 재계획해 연결 candidate 생성")
 	c.Flags().IntVar(&maxConnections, "max-connections", 3, "반환할 연결 candidate 수")
 	return c
-}
-
-func runCatalogQuery(cmd *cobra.Command, cat *catalog.Catalog, plan catalog.QueryPlan, semantic, requireSemantic bool) (catalog.Result, error) {
-	var res catalog.Result
-	if !semantic {
-		res = cat.SearchPlan(plan)
-		if requireSemantic {
-			return res, catalog.RequireSemantic(res)
-		}
-		return res, nil
-	}
-	idx, indexErr := catalog.LoadSemanticIndex(cat)
-	switch {
-	case indexErr == nil:
-		embedder := catalog.NewOllamaEmbedder(catalog.OllamaURLFromEnv(), idx.Model)
-		res = cat.SearchHybrid(cmd.Context(), plan, idx, embedder)
-	case errors.Is(indexErr, catalog.ErrSemanticIndexStale):
-		res = cat.SearchPlan(plan)
-		catalog.RecordSemanticOutcome(&res, catalog.SemanticInfo{Status: catalog.SemanticUnavailable, Detail: "카탈로그 갱신 후 semantic-build 필요"})
-		fmt.Fprintln(cmd.ErrOrStderr(), "⚠ 의미 인덱스가 현재 카탈로그와 다릅니다 — `odeduck catalog semantic-build` 로 갱신하세요.")
-	case errors.Is(indexErr, catalog.ErrSemanticIndexNotBuilt):
-		res = cat.SearchHybrid(cmd.Context(), plan, nil, nil)
-	default:
-		res = cat.SearchPlan(plan)
-		catalog.RecordSemanticOutcome(&res, catalog.SemanticInfo{Status: catalog.SemanticUnavailable, Detail: "의미 인덱스 로드 실패: " + indexErr.Error()})
-		fmt.Fprintf(cmd.ErrOrStderr(), "⚠ 의미 인덱스를 읽지 못해 키워드 검색으로 폴백합니다: %v\n", indexErr)
-	}
-	if requireSemantic {
-		return res, catalog.RequireSemantic(res)
-	}
-	return res, nil
-}
-
-func selectAnchorHits(hits []catalog.Hit, limit int) []catalog.Hit {
-	var anchors []catalog.Hit
-	for _, hit := range hits {
-		if !strings.EqualFold(hit.Role, "anchor") {
-			continue
-		}
-		anchors = append(anchors, hit)
-		if len(anchors) == limit {
-			break
-		}
-	}
-	return anchors
-}
-
-func nonAnchorAxes(axes []catalog.DiscoveryAxis) []catalog.DiscoveryAxis {
-	out := make([]catalog.DiscoveryAxis, 0, len(axes))
-	for _, axis := range axes {
-		if !strings.EqualFold(axis.Role, "anchor") {
-			out = append(out, axis)
-		}
-	}
-	return out
-}
-
-func anchorAxes(axes []catalog.DiscoveryAxis) []catalog.DiscoveryAxis {
-	for _, axis := range axes {
-		if strings.EqualFold(strings.TrimSpace(axis.Role), "anchor") {
-			return []catalog.DiscoveryAxis{axis}
-		}
-	}
-	return nil
-}
-
-func connectionOptionHits(groups []catalog.ConnectionOptionGroup) []catalog.Hit {
-	var out []catalog.Hit
-	seen := map[string]bool{}
-	for _, group := range groups {
-		for _, hit := range group.Nodes {
-			if seen[hit.PK] {
-				continue
-			}
-			seen[hit.PK] = true
-			out = append(out, hit)
-		}
-	}
-	return out
-}
-
-// mergeBridgeAxes gives post-retrieval roles first, then fills unused slots
-// from the initial plan. Repeating a role or query cannot buy another candidate.
-func mergeBridgeAxes(primary, fallback []catalog.DiscoveryAxis, limit int) []catalog.DiscoveryAxis {
-	seenRoles := map[string]bool{}
-	seenQueries := map[string]bool{}
-	var out []catalog.DiscoveryAxis
-	for _, axes := range [][]catalog.DiscoveryAxis{primary, fallback} {
-		for _, axis := range axes {
-			role := strings.ToLower(strings.TrimSpace(axis.Role))
-			query := strings.ToLower(strings.TrimSpace(axis.Query))
-			if role == "" || query == "" || role == "anchor" || seenRoles[role] || seenQueries[query] {
-				continue
-			}
-			seenRoles[role], seenQueries[query] = true, true
-			out = append(out, axis)
-			if len(out) == limit {
-				return out
-			}
-		}
-	}
-	return out
 }
 
 func catalogSemanticBuildCmd() *cobra.Command {

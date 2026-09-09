@@ -1,0 +1,112 @@
+{
+  "id": "kr_sido_labels_20260907_v1",
+  "kind": "published_label_equivalence_only",
+  "observedAt": "2026-09-07",
+  "sources": [
+    {
+      "url": "https://sgis.mods.go.kr/developer/html/openApi/api/dataCode/SidoCode.html",
+      "sha256": "6bb5ea7101f87b4fa161f1ab9926e3a989f82e21ede73f9ebefdf8226486b1ff",
+      "bytes": 3007,
+      "selector": "Non-commented tbody td name/code rows; country 00 excluded."
+    },
+    {
+      "url": "https://sgis.mods.go.kr/statexp/js/map.js",
+      "sha256": "96b73197feb076e4891296f64a35b4d59f619576f2443e25ce1111c94f5000ac",
+      "bytes": 369918,
+      "selector": "selectSidoNameChk, checked branch: adm_cd/adm_nm pairs (line 4481); no JavaScript execution."
+    }
+  ],
+  "labels": [
+    {
+      "sourceCode": "11",
+      "full": "서울특별시",
+      "short": "서울"
+    },
+    {
+      "sourceCode": "21",
+      "full": "부산광역시",
+      "short": "부산"
+    },
+    {
+      "sourceCode": "22",
+      "full": "대구광역시",
+      "short": "대구"
+    },
+    {
+      "sourceCode": "23",
+      "full": "인천광역시",
+      "short": "인천"
+    },
+    {
+      "sourceCode": "24",
+      "full": "광주광역시",
+      "short": "광주"
+    },
+    {
+      "sourceCode": "25",
+      "full": "대전광역시",
+      "short": "대전"
+    },
+    {
+      "sourceCode": "26",
+      "full": "울산광역시",
+      "short": "울산"
+    },
+    {
+      "sourceCode": "29",
+      "full": "세종특별자치시",
+      "short": "세종"
+    },
+    {
+      "sourceCode": "31",
+      "full": "경기도",
+      "short": "경기"
+    },
+    {
+      "sourceCode": "32",
+      "full": "강원특별자치도",
+      "short": "강원"
+    },
+    {
+      "sourceCode": "33",
+      "full": "충청북도",
+      "short": "충북"
+    },
+    {
+      "sourceCode": "34",
+      "full": "충청남도",
+      "short": "충남"
+    },
+    {
+      "sourceCode": "35",
+      "full": "전북특별자치도",
+      "short": "전북"
+    },
+    {
+      "sourceCode": "36",
+      "full": "전라남도",
+      "short": "전남"
+    },
+    {
+      "sourceCode": "37",
+      "full": "경상북도",
+      "short": "경북"
+    },
+    {
+      "sourceCode": "38",
+      "full": "경상남도",
+      "short": "경남"
+    },
+    {
+      "sourceCode": "39",
+      "full": "제주특별자치도",
+      "short": "제주"
+    }
+  ],
+  "limitations": [
+    "SGIS codes link the two published label tables only; never translate source-record numeric identifiers with these codes.",
+    "Label equivalence does not establish geographic boundaries, historical continuity, field meaning, facility identity or source coverage.",
+    "Apply only to explicitly selected row-bound scope first tokens. No substring replacement, facility-name normalization, district renaming or global canonical merge.",
+    "Old names in HTML comments are excluded. A label outside this revision remains unknown. Runtime never fetches SGIS datasets or replaces this version."
+  ]
+}

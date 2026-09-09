@@ -40,9 +40,10 @@ type xlsxRelationships struct {
 }
 
 type xlsxRelationship struct {
-	ID     string `xml:"Id,attr"`
-	Target string `xml:"Target,attr"`
-	Type   string `xml:"Type,attr"`
+	ID         string `xml:"Id,attr"`
+	Target     string `xml:"Target,attr"`
+	Type       string `xml:"Type,attr"`
+	TargetMode string `xml:"TargetMode,attr"`
 }
 
 type xlsxRichText struct {
@@ -78,10 +79,12 @@ type xlsxRow struct {
 }
 
 type xlsxCell struct {
-	Ref    string       `xml:"r,attr"`
-	Type   string       `xml:"t,attr"`
-	Value  string       `xml:"v"`
-	Inline xlsxRichText `xml:"is"`
+	Ref      string       `xml:"r,attr"`
+	Type     string       `xml:"t,attr"`
+	Value    string       `xml:"v"`
+	Inline   xlsxRichText `xml:"is"`
+	Formula  bool
+	HasValue bool
 }
 
 type xlsxCoordinate struct {
@@ -251,7 +254,7 @@ func decodeXLSXRelationships(member *zip.File) (xlsxRelationships, error) {
 			}
 			relationships.Items = append(relationships.Items, xlsxRelationship{
 				ID: xlsxAttribute(start.Attr, "Id"), Target: xlsxAttribute(start.Attr, "Target"),
-				Type: xlsxAttribute(start.Attr, "Type"),
+				Type: xlsxAttribute(start.Attr, "Type"), TargetMode: xlsxAttribute(start.Attr, "TargetMode"),
 			})
 			if err := decoder.Skip(); err != nil {
 				return err
@@ -262,6 +265,10 @@ func decodeXLSXRelationships(member *zip.File) (xlsxRelationships, error) {
 }
 
 func decodeXLSXSharedStrings(member *zip.File, wanted map[int]struct{}) (map[int]string, error) {
+	return decodeXLSXSharedStringsMode(member, wanted, true)
+}
+
+func decodeXLSXSharedStringsMode(member *zip.File, wanted map[int]struct{}, trim bool) (map[int]string, error) {
 	values := make(map[int]string, len(wanted))
 	if len(wanted) == 0 {
 		return values, nil
@@ -293,7 +300,10 @@ func decodeXLSXSharedStrings(member *zip.File, wanted map[int]struct{}) (map[int
 				if retainedBytes > maxXLSXSharedStringBytes {
 					return fmt.Errorf("shared string 보관 크기가 허용 한도 %d bytes를 초과했습니다", maxXLSXSharedStringBytes)
 				}
-				values[itemIndex] = strings.TrimSpace(value)
+				if trim {
+					value = strings.TrimSpace(value)
+				}
+				values[itemIndex] = value
 			} else if err := decoder.Skip(); err != nil {
 				return err
 			}
@@ -432,6 +442,7 @@ func decodeXLSXRow(decoder *xml.Decoder, start xml.StartElement) (xlsxRow, error
 
 func decodeXLSXCell(decoder *xml.Decoder, start xml.StartElement) (xlsxCell, error) {
 	cell := xlsxCell{Ref: xlsxAttribute(start.Attr, "r"), Type: xlsxAttribute(start.Attr, "t")}
+	seen := map[string]bool{}
 	for {
 		token, err := decoder.Token()
 		if err != nil {
@@ -439,8 +450,13 @@ func decodeXLSXCell(decoder *xml.Decoder, start xml.StartElement) (xlsxCell, err
 		}
 		switch typed := token.(type) {
 		case xml.StartElement:
+			if seen[typed.Name.Local] {
+				return xlsxCell{}, fmt.Errorf("duplicate XLSX cell element %s", typed.Name.Local)
+			}
+			seen[typed.Name.Local] = true
 			switch typed.Name.Local {
 			case "v":
+				cell.HasValue = true
 				cell.Value, err = decodeBoundedXLSXText(decoder, typed)
 				if err != nil {
 					return xlsxCell{}, err
@@ -448,6 +464,11 @@ func decodeXLSXCell(decoder *xml.Decoder, start xml.StartElement) (xlsxCell, err
 			case "is":
 				cell.Inline.Text, err = decodeBoundedXLSXInlineString(decoder, typed)
 				if err != nil {
+					return xlsxCell{}, err
+				}
+			case "f":
+				cell.Formula = true
+				if err := decoder.Skip(); err != nil {
 					return xlsxCell{}, err
 				}
 			default:
@@ -472,6 +493,13 @@ func decodeBoundedXLSXInlineString(decoder *xml.Decoder, start xml.StartElement)
 		}
 		switch typed := token.(type) {
 		case xml.StartElement:
+			// rPh is a pronunciation annotation, not another part of the cell value.
+			if typed.Name.Local == "rPh" {
+				if err := decoder.Skip(); err != nil {
+					return "", err
+				}
+				continue
+			}
 			if typed.Name.Local != "t" {
 				continue
 			}

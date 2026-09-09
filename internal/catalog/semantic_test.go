@@ -484,24 +484,24 @@ func TestHybridSearchMakesEverySemanticFallbackMachineVisible(t *testing.T) {
 func TestSemanticOutcomeWarningIsDeduplicatedAndStrictModeAcceptsUsed(t *testing.T) {
 	result := Result{}
 	fallback := SemanticInfo{Status: SemanticUnavailable, Detail: "Ollama unavailable"}
-	RecordSemanticOutcome(&result, fallback)
-	RecordSemanticOutcome(&result, fallback)
+	recordSemanticOutcome(&result, fallback)
+	recordSemanticOutcome(&result, fallback)
 	if len(result.Warnings) != 1 {
 		t.Fatalf("warnings = %+v, want one deduplicated fallback warning", result.Warnings)
 	}
-	if err := RequireSemantic(result); err == nil || !strings.Contains(err.Error(), SemanticUnavailable) {
+	if err := requireSemantic(result); err == nil || !strings.Contains(err.Error(), SemanticUnavailable) {
 		t.Fatalf("RequireSemantic fallback error = %v", err)
 	}
 
-	RecordSemanticOutcome(&result, SemanticInfo{Status: SemanticUsed, Model: "test"})
-	if err := RequireSemantic(result); err != nil {
+	recordSemanticOutcome(&result, SemanticInfo{Status: SemanticUsed, Model: "test"})
+	if err := requireSemantic(result); err != nil {
 		t.Fatalf("RequireSemantic used = %v", err)
 	}
 	if len(result.Warnings) != 1 {
 		t.Fatalf("used outcome added a warning: %+v", result.Warnings)
 	}
 
-	if err := RequireSemantic(Result{}); err == nil || !strings.Contains(err.Error(), "disabled") {
+	if err := requireSemantic(Result{}); err == nil || !strings.Contains(err.Error(), "disabled") {
 		t.Fatalf("RequireSemantic disabled error = %v", err)
 	}
 }

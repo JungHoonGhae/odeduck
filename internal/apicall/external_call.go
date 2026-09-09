@@ -530,7 +530,6 @@ func (c *ExternalCaller) do(req *http.Request, secret string) (*CallResult, erro
 	if int64(len(body)) > fetch.DefaultMaxResponseBytes {
 		return nil, fmt.Errorf("%w: external provider (%d bytes 제한)", fetch.ErrResponseTooLarge, fetch.DefaultMaxResponseBytes)
 	}
-	body = []byte(redactSecret(string(body), secret))
 	result := &CallResult{
 		Status:      resp.StatusCode,
 		ContentType: resp.Header.Get("Content-Type"),
@@ -541,6 +540,11 @@ func (c *ExternalCaller) do(req *http.Request, secret string) (*CallResult, erro
 		result.Body = base64.StdEncoding.EncodeToString(body)
 	} else {
 		result.Body = decodeBody(result.ContentType, body)
+	}
+	// Preserve source bytes, or withhold the entire response. Redaction would
+	// invent replacement observations and miss JSON/XML-escaped credentials.
+	if echoesCredential(result.Body, secret) || echoesCredential(string(body), secret) || echoesCredential(result.ContentType, secret) {
+		return nil, errCredentialResponse
 	}
 	if resp.StatusCode >= 300 && resp.StatusCode < 400 {
 		return result, fmt.Errorf("%w: HTTP %d", ErrExternalRedirect, resp.StatusCode)
