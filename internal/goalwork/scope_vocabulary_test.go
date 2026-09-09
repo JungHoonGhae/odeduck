@@ -162,7 +162,7 @@ func TestScopeVocabularyRetainsEveryExistingTokenRule(t *testing.T) {
 	} {
 		t.Run(tc.rule, func(t *testing.T) {
 			e := vocabularyGoal(t, []Row{{"name": "same", "address": tc.address}}, []Row{{"name": "same", "province": " 인천 ", "district": "서구", "access": "yes"}})
-			p := vocabularyComposition(t, "token-rule", "kr_sido_labels_20260907_v1")
+			p := vocabularyComposition(t, "scope-rule", "kr_sido_labels_20260907_v1")
 			p.Joins[0].Scopes[0].Rule = tc.rule
 			vocabularyStep(t, e, Decision{Action: "compose", Composition: &p})
 			v := vocabularyStep(t, e, Decision{Action: "execute", CompositionID: p.ID})

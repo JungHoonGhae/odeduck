@@ -127,7 +127,8 @@ Discovery Gap과 함께 재탐색에 돌려준다. 문자열 규칙의 일치는
 한 원천의 조회·집계와 여러 원천의 결합은 같은 실행 경로를 사용한다. `sample_executed`는 표본 실행 결과이지
 namespace 동일성·인과·사용자 목표 효과의 검증이 아니다.
 필수 역할·출력 타입·출처가 빠진 artifact는 partial로 남기고 탐색을 계속한다. 구조적 조건을 통과해도
-`needsSemanticReview=true`이면 `review_required`로 멈추고 후보를 보존하며 CLI는 실패 코드를 반환한다.
+`needsSemanticReview=true`이면 `review_required`로 남겨 후보를 보존하고 같은 목표·예산·만료 안에서
+재탐색한다. 최종 검토된 완료에 이르지 못하면 CLI는 실패 코드를 반환한다.
 위 도식은 구조적 실행 경로다. 명시적으로 켠 [별도 결과 검토](docs/specs/goal-source-report-review-v1.md)가
 지원하는 원천 보고·관계·계산·원천 인용 설명의 근거와 원래 목표 적합성을 통과한 경우에만
 `output_ready`를 허용한다. 모델 판단은 현장·사람 검증이 아니며 범용 의미 검증은 미완료다.
