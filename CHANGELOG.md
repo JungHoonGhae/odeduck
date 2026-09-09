@@ -5,7 +5,12 @@ All notable changes to odeduck are documented here. Format follows
 [SemVer](https://semver.org/). The release workflow uses the `## [X.Y.Z]`
 section matching a `vX.Y.Z` tag as the GitHub release notes.
 
-## [Unreleased]
+## [0.19.0] - 2026-09-09
+
+Start with a goal, inspect the actual sources, execute bounded analyses and review
+selected supporting evidence through the same CLI/MCP engine. Goal execution and
+model review are experimental: this release does not establish general autonomous
+goal completion, canonical entity identity, causal claims or field verification.
 
 ### Added
 
@@ -111,6 +116,10 @@ section matching a `vX.Y.Z` tag as the GitHub release notes.
 
 ### Fixed
 
+- Discard retained goal values before returning acquisitions that finish after
+  session expiry, including source failures and cancellation.
+- Reject malformed UTF-8 before decoding goal-planner decisions, and return
+  bounded errors for oversized comparison numbers and result tables without panics.
 - Continue experimental goal planning after `review_required` within the original
   contract, disclosure policy, budgets and expiry. Pin evaluations to execution
   revisions and clear stale current results before a replacement execution.

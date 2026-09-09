@@ -127,7 +127,7 @@ MCP에서는 서버를 `mcp --share-goal-evidence`로 시작해야 하며 모델
 릴리스에는 검증된 카탈로그가 포함되어 있어 로그인이나 API 키 없이 바로 검색할 수 있다.
 
 ```sh
-curl -fsSL https://github.com/JungHoonGhae/odeduck/releases/download/v0.18.0/install.sh | sh
+curl -fsSL https://github.com/JungHoonGhae/odeduck/releases/download/v0.19.0/install.sh | sh
 
 odeduck catalog search \
   "서울에서 작은 가게 후보를 좁힐 자료" \
@@ -209,7 +209,7 @@ data.go.kr REST는 정부 SSO 로그인 한 번 뒤 신청→승인 확인→키
 Windows:
 
 ```powershell
-irm https://github.com/JungHoonGhae/odeduck/releases/download/v0.18.0/install.ps1 | iex
+irm https://github.com/JungHoonGhae/odeduck/releases/download/v0.19.0/install.ps1 | iex
 ```
 
 macOS·Linux 설치 명령은 위 빠른 시작에 있다. 설치 스크립트는 checksum을 검증하고 같은 릴리스의
