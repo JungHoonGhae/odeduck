@@ -16,6 +16,64 @@ import (
 	"github.com/JungHoonGhae/odeduck/internal/goalwork"
 )
 
+// Reuse the native test executable rather than a shell script, so the public
+// provider adapter is exercised on Windows too. An empty PATH makes accidental
+// use of an installed coding agent or shell fail deterministically.
+func sourceReviewCLI(t *testing.T, provider string, response []byte, promptPath string) string {
+	t.Helper()
+	executable, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	responsePath := filepath.Join(t.TempDir(), "response.jsonl")
+	if err := os.WriteFile(responsePath, response, 0600); err != nil {
+		t.Fatal(err)
+	}
+	original := providerBinariesFor
+	t.Cleanup(func() { providerBinariesFor = original })
+	providerBinariesFor = func(requested string) []binaryCandidate {
+		if requested != provider {
+			return nil
+		}
+		return []binaryCandidate{{name: executable, prefix: []string{"-test.run=^TestSourceReviewCLIHelper$", "--"}}}
+	}
+	t.Setenv("PATH", "")
+	for _, prefix := range []string{"CODEX_", "CLAUDE_"} {
+		t.Setenv(prefix+"SOURCE_REVIEW_RESPONSE", "")
+		t.Setenv(prefix+"SOURCE_REVIEW_PROMPT", "")
+	}
+	prefix := strings.ToUpper(provider) + "_"
+	t.Setenv(prefix+"SOURCE_REVIEW_RESPONSE", responsePath)
+	t.Setenv(prefix+"SOURCE_REVIEW_PROMPT", promptPath)
+	return responsePath
+}
+
+func TestSourceReviewCLIHelper(t *testing.T) {
+	for _, prefix := range []string{"CODEX_", "CLAUDE_"} {
+		responsePath := os.Getenv(prefix + "SOURCE_REVIEW_RESPONSE")
+		if responsePath == "" {
+			continue
+		}
+		prompt, err := io.ReadAll(os.Stdin)
+		if err != nil {
+			os.Exit(2)
+		}
+		if promptPath := os.Getenv(prefix + "SOURCE_REVIEW_PROMPT"); promptPath != "" {
+			if err := os.WriteFile(promptPath, prompt, 0600); err != nil {
+				os.Exit(3)
+			}
+		}
+		response, err := os.ReadFile(responsePath)
+		if err != nil {
+			os.Exit(4)
+		}
+		if _, err := os.Stdout.Write(response); err != nil {
+			os.Exit(5)
+		}
+		os.Exit(0)
+	}
+}
+
 // Replay the retained real-provider transcripts through the public adapter.
 // This is an offline decoder regression, not another model accuracy trial.
 func TestReviewGoalReplaysArchivedCodexCalibration(t *testing.T) {
@@ -70,16 +128,7 @@ func replayArchivedReview(t *testing.T, folder, file string, wantReady, wantTria
 			if trial.ProviderResponse == "" || trial.Result.Evaluation == nil || trial.Result.Evaluation.Review == nil {
 				t.Fatal("archive is missing its provider transcript or typed assessment")
 			}
-			dir := t.TempDir()
-			responsePath := filepath.Join(dir, "response.jsonl")
-			if err := os.WriteFile(responsePath, []byte(trial.ProviderResponse), 0600); err != nil {
-				t.Fatal(err)
-			}
-			script := "#!/bin/sh\nexec /bin/cat '" + strings.ReplaceAll(responsePath, "'", "'\\''") + "'\n"
-			if err := os.WriteFile(filepath.Join(dir, "codex"), []byte(script), 0700); err != nil {
-				t.Fatal(err)
-			}
-			t.Setenv("PATH", dir)
+			sourceReviewCLI(t, ProviderCodex, []byte(trial.ProviderResponse), "")
 			response, err := ReviewGoal(context.Background(), decodeLegacyReviewInput(t, trial.Input), "codex")
 			if err != nil || response.Truncated || response.RawResponse != trial.ProviderResponse || !reflect.DeepEqual(response.Assessment, trial.Result.Evaluation.Review.Assessment) {
 				t.Fatalf("archived response no longer decodes to its recorded findings: %v", err)
@@ -147,12 +196,11 @@ func decodeLegacyReviewInput(t *testing.T, raw json.RawMessage) goalwork.ReviewI
 }
 
 func TestReviewGoalUsesAnIsolatedContextAndReturnsTypedFindings(t *testing.T) {
-	dir := t.TempDir()
-	bin := filepath.Join(dir, "claude")
-	if err := os.WriteFile(bin, []byte("#!/bin/sh\nprintf '%s' '{\"result\":\"{\\\"goalFit\\\":{\\\"verdict\\\":\\\"supported\\\",\\\"reason\\\":\\\"source report only\\\",\\\"packetId\\\":\\\"ep_actual\\\"},\\\"outputs\\\":[{\\\"output\\\":\\\"record\\\",\\\"finding\\\":{\\\"verdict\\\":\\\"supported\\\",\\\"reason\\\":\\\"observed label\\\",\\\"packetId\\\":\\\"ep_actual\\\"}}]}\"}'\n"), 0700); err != nil {
+	body, err := json.Marshal(map[string]string{"result": `{"goalFit":{"verdict":"supported","reason":"source report only","packetId":"ep_actual"},"outputs":[{"output":"record","finding":{"verdict":"supported","reason":"observed label","packetId":"ep_actual"}}]}`})
+	if err != nil {
 		t.Fatal(err)
 	}
-	t.Setenv("PATH", dir)
+	sourceReviewCLI(t, ProviderClaude, body, "")
 	in := goalwork.ReviewInput{Recipient: "claude", Goal: "recorded labels", Contract: goalwork.GoalContract{Outputs: []goalwork.OutputRequirement{{ID: "record"}}}, Evidence: goalwork.EvidencePacket{ID: "ep_actual"}}
 	response, err := ReviewGoal(context.Background(), in, "claude")
 	if err != nil || response.Assessment.GoalFit.Verdict != "supported" || response.RawResponse == "" {
@@ -174,12 +222,7 @@ func TestReviewGoalRejectsInventedOrMalformedVerdicts(t *testing.T) {
 		`{"goalFit":{"verdict":"supported","reason":"yes","packetId":"ep_actual"},"outputs":[{"output":"record","finding":{"verdict":"supported","reason":"yes","packetId":"ep_actual"}}],"outputſ":[{"output":"record","finding":{"verdict":"supported","reason":"yes","packetId":"ep_actual"}}]}`,
 		"{\"goalFit\":{\"verdict\":\"supported\",\"reason\":\"yes\",\"packetId\":\"ep_actual\"},\"outputs\":[{\"output\":\"record\",\"finding\":{\"verdict\":\"supported\",\"reason\":\"yes\",\"packetId\":\"ep_actual\"}}]}\n{\"type\":\"turn.failed\",\"error\":{\"message\":\"provider failure\"}}",
 	} {
-		dir := t.TempDir()
-		script := fmt.Sprintf("#!/bin/sh\nprintf '%%s' '%s'\n", strings.ReplaceAll(body, "'", "'\\''"))
-		if err := os.WriteFile(filepath.Join(dir, "claude"), []byte(script), 0700); err != nil {
-			t.Fatal(err)
-		}
-		t.Setenv("PATH", dir)
+		sourceReviewCLI(t, ProviderClaude, []byte(body), "")
 		response, err := ReviewGoal(context.Background(), in, "claude")
 		if err == nil {
 			t.Fatalf("accepted %s", body)
@@ -199,11 +242,7 @@ func TestReviewGoalSelectsAnalysisContractWithoutChangingSourceReportGuide(t *te
 		a.AnalysisChecks = append(a.AnalysisChecks, goalwork.AnalysisCheck{Topic: topic, Finding: f})
 	}
 	body, _ := json.Marshal(a)
-	script := "#!/bin/sh\n/bin/cat > '" + strings.ReplaceAll(promptPath, "'", "'\\''") + "'\nprintf '%s' '" + strings.ReplaceAll(string(body), "'", "'\\''") + "'\n"
-	if err := os.WriteFile(filepath.Join(dir, "claude"), []byte(script), 0700); err != nil {
-		t.Fatal(err)
-	}
-	t.Setenv("PATH", dir)
+	responsePath := sourceReviewCLI(t, ProviderClaude, body, promptPath)
 	in := goalwork.ReviewInput{Recipient: "claude", Goal: "compare recorded totals", Contract: goalwork.GoalContract{Outputs: []goalwork.OutputRequirement{{ID: "total"}}}, Evidence: goalwork.EvidencePacket{ID: "ep_one"}, Analysis: &goalwork.AnalysisReviewContext{Method: "engine_relational_replay_v3", AdditionalEvidence: []goalwork.EvidencePacket{{ID: "ep_two"}, {ID: "ep_context", Records: []goalwork.EvidenceRecord{{RetainedRow: 1, Values: goalwork.Row{"A": "SOURCE_HEADER_FIXTURE"}}}}, {ID: "ep_definitions", Records: []goalwork.EvidenceRecord{{RetainedRow: 1, Values: goalwork.Row{"term": "SEPARATE_DEFINITION_FIXTURE"}}}}}}}
 	in.Analysis.SourceContext = []goalwork.SourceContext{{Targets: []string{"o1"}, PacketID: "ep_context"}}
 	in.Analysis.SourceContext = append(in.Analysis.SourceContext, goalwork.SourceContext{Targets: []string{"o1"}, Proposed: true, Purpose: "Check definition applicability", Source: goalwork.Observation{ID: "o3", PK: "definitions"}, PacketID: "ep_definitions"})
@@ -260,8 +299,7 @@ func TestReviewGoalSelectsAnalysisContractWithoutChangingSourceReportGuide(t *te
 	}
 	a.SourceCoverage = []goalwork.SourceCoverageReview{{Observation: "o1", Finding: f}}
 	body, _ = json.Marshal(a)
-	script = "#!/bin/sh\n/bin/cat > '" + strings.ReplaceAll(promptPath, "'", "'\\''") + "'\nprintf '%s' '" + strings.ReplaceAll(string(body), "'", "'\\''") + "'\n"
-	if err := os.WriteFile(filepath.Join(dir, "claude"), []byte(script), 0700); err != nil {
+	if err := os.WriteFile(responsePath, body, 0600); err != nil {
 		t.Fatal(err)
 	}
 	response, err = ReviewGoal(context.Background(), in, "claude")
@@ -283,8 +321,7 @@ func TestReviewGoalSelectsAnalysisContractWithoutChangingSourceReportGuide(t *te
 	}
 	a.Explanations = []goalwork.ExplanationReview{{Explanation: "reference_date", Finding: f}}
 	body, _ = json.Marshal(a)
-	script = "#!/bin/sh\n/bin/cat > '" + strings.ReplaceAll(promptPath, "'", "'\\''") + "'\nprintf '%s' '" + strings.ReplaceAll(string(body), "'", "'\\''") + "'\n"
-	if err := os.WriteFile(filepath.Join(dir, "claude"), []byte(script), 0700); err != nil {
+	if err := os.WriteFile(responsePath, body, 0600); err != nil {
 		t.Fatal(err)
 	}
 	response, err = ReviewGoal(context.Background(), in, "claude")

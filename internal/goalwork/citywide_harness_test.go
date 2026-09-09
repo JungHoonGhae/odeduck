@@ -3,9 +3,11 @@ package goalwork_test
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -13,6 +15,69 @@ import (
 	"github.com/JungHoonGhae/odeduck/internal/agentplan"
 	"github.com/JungHoonGhae/odeduck/internal/goalwork"
 )
+
+// The fixture CLI is a copy of this platform's native test executable. Handle
+// only that named executable before Go parses the real provider's CLI flags.
+// The ordinary test process and diagnostic subprocess still use m.Run.
+func TestMain(m *testing.M) {
+	name := filepath.Base(os.Args[0])
+	if name == "codex" || name == "codex.exe" {
+		responsePath := os.Getenv("CODEX_CITYWIDE_RESPONSE")
+		if responsePath == "" {
+			os.Exit(2)
+		}
+		if _, err := io.Copy(io.Discard, os.Stdin); err != nil {
+			os.Exit(3)
+		}
+		body, err := os.ReadFile(responsePath)
+		if err != nil {
+			os.Exit(4)
+		}
+		if _, err := os.Stdout.Write(body); err != nil {
+			os.Exit(5)
+		}
+		switch os.Getenv("CODEX_CITYWIDE_EXIT") {
+		case "0":
+			os.Exit(0)
+		case "1":
+			os.Exit(1)
+		default:
+			os.Exit(6)
+		}
+	}
+	os.Exit(m.Run())
+}
+
+func citywideFixtureCLI(t *testing.T) string {
+	t.Helper()
+	executable, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	source, err := os.Open(executable)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer source.Close()
+	dir := t.TempDir()
+	name := "codex"
+	if runtime.GOOS == "windows" {
+		name += ".exe"
+	}
+	target, err := os.OpenFile(filepath.Join(dir, name), os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0700)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, copyErr := io.Copy(target, source)
+	closeErr := target.Close()
+	if copyErr != nil {
+		t.Fatal(copyErr)
+	}
+	if closeErr != nil {
+		t.Fatal(closeErr)
+	}
+	return dir
+}
 
 // Exercise the actual go-test entrypoint, including fatal/cleanup behavior.
 // Only the external coding-agent CLI is replaced; no live account is needed.
@@ -26,6 +91,7 @@ func TestCitywideReviewDiagnosticPreservesFailures(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	cliDir := citywideFixtureCLI(t)
 	for _, kind := range []string{"existing-output", "provider-error", "false-approval", "missing-reference", "unproven-full-scope", "unproven-table-context", "invalid-provider", "invalid-mode", "synthetic-document"} {
 		t.Run(kind, func(t *testing.T) {
 			dir := t.TempDir()
@@ -36,10 +102,6 @@ func TestCitywideReviewDiagnosticPreservesFailures(t *testing.T) {
 			}
 			response := filepath.Join(dir, "response.json")
 			if err := os.WriteFile(response, body, 0600); err != nil {
-				t.Fatal(err)
-			}
-			script := "#!/bin/sh\n/bin/cat '" + strings.ReplaceAll(response, "'", "'\\''") + "'\nexit " + exit + "\n"
-			if err := os.WriteFile(filepath.Join(dir, "codex"), []byte(script), 0700); err != nil {
 				t.Fatal(err)
 			}
 			if kind == "existing-output" {
@@ -67,11 +129,14 @@ func TestCitywideReviewDiagnosticPreservesFailures(t *testing.T) {
 			defer cancel()
 			cmd := exec.CommandContext(ctx, os.Args[0], "-test.run=^TestLiveCitywideGoalAnalysisReview$", "-test.count=1")
 			for _, env := range os.Environ() {
-				if !strings.HasPrefix(env, "ODEDUCK_CITYWIDE_") && !strings.HasPrefix(env, "PATH=") {
+				key, _, _ := strings.Cut(env, "=")
+				key = strings.ToUpper(key) // Windows may retain the spelling "Path".
+				if !strings.HasPrefix(key, "ODEDUCK_CITYWIDE_") && !strings.HasPrefix(key, "CODEX_CITYWIDE_") && key != "PATH" {
 					cmd.Env = append(cmd.Env, env)
 				}
 			}
-			cmd.Env = append(cmd.Env, "PATH="+dir, "ODEDUCK_CITYWIDE_REVIEW="+provider, "ODEDUCK_CITYWIDE_ACQUISITION="+mode, "ODEDUCK_CITYWIDE_RESULT="+variant, "ODEDUCK_CITYWIDE_REVIEW_OUTPUT="+output)
+			cmd.Env = append(cmd.Env, "PATH="+cliDir, "CODEX_CITYWIDE_RESPONSE="+response, "CODEX_CITYWIDE_EXIT="+exit,
+				"ODEDUCK_CITYWIDE_REVIEW="+provider, "ODEDUCK_CITYWIDE_ACQUISITION="+mode, "ODEDUCK_CITYWIDE_RESULT="+variant, "ODEDUCK_CITYWIDE_REVIEW_OUTPUT="+output)
 			if kind == "missing-reference" {
 				cmd.Dir = dir // The declared source reference is genuinely unavailable.
 			}
