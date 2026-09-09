@@ -126,15 +126,18 @@ https://github.com/JungHoonGhae/odeduck
 
 ## 게시 직전 확인
 
+2026-09-09 현재 저장소는 비공개다. 아래 공개 접근·비로그인 설치 점검은 공개 후 실행할 항목이며,
+v0.19.0의 익명 공개 smoke 통과를 뜻하지 않는다.
+
 - 비로그인 브라우저에서 저장소·README·릴리스 링크가 열린다.
 - README의 macOS/Linux와 Windows 설치 명령이 최신 release를 받는다.
 - 설치 직후 `catalog info`에 9.6만 건 이상이 나온다.
 - 기본 카탈로그 검색이 로그인과 외부 AI 없이 재현된다.
 - 자연어 한 문장 데모가 사용할 AI 제공자를 명시하고 연결 후보의 검증 전 경계를 유지한다.
 - 저장소 공개 직후 GitHub social preview에 `docs/assets/odeduck-social-preview.png`를 등록한다.
-- 이미 켜 둔 immutable releases 설정을 재확인하고, `v0.18.0`에서 `install.sh`·`install.ps1`·checksum을 확인한다.
+- 이미 켜 둔 immutable releases 설정을 재확인하고, `v0.19.0`에서 `install.sh`·`install.ps1`·checksum을 확인한다.
 - 공개 직후 `main`에 PR·필수 CI·force-push 차단 ruleset을 적용한 뒤 외부 링크를 배포한다.
-- `Public launch smoke` workflow를 `v0.18.0`로 실행해 비로그인 설치·카탈로그·첫 검색을 확인한다.
+- `Public launch smoke` workflow를 `v0.19.0`로 실행해 비로그인 설치·카탈로그·첫 검색을 확인한다.
 - GitHub 프로필의 odeduck 링크를 비로그인 상태에서 확인하고 `public release in progress` 표기를 제거한다.
 - GitHub private vulnerability reporting을 켜고 Security 탭의 비공개 신고 링크를 확인한다.
 - LinkedIn 게시물 공개 범위를 `Anyone`으로 둔다.

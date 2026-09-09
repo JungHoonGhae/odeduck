@@ -82,13 +82,13 @@ AI가 질문을 생활인구·업종별 매출·점포 생존·개폐업으로 �
 
 ## 빠른 시작
 
-### 개발 브랜치: 목표에서 실제 표본 조합까지 (experimental)
+### v0.19.0: 목표에서 실제 표본 조합까지 (experimental)
 
-아래 기능은 아직 v0.18.0 릴리스에 포함되지 않은 개발 브랜치 기능이다.
+v0.19.0에 포함된 실험적 기능이다. 아래 설치를 마친 뒤 사용할 수 있으며 범용 목표 완주를 보장하지 않는다.
 
 ```sh
-go run ./cmd/odeduck catalog semantic-build
-go run ./cmd/odeduck solve "폭염 때 어르신이 쉴 곳을 찾는 데 도움이 될 데이터를 서로 연결해줘"
+odeduck catalog semantic-build
+odeduck solve "폭염 때 어르신이 쉴 곳을 찾는 데 도움이 될 데이터를 서로 연결해줘"
 ```
 
 설치·로그인된 Codex·Claude·Gemini가 목표를 역할별로 나누고, 검색·검사·표본·결합을 반복한다.

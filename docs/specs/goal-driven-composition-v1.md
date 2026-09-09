@@ -1,6 +1,6 @@
 # Goal-driven composition v1
 
-Status: experimental implementation on the development branch; not a released/general goal-solving guarantee.
+Status: included in v0.19.0 as experimental; not a general goal-solving guarantee.
 Decision: [ADR-0006](../adr/0006-goal-driven-composition.md).
 Evaluation: [2026-09-07 execution audit](../research/goal-composition-evaluation-2026-09-07.md).
 
@@ -9,7 +9,8 @@ Evaluation: [2026-09-07 execution audit](../research/goal-composition-evaluation
 Natural-language goal → role/crosswalk searches → alternative Data Nodes → inspection and bounded
 samples → Composition → actual bounded output. A failed join produces a Discovery Gap and the next
 planner decision may search a replacement or intermediate mapping. No initial Anchor is permanent.
-MCP host and standalone CLI share the same engine; the server never runs a nested model for MCP.
+MCP host and standalone CLI share the same engine. The MCP host plans without a nested planner;
+explicitly configured separate result review invokes the fixed reviewer under the trusted disclosure policy.
 
 ## Questions and acceptable errors
 

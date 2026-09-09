@@ -3,8 +3,13 @@
 data.go.kr(공공데이터포털)의 OpenAPI **활용신청·인증키 발급·호출을 AI 에이전트가 대신**하게 하는
 Go CLI + MCP. 사람은 정부 SSO 로그인 한 번만 하고 이후 포털 작업을 에이전트가 잇는 것이 핵심.
 
-## 현재 상태 (2026-09-04)
+## 현재 상태 (2026-09-09)
 
+- v0.19.0은 실험적 `solve`·MCP `advance_goal`을 공통 목표 실행기로 제공한다. API·CSV·ZIP·XLSX·STD
+  관측, 과거 FILE 버전·등록된 보조 문서·월간 export, 선택 근거·선집계·미대응 결과·비교 근거를 지원한다.
+  명시한 수신자와 공개 권한 아래 별도 모델이 제한된 원천 보고·관계·계산·원천 인용 설명을 검토한다.
+  등록된 작업의 마감이며 모델 판단은 현장·사람 검증을 보장하지 않는다. 범용 INTENT, 프로세스 재개와
+  장기 장부 재사용은 미완료다. 요구사항별 상태는 `docs/specs/goal-driven-completion-plan.md`를 따른다.
 - v0.18.0은 교차 데이터 연결 판정을 append-only 연결 근거 장부에 기록하고, MCP 세션의 최근 `call_api`
   profile 영수증과 요청·operation·delivery를 대조해 `sample_verified`를 제한한다. credential material,
   조작된 집계, 잘못된 data.go.kr 출처 URL은 거부하며 손상된 JSONL tail은 삭제하지 않고 오류로 알린다.
@@ -74,6 +79,8 @@ Go CLI + MCP. 사람은 정부 SSO 로그인 한 번만 하고 이후 포털 작
 - `internal/apicall/external_call.go`, `internal/providerauth/` — provider별 exact HTTPS caller와 scope 제한 key lifecycle.
 - `internal/apicall/call.go` — data.go.kr 계정 인증키 주입 + HTTP GET + XML→JSON + 에러코드 surface.
 - `internal/agentplan/` — provider별 계획 생성과 검색 결과 기반 확장·조합, 안전한 abstention.
+- `internal/discovery/` — 독립 CLI의 다단계 계획·검색·후보 선택 순서를 공통 검색 정책에 연결한다.
+- `internal/goalwork/` — CLI/MCP 공통 목표·관측·실행·재계획·선택 근거와 별도 결과 검토를 관리한다.
 - `internal/catalog/` — 공식 API·월간 CSV·웹 composite 수집, prebuilt snapshot, 키워드·의미 검색,
   release golden query gate, connection discovery의 제한·중복 제거·증거 경계.
 - `internal/dataset/` — REST/LINK/FILE 공통 검사와 실제 FILE 자산·bounded CSV/DBF/XLSX schema 관찰.

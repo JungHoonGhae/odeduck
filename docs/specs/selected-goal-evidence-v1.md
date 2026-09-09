@@ -1,7 +1,7 @@
 # 선택 근거 읽기 v1
 
-상태: 개발 브랜치 구현. [공통 통합 검증](goal-integration-and-cleanup-v1.md)은 별도로 기록한다.
-독립 호출 경계 수정은 `490e4a8`; 아직 릴리스하지 않았다.
+상태: v0.19.0에 실험적 기능으로 포함된다. [공통 통합 검증](goal-integration-and-cleanup-v1.md)은 별도로 기록한다.
+독립 호출 경계 수정은 `490e4a8`에 포함돼 있다.
 [검증 기록](../research/selected-goal-evidence-validation-2026-09-08.md), [결정](https://github.com/JungHoonGhae/odeduck/issues/42),
 [ADR](../adr/0007-selected-evidence-and-reuse.md). INTENT 전체 완료를 뜻하지 않는다.
 

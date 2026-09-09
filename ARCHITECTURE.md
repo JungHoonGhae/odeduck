@@ -80,8 +80,9 @@ provider, 검색 정책을 유지하며 Bridge 선택지와 단계별 폴백·Ab
 ### 1.5. Goal-driven composition (experimental)
 
 `odeduck solve "목표"`와 MCP `advance_goal`은 [`internal/goalwork`](internal/goalwork)의 동일한
-Start/Advance interface를 사용한다. `solve`만 tool-free Codex·Claude·Gemini를 호출하고 MCP에서는
-host가 다음 행동을 제안한다. 고정 Anchor 없이 역할별 후보와 여러 Composition을 보존한다.
+Start/Advance interface를 사용한다. CLI 계획은 tool-free Codex·Claude·Gemini가, MCP 계획은 host가
+다음 행동을 제안한다. 별도 결과 검토는 명시한 시작 설정이 있을 때만 고정된 모델을 호출한다.
+고정 Anchor 없이 역할별 후보와 여러 Composition을 보존한다.
 상세 행동 안내는 Goal Engine의 [정적 계획 계약](internal/goalwork/planning-guide.md) 하나를
 CLI prompt와 MCP resource가 공유한다. 각 adapter는 전달·출력·신뢰된 시작 설정만 덧붙인다.
 
@@ -127,7 +128,10 @@ Discovery Gap과 함께 재탐색에 돌려준다. 문자열 규칙의 일치는
 namespace 동일성·인과·사용자 목표 효과의 검증이 아니다.
 필수 역할·출력 타입·출처가 빠진 artifact는 partial로 남기고 탐색을 계속한다. 구조적 조건을 통과해도
 `needsSemanticReview=true`이면 `review_required`로 멈추고 후보를 보존하며 CLI는 실패 코드를 반환한다.
-현재 의미 검증은 미완성이므로 `output_ready`를 자동 발급하지 않는다. 모델의 가정 문구는 승인이 아니다.
+위 도식은 구조적 실행 경로다. 명시적으로 켠 [별도 결과 검토](docs/specs/goal-source-report-review-v1.md)가
+지원하는 원천 보고·관계·계산·원천 인용 설명의 근거와 원래 목표 적합성을 통과한 경우에만
+`output_ready`를 허용한다. 모델 판단은 현장·사람 검증이 아니며 범용 의미 검증은 미완료다.
+모델의 가정 문구는 승인이 아니다. 프로세스 재개·장기 장부 재사용도 미지원이다.
 기존 connection ledger의 `sample_verified` gate와 분리한다. bounded join에는 별도 graph DB가
 필요하지 않다. 계약과 현재 한계는 [spec](docs/specs/goal-driven-composition-v1.md), 결정은
 [ADR-0006](docs/adr/0006-goal-driven-composition.md)에 있다.
@@ -169,7 +173,7 @@ MCP 도구는 외부 상태를 바꾸는 destructive action으로 표시해 호�
 | [`internal/catalog`](internal/catalog) | snapshot 동기화, 어휘·hybrid 검색, bounded connection 후보 | 모델 실행, 자격증명, API 호출 |
 | [`internal/discovery`](internal/discovery) | 독립 CLI의 계획·검색·선택 순서, 폴백·Abstention | ranking, 연결 검증, MCP host 계획 대체 |
 | [`internal/goalwork`](internal/goalwork) | 불변 목표·관측·예산·실행·평가·선택 근거와 공통 행동 안내 | 자동 의미 승인, 자격증명 소유, 전역 entity merge |
-| [`internal/agentplan`](internal/agentplan) | 자연어 목표를 검색축으로 변환하고 실제 후보 중 Bridge PK 선택 | 카탈로그 ranking, 신청, 호출 |
+| [`internal/agentplan`](internal/agentplan) | 검색축·Bridge 선택·목표 행동 계획, 명시적으로 설정한 별도 결과 검토 모델 호출 | 카탈로그 ranking, 신청, API 호출 |
 | [`internal/dataset`](internal/dataset) | REST·LINK·FILE 통합 검사, bounded FILE schema 관찰 | FILE을 호출 가능한 API로 추측 |
 | [`internal/apicall`](internal/apicall) | 공식 API 계약 해석, REST/LINK dispatch, 검증·호출·profiling | 브라우저 로그인 UI |
 | [`internal/portal`](internal/portal) | data.go.kr 공개 페이지, 로그인 세션, 신청·계정·키 흐름 | 외부 provider credential 재사용 |

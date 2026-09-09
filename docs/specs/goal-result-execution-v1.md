@@ -1,7 +1,7 @@
 # Goal Result execution v1 — 결합을 강제하지 않는 표본 실행
 
-상태: 개발 브랜치 구현. [기능 검증](../research/goal-result-execution-validation-2026-09-08.md)과
-[공통 통합 검증](goal-integration-and-cleanup-v1.md)을 구분해 기록한다. 아직 릴리스하지 않았다.
+상태: v0.19.0에 실험적 기능으로 포함된다. [기능 검증](../research/goal-result-execution-validation-2026-09-08.md)과
+[공통 통합 검증](goal-integration-and-cleanup-v1.md)을 구분해 기록한다.
 [INTENT 지도](https://github.com/JungHoonGhae/odeduck/issues/40)의
 [산출물·완료 결정](https://github.com/JungHoonGhae/odeduck/issues/41)에서 확정된 첫 vertical slice.
 전체 목표의 구현 명세를 대체하지 않으며 I1–I10, G1–G5, 자동 의미 승인·지식 재사용은 계속 미완료다.
