@@ -27,3 +27,7 @@ b7d9ccf08a414349fa759a251997df882ae45f8b:internal/apicall/external_call_test.go:
 
 # RFC 6455 WebSocket handshake nonce in a removed prototype.
 b596cc84d51b2189a7ed5aa7339ff56e24ea9c66:proto-cdp-origin/main.go:generic-api-key:188
+
+# Frozen Korean province-label vocabulary ID in a scope-token regression test,
+# not an API credential. Keep this exception tied to the original commit/line.
+57e9200e441eaa95f3705f7a3268da1cd2998825:internal/goalwork/scope_vocabulary_test.go:generic-api-key:165
