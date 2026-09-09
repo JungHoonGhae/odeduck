@@ -147,7 +147,7 @@ func validatePrebuilt(candidate *Catalog) error {
 		}
 		seen[pk] = true
 		switch entry.SvcType {
-		case "", SvcREST, SvcLINK, SvcFILE:
+		case "", SvcREST, SvcLINK, SvcFILE, SvcSTD:
 		default:
 			return fmt.Errorf("prebuilt snapshot PK %s의 유형 %q가 유효하지 않습니다", pk, entry.SvcType)
 		}

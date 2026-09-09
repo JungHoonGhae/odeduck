@@ -38,6 +38,7 @@ func init() {
 	rootCmd.AddCommand(searchCmd(), inspectCmd(), describeCmd(), callCmd(), keyCmd())
 	rootCmd.AddCommand(providerKeyCmd())
 	rootCmd.AddCommand(catalogCmd())
+	rootCmd.AddCommand(solveCmd())
 	rootCmd.AddCommand(applyCmd(), applicationsCmd())
 	rootCmd.AddCommand(doctorCmd())
 	rootCmd.AddCommand(mcpCmd())

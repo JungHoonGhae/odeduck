@@ -1,0 +1,129 @@
+{
+  "case": "G2",
+  "kind": "independent_reference_slice",
+  "status": "partial_oracle_not_goal_completion",
+  "method": "Python stdlib ZIP/CSV decoding, no goalwork. Same facility occurs at different record ordinals in two members; associate by complete observed name/province/district/road/building/coordinates. Transit latitude range failure blocks geometry until an independently grounded correction or alternative source exists. Never auto-swap axes.",
+  "sources": [
+    {
+      "pk": "15109171",
+      "url": "https://www.data.go.kr/cmm/cmm/fileDownload.do?atchFileId=FILE_000000002671073&dataNm=%EC%9D%B8%EC%B2%9C%EA%B4%80%EA%B4%91%EA%B3%B5%EC%82%AC_%EA%B4%80%EA%B4%91_%EA%B4%80%EA%B4%91%EC%88%98%EC%9A%A9%ED%83%9C%EC%84%B8%EC%A0%95%EB%B3%B4_%EB%AC%B4%EC%9E%A5%EC%95%A0%EA%B4%80%EA%B4%91%EC%A0%95%EB%B3%B4_20221207&fileDetailSn=1",
+      "observedAt": "2026-09-07T04:10:47.187812+00:00",
+      "contentSha256": "204d7e775c1b8854d7aa1ca520685695303bad52e0d71edb4ef3baa540ac755f",
+      "license": "이용허락범위 제한 없음",
+      "records": [
+        {
+          "member": "인천관광공사_관광_관광수용태세정보_무장애관광정보/인천관광공사_관광_관광수용태세정보.csv",
+          "memberSha256": "9b59f631dc7a40ee2809c8e7db157c836336fd0f985fef9dfde7b91186ef4467",
+          "csvRecord": 149,
+          "values": {
+            "업체명": "인천도시역사관",
+            "카테고리명": "관광",
+            "폐업": "N",
+            "비관광업": "N",
+            "시도명": "인천",
+            "시군구명": "연수구",
+            "도로명": "인천타워대로",
+            "건물번호": "238",
+            "법정읍면동리명칭": "",
+            "번지": "",
+            "경도": "126.635889346901",
+            "위도": "37.3928128194922",
+            "전화번호": "032-850-6000",
+            "홈페이지주소": "https://www.incheon.go.kr/museum/index",
+            "화장실 유무": "Y",
+            "화장실 정보": "구분",
+            "주차장 유무": "Y",
+            "전기차충전소 유무": "N",
+            "관광안내소 유무": "Y",
+            "관광안내표지판 유무": "Y",
+            "물품보관소 유무": "N",
+            "예약 가능 여부": "Y",
+            "외국어안내 유무": "Y",
+            "외국어안내 종류": "영어,중국어",
+            "와이파이 유무": "N",
+            "휴무일": "",
+            "휴무일 기타": "",
+            "전자결제 가능 여부": "N",
+            "반려견 동반 가능 여부": "N",
+            "유무료": "N",
+            "입장료(체험료)_대인": "",
+            "입장료(체험료)_소인": ""
+          }
+        },
+        {
+          "member": "인천관광공사_관광_관광수용태세정보_무장애관광정보/인천관광공사_관광_무장애관광정보.csv",
+          "memberSha256": "1c7a03f4d5ac1476440032ff6efe55643eb4ce8484e88b54fc98fc272da152c2",
+          "csvRecord": 937,
+          "values": {
+            "업체명": "인천도시역사관",
+            "카테고리명": "관광",
+            "폐업": "N",
+            "비관광업": "N",
+            "시도명": "인천",
+            "시군구명": "연수구",
+            "도로명": "인천타워대로",
+            "건물번호": "238",
+            "법정읍면동리명칭": "",
+            "번지": "",
+            "경도": "126.635889346901",
+            "위도": "37.3928128194922",
+            "엘리베이터 유무": "Y",
+            "출입구 경사로 유무": "Y",
+            "휠체어 대여 가능": "Y",
+            "유모차 대여 가능": "Y",
+            "수유실 유무": "N",
+            "안내견 동반 가능": "Y",
+            "점자유도로 유무": "Y",
+            "점자안내문 유무": "Y",
+            "화장실 유무": "Y",
+            "장애인화장실 유무": "Y",
+            "가족화장실 유무": "N",
+            "기저귀교환대 유무": "N",
+            "주차장 유무": "Y",
+            "장애인전용 주차공간 유무": "N"
+          }
+        }
+      ]
+    },
+    {
+      "pk": "15074309",
+      "url": "https://www.data.go.kr/cmm/cmm/fileDownload.do?atchFileId=FILE_000000003609211&dataNm=%EC%9D%B8%EC%B2%9C%EA%B4%91%EC%97%AD%EC%8B%9C_%EC%8B%9C%EB%82%B4%EB%B2%84%EC%8A%A4+%EC%A0%95%EB%A5%98%EC%86%8C+%ED%98%84%ED%99%A9_20260228&fileDetailSn=1",
+      "observedAt": "2026-09-07T04:10:47.775653+00:00",
+      "contentSha256": "13861816df7a8ae996fd3b564c88a712a3fee0096fe0d590285f0b532ae3dd45",
+      "license": "이용허락범위 제한 없음",
+      "records": [
+        {
+          "csvRecord": 2,
+          "values": {
+            "기준 일자": "20260228",
+            "정류소 명": "(구)주안2동치안센터",
+            "정류소 번호": "37302",
+            "정류소 ID": "163000302",
+            "권역": "미추홀구",
+            "행정동 명": "주안2동",
+            "X 좌표": "170842.16",
+            "위도": "126.671236",
+            "Y 좌표": "439486.142",
+            "경도": "37.4570777"
+          }
+        }
+      ],
+      "totalCSVRecords": 7237,
+      "declaredLatitudeOutOfRange": 7085
+    }
+  ],
+  "expected": {
+    "facility": "인천도시역사관",
+    "facilityCSVRecord": 149,
+    "accessibilityCSVRecord": 937,
+    "observedAccessibility": {
+      "엘리베이터 유무": "Y",
+      "출입구 경사로 유무": "Y",
+      "휠체어 대여 가능": "Y"
+    },
+    "transitCoordinates": "reject_as_declared_latitude",
+    "distance": null,
+    "routeAccessibility": "unknown",
+    "currentOperation": "unknown"
+  }
+}

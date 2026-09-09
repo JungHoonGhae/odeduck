@@ -5,8 +5,8 @@ package mcpserver
 
 import (
 	"context"
-	"errors"
 	"fmt"
+	"github.com/JungHoonGhae/odeduck/internal/agentplan"
 	"strings"
 	"time"
 
@@ -15,6 +15,7 @@ import (
 	"github.com/JungHoonGhae/odeduck/internal/connectionledger"
 	"github.com/JungHoonGhae/odeduck/internal/dataset"
 	"github.com/JungHoonGhae/odeduck/internal/fetch"
+	"github.com/JungHoonGhae/odeduck/internal/goalwork"
 	"github.com/JungHoonGhae/odeduck/internal/portal"
 	"github.com/JungHoonGhae/odeduck/internal/providerauth"
 	"github.com/JungHoonGhae/odeduck/internal/version"
@@ -23,12 +24,16 @@ import (
 
 // Deps carries the collaborators the server needs.
 type Deps struct {
-	Fetch         *fetch.Client
-	BaseURL       string // data.go.kr root for search/describe (override in tests)
-	SemanticIndex *catalog.SemanticIndex
-	Embedder      catalog.Embedder
-	Caller        datasetCallExecutor
-	Ledger        *connectionledger.Store
+	Fetch               *fetch.Client
+	BaseURL             string // data.go.kr root for search/describe (override in tests)
+	SemanticIndex       *catalog.SemanticIndex
+	Embedder            catalog.Embedder
+	Caller              datasetCallExecutor
+	Ledger              *connectionledger.Store
+	ShareGoalEvidence   bool   // trusted startup setting; never a model tool argument
+	GoalReviewProvider  string // additional explicit disclosure to a separate reviewer
+	ReviewGoalAnalyses  bool   // additional review scope, fixed at trusted startup
+	ReviewGoalFullScope bool   // additional source-supported population-goal review authority
 }
 
 type datasetCallExecutor interface {
@@ -50,10 +55,12 @@ type describeIn struct {
 	PK string `json:"pk" jsonschema:"publicDataPk of an OpenAPI dataset"`
 }
 type inspectDatasetIn struct {
-	PK       string `json:"pk" jsonschema:"publicDataPk returned by catalog_search"`
-	Delivery string `json:"delivery,omitempty" jsonschema:"representation to inspect: auto (default, returns API and FILE when both exist), api, or file"`
-	Observe  bool   `json:"observe,omitempty" jsonschema:"for FILE data, download the newest or selected asset within safety limits and return its observed CSV/DBF/XLSX worksheet columns and content hash"`
-	Asset    string `json:"asset,omitempty" jsonschema:"exact FILE asset name to observe; omit to use the newest asset listed first"`
+	FileHistory bool   `json:"fileHistory,omitempty" jsonschema:"list at most 32 portal-advertised historical FILE versions without downloading; implies file delivery"`
+	FileVersion string `json:"fileVersion,omitempty" jsonschema:"exact fileVersions.id from inspection; revalidates membership and selects only that edition, with no latest-file fallback"`
+	PK          string `json:"pk" jsonschema:"publicDataPk returned by catalog_search"`
+	Delivery    string `json:"delivery,omitempty" jsonschema:"representation to inspect: auto (default, returns API and FILE when both exist), api, file, or standard. STD returns first-party schema and optionally a bounded first-page observation"`
+	Observe     bool   `json:"observe,omitempty" jsonschema:"for FILE data, download the newest or selected asset within safety limits and return observed CSV/DBF/XLSX worksheet columns and content hash; for STD, observe only the bounded first page"`
+	Asset       string `json:"asset,omitempty" jsonschema:"exact FILE asset name to observe; omit to use the newest asset listed first"`
 }
 
 type inspectDatasetOut = dataset.InspectionResult
@@ -244,32 +251,11 @@ func New(deps Deps) *mcp.Server {
 			Axes: in.Axes, AnchorPKs: in.AnchorPKs, BridgeSelections: in.BridgeSelections,
 			MaxConnections: in.MaxConnections,
 		}
-		var res catalog.Result
-		if !in.semanticEnabled() {
-			res = cat.SearchPlan(plan)
-		} else {
-			index, embedder := deps.SemanticIndex, deps.Embedder
-			if index == nil {
-				loaded, loadErr := catalog.LoadSemanticIndex(cat)
-				switch {
-				case loadErr == nil:
-					index = loaded
-				case errors.Is(loadErr, catalog.ErrSemanticIndexStale):
-					res = cat.SearchPlan(plan)
-					catalog.RecordSemanticOutcome(&res, catalog.SemanticInfo{Status: catalog.SemanticUnavailable, Detail: "카탈로그 갱신 후 semantic-build 가 필요함"})
-				case errors.Is(loadErr, catalog.ErrSemanticIndexNotBuilt):
-					res = cat.SearchHybrid(ctx, plan, nil, nil)
-				default:
-					res = cat.SearchPlan(plan)
-					catalog.RecordSemanticOutcome(&res, catalog.SemanticInfo{Status: catalog.SemanticUnavailable, Detail: "의미 인덱스 로드 실패: " + loadErr.Error()})
-				}
-			}
-			if index != nil {
-				if embedder == nil {
-					embedder = catalog.NewOllamaEmbedder(catalog.OllamaURLFromEnv(), index.Model)
-				}
-				res = cat.SearchHybrid(ctx, plan, index, embedder)
-			}
+		res, err := (catalog.Searcher{Index: deps.SemanticIndex, Embedder: deps.Embedder}).Search(ctx, cat, plan, catalog.SearchOptions{
+			Semantic: in.semanticEnabled(), RequireSemantic: in.RequireSemantic,
+		})
+		if err != nil {
+			return errResult(err.Error()), nil, nil
 		}
 		hits := res.Hits
 		out := &catalogOut{
@@ -281,29 +267,27 @@ func New(deps Deps) *mcp.Server {
 			ConnectionOptions: res.ConnectionOptions, Connections: res.Connections,
 			Warnings: res.Warnings, Abstention: res.Abstention,
 		}
-		if in.RequireSemantic {
-			if err := catalog.RequireSemantic(res); err != nil {
-				// Strict callers must not accidentally consume the lexical candidates
-				// that were computed only to diagnose the degraded semantic path.
-				return errResult(err.Error()), nil, nil
-			}
-		}
 		return nil, out, nil
 	})
 
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "inspect_dataset",
 		Annotations: readOnlyAnnotations("2단계 · 데이터 계약 및 실제 스키마 검사", true),
-		Description: "[2단계: 검사] catalog_search에서 고른 pk의 delivery 계약을 확인한다. API+FILE 복수 제공형은 기본적으로 두 계약을 모두 반환하며 delivery=api 또는 file로 하나만 선택할 수 있다. REST/LINK는 상세기능·필수 요청변수·승인 및 provider handoff를 반환한다. FILE은 공식 상세페이지와 검증된 provider Adapter를 통해 다운로드 자산·기간·수정일을 반환한다. FILE의 실제 컬럼이 필요하면 observe=true를 사용한다. 이 경우 bounded 다운로드 후 CSV, SHP의 DBF, XLSX worksheet 컬럼과 원본 SHA-256을 반환하므로 메타데이터 설명과 실제 스키마를 구분할 수 있다. 검사되지 않은 URL이나 파라미터는 추측하지 않는다.",
+		Description: "[2단계: 검사] catalog_search에서 고른 pk의 delivery 계약을 확인한다. API+FILE 복수 제공형은 기본적으로 두 계약을 모두 반환하며 delivery=api 또는 file로 하나만 선택할 수 있다. REST/LINK는 상세기능·필수 요청변수·승인 및 provider handoff를 반환한다. FILE은 공식 상세페이지와 검증된 provider Adapter를 통해 다운로드 자산·기간·수정일을 반환한다. FILE의 실제 컬럼이 필요하면 observe=true를 사용한다. 이 경우 bounded 다운로드 후 CSV, SHP의 DBF, XLSX worksheet 컬럼과 원본 SHA-256을 반환하므로 메타데이터 설명과 실제 스키마를 구분할 수 있다. STD(delivery=standard)는 공식 포털 JSON 계약·컬럼 표시명·선언 건수와 observe=true일 때 실제 첫 페이지를 관찰한다. 선언 건수는 모집단 검증이 아니며 카탈로그 수정일은 레코드 기준일이 아니다. 검사되지 않은 URL이나 파라미터는 추측하지 않는다.",
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in inspectDatasetIn) (*mcp.CallToolResult, *inspectDatasetOut, error) {
 		if strings.TrimSpace(in.PK) == "" {
 			return errResult("pk 가 필요합니다 — catalog_search에서 Data Node를 먼저 고르세요"), nil, nil
 		}
 		out, err := dataset.NewUnifiedInspector(deps.Fetch, base).Inspect(ctx, dataset.InspectionRequest{
-			PK: in.PK, Delivery: dataset.DeliverySelection(in.Delivery), Observe: in.Observe, Asset: in.Asset,
+			PK: in.PK, Delivery: dataset.DeliverySelection(in.Delivery), Observe: in.Observe, Asset: in.Asset, FileHistory: in.FileHistory, FileVersion: in.FileVersion,
 		})
 		if err != nil {
 			return errResult(err.Error()), nil, nil
+		}
+		if in.FileHistory && in.FileVersion == "" {
+			// Version labels are discovery metadata, not an inspected asset's
+			// structural contract. Preserve the existing ledger trust boundary.
+			return nil, out, nil
 		}
 		for _, delivery := range out.Deliveries {
 			if delivery == "API" && out.API != nil {
@@ -500,10 +484,26 @@ func New(deps Deps) *mcp.Server {
 		Description: "odeduck 도구 사용 순서와 인증키 Encoding/Decoding 주의. 먼저 읽으세요.",
 	}, func(context.Context, *mcp.ReadResourceRequest) (*mcp.ReadResourceResult, error) {
 		return &mcp.ReadResourceResult{Contents: []*mcp.ResourceContents{{
-			URI: guideURI, MIMEType: "text/markdown", Text: GuideDoc,
+			URI: guideURI, MIMEType: "text/markdown", Text: guideDoc(),
 		}}}, nil
 	})
 
+	// Reuse one catalog snapshot across bounded goal sessions. Each engine
+	// enforces its immutable semantic policy before admitting any candidates.
+	goalDeps := goalwork.LiveDependencies(deps.Fetch, base, caller, catalog.Searcher{Index: deps.SemanticIndex, Embedder: deps.Embedder}, goalwork.Policy{})
+	if deps.GoalReviewProvider != "" {
+		goalDeps.Review = func(ctx context.Context, in goalwork.ReviewInput) (goalwork.ReviewAssessment, error) {
+			response, err := agentplan.ReviewGoal(ctx, in, deps.GoalReviewProvider)
+			return response.Assessment, err
+		}
+	}
+	goalPolicy := goalwork.Policy{ReviewRecipient: deps.GoalReviewProvider, ReviewAnalyses: deps.ReviewGoalAnalyses, ReviewFullScope: deps.ReviewGoalFullScope}
+	if deps.ShareGoalEvidence {
+		goalPolicy.EvidenceRecipient = "mcp_host"
+	}
+	registerGoalTool(s, goalPolicy, func(goalwork.Policy) goalwork.Dependencies {
+		return goalDeps
+	})
 	return s
 }
 

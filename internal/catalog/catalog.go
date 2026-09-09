@@ -80,6 +80,7 @@ const (
 	SvcREST = "REST"
 	SvcLINK = "LINK"
 	SvcFILE = "FILE"
+	SvcSTD  = "STD"
 )
 
 // Catalog is the synced snapshot.
@@ -624,7 +625,7 @@ func serviceTypeRank(value string) int {
 		return 3
 	case SvcLINK:
 		return 2
-	case SvcFILE:
+	case SvcFILE, SvcSTD:
 		return 1
 	default:
 		return 0
@@ -1008,6 +1009,8 @@ func entryDataTypes(entry *Entry) []string {
 		return []string{"API"}
 	case SvcFILE:
 		return []string{"FILE"}
+	case SvcSTD:
+		return []string{"STD"}
 	default:
 		return nil
 	}
@@ -1027,6 +1030,9 @@ func hitFromEntry(entry *Entry) Hit {
 }
 
 func entryDetailURL(entry *Entry) string {
+	if entry != nil && entry.PK != "" && (entry.SvcType == SvcSTD || containsFold(entry.DataTypes, "STD")) {
+		return portal.BaseURL + "/data/" + entry.PK + "/standard.do"
+	}
 	if entry != nil && entry.PK != "" && (entry.SvcType == SvcFILE || containsFold(entry.DataTypes, "FILE")) {
 		return portal.BaseURL + "/data/" + entry.PK + "/fileData.do"
 	}

@@ -277,6 +277,8 @@ func entryFromOfficialFileSnapshot(record []string, columns map[string]int) (Ent
 		Desc:    strings.TrimSpace(value("설명") + " " + value("키워드")),
 	}
 	switch typeName {
+	case "STD":
+		entry.SvcType, entry.DataTypes = SvcSTD, []string{"STD"}
 	case "FILE":
 		entry.SvcType, entry.DataTypes = SvcFILE, []string{"FILE"}
 	case "API":

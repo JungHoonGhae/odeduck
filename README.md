@@ -82,10 +82,52 @@ AI가 질문을 생활인구·업종별 매출·점포 생존·개폐업으로 �
 
 ## 빠른 시작
 
+### v0.19.0: 목표에서 실제 표본 조합까지 (experimental)
+
+v0.19.0에 포함된 실험적 기능이다. 아래 설치를 마친 뒤 사용할 수 있으며 범용 목표 완주를 보장하지 않는다.
+
+```sh
+odeduck catalog semantic-build
+odeduck solve "폭염 때 어르신이 쉴 곳을 찾는 데 도움이 될 데이터를 서로 연결해줘"
+```
+
+설치·로그인된 Codex·Claude·Gemini가 목표를 역할별로 나누고, 검색·검사·표본·결합을 반복한다.
+실패하면 다른 데이터나 중간 코드 대응표를 탐색한다. 기본 32단계이며 agent CLI의 호출 비용과 한도가
+적용된다. MCP에서는 같은 동작을 `advance_goal`로 host가 진행한다. 별도 검토 모델은 명시한 서버 시작 설정이 있을 때만 호출한다.
+
+외부 CLI 계획기에는 기본적으로 원천 값을 보내지 않는다. 선택한 행·필드를 근거로 읽게 하려면
+`--agent=claude --share-evidence`처럼 수신 모델 하나를 명시한다. 자동 모델 전환은 허용하지 않는다.
+MCP에서는 서버를 `mcp --share-goal-evidence`로 시작해야 하며 모델이 tool 입력으로 켤 수 없다.
+세션당 최대 8개/64 KiB의 선택 근거만 허용한다. 개인정보·전송 권한은 사용자가 확인해야 하며,
+이 설정은 기존 MCP 실행 결과나 `call_api` 원문 출력을 차단하는 기능이 아니다.
+
+실제 결합은 API·직접 CSV·ZIP 내부 CSV·XLSX 셀 범위·포털 STD의 제한된 표본을 지원한다. 먼저 필수 역할·범위·출력을 고정하고,
+빠진 항목이 있으면 부분 결과로 남겨 탐색을 계속한다. 한 원천의 필드 조회·집계도 가능하며 결합은 선택 연산이다.
+`sample_executed`는 표본 실행 결과이며, 필수 요구 충족이나 의미 검증과는 별개다.
+직접 CSV는 선택적으로 전체를 순차 검사하고, 관측한 좌표를 기준으로 전체 일치 레코드의 최근접 후보를
+계산할 수 있다. 이 구면 거리는 실제 이동 경로나 현재 접근 가능성을 뜻하지 않는다.
+전체 CSV 검사에서는 `sample.whereIn`으로 여러 지역·연령처럼 정확한 값 목록을 함께 고를 수 있다.
+파일 전체 검사와 일치 행의 실제 보관, 요청한 집단 전체의 확보는 각각 구분해 보고한다.
+검사한 FILE의 등록된 공식 HTML 설명은 `sample`의 `delivery:"document"`로 별도 관측할 수 있다.
+선택 공개한 원문만 `composition.support`로 해석 검토에 연결하며 계산 행이나 모집단 증거로 자동
+승격하지 않는다. 현재 지원은 행안부 월간 통계 도움말과 등록된 KOSIS 공식 답변이며 임의 URL·PDF는
+지원하지 않는다. [보조 문서 읽기 계약](docs/specs/source-document-acquisition-v1.md)에 범위를 명시했다.
+출력 형식이 맞아도 지역·식별자·시간의 의미가 검증되지 않으면 `review_required`로 남기고 같은 목표·예산
+안에서 추가 근거와 대안을 찾는다. 제한된 원천 보고는 CLI의 `--review-source-reports`(명시한 agent와
+`--share-evidence` 필수), MCP의 `--review-goals-with=claude`와 `--share-goal-evidence`로 별도 검토를
+켤 수 있다. typed 관계·계산은 CLI `--review-analyses` 또는 MCP 시작 설정 `--review-goal-analyses`로
+추가 허용한다. 원래 질문·출력별 지지와 관계·기간·측정·범위를 통과해야 성공 종료한다. 모델 검토이지
+현장·사람 검증은 아니며 공간·인과·사업 가설 및 범용 목표 완주는 미완료다. 결과와 검토는 실행 revision에 묶인다.
+[원천 보고 검토의 범위와 공개 정책](docs/specs/goal-source-report-review-v1.md)을 확인할 수 있다.
+의미 검색이 쓰이지 않으면 기본적으로 멈추며, 자동 활용신청은 하지 않는다.
+[실행 계약과 한계](docs/specs/goal-driven-composition-v1.md)를 확인할 수 있다.
+
+### 릴리스: 로그인 없는 첫 검색
+
 릴리스에는 검증된 카탈로그가 포함되어 있어 로그인이나 API 키 없이 바로 검색할 수 있다.
 
 ```sh
-curl -fsSL https://github.com/JungHoonGhae/odeduck/releases/download/v0.18.0/install.sh | sh
+curl -fsSL https://github.com/JungHoonGhae/odeduck/releases/download/v0.19.0/install.sh | sh
 
 odeduck catalog search \
   "서울에서 작은 가게 후보를 좁힐 자료" \
@@ -167,7 +209,7 @@ data.go.kr REST는 정부 SSO 로그인 한 번 뒤 신청→승인 확인→키
 Windows:
 
 ```powershell
-irm https://github.com/JungHoonGhae/odeduck/releases/download/v0.18.0/install.ps1 | iex
+irm https://github.com/JungHoonGhae/odeduck/releases/download/v0.19.0/install.ps1 | iex
 ```
 
 macOS·Linux 설치 명령은 위 빠른 시작에 있다. 설치 스크립트는 checksum을 검증하고 같은 릴리스의

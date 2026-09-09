@@ -212,13 +212,13 @@ func invokeProvider(ctx context.Context, prompt string, candidate resolvedProvid
 	cmd.Stderr = &stderr
 	if err := cmd.Run(); err != nil {
 		if errors.Is(callCtx.Err(), context.DeadlineExceeded) {
-			return nil, fmt.Errorf("%s 검색 계획이 3분 안에 끝나지 않았습니다", candidate.provider)
+			return stdout.Bytes(), fmt.Errorf("%s 검색 계획이 3분 안에 끝나지 않았습니다", candidate.provider)
 		}
 		detail := commandErrorDetail(stdout.Bytes(), stderr.Bytes())
 		if detail == "" {
 			detail = err.Error()
 		}
-		return nil, fmt.Errorf("%s 검색 계획 실패: %s", candidate.provider, detail)
+		return stdout.Bytes(), fmt.Errorf("%s 검색 계획 실패: %s", candidate.provider, detail)
 	}
 	return stdout.Bytes(), nil
 }

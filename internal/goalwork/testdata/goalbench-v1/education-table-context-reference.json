@@ -1,0 +1,26 @@
+{
+  "kind": "independent_additional_source_cells",
+  "observedOn": "2026-09-08",
+  "pk": "15004947",
+  "url": "https://www.data.go.kr/cmm/cmm/fileDownload.do?atchFileId=FILE_000000003633383&dataNm=%EC%9D%B8%EC%B2%9C%EA%B4%91%EC%97%AD%EC%8B%9C%EA%B5%90%EC%9C%A1%EC%B2%AD_%ED%95%99%EA%B5%90%ED%98%84%ED%99%A9_20260401&fileDetailSn=1",
+  "contentSha256": "c8f57fc8e3bd7e70175ff0debd1529a17539e526e436dc244fcea39ed9a0f695",
+  "method": "Read original OOXML worksheet cells with unzip and xml-js, independently of the Go dataset reader and goal Engine. Stored numeric lexemes, not recalculated formulas. These cells supplement, not replace, education-citywide-reference.json.",
+  "limits": "Publisher total and adjacent cells are source context, not a certified logical-table boundary, student definition, district mapping or goal approval. Other worksheet cells, including AK41, remain outside this selected context.",
+  "records": [
+    {
+      "sheet": "구·군별",
+      "row": 38,
+      "cells": {"A": "합계 ", "AG": "960", "AK": "335562", "AH": "7", "AL": "63"}
+    },
+    {
+      "sheet": "구·군별",
+      "row": 39,
+      "cells": {"A": null, "AG": null, "AK": null, "AH": null, "AL": null}
+    },
+    {
+      "sheet": "구·군별",
+      "row": 40,
+      "cells": {"A": "※ 학급수: 일반학급+특수학급+한국어학급", "AG": null, "AK": null, "AH": null, "AL": null}
+    }
+  ]
+}

@@ -1,0 +1,778 @@
+# Goal Result 첫 실행 경로 검증 — 2026-09-08
+
+상태: 첫 slice 구현·검토 기록. 후속 [공통 통합 검증](../specs/goal-integration-and-cleanup-v1.md)과 구분한다.
+제품 목표는 미완료다.
+[결정 지도](https://github.com/JungHoonGhae/odeduck/issues/40) →
+[산출물 결정](https://github.com/JungHoonGhae/odeduck/issues/41) →
+[구현 티켓](https://github.com/JungHoonGhae/odeduck/issues/45).
+계약은 [Goal Result execution v1](../specs/goal-result-execution-v1.md)에 둔다.
+
+## 변경 및 삭제
+
+- 공개 목표 실행에서 공간 관측에만 허용하던 zero-join gate를 삭제했다. 기존 연산으로 단일 원천 필드 선택과 집계를 실행한다.
+- 현재 writer의 `sample_joined` 이름을 `sample_executed`로 교체했다. 추가 호환 분기나 별도 엔진은 만들지 않았다.
+- 실행하지 않은 join 설명과 일반 날짜 필터의 중복 nearest 경고를 제거했다. 실제 공간 원천의 한계 설명은 남겼다.
+- CLI/MCP tool·초기 instructions·guide와 현재 문서를 갱신했다. ADR에는 날짜가 있는 amendment를 추가했다.
+- `INTENT.md`의 목표·제약·성공 조건은 유지하고 사용자 위임에 따른 재개 상태와 지도 링크만 갱신했다.
+- 파일 전체 삭제는 없다. 과거 진단·독립 oracle·오탐 회귀와 무관한 이전 변경은 보존했다.
+
+## Red → green
+
+1. `TestSingleSourceResultUsesObservedFieldsWithoutInventingAJoin`: 공간 base가 아니라는 공개 compose 오류로 실패 → gate 제거와 공통 실행 상태 적용 후 통과.
+2. `TestSingleSourceResultExplainsOnlyExecutedOperations`: 실행하지 않은 inner join의 설명으로 실패 → 실제 join 유무에 따른 설명으로 통과.
+3. `TestSingleSourceEmptyTimeResultDoesNotInventSpatialWork`: 일반 시점 불일치를 spatial 결과 오류로 표시해 실패 → 중립적 오류로 통과.
+4. `TestSingleSourceResultRetainsRequestedTimeWindow`: 리뷰에서 지적한 nearest 경고 assertion이 실패 → 중복 경고 제거 후 통과.
+
+추가 public 회귀는 정확한 0.10+0.20=0.3, 큰 정수 합 9007199254740993+1=9007199254740994,
+원천/요청 보존, 날짜 필터, 필수 역할/population 미충족, planner 원문 비노출,
+실제 CLI Run과 MCP JSON-RPC의 동일 실행·검토 상태를 확인한다.
+
+## 검증
+
+- 시작 `go test ./...` 통과(일부 cache).
+- 수정 후 `go mod tidy -diff`, `go vet ./...`, `go test ./... -count=1`, `go build ./...`, `git diff --check` 통과.
+- 첫 전체 `go test -race ./... -count=1` 통과. 마지막 안내/시간 설명 수정 이후 `go test -race ./internal/goalwork ./internal/mcpserver ./cmd/odeduck -count=1`도 통과했다.
+- opt-in 실제 포털/agent 실행·로그인·활용신청·provider key 변경은 하지 않았다. 위 결과는 fixture와 로컬 실행 근거다.
+
+### Standards
+
+독립 검토 1건: 활성 MCP 안내가 새 상태명/동작과 불일치. 수정 후 재검토에서 해결, 남은 지적 0건.
+
+### Spec
+
+독립 검토 2건: 위 MCP 안내 불일치와 일반 날짜 필터의 nearest 경고. 수정 후 단일 원천·공간·시간·MCP 검증과 재검토에서 해결, 남은 지적 0건.
+이 검토는 첫 slice 계약에 한정되며 전체 INTENT 구현 검토가 아니다.
+
+## 복구 및 비교 기준
+
+시작 HEAD는 `450d17b4a8edb0927d7fccd30592b7211013e4fe`이지만 기존 큰 dirty 변경이 있어
+HEAD 대비 전체 diff를 이번 변경으로 간주하지 않는다. 수정 직전 다음 내용을 Git blob으로 보존했다.
+`git show <blob>`으로 확인할 수 있다. 아직 ref로 보호된 전체 스냅샷/통합 커밋은 아니므로 Git GC 이후까지
+보장되는 장기 백업은 아니다. 이번 코드를 통합할 때 기존 foundation 변경과 새 delta를 구분해 검토한다.
+
+| 파일 | 수정 전 blob |
+| --- | --- |
+| internal/goalwork/engine.go | f9151027c4b8484242f6fa3a2e075be9cd6bbd33 |
+| internal/goalwork/compose.go | b32ec010308423c42f6230020b5c48b01990c810 |
+| internal/goalwork/explanation.go | e4a306c9056d58b2b84c5103b7c1335a865145f0 |
+| internal/goalwork/temporal.go | a5c2bdcd866cc11c30d82621c254b46cfabed81c |
+| internal/agentplan/goal.go | 08174771a416a5217af51c3490bf34270f6e5eba |
+| internal/mcpserver/goal.go | 8272044f089227bdbb6e252a1c7e90c65db99bda |
+| internal/mcpserver/guide.go | f4ac6a8739e91b7a5aa0ecfd51c42c98cd53adec |
+| cmd/odeduck/solve.go | 22434f554041bb644c1b18c92cd4db726fc8d3da |
+
+## 잔여 범위 / 다음 행동
+
+현재 결과는 여전히 의미 미검증이면 `review_required`다. 단일 원천 실행을 허용한 것만으로 자동 완료,
+사업 가설 생성, 지식 재사용, G1–G5 또는 I1–I10을 달성하지 않았다. 이전 고정 평가의 질문/정답을 낮추지 않았다.
+당시 후속이던 근거 공개 결정과 구현은 [선택 근거 검증](selected-goal-evidence-validation-2026-09-08.md)에
+이어 기록했다. 현재 통합은 [공통 실행 계약](../specs/goal-integration-and-cleanup-v1.md)을 따른다.
+[과적합 없는 원천 정답·자율 완주·사업 효용 평가](https://github.com/JungHoonGhae/odeduck/issues/44)와
+전체 목표 감사는 계속 남아 있다.
+
+## 원천별 선집계 후속 검증
+
+2026-09-08, 원천 보고 검토 커밋 `eead795` 이후의 추가 구현이다. 기존 단일 원천 실행·검토 기록을
+소급 변경하지 않는다. [추가 계약](../specs/goal-result-execution-v1.md#원천별-선집계--2026-09-08-추가-계약)은
+공통 Engine의 선집계이며 별도 저장소·패키지 의존성·도메인별 분기를 만들지 않는다.
+
+오데덕의 공식 inspection과 CSV/XLSX reader로 G4 원천을 다시 취득했다. 인구 162행을 11개 군·구로
+집계한 만 6–17세 인구는 **304,280명**이다. 모든 군·구 값이 기존 독립
+`education-citywide-reference.json`의 제공기관 대조값과 일치했다. 기대값은 이번 실행기로 만들지 않았다.
+
+| 실제 취득 | 보유 행 | 확인한 원천 SHA256 |
+| --- | ---: | --- |
+| 인구 CSV, 인천 조건 | 162 | `6920fdafd269554d259e8498301f004c9799f499c38832de9352a0e7def916c5` |
+| 학교 XLSX, `구·군별!A27:AM37` | 11 | `c8f57fc8e3bd7e70175ff0debd1529a17539e526e436dc244fcea39ed9a0f695` |
+
+원천 날짜는 인구 2026-07-31, 학교 조사 2026-04-01, 학교 표의 행정구역 적용은 2026-07-01로 구분한다.
+정확한 이름 결합은 5쌍이었다. 실제 학교 셀의 바깥 공백을 보고 명시적인 기존 `trim` 규칙으로 다시
+실행하니 10쌍이 됐다. 원문은 바꾸지 않았고 두 실행을 이력에 유지했다. 일치한 지역의 학교·학생 수가
+인구 원천 행 수만큼 곱해지지 않는 것을 독립 기대값으로 확인했다.
+
+남은 한 지역은 인구의 `서해구`와 학교 표의 `서구`다. 이를 전역 이름 치환으로 해결하지 않았다.
+결과는 `review_required`이며 원래 G4의 전체 비교·미확정 부분 설명·의미 승인은 미완료다.
+이 검증은 PK·필드·학교 셀 범위를 사전에 지정했으므로 자율 탐색 평가도 아니다. 실제 데이터 취득과
+계산 경로의 검증이라는 범위를 유지한다. 별도 모델 검토·로그인·활용신청은 실행하지 않았다.
+
+```sh
+# 외부 네트워크 없이 보존된 독립 원천과 실제 Engine을 대조
+go test ./internal/goalwork -run TestCitywideSourceReduction -count=1
+
+# 공식 메타데이터·원천 파일을 새로 읽고 같은 독립 기대값에 대조
+ODEDUCK_LIVE_REDUCTION=1 go test ./internal/goalwork -run TestLiveCitywideSourceReduction -count=1 -v
+```
+
+실조회는 11.03초에 통과했다. 파일 hash가 바뀌면 실패하며 기존 reference를 새 결과에 맞춰 덮어쓰지 않는다.
+추가 회귀는 계산 그룹의 원본 기여 위치, 비공개 값 격리, 같은 값의 별개 원본 보존, 오래된 revision,
+null 항목, 혼합 선택/중첩, 그룹-원본 재결합, 모든 기여 기록의 시간 검사, 공간 원점 오인과
+CLI/MCP의 `9007199254740993 + 1 = 9007199254740994`를 검사한다.
+
+`go mod tidy -diff`, `go vet ./...`, `go test ./... -count=1`, `go build ./...`와 브랜드 동기화
+검사를 통과했다. `internal/goalwork`, `internal/mcpserver`, `cmd/odeduck`의 race 검사도 통과했다.
+이 결과는 구현 회귀 검증이며 위에 남긴 G4의 의미·범위 문제를 해결했다는 뜻은 아니다.
+
+재발 방지 기준은 그래프 엔지니어링 스킬의 ‘결합 전에 관측 단위를 맞춘다’에 모았다. 특정 PK·지역명·
+기대 숫자를 스킬에 넣지 않고, 원천의 행 단위·연결 배수·계산 그룹의 기여 기록을 검토하도록 했다.
+
+## 미대응 기록 추적 후속 검증
+
+2026-09-08 `a5082fc` 이후, 기존 G4 원천·질문·독립 정답을 유지했다. 원래 지역 전체 비교에서
+누락된 행을 일반 문구로만 알리던 경로에 [단계별 원천 위치](../specs/goal-result-execution-v1.md#미대응-기록-추적--2026-09-08-추가-계약)를 추가했다.
+10개 대응 행을 11개로 꾸미거나 서구/서해구를 자동 합치지 않는다.
+
+같은 날 위 opt-in 실조회 명령이 10.81초에 통과했다. 두 파일의 hash는 위 선집계
+검증과 같고, 인구 162행→11그룹/304,280명과 학교 11행을 다시 확인했다. 명시적 trim 뒤 10쌍과
+왼쪽 미대응 그룹 1개(`서해구`), 오른쪽 미대응 학교 보유 행 9번(`구·군별!A35`의 ` 서구 `, 학교 111개)을
+함께 추적했다. 후자의 값은 실행 지표로 원문을 공개한 것이 아니라 그 위치로 `read_evidence`를 호출해
+확인했다. 인구 그룹의 원본 구성원은 기존 reduction 근거로 이어진다. 두 원천 날짜와 geography
+해석은 앞선 기록을 유지한다. 새 모델 호출·로그인·활용신청·외부 쓰기는 하지 않았다.
+
+회귀는 다단계 1:N의 왼쪽 tuple 보존, 양쪽 미대응, 빈 결합 후 근거 읽기, null/scope/time 제외,
+PlanningView의 값 비공개와 반환 사본 격리를 포함한다. 대응된 행만으로 결과를 재생하면 미대응
+기록의 비교 근거 없이도 검토에 도달하던 결함을 재현하고, 필요한 비교 필드를 선택해야 모델을
+호출하도록 고쳤다. 제외된 행의 무관한 출력 값까지 요구하거나 자동 전송하지 않는다.
+
+이는 I5/I6/I7의 추적·검토 입력 진전이다. 원래 G4의 전체 지역 산출물·명칭 대응의 공식 근거 연결·
+학교 기준일/지리 적용일 해석·population 승인 및 무힌트 자율 완주는 아직 검증되지 않았다.
+실제 취득 회귀와 모델 fixture 승인 경로를 새 모델 정확도나 G4 완료로 집계하지 않는다.
+
+`go mod tidy -diff`, 브랜드 동기화 검사, `go vet ./...`, `go test ./...`, `go build ./...`와
+`internal/goalwork`, `internal/mcpserver`, `cmd/odeduck` race 검사를 통과했다. CLI 실제 명령과 MCP
+JSON-RPC가 같은 제외 위치를 보존한다. 그래프 스킬은 파일 검사·일치 행 보관·모집단·결합 후 제외를
+구분하도록 갱신했고 제공된 `quick_validate.py`를 통과했다. 특정 지역 대응이나 정답은 넣지 않았다.
+
+## 같은 파일의 헤더 문맥 전달 후속 검증
+
+2026-09-08 `50474b2` 이후, [같은 파일 문맥 계약](../specs/goal-source-report-review-v1.md#같은-파일의-별도-문맥-근거)을
+구현했다. 계산에 참여하지 않은 별도 헤더 관측의 공개 근거가 검토 입력에서 빠지던 경로를 고쳤다.
+새 엔진·도메인 예외·의존성을 추가하지 않았고, 중복된 검토 원천 metadata 투영 로직은 공통화했다.
+기존 원천 보고 v1은 유지하며 분석 검토 권한 아래에서만 문맥을 전달한다. 파일 삭제는 없고 독립
+reference, 정확한 이름 결합의 실패·공백 정규화 결과와 과거 모델 응답은 보존했다.
+
+위 opt-in G4 실제 취득 명령은 12.54초에 통과했다. 인구·학교 파일 hash는 이전과 같으며,
+162행→11그룹/304,280명과 학교 10쌍을 유지했다. 같은 학교 파일의 `구·군별!A22:AM26`을
+별도로 취득해 선택한 다섯 열의 실제 값·원본 행 주소를 기존 독립 `headerEvidence`에 대조했다.
+행정개편 적용 2026-07-01과 작성 기준 2026-04-01 문구, 합계·학교수·학생수·분교 헤더가
+계산 원천과 분리된 `analysis.sourceContext`로 전달됐다. 헤더를 join하거나 날짜 열을 만들지 않았다.
+
+원래 미대응 packet을 보존한 채 그룹·학교 행·원본 연령 필드 예시·헤더로 기존 8 packet 한도에
+맞췄다. 원본 인구 162행은 로컬 재계산에 사용되며 검토자로 전체 전송되지 않는다. 검토 callback은
+입력 경계를 검사하는 fixture로서 원래 목표를 `insufficient`로 남긴다. 실제 모델을 호출하지 않았으므로
+헤더 적용·명칭 대응·모집단/전체 G4 의미 승인 또는 새로운 calibration 정확도를 주장하지 않는다.
+PK·셀 범위 사전 지정도 유지했으므로 자율 탐색 평가가 아니다. 로그인·활용신청·외부 쓰기는 없었다.
+
+회귀는 새 헤더 근거 뒤 추가 검토, 다른 PK/asset/ZIP member/내용/계약 revision·누락/잘못된 hash
+차단, 미공개 값/metadata 격리, 원천 보고 권한만 있을 때의 제외, 검토 입력 변조 차단과 같은 문맥
+셀을 새 packet으로 합쳐 재검토하는 우회 차단을 검사한다. 공개 `ReviewGoal` adapter는 별도 분석
+guide·선택 문맥 전달·문맥 packet 인용을 검사한다. fixture 승인은 경로 검증으로만 센다.
+
+`go mod tidy -diff`, 브랜드 동기화 검사, `go vet ./...`, `go test ./...`, `go build ./...`와
+`internal/goalwork`, `internal/mcpserver`, `cmd/odeduck`의 race 검사를 통과했다.
+
+다음은 같은 원래 G4의 전체 지역 산출물과 공식 명칭 대응·인구/학교 집계 범위를 근거에 연결하고
+실제 의미 검토를 검증하는 것이다. 이번 문맥 경로는 별도 파일의 법령·대응표 연관이나 원천 기록의
+시간 필드를 대신하지 않는다. 모든 I1–I10/G1–G5 및 M5 상태는 종전대로 미완료다.
+
+## 미대응 원천 값의 결과 표 검증
+
+2026-09-08 `991d143` 이후, [미대응 결과 계약](../specs/goal-result-execution-v1.md#미대응-원천-값의-결과-표)을
+구현했다. 계산된 대응 행만 결과 표에 있던 경로에 명시적 `reportUnmatched` 투영을 추가했다.
+별도 엔진·저장소·지역명 치환 없이 원래 실행 지표의 tuple과 선택한 원천 값을 결과에 보존한다.
+미대응 값은 inner join·시간·산술의 입력으로 넣지 않는다. 기존 실패·oracle·원천 보고 경로와
+기본 비공개 정책은 유지했으며 파일 삭제는 없다.
+
+### 오데덕을 통한 대응 자료 확인
+
+`catalog search --require-semantic --limit 6`로 다음 두 검색을 실행했고 모두
+`semantic.status=used`(`embeddinggemma:300m-qat-q4_0`)였다. 사람이 정한 조사 검색어이므로
+PK 없는 자율 목표 완주 평가나 의미 검색의 인과 효과로 세지 않는다.
+
+- `인천 행정구역 개편 서해구 서구 명칭 변경`: [서구청 연혁 15105269](https://www.data.go.kr/data/15105269/fileData.do)를
+  `inspect --delivery file --observe`로 검사했다. 현재 제목·기관은 서해구지만 자산은 2025-07-15
+  연혁 CSV이며 관측 열은 연번/연대/연혁이다. 내용 SHA256은
+  `14887a3636b629db89458fe74c76d72f118f81bc16a9432677e5515178cf8af7`이다.
+  제목의 현재 이름만으로 2026년 학교 표의 동일 영역 대응을 확정하지 않았다.
+- `행정구역 변경 이력 신구 대응 코드`: [등록번호용 지역코드 15063993](https://www.data.go.kr/data/15063993/fileData.do)를
+  같은 명령으로 검사했다. 신·구 기관 코드/명칭과 변동일자 열이 있지만 공식 선언은 비법인 기관의
+  등기용 네 자리 코드다. 내용 SHA256은
+  `f3ef89af1936bac94f455e1bbe00867026c2d4ee89bd78b460d1965b1dda4f00`이다.
+  주민등록·교육 행정구역의 namespace나 경계 대응 근거로 자동 전용하지 않았다.
+
+이 두 후보의 schema 관찰은 개별 mapping 행 검증이 아니다. 공식 과거 대응이 없다는 결론도 아니다.
+
+### 결과와 공개 경계
+
+기존 G4 실취득 명령은 12.00초에 통과했다. 인구·학교 내용 hash와 162행→11그룹/304,280명의
+독립 대조를 유지했다. 정확한 이름 5쌍, 명시적 trim 10쌍의 기존 실행에 이어 세 번째 조합은
+10쌍과 미대응 인구 그룹/학교 행 두 tuple을 별도 표로 반환했다. 원래 `서해구`/` 서구 `와
+학교·학생·인구 값이 독립 reference와 일치했으며 강제 이름 대응·0 대입은 하지 않았다.
+헤더 문맥과 실제 보고 필드 모두 기존 8 evidence packet 안에서 scripted reviewer에 전달됐다.
+
+첫 공개 Engine 테스트는 결과/recipe 계약 부재로 실패했고 구현 뒤 통과했다. 후속 테스트에서
+미대응 결과 값이 공개 근거 없이 reviewer로 전달되는 결함을 재현했다. 모든 보고 필드를 선택
+공개하고 로컬 원본·공개 값으로 각각 재현해야 검토할 수 있도록 수정했다. 새로운 원문 자동 공개
+경로를 남기지 않는다. 16개 필드 한도도 compose 저장 전에 실패시키고 회귀로 고정했다.
+
+추가 검증은 null/빈 상대/0/missing의 구분, 다단계 1:N tuple 보존, 없는 필드·계산 alias·중복 필드,
+계산 표와 미대응 표의 합산 행/byte 초과, 반환 사본 격리와 CLI 실제 명령/MCP JSON-RPC를 포함한다.
+`go mod tidy -diff`, 브랜드 동기화 검사, `go vet ./...`, `go test ./...`, `go build ./...`와 핵심
+세 패키지의 race 검사를 통과했다. 원래 G4 GoalContract와 독립 정답은 변경하지 않았다.
+
+검토 callback은 입력·상태 전이 fixture이며 원래 G4를 계속 insufficient로 남긴다. 실제 모델
+해석, 근거 있는 행정구역 대응·학교/인구 집계 범위와 전체 질문 충족은 다음 검증이다. 값 두 개를
+결과에 추가한 것을 G4·I1–I10·M5 완료로 세지 않는다. SSO·활용신청·외부 쓰기는 하지 않았다.
+
+## 원래 G4의 실제 모델 진단
+
+2026-09-08 후속으로 실제 `ReviewGoal`을 실행했다. 원래 G4 질문과 July citywide reference는
+그대로이며 PK·recipe를 지정한 개발 진단이다. 새 자율 검색이나 held-out 평가가 아니다.
+공개 집계·선택 헤더만 명시한 Codex로 전송했다. 개인별 행, 인증키, 기대 판정과 oracle 해석은
+보내지 않았다. 기존 scripted recipe의 완료 여부 문구도 실제 모델 입력에서 제거하고 원천별
+revision·정규화·측정 가정만 명시했다. 실제 제품의 기본 off·수신자·예산 계약은 바꾸지 않았다.
+
+### 취득 revision과 실패 분모
+
+첫 실제 취득은 인구 내용 hash가 달라 모델 호출 전 멈췄다. 이어 오데덕
+`inspect 15097972 --delivery file --observe --format json`으로 현재 계약을 확인했다.
+[공식 원천](https://www.data.go.kr/data/15097972/fileData.do)은 `20260831.csv`, 수정일 선언
+2026-09-02, 2,568,139 bytes이며 SHA256은
+`0cbb5983a9efad7951548a89ae11c295ed08e95f8d222d15bc5e5e46d5701e24`이다.
+이를 7월의 독립 합계 304,280명으로 채점하거나 기존 oracle을 덮어쓰지 않았다.
+
+원천을 고정한 의미 진단은 이후 `reference` 모드를 명시해 수행했다. 이 모드는 보존된 162개
+인구 record·11개 학교 record·헤더를 재생하고 synthetic contract hash와 재생 경고를 사용한다.
+현재 metadata, 실제 scanner의 전체 검사 영수증이나 모집단 근거를 생성한 것처럼 꾸미지 않는다.
+그래서 아래 coverage 보류에는 **진단 입력이 취득·metadata 근거를 생략한 한계**도 포함된다.
+
+| 시도 | 실제 모델 호출 | 결과 |
+| --- | --- | --- |
+| live revision | 0 | 현재 파일이 8월로 바뀌어 oracle hash 불일치; 첫 기록은 최종 View 없이 준비 실패만 보존 |
+| reference 준비 | 0 | 필수 assumptions까지 제거한 진단 구성 오류; compose 거부, 실패 View 보존 |
+| reference baseline | 1 | 기간 supported; 세 출력·관계·측정·coverage 및 GoalFit insufficient |
+| reference with-branches | 1 | 기간·학교 관련 네 출력 supported; 인구·관계·측정·coverage와 GoalFit insufficient |
+
+예정은 네 시도, 실제 모델 호출은 두 번, 원래 목표 완료는 0회다. 두 번의 예상 보류를 목표 성공률이나
+모델 정확도 100%로 보고하지 않는다. provider는 Codex CLI 0.153.4의 기본 모델이며 응답에서 실제
+모델명은 확인되지 않았다. 각각 76.88초와 87.44초였다. 단일 전후 실행이므로 변동성을 분리한 효과
+평가가 아니다. 원문에 skill 목록 축약 경고가 있어 전역 CLI 문맥까지 비어 있었다고 주장하지 않는다.
+
+### 실제 지적을 반영한 결과 수정
+
+첫 모델은 같은 학교 시트의 A22/A23을 데이터 표 바로 위 문맥으로 해석해 4월 조사 기준일과
+7월 행정구역 적용일을 구분했다. 반면 AH/AL 분교 수치가 출력되지 않은 점을 지적했다.
+기존 Engine 연산만으로 진단 recipe의 Select·ReportUnmatched·선택 근거에 AH/AL을 추가하고,
+기존 출력 세 개를 유지한 채 분교 학교 수·학생 수 출력을 각각 추가했다. 새 연산이나 지역명
+치환은 만들지 않았다. 같은 8 packet 안에서 10개 비교 행과 미대응 학교 행의 분교 값까지 전달된다.
+공개 Engine 회귀는 먼저 분교 출력 부재로 실패했고, 수정 후 구별 독립 기대값 및 전체 **7교/63명**과
+일치했다. 이 fixture의 승인 응답은 상태 전이 검사용이지 실제 의미 검증으로 세지 않는다.
+
+두 번째 실제 모델은 학교 수·학생 수·분교 수·분교 학생 수 각각의 원천 지지를 인정했지만,
+만 나이 정의·전체 지역 coverage·서해구/서구 대응 근거 부족으로 원래 질문은 계속 보류했다.
+주민 인구와 학교 학생수를 같은 연령·거주 모집단으로 만들거나 미대응을 0으로 채우지 않았다.
+
+다음은 추가 산술 기능이 아니라 원천 의미와 적용 범위를 검토 입력에 연결하는 일이다.
+예를 들어 [행안부 공식 설명](https://jumin.mois.go.kr/ageStatMonth.do)은 통계의 전체 등록구분에
+거주자·거주불명자·재외국민을 포함하고 외국인은 제외한다고 설명한다. 이 정의와 만 나이 정의는
+별개이며, 이번 웹 확인을 모델에 제공된 근거로 세지 않는다. 같은 파일 헤더만 연결하는 현재 경로는
+별도 공식 대응표·방법론의 적용 근거까지 자동으로 제공하지 않는다. 근거 없는 가정을 추가하거나
+승인 기준을 낮추어 해결하지 않는다. G1–G5·I1–I10·M5는 여전히 미완료다.
+
+### 보존과 재실행
+
+[진단 archive](../../internal/goalwork/testdata/goalbench-v1/citywide-review-20260908/)는 네 JSON을
+내용 변경 없이 gzip `-n`으로 압축했다. 원본 임시 파일과 압축 해제 bytes를 대조했다.
+
+| 파일 | 압축 해제 SHA256 |
+| --- | --- |
+| `live-revision-failure.json.gz` | `7a8229cc08d050c045e04c3102deda26a78766844bc63ad4a27bd13c1bec443d` |
+| `replay-assumption-failure.json.gz` | `5fc19e674d8d8d8b5f8e49ab7cb893367c3ab46d317467180ff1ddfb61ca78d0` |
+| `baseline-codex.json.gz` | `62becb0057de0078bbdb68c323937fe4a00e26f7cf7d592ccb11067957a6868b` |
+| `with-branches-codex.json.gz` | `8471d3ba30011fd271026cf4b142c5884e771edab9fea7d4887ef2da188767ae` |
+
+두 실제 호출의 `analysis-review-guide.md` SHA256은
+`e6bcee382b9b1fe7a048e2ff8ac7cc8453266be429f68a0aa4287b8ed8b6ffb9`다.
+공개 adapter의 archive 재생 회귀는 실제 두 원 응답이 기록된 판정으로 다시 해석되는지 검사하며,
+과거 세 calibration archive의 각 12회 분모도 그대로 검사한다.
+
+```sh
+# 외부 모델 호출 없이 기존/신규 응답 재생
+go test ./internal/agentplan -run '^TestReviewGoalReplaysArchivedCodexCalibration$' -count=1
+
+# 선택 공개 집계·헤더를 Codex로 전송하는 단일 reference 진단. 기존 출력 경로는 거부한다.
+ODEDUCK_CITYWIDE_REVIEW=codex ODEDUCK_CITYWIDE_ACQUISITION=reference \
+ODEDUCK_CITYWIDE_RESULT=with-branches ODEDUCK_CITYWIDE_REVIEW_OUTPUT=/tmp/odeduck-g4-new.json \
+go test ./internal/goalwork -run '^TestLiveCitywideGoalAnalysisReview$' -count=1 -v
+```
+
+기존 baseline은 `ODEDUCK_CITYWIDE_RESULT=baseline`으로 남는다. `live` 취득 모드에서는 현재
+원천 revision이 고정 reference와 다르면 계속 실패하는 것이 맞다. 새 월 자료의 독립 검증은 별도다.
+`go mod tidy -diff`, `go vet ./...`, `go test ./...`, `go build ./...`, 브랜드 동기화 및 핵심 세
+패키지 race 검사를 수행했다. API 신청·SSO·배포·외부 tracker 변경은 하지 않았다.
+
+독립 코드 검토에서 새 진단 진입점의 결정론적 회귀가 부족한 점을 지적받아 보강했다. 실제 테스트
+명령 진입점과 cleanup을 자식 프로세스로 실행하고 외부 CLI만 fixture로 대체한다. 기존 파일
+비덮어쓰기, provider 오류 원문, 잘못된 승인 상태·실패 표시, 원천 reference 부재, 잘못된 provider와
+취득 모드 거부를 검사한다. 자식 실행은 30초로 제한하며 실제 모델 호출 없이 일반/race 회귀를 수행한다.
+
+## 과거 버전의 실취득 복구
+
+2026-09-08 10:00:12 UTC에 원래 G4 질문·7월 oracle·분교 포함 recipe로 `historical` 진단을
+실행했다. 포털의 최신 항목 교체와 원본 삭제를 구분한 후속이다. 실제 포털 목록에서 July publication을
+선택하고 같은 Unified Inspector/LiveDependencies/Engine으로 읽었다. PK·publication 이름·recipe를
+사람이 고정한 개발 진단이며 자율 발견이 아니다. 기본 `live`와 명시 `reference` 모드 및 이전 실패는 유지한다.
+
+현재 포털의 과거 목록은 54개, 노출은 첫 32개다. July ID는
+`uddi:95f114ef-87c9-4669-971d-aab9aff9d7d4/2`이며 2,568,212-byte CSV의 hash는 기존
+`6920fdafd269554d259e8498301f004c9799f499c38832de9352a0e7def916c5`와 일치했다.
+전체 3,619개 데이터 행을 검사하고 인천 조건의 162행을 모두 보관했다. 원본 행 위치와
+11개 지역의 6–17세 남녀 합계 **304,280명**을 기존 독립 reference에 대조했다.
+학교 11행과 헤더도 원래 hash `c8f57fc8e3bd7e70175ff0debd1529a17539e526e436dc244fcea39ed9a0f695`로
+실취득했다. 최신 metadata나 합성 scanner 영수증을 과거 원본에 붙이지 않았다.
+
+선택 집계·헤더와 실제 취득 범위/metadata를 같은 Codex CLI 0.153.4의 별도 tool-free 요청으로
+전송했다. 전체 소요 102.64초, 예정 1회/실제 모델 1회, 결과 `review_required`다. 다섯 출력 및
+periods/measurements는 supported, relations/coverage/GoalFit은 insufficient였다. 서해구 인구와
+서구 학교 행은 미대응으로 유지하며 명칭 대응의 근거를 요구했다. 모델이 인정한 6–17세 필드의
+의미는 독립적인 만 나이 정의 검증이 아니며, 전체 스캔도 모집단 포괄성 승인으로 세지 않는다.
+
+이 한 번의 판정 변화는 취득 입력 차이를 동반한 관측이며 모델 변동성과 효과를 분리한 대조 실험이
+아니다. 앞선 네 시도를 합치면 G4 진단은 **5시도/3모델 호출/목표 완료 0회**다. 보류를 정확도나
+양성 완주 성공으로 세지 않는다. 다음은 원래 요청의 기준일·집계 대상·행정개편 대응 근거와 전체
+설명을 연결하는 작업이다. 새 graph DB나 계산 연산을 추가할 이유가 확인된 것은 아니다.
+
+원 입력·원 응답·Engine View는 기존 archive의 `historical-codex.json.gz`로 보존했다.
+압축 해제 SHA256은 `3840b8cc0d4d59198f8036374631fa5526bbe722fa5651e51e3906b3f6665224`다.
+검토 지침 hash는 앞선 두 실행과 동일하다. 이 원 응답도 공개 ReviewGoal adapter의 오프라인 재생
+회귀에 추가했다. 제품 기본 전송 권한이나 검토 정책은 변경하지 않았다.
+
+```sh
+ODEDUCK_CITYWIDE_REVIEW=codex ODEDUCK_CITYWIDE_ACQUISITION=historical \
+ODEDUCK_CITYWIDE_RESULT=with-branches ODEDUCK_CITYWIDE_REVIEW_OUTPUT=/tmp/odeduck-g4-historical-new.json \
+go test ./internal/goalwork -run '^TestLiveCitywideGoalAnalysisReview$' -count=1 -v
+```
+
+공개 seam 회귀에서 JSON 변환 파일의 잘못된 CSV 표시, 원 요청과 다른 버전 응답, 파서 drift의 빈 목록
+오인, popup 밖 metadata 혼입, 중복 asset 이름, 잘못된 attachment ID, 목록만 본 뒤 structural 장부
+검증을 허용하던 실패를 먼저 재현했다. 공통 검사와 실제 CLI/MCP·Engine 경계에서 이를 차단했다.
+한도/사라진 membership, 현재 재검사 후 과거 관측의 로컬 합계 보존도 fixture로 검사한다.
+최신 파일 경로는 기본 동작으로 유지하되 과거 취득을 위해 최신 metadata를 재사용하는 경로는 두지 않는다.
+SSO·신청·배포·외부 tracker 쓰기는 하지 않았다.
+
+과거 FILE 구현의 독립 Spec 검토는 첫 candidate `036ea438`에서 같은 attachment/serial에 CSV와
+JSON을 중복 선언하면 뒤의 형식이 무시되는 P2 한 건을 찾았다. 공개 Inspector seam에서 실패를
+재현한 후 충돌 선언을 거부하도록 수정했다. 대소문자만 다른 동일 형식의 반복 버튼은 계속 허용한다.
+기준점 `8e19bff` 대비 수정 candidate `01152035`(tree
+`1d087abad717932fa9a37491aa9329b73d27fbc4`)의 후속 검토는 Standards 0건, Spec 미해결 0건이다.
+분리된 깨끗한 worktree에서 tidy/vet/전체 test/build/브랜드 일치를 통과했고, 원래 worktree에서
+dataset·goalwork·agentplan·MCP·CLI race 검사를 통과했다. 검토 이후 변경은 이 검증 기록뿐이다.
+이는 구현 계약 검증이며 추가 모델 호출이나 G4 의미 승인 증거가 아니다.
+
+### 공식 정의와 행정구역 적용 범위 재확인 — 2026-09-08
+
+이번 후속은 공식 웹의 방법론·법령 조사다. 오데덕의 새 자율 발견이나 실취득·모델 검토로 세지
+않으며, 기존 **5시도/3모델 호출/목표 완료 0회**와 원래 G4 질문·oracle은 그대로다.
+
+- **연령**: KOSIS의 2024-06-28 답변은 주민등록인구현황 작성기관에 확인한 내용으로, 주민등록상
+  출생월일과 통계 기준 월의 말일에 따라 만 나이를 산출한다고 설명한다. 이는 해당 통계계열의
+  공식 방법론 근거지만 PK `15097972`의 July CSV revision을 직접 명시한 답변은 아니다.
+  [KOSIS 작성기관 확인 답변](https://kosis.kr/civilComplaint/qnaDetail.do?boardIdx=22124)
+- **모집단**: 행안부 화면은 등록구분 전체에 거주자·거주불명자·재외국민을 포함하고 외국인은
+  제외한다고 명시한다. 별도 거주자 구분은 재외국민을 제외하므로 일상어의 거주 인구와 등록구분
+  전체를 섞을 수 없다. 월별 통계의 기준일은 매월 말일이다. 이 화면의 선택 가능한 등록구분 중
+  어느 것이 July CSV에 적용됐는지는 파일에 연결된 선언으로 추가 확인해야 한다.
+  [행안부 연령별 주민등록인구 화면](https://jumin.mois.go.kr/ageStatMonth.do)
+- **명칭과 영역은 다른 변경**: 명칭 변경 법률 제21734호(2026-06-02 공포)는 서구를 서해구로
+  바꾸며 2026-07-01 시행한다. 부칙 제3조는 다른 법령의 인용 관계를 정할 뿐 학교 통계 행의
+  대응표가 아니다. 부칙 제2조의 법원 관할구역 표 개정만 2028-03-01 시행인 예외와 구분한다.
+  같은 2026-07-01 시행되는 설치법 제21247호의 제2조제3항은 검단구에 속하게 된 영역을 서구에서
+  제외한다. 따라서 개편 전 4월 서구 전체와 개편 후 7월 서해구의 영토적 동일성을 명칭 변경만으로
+  승인할 수 없다. 이 결론은 두 법률을 함께 읽은 적용 판단이며 학교 원자료의 집계 검증은 아니다.
+  [명칭 변경 법률 본문](https://www.law.go.kr/LSW/lsInfoP.do?lsiSeq=286453&efYd=20260701&ancYnChk=0),
+  [명칭 변경 법률 부칙](https://law.go.kr/LSW/lsRvsDocListP.do?chrClsCd=010202&lsId=015137&lsRvsGubun=all),
+  [신설구 설치법 제2조](https://www.law.go.kr/LSW/lsInfoP.do?lsiSeq=281877&efYd=20260701&ancYnChk=0)
+
+포털의 현재 August [인구 설명·컬럼 표](https://www.data.go.kr/data/15097972/fileData.do)는
+행안부·KOSIS 통계 홈페이지를 안내하지만 만 나이나 등록구분의 상세 정의를 싣지 않는다.
+`계`의 설명은 전체 주민등록인구, 개별 연령 열 설명은 해당 연령·성별 표기에 그친다.
+July ID `uddi:95f114ef-87c9-4669-971d-aab9aff9d7d4/2`의 과거 popup은 공식
+`/tcs/dss/selectDpkDetailInfo.do`에 해당 detail PK와 `publicDataHistSn=2`를 보내 재확인했다.
+제공기관·등록일·수정일·3,619행·CSV/JSON 자산은 있지만 설명·연령 정의·등록구분·행정구역 대응은
+없다. 메인 작업의 동일 ID에 대한 오데덕 CLI 검사도 이 경계를 확인했다. 이 HTTP 재확인은
+파서 누락과 원천 부재를 구분하기 위한 별도 조사이며, 현재 설명을 과거 metadata로 승격하지 않는다.
+
+다음 최소 작업은 새 저장 계층이 아니라 **정의의 원문 위치·revision·적용 필드/기간을 기존 검토
+입력까지 연결하는 것**이다. 먼저 July 파일의 등록구분을 확정할 원천 선언과, 학교 시트의
+7월 개편 표에 남은 `서구` 행이 검단구를 제외해 재집계됐다는 원천 근거를 확인해야 한다.
+법령은 행정개편의 의미를 설명하지만 특정 학교 행의 실제 소속·재집계를 보증하지 않는다.
+현재 컬럼 정의서만 추가로 읽거나 외부 설명을 assumptions에 넣는 것으로 이 두 적용 공백이
+해결되지는 않는다. 근거를 확보하기 전에는 미대응 값을 보존하고 원래 질문의 비교 한계를 설명한다.
+
+### 학교별 원문으로 개편 후 서구 집계 대조 — 2026-09-08
+
+오데덕 `inspect 15004947 --delivery file --observe --format json`으로 원래 XLSX의
+544,942 bytes와 hash `c8f57fc8e3bd7e70175ff0debd1529a17539e526e436dc244fcea39ed9a0f695`가
+유지됨을 확인했다. 이어 그 계약의 공개 자산을 읽어 학교별 OOXML 저장값을 독립 Node 계산으로
+대조했다(11:03 UTC 검증 종료). 이는 PK를 지정한 원천 조사이며 제품의 자율 실행이나 모델 호출은
+아니다. [공식 학교 원천](https://www.data.go.kr/data/15004947/fileData.do)의 같은 revision이며
+원본 XLSX·기존 oracle·archive는 수정하지 않았다.
+
+새 근거는 요약표의 합이 아니라 **학교별 개편 전·후 분류와 그 독립 합산**이다. 유치원·초·중·고
+각 시트의 `B3`는 기존 구군별, `C3`는 2026-07-01 개편 후 행정구역이다. `B=서구`인 실제 학교
+행을 `C=서구`와 `C=검단구`로 나눴으며 다른 기존 구에서 이 두 새 구로 들어온 행은 없었다.
+소계·학년별 부분합을 학교 record로 중복 계산하지 않았다.
+
+| 학교 원문 범위와 학생수 열 | 개편 후 서구: 교 / 명 | 검단구: 교 / 명 | `구·군별` 대조 열, 행 35/36 |
+| --- | ---: | ---: | --- |
+| `유치원` 319–405행, `BF+BK` | 47 / 4,829 | 39 / 4,699 | B/D |
+| `초등학교` 229–282행, `AH` | 32 / 19,489 | 22 / 17,125 | E/I |
+| `중학교` 136–164행, `Z` | 19 / 11,500 | 10 / 8,864 | K/M |
+| `고등학교` 161–185행, `Z` | 12 / 9,325 | 8 / 6,880 | N/P |
+| `특수학교` K열: K4/K5의 기존/개편 구분, K100 학생수 | 0 / 0 | 1 / 301 | Q/S |
+| `각종학교(각종,대안,외국인)` 13행: A/B 구분, AH 학생수 | 1 / 555 | 0 / 0 | T/V |
+
+처음 네 시트의 학생수는 총계 열뿐 아니라 별도 연령/학년 계 열 합산과도 일치했다. 유치원은
+`BC+BD+BE+BH+BI+BJ`, 초등학교는 `V+X+Z+AB+AD+AF`, 중·고등학교는 `T+V+X`다.
+특수학교 `K6`의 인천서희학교는 `K4=서구`, `K5=검단구`로 명시되며, 각종학교 `G13`의
+청라달튼외국인학교는 `A13=B13=서구`다. 국제학교·방송통신·학력인정 시설 시트에는 해당 두 구
+소속 학교가 없었다. 분교 0도 요약표의 별도 AH/AL 열과 대조했으며 빈 칸을 인구 0으로 바꾸지 않았다.
+
+독립 합계는 각각 **111교/45,698명**, **80교/37,869명**으로 원문 `AG35/AK35`, `AG36/AK36` 및
+기존 citywide reference와 일치한다. 두 그룹을 합하면 개편 전 `AG14/AK14`의 191교/83,567명이다.
+따라서 앞 절의 미확인 항목 중 **이 revision의 개편 후 요약 35행은 검단 학교를 제외해 집계했다**는
+점은 학교별 원문으로 뒷받침된다. 다만 작성 기준일은 각 시트 `A2` 및 요약 `A23`의 2026-04-01이고,
+개편 지리는 2026-07-01 적용이다. 새 7월 학교 조사나 현재 운영 보증은 아니다. 예를 들어 유치원
+328행은 원천 자체에 휴원으로 표시되지만 제공기관의 학교 수에는 포함되어 있다.
+
+다음은 이 학교 수준 근거를 source hash·시트·행·적용일에 묶어 검토 입력으로 전달하는 일이다.
+앞 절의 법령과 함께 이 특정 개편 표의 명칭 해석을 지지할 수 있으나, 다른 시점의 서구나 실제
+동별 경계를 전역 alias로 확정하지 않는다. 기존 제품 결과의 10쌍과 서해구/서구 미대응은 유지했고,
+이번 조사만으로 모집단·전체 G4·I1–I10 완료나 추가 성공 시도를 기록하지 않는다. 로그인은 불필요했다.
+
+### 원래 population 범위를 유지한 실제 검토 — 2026-09-08
+
+11:33:14 UTC에 `with-branches-full-scope` 진단을 1회 실행했다. 앞선 학교별 독립 합산도 다시 실행해
+서구 111교/45,698명, 검단구 80교/37,869명과 파일 hash를 확인했지만, 이 조사 해석을 모델 입력에
+주입하지 않았다. 이번 모델에는 기존 실제 취득·선택 공개와 새 원본별 범위 검토 계약만 전달했다.
+recipe의 기대 완료 상태 문장은 제거했다. 질문·독립 oracle·과거 입력/응답은 변경하지 않았다.
+
+실제 CSV는 기존 July hash로 3,619행 전체 검사·인천 162행 보관을 확인했다. 학교 원천도 같은 hash의
+`구·군별!A27:AM37` 11행을 취득했고, 별도 헤더 `A22:AM26`을 읽었다. Engine은 원본 두 개를 각각
+`complete_csv_selection`, `xlsx_rectangle`으로 식별했다. 원래 `population` 계약 아래 구조 검사는
+통과했지만 의미 검토 필요 상태를 유지했다. 인구 304,280명·10개 연결·미대응 두 기록은 동일하다.
+
+별도 Codex 검토는 `independent_model_full_scope_analysis_v1`으로 **review_required**를 반환했다.
+
+- 기준일 구분, 학교수·분교 학교수·분교 학생수는 supported다.
+- 만 나이 정의가 없어 인구 출력, '재적 학생' 집계 정의가 없어 학생 출력은 insufficient다.
+  이전 historical 진단에서 다섯 출력이 모두 supported였던 판정과 구분한다.
+- 관계·측정·coverage·원래 GoalFit과 두 원본별 `sourceCoverage`는 insufficient다. 인구는 등록구분과
+  행정동/집계행의 포함 범위, 학교는 선택 사각형과 논리적 표 전체의 관계 및 서구/서해구 적용 근거가
+  부족하다고 판정했다. 이 원천 적용 공백은 취득 자격 통과나 미대응 값 보고만으로 해소되지 않았다.
+
+이 시점의 G4 진단 누적은 **6시도/4모델 호출/목표 완료 0회**다. 새 단일 관측은 모델 정확도 통과선이나
+양성 완주 증거가 아니다. 새 guide와 full-scope 입력, 기대 상태 문장 제거가 함께 바뀌었으므로
+앞선 sample 진단과 동등 조건 A/B 비교로 제시하지 않는다. 원래 모든 G1–G5 통과선은 유지한다.
+
+[새 archive](../../internal/goalwork/testdata/goalbench-v1/citywide-review-20260908/full-scope-codex.json.gz)는
+선택 입력·원 응답·Engine 결과를 보존한다. 압축 전 JSON 459,876 bytes SHA256은
+`cb2067c9b804bb662367dadd55ae34eaaf730d30b3499385410e7574154f6f73`, guide SHA256은
+`92a453b15321e29e8e4dbfda7f0f3b739ee353bd529af3ca83ccd7f4aaa1e54b`다. 검토 입력은 46,891 bytes,
+원 응답은 9,336 bytes로 잘림이 없으며 실제 취득·계산·검토에 111.61초가 걸렸다. 원 이벤트의 사용량은
+input 35,354, cached input 10,752, output 3,094 tokens다. 모델명·청구 비용은 확인하지 못했다.
+로그인·활용신청은 필요 없었다. 기존 archive는 보존하고 새 응답의 offline adapter 재생을 추가했다.
+
+다음은 이 판정의 반복 호출이 아니라 인구의 정의·행 단위와 학교 집계표의 경계·명칭 해석을 원천
+위치·revision에 묶어 취득하고, 선택 공개와 기준일·비교 한계 산출물로 연결하는 일이다. 학교별
+원문 합산의 새 근거와 모델이 아직 받지 못한 자료를 구분한다. 일반 외부 URL을 임의 호출하거나
+검토 보류를 없애려고 원래 목표·기대값·공개 상한을 낮추지 않는다.
+
+```sh
+ODEDUCK_CITYWIDE_REVIEW=codex ODEDUCK_CITYWIDE_ACQUISITION=historical \
+  ODEDUCK_CITYWIDE_RESULT=with-branches-full-scope \
+  ODEDUCK_CITYWIDE_REVIEW_OUTPUT=/tmp/odeduck-g4-full-scope-new.json \
+  go test ./internal/goalwork -run '^TestLiveCitywideGoalAnalysisReview$' -count=1 -v
+```
+
+### 학교 표의 합계·주석 문맥 전달 — 2026-09-08
+
+위 full-scope 진단이 받지 못한 학교 표의 주변 셀을 같은 원본에서 읽었다. 원본 XLSX hash는
+`c8f57fc8e3bd7e70175ff0debd1529a17539e526e436dc244fcea39ed9a0f695`로 유지된다.
+Go reader/Engine과 별개로 `unzip`·`xml-js`로 OOXML 셀을 확인하고, 추가 15개 셀만
+[독립 문맥 reference](../../internal/goalwork/testdata/goalbench-v1/education-table-context-reference.json)에
+고정했다. 기존 citywide oracle과 기대 계산은 바꾸지 않았다.
+
+`구·군별` 38행의 A는 공백을 포함한 `합계 `, AG/AK/AH/AL은 각각 960/335562/7/63이다.
+39행의 선택 셀은 비어 있고, 40행 A에는 학급수가 일반·특수·한국어 학급의 합이라는 주석이 있다.
+이는 '재적 학생' 정의가 아니다. AK41에도 값이 있으므로 40행을 시트의 물리적 끝이라고 해석하지 않는다.
+합계와 인접 공백은 논리적 표 해석의 근거이지 전체 모집단·행정구역 동일성의 자동 증명이 아니다.
+
+`with-table-context` 진단은 기존 XLSX 선택을 `A22:AM40`으로 넓혀 19행을 보관하되, 문맥 공개는
+22–26·38–40행의 A/AG/AK/AH/AL 40개 셀로 한정한다. 표 데이터 27–37행은 기존 계산 관측과
+공개 packet으로 유지한다. 문맥을 계산에 결합하지 않으며 전체 8 packet 상한도 늘리지 않는다.
+Start/Advance·검토 입력 seam에서 누락 테스트의 실패를 확인한 뒤 진단 recipe만 보강해 통과했다.
+제품의 읽기·공개·승인 코드, 원래 질문·계산·미대응 기록은 변경하지 않았다. 합성 reference 모드는
+새 문맥이 있어도 실제 취득 자격을 얻지 못하고 모델 호출 전에 중단한다.
+
+11:56:24 UTC에 과거 7월 원본을 실제 취득해 이 variant를 1회 실행했다. CSV 전체 3,619행 검사·
+인천 162행 보관·11그룹 304,280명, 학교 11행, 10쌍과 미대응 두 기록이 독립 reference와 일치했다.
+원래 `population` 계약과 full-scope 권한을 유지했다. Codex는 학교 `sourceCoverage`를 supported로
+판정하며 새 합계행·빈 행을 인용했다. 11행의 원천 학교/학생/분교 합계는 38행과 일치한다.
+이는 제공기관 표 범위에 대한 단일 모델 판단이지 현실의 모든 교육기관·행정구역 대응 인증이 아니다.
+
+전체 결과는 **review_required**다. 인구 출력·인구 sourceCoverage·관계·측정·coverage·GoalFit은
+insufficient, 기간과 학교 관련 네 출력은 supported다. '재적 학생' 출력도 직전 insufficient에서
+supported로 바뀌었지만, 추가한 주석은 학급수에 관한 것이므로 이 판정 변화를 학생 정의 확보로
+해석하지 않는다. 인구 정의 및 명칭 대응의 외부 조사 결과는 이 입력에 주입하지 않았다.
+
+직전 full-scope와 질문·계약·recipe·계산/미대응 결과·guide는 같다. 입력 차이는 새 취득 관측 시각과
+학교 문맥의 보관 범위·선택 셀·metadata다. 두 단일 관측은 모델 정확도나 통계적 A/B의 증거가 아니다.
+G4 진단 누적은 **7시도/5실제 모델 호출/목표 완료 0회**다. 실패와 기존 원문은 모두 유지한다.
+
+[이번 archive](../../internal/goalwork/testdata/goalbench-v1/citywide-review-20260908/table-context-codex.json.gz)의
+압축 전 JSON은 486,463 bytes, SHA256은
+`151807bc4d940955a1c9bab6eb5943961a0b890185bae6e09d559d4ddbaf2d74`다. 검토 입력은 51,002 bytes,
+원 응답은 9,408 bytes이며 잘리지 않았다. guide hash는 직전과 같은
+`92a453b15321e29e8e4dbfda7f0f3b739ee353bd529af3ca83ccd7f4aaa1e54b`다. 총 122.69초,
+원 이벤트 사용량은 input 36,977/cached input 10,752/output 3,340 tokens다. 모델명·청구 비용은
+확인하지 못했다. offline adapter 재생은 기존 40개에 이번 응답 하나를 더한 41개 회귀이며 새 모델 호출이 아니다.
+
+```sh
+ODEDUCK_CITYWIDE_REVIEW=codex ODEDUCK_CITYWIDE_ACQUISITION=historical \
+  ODEDUCK_CITYWIDE_RESULT=with-table-context \
+  ODEDUCK_CITYWIDE_REVIEW_OUTPUT=/tmp/odeduck-g4-table-context-new.json \
+  go test ./internal/goalwork -run '^TestLiveCitywideGoalAnalysisReview$' -count=1 -v
+```
+
+고정 candidate `840fd16`은 `go mod tidy -diff`, 브랜드 동기화 검사, `go vet ./...`,
+`go test ./...`, `go build ./...` 및 goalwork/agentplan race 검사를 통과했다. `740ec6d` 대비
+독립 Standards·Spec 검토는 각각 지적 0건이었다. 별도 읽기 전용 원천 감사도
+[인구 조사](population-source-applicability-2026-09-08.md)의 20개 파일 hash와 3,619행·309개 수치
+대조를 재현했다. 이 검증 기록 외의 후속 코드 변경은 없다. 로그인·신청·외부 배포는 하지 않았다.
+
+### 공식 나이 정의의 실제 전달 — 2026-09-08
+
+후속 [등록 문서 취득](../specs/source-document-acquisition-v1.md)을 기존 G4 진단에 연결했다.
+`with-age-definition`은 원래 population 목표·7월 파일·선집계·분교 출력·학교 표 문맥을 유지하고,
+PK 3033304의 실제 inspection이 제공한 KOSIS 답변을 `DOCUMENT` 관측으로 읽는다. 문서 PK와
+참조 ID는 개발 진단의 명시적 힌트이며 자율 발견 성과가 아니다. 인구 원본 o1에 대한 `support`는
+적용 검토의 제안이고, 답변을 특정 월 파일의 제공기관 선언으로 넣지 않는다.
+
+미대응 학교 행의 선공개와 전체 학교 공개를 하나로 합쳤다. 공개 seam의 실패 테스트 후 연결했고,
+기존 진단과 새 진단의 데이터·학교 문맥 155개 고유 셀을 값·missing/null·원본 위치별로 비교해
+전부 동일함을 확인했다. 27개 원본 인구 필드의 예시 값, 11개 계산 그룹, 학교 11행 및 헤더·합계·
+공백·주석은 유지한다. 8 packet·64 KiB 상한도 그대로다. 과거 archive의 중복 packet은 지우지
+않았다. 일반 회귀의 문서 본문은 명시적 합성 HTTP fixture이며 실제 모델 진단은 이 fixture/
+reference 모드를 실행 전에 거부한다.
+
+고정 코드 `2ed4a2e`로 13:05:18 UTC에 `historical` 진단을 한 번 실행했다. 인구 원본
+`6920fdafd269554d259e8498301f004c9799f499c38832de9352a0e7def916c5`의 전체 3,619행 검사·
+인천 162행 보관·11그룹 304,280명과 학교 원본
+`c8f57fc8e3bd7e70175ff0debd1529a17539e526e436dc244fcea39ed9a0f695`의 11행을 기존 독립
+reference에 대조했다. 10쌍·미대응 두 기록과 전체 범위 취득 자격은 유지했다.
+
+KOSIS HTML은 83,632 bytes, SHA256
+`9e16cbb7fc6ee3405e4ae3636227b2bba93139f231842b772cd4aa4ec55566d1`이었다. 두 공식 답변
+section의 원본 DOM 위치와 정규화 text hash는 앞선 live 문서 관측과 같았다. 답변의 통계 계열·
+만 나이·월말 기준 설명과 실제 공개 원문은 archive에 보존했다. 전체 HTML을 archive에 넣거나,
+포털이 KOSIS를 직접 연결했다고 표시하지 않았다. 행안부 도움말과 월간 export 대조는 이번
+검토 입력에 추가하지 않았다.
+
+실제 Codex 결과는 **review_required**다. 문서 packet을 인용했지만 인구 출력·인구 원천 범위는
+계속 insufficient였다. 2024년 통계 계열 답변과 해당 2026년 파일의 적용 관계가 부족하다는
+판정이며 문서 전달 실패는 아니다. GoalFit·관계·측정·coverage도 insufficient, 기간·학교 수·
+분교 학교/학생 수·학교 원천 범위는 supported다. 학교의 `enrolled`는 직전 supported에서
+insufficient로 바뀌었다. 같은 학교 셀인데 '재적 학생'이라는 더 구체적인 정의가 명시되지 않았다고
+보았다. 이 변동을 원천 학생 정의의 새 발견이나 문서 추가의 인과 효과로 해석하지 않는다.
+
+Node의 별도 읽기 전용 archive 대조에서도 원래 Goal Contract·계산/미대응 행·결합 지표·세 계산
+원천의 revision/행 수 및 155개 고유 공개 셀이 직전과 동일했다. 새 문서와 적용 제안, 중복 packet
+제거, 취득 시각과 실행 ID가 달라졌다. 분석 reviewer guide는 같은
+`92a453b15321e29e8e4dbfda7f0f3b739ee353bd529af3ca83ccd7f4aaa1e54b`다. 두 단일 관측은
+정확도 통과율·통계적 A/B·목표 완주 증거가 아니다. G4 누적은 **8시도/6실제 모델 호출/목표 완료 0회**다.
+
+[새 archive](../../internal/goalwork/testdata/goalbench-v1/citywide-review-20260908/age-definition-codex.json.gz)는
+원본 JSON을 내용 변경 없이 gzip `-n`으로 압축하고 압축 해제 bytes를 원본과 비교했다.
+압축 전 501,122 bytes, SHA256은
+`0946308262f2509367e48877de88e2b940986bcd578afd906eb0e0c1a8b9927d`다. 검토 입력은 54,004 bytes,
+SHA256 `9066a0fae15957df2a3b89b5658a3873dc1f10e220a0cf63b7a57579d636ceb7`, 공개 packet 합계는
+22,732 bytes다. 원 응답 9,778 bytes는 잘리지 않았다. 총 122.38초, 원 이벤트 사용량은 input
+37,971/cached input 10,752/output 3,414/reasoning output 283 tokens다. 모델명·청구 비용은
+확인하지 못했다. 새 원 응답을 기존 41개에 더한 42개 offline adapter 재생은 새 모델 호출이 아니다.
+
+```sh
+ODEDUCK_CITYWIDE_REVIEW=codex ODEDUCK_CITYWIDE_ACQUISITION=historical \
+  ODEDUCK_CITYWIDE_RESULT=with-age-definition \
+  ODEDUCK_CITYWIDE_REVIEW_OUTPUT=/tmp/odeduck-g4-age-definition-new.json \
+  go test ./internal/goalwork -run '^TestLiveCitywideGoalAnalysisReview$' -count=1 -v
+```
+
+다음은 이미 독립 조사한 원천 계열의 실제 월간 export·등록구분·코드/수치 대조를 제품 관측과
+검토 입력까지 연결하고, 학교 원문으로 확인한 행정구역 범위·기준일·비교 한계를 산출물로 표현하는
+일이다. 단순 재호출이나 원래 범위 축소로 해결하지 않는다. 로그인·활용신청·외부 배포는 하지 않았다.
+
+후속 정리 `dd583da`는 진단 이름과 옵션을 한 표로 모아 중복 분기를 제거했다. 전체
+`go mod tidy -diff`·`go vet ./...`·`go test ./...`·`go build ./...`·brand 동기화 검사·
+`git diff --check` 및 goalwork/agentplan race 검사를 통과했다. `208df8d` 기준 독립 검토에서
+Spec 지적은 0건, Standards 강제 위반은 0건이며 중복 분기 의견은 해결했다. 원본 archive 대조와
+실패 포함 8시도/6모델 응답/완료 0회의 분모도 독립 재확인했다.
+
+Standards의 별도 위생 참고 의견은 공식 답변 구역에 발행자가 마스킹한 인사말과 공개된 부서 연락처가
+남는다는 점이다. 파서용 HTML fixture가 아니라 실제 선택·전송된 입력의 진단 기록이므로 이번에
+원문을 바꾸지는 않았다. 공개 문서라고 개인정보 부재를 보증하지 않으며, 원문 선택·수신자 고정·
+전송 시작 권한은 기존 계약을 따른다. 전체 HTML·질문자 본문·포털 세션은 이 archive에 포함하지 않는다.
+
+### 공식 월간 FILE export의 제품 취득 — 2026-09-08
+
+[공식 선택 계약 조사](population-source-applicability-2026-09-08.md#추가-조사-공식-617세-범위-csv-계약)에서
+6–17세 선택은 43열·전국 3,919행이며 원래 요청 연령을 유지함을 확인했다. 따라서 310열 전체 원천을
+위해 공통 projection framework나 기존 256열 한도를 넓히는 대신, 검사된 FILE export operation을
+기존 sample에 추가했다. 세 대안과 선택 이유는 [취득 계약](../specs/monthly-file-export-v1.md)에 있다.
+
+외부 HTTP만 대체하는 fixture에서 공개 취득 경로를 먼저 실패시킨 뒤 구현했다. 공식 URL family의
+private 검사 참조, 다섯 typed 선택값, 선택 페이지의 실제 반영값과 CSV 버튼 계약, 응답 헤더의 월·
+성별·연령, 엄격한 CSV 전체 스캔을 확인한다. 소스 선택 조건과 로컬 코드 선택·scan/matched/returned
+수를 구분한다. 별도 CSV parser를 만들지 않았으며 일반 CSV 경로도 같은 내부 parser를 계속 사용한다.
+공개 POST는 공유 쿠키를 송수신하지 않고 같은 원천 페이지의 Referer를 사용하며 모든 redirect를 반환한다.
+userinfo URL·다른 origin의 Referer·미검사 참조·섞인 선택자·form/header drift·손상된 제외 tail은 거부했다.
+
+아래 opt-in 명령은 실제 `dataset.Inspector`로 data.go.kr 광고를 검사한 뒤 공식 페이지와 CSV를
+읽었다. 7.87초에 통과했으며 CSV SHA256
+`911940f3c38ffb7ed487a820607560616dedd5d226dcec1c0b9d7ffb65c4e47f`, 1,050,109 bytes,
+EUC-KR·43열·3,919행 검사·인천 177행 전부 보관이 독립 조사본과 일치했다. 선택 페이지는
+104,915 bytes, SHA256 `dda8b66761680e6db3eb51c668aef1b2fce89c982ed086a523cdff3515ece444`다.
+HTML은 익명 세션 문자열 때문에 같은 선택에서도 hash가 바뀔 수 있어 CSV의 고정 revision과 구분한다.
+
+```sh
+ODEDUCK_MONTHLY_EXPORT_LIVE=1 \
+  go test ./internal/dataset -run '^TestMonthlyExportLiveContract$' -count=1 -v
+```
+
+CLI solve·MCP advance_goal·공통 Engine에서는 합성 HTML/CSV를 같은 실제 취득 코드로 읽고
+선택 조건·원본 주소·원문 기본 비공개 및 명시적인 evidence 공개를 검증했다. CLI의 계획 선택은
+scripted runner이며 실제 모델 선택이 아니다. 공유 planning guide의 CLI subprocess·MCP resource
+전달 테스트도 통과했다. 검토자 지침과 기존 G4 원문 archive는 변경하지 않았다.
+
+원래 인구 162행과 공식 export 177행은 서로 다른 관측이다. 집계·인구 0행·출장소를 제공기관 원문에서
+삭제하거나 이름을 코드 컬럼으로 바꾸지 않았다. 선택용 코드 추출 규칙은 provenance에만 둔다.
+현재 export는 population 검토 자격을 자동 획득하지 않으며, 독립 대조를 제품의 계산 근거로 실행·
+공개하는 경로와 정의 적용·학교 구역 근거를 포함한 G4 검토는 남는다. 추가 모델 호출 없이
+**G4 누적 8시도/6실제 모델 호출/완료 0회**를 유지한다. 로그인·신청·외부 배포도 하지 않았다.
+
+취득 구현 `528cdf9...1d6c6ba`의 독립 검토는 두 축으로 진행했다. Spec은 등록구분별 지원 시작월
+누락 1건(P2)을 찾았다. 보존된 공식 폼의 거주자·거주불명자 2010-10, 재외국민 2015-01 경계와
+직전 월 거부/첫 월 허용의 공개 validator 테스트로 재현했다. 수정 전 세 거부 사례가 실패했고,
+수정 후 전체 및 각 구분의 경계가 통과했다. 공통 Engine에서도 지원 전 요청은 acquisition attempt
+전에 거부한다. 등록구분·폼 값·시작월은 한 표에서 검증·폼·공개 안내에 쓰며 adapter revision은 2다.
+
+Standards는 문서화된 강제 위반 0건, 행 보관 코드 중복 휴리스틱 1건(P3)을 보고했다. 정적 CSV와
+월간 export가 보관 bytes·행 복사·원본 위치를 같은 private collector로 기록하도록 교체했다.
+외부 HTTP fixture로 1행 및 최대 1,000행을 보관해도 1,002행을 모두 검사하고 1,001개 일치와
+prefix·원본 주소·전체 byte hash를 보존하는지 확인했다. 2 MiB 보관 초과는 부분 관측 없이 실패한다.
+중복 구현만 제거했으며 과거 실패·원천·oracle은 유지했다.
+
+수정 후 `go mod tidy -diff`, `go vet ./...`, `go test ./...`, `go build ./...`, brand 동기화 검사,
+`git diff --check` 및 fetch/dataset/goalwork race 검사를 통과했다. 이 후속 검사는 offline이며
+위 실취득을 재실행하거나 새 모델 호출을 하지 않았다. 계산된 원천 대조·정의 적용 및 G4 완료는 남는다.
+
+독립 수정 재검토는 `1d6c6ba...d04de13`으로 고정했다. Spec의 지원 시작월 누락과 Standards의
+보관 중복 의견은 각각 해결됐으며 남은 지적은 0건이다. 이후의 계산 대조 구현을 검토한 결과는 아니다.
+
+### 계산된 원천 대조와 보존 원천 재생 — 2026-09-08
+
+[Source Comparison 계약](../specs/source-comparison-evidence-v1.md)은 별도 action/store와
+Composition 부속 계산을 비교한 뒤 기존 `sample`의 로컬 계산·수명·선택 공개를 재사용한다.
+명시된 두 원본 revision의 string key와 exact decimal 계산만 수행하며, 원본 필드를 바꾸거나
+동일성·정의 적용을 자동 승인하지 않는다. 일반 측정과 같은 수치 해석을 사용하고 별도 parser나
+수식 언어·그래프 저장소·원천 정답 recipe는 제품 코드에 넣지 않았다.
+
+Engine 공개 경계에서 대조가 외부 취득으로 흘러가던 실패, 선택적인 일치 수만 support로 제안할 수
+있던 실패, 계산 근거가 base/join/reduction으로 승격되던 실패, 검토 문맥에서 양쪽 원천 revision이
+빠지던 실패를 먼저 확인하고 연결했다. 중복키는 어느 쪽도 임의 선택하지 않으며 복합키·선행 0·
+큰 소수·null/형식 오류·양쪽 미대응·stale revision·전체 보고서 한도 초과를 확인한다. 요약 13개의
+항목/값은 한 기존 packet에 들어가고, 각 support 대상에 전체 요약이 없으면 거부한다. 공개량이나
+원래 결과·필수 역할은 바뀌지 않는다. 비교 결과와 provenance는 검토 전에 두 보유 원본에서 재현한다.
+
+CLI의 scripted runner와 실제 Engine을 연결한 회귀는 선택된 수치 차이만 반환하고 미검토 성공을
+거부했다. MCP JSON-RPC 회귀에서는 `Measure.as`가 항상 필수였던 스키마 불일치를 발견했다.
+비교 operand는 별칭을 생략할 수 있도록 수정했으며 일반 출력 계산의 별칭 요구는 실행기가 유지한다.
+이는 계획기의 자율 선택이나 실제 모델 판단을 검증한 테스트가 아니다. 공유 planning guide에 요청과
+대조의 근거 경계를 추가했고, `exhausted:true`를 보관 완료로 오해할 수 있던 문구도 실제 계약에 맞춰
+수정했다. 이 값은 EOF 검사이며 전체 일치 보관은 matchedRows/returnedRows로 따로 확인한다.
+
+`TestSourceComparisonReplaysOriginalG4Bytes`는 아래 세 보존 파일의 기존 SHA256을 먼저 확인한 뒤
+실제 Inspector·LiveDependencies·CSV scanner·Engine으로 계산한다. 카탈로그와 포털 목록/resolver는
+합성 HTTP fixture다. 원래 역사 버전 조회나 실시간 다운로드의 새 증거로 사용하지 않는다.
+
+```sh
+ODEDUCK_COMPARISON_ORIGINAL_CSV=/tmp/odeduck-population-applicability.KmYDur/population-july-original.csv \
+ODEDUCK_COMPARISON_EXPORT_CSV=/tmp/odeduck-monthly-export.fqn2uP/mois-july-all-eupmyeondong-6to17.csv \
+ODEDUCK_COMPARISON_EXPORT_HTML=/tmp/odeduck-monthly-export.fqn2uP/age-july-incheon-all-6to17.html \
+  go test ./internal/goalwork -run '^TestSourceComparisonReplaysOriginalG4Bytes$' -count=1 -v
+```
+
+초기 진단 테스트에서 EOF 필드를 반대로 기대한 오류를 바로잡았다. 실제 반환은 양쪽 EOF=true,
+전체 3,619/3,919행 검사 및 162/177행 일치·전부 보관이다. 원본/배포물 hash는 각각
+`6920fdafd269554d259e8498301f004c9799f499c38832de9352a0e7def916c5`와
+`911940f3c38ffb7ed487a820607560616dedd5d226dcec1c0b9d7ffb65c4e47f`다. 선택 페이지는
+`1a1423e466dbc572ebee91b7cfeabf5ee7ac39085dc44c2b91ce3b689bfef982`를 재생했다.
+
+제품 계산은 독립 `verify-range.mjs`의 원천별 대응에 따라 **162쌍·42항목·6,804개 수치 위치가
+일치**, 차이·결측·형식 오류·모호키·왼쪽 미대응은 0, 오른쪽 미대응은 15다. 13요약+42항목+15진단의
+70행을 보관했다. 미대응 원본 15곳과 출장소 네 쌍의 실제 CSV 물리적 시작 줄도 독립 기록과 같았다.
+계산 요약만 한 packet으로 공개했고 출장소 이름·개별 수치 등 미선택 값은 계획 입력에 포함하지 않았다.
+
+원래 G4 전체 산출물의 검토 입력은 아직 구성하지 않았다. 앞선 나이 정의 진단은 이미 8 packet을
+사용하므로 대조 요약을 그대로 더하면 기존 상한을 넘는다. 인구 원본의 필요한 의미 근거를 빼거나
+상한을 임의로 높이지 않고 전체 근거 전달 방식을 검증해야 한다. 학교 구역 근거·정의의 revision 적용·
+전체 산출물 검토·무힌트 분야 전이는 계속 남는다. **G4 누적 8시도/6실제 모델 호출/완료 0회**와
+기존 archive·oracle을 유지하며 로그인·신청·새 모델 호출·외부 배포는 하지 않았다.
+
+대조 구현의 `go mod tidy -diff`, `go vet ./...`, `go test ./...`, `go build ./...`, brand 동기화
+검사, `git diff --check`와 goalwork/mcpserver/agentplan race 검사를 통과했다. 오래된 안내 문구를
+그대로 요구하던 private prompt substring 검사는 제거하고, 공통 지침 전체의 실제 CLI subprocess·
+MCP resource 전달 회귀와 EOF/보관 수의 공개 실행 테스트를 유지했다. 기존 목표 oracle은 변경하지 않았다.
+
+`d04de13...9b1bfeb`의 독립 Standards 검토는 문서화된 위반 0건·조치할 설계 휴리스틱 0건이었다.
+Spec은 수치 범위 오류를 버린 뒤 비교하는 P1 한 건을 찾았다. 256자리 `9`와 `1`의 합이 257자리로
+늘어날 때 공개 Engine 테스트에서 nil 역참조 panic을 재현했다. 양쪽 단일 JSON 지수의 전개와
+반대쪽이 결측/잘못된 값인 경우까지 다섯 회귀를 두고, 계산된 숫자의 범위를 판정 전에 확인하도록
+고쳤다. 범위 초과는 근거·부분 관측 없이 실패하며 원천의 일반 결측/형식 오류는 기존 진단으로 남는다.
+수정 뒤 실제 보존 CSV의 6,804개 일치·15개 미대응 원본 위치 재생은 그대로 통과했다.
+수정 후 전체 tidy/vet/test/build·brand·diff 검사와 goalwork/mcpserver/agentplan race 검사도 다시 통과했다.
+
+### 합산 중간값의 범위 오류 후속 — 2026-09-09
+
+`9b1bfeb...c4eaf0f` 재검토에서 Standards는 새 지적 0건, Spec은 기존 panic 해결과 별개로 P2 한 건을
+보고했다. `sum_fields`의 원문 JSON 숫자 `1e256`이 변환 후 257자리로 전개되면 내부 범위 오류가
+일반 `invalid` 진단으로 처리됐다. 공개 Engine의 해당 사례가 수정 전 `gaps=[]`로 실패함을 재현했다.
+원문 파싱 실패와 변환된 결과의 범위 초과를 오류 종류로 구분하고, 후자를 비교 보고서 전체 실패로
+전파했다. 오류 문구를 비교하지 않으며 일반 측정의 원문 숫자 허용 범위는 변경하지 않았다.
+
+양쪽 합산·단일 변환과 결측/잘못된 반대값을 포함한 범위 초과 9사례가 부분 관측 없이 실패한다.
+별도로 257자리 원문 string/JSON number와 미지원 원문 지수를 양쪽 피연산자에 넣은 6사례는
+보고서의 `invalid`로 남는다. 실제 보존 CSV 재생도 162쌍·42항목·6,804일치·15미대응 위치를 유지했다.
+수정 후 tidy/vet/test/build·brand·diff 검사는 통과했다. 새 live 취득이나 모델 호출은 하지 않았으며
+원래 G4의 8시도/6실제 모델 호출/완료 0회는 변하지 않았다.
+
+`c4eaf0f...94c6dd1`의 독립 재검토는 Spec의 남은 P2 해결을 확인했고 새 지적 0건이었다.
+Standards도 문서화 위반 0건·조치할 설계 휴리스틱 0건이었다. 주 에이전트가 실행한
+goalwork/mcpserver/agentplan race 검사도 통과했다. 검토자는 테스트를 직접 재실행하지 않았다.
+
+### 원본 셀 공개 재사용의 실현 가능성 — 2026-09-09
+
+원래 `age-definition-codex.json.gz`의 비압축 SHA256
+`0946308262f2509367e48877de88e2b940986bcd578afd906eb0e0c1a8b9927d`를 먼저 확인했다.
+학교 계산 관측 o2의 27–37행과 문맥 o4의 22–26/38–40행은 같은 다섯 필드의 서로 다른 95셀이다.
+기존 두 packet은 11,787 bytes이며 같은 값·명시적 null·원본 위치를 o4의 19행 선택으로 공개하면
+11,522 bytes다. 단순 wire 계산 뒤 `TestOriginalG4SchoolDisclosureFitsOnePacketWithoutLosingCells`가
+실제 Engine의 sample/read_evidence를 통해 같은 크기와 한 packet·잔여 7개를 확인했다.
+취득 dependency는 과거 공개 셀을 재생하는 fixture이며 실제 파일 reader/다운로드의 새 검증은 아니다.
+이 테스트는 원래 goal/contract를 유지하지만 결과 계산이나 모델을 호출하지 않는다.
+
+원래 8 packet을 7개로 구성할 여지가 있으며 대조 요약을 추가한 개수는 8개다. 다만 현재 계산 검토는
+observation ID가 다른 셀을 재사용하지 못하므로 전체 검토 입력 전달을 통과했다고 주장하지 않는다.
+`codebase-design`의 세 독립 설계를 비교해 [원본 셀 재사용](../specs/original-cell-evidence-reuse-v1.md)의
+내부 공개 해석안을 선택했다. 명시적 새 binding은 호출자 부담을 늘리고, 취득 통합은 헤더·합계·주석을
+계산에 섞을 수 있어 선택하지 않았다. 원본 주소 검증·단일 packet 본문·재포장 검토 차단을 함께 구현할
+계획이며 아직 제품 지침이나 실행기를 변경하지 않았다. 학교 구역 근거와 최종 산출물은 계속 미완료다.

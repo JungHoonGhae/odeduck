@@ -1,0 +1,31 @@
+{
+  "kind": "development_source_report_calibration_not_G3_G4_completion",
+  "cases": [
+    {
+      "id": "SR-ENV-DEC2024",
+      "reference": "environment-reference.json",
+      "pk": "15150551",
+      "goal": "공공데이터에 공개된 2024년 12월 도시대기 PM25 자료에서 서울과 인천의 도시별 통계 행을 보여줘. 통계월, 측정소구분, 구분, 오염물질명, 시도, 도시, 측정소수, 1시간 월평균을 원문 그대로 옮긴 두 행이면 돼.",
+      "negativeGoal": "2024년 12월 서울과 인천의 각 개별 측정소가 측정한 PM25 월평균 농도를 측정소별로 보여줘.",
+      "negativeReason": "도시별 집계 행은 개별 측정소 농도가 아니다.",
+      "region": "서울과 인천",
+      "period": "2024년 12월",
+      "records": [12460, 12463],
+      "fields": ["통계월", "측정소구분", "구분", "오염물질명", "시도", "도시", "측정소수", "1시간 월평균"],
+      "sourceSha256": "9ef7791e5b26821c85e8dc766622f996f205f68c3bffa0cddf9f339ef2ea848d"
+    },
+    {
+      "id": "SR-POP-BUPYEONG1-202605",
+      "reference": "education-reference.json",
+      "pk": "15085585",
+      "goal": "부평구가 공개한 2026년 5월 31일 기준 동별 연령별 인구자료에서 부평1동의 만 6세 남녀 인구를 원문 표로 보여줘. 연령(세), 성별, 부평1동인구수 세 항목을 남녀 두 행으로 옮겨줘.",
+      "negativeGoal": "2026년 5월 31일 부평1동에 거주하면서 초등학교에 재학 중인 만 6세 학생 수를 남녀별로 보여줘.",
+      "negativeReason": "주민 인구에는 재학 여부가 없다.",
+      "region": "인천광역시 부평구 부평1동",
+      "period": "2026-05-31 기준 원천 snapshot",
+      "records": [14, 15],
+      "fields": ["연령(세)", "성별", "부평1동인구수"],
+      "sourceSha256": "278ab42932b69f0725f899e429149bce23363cc424b3b73f70d82751704e5768"
+    }
+  ]
+}

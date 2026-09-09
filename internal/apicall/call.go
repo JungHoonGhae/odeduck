@@ -30,6 +30,8 @@ var ErrPropagating = errors.New("게이트웨이에 아직 반영되지 않았�
 // specific sentinel. CallResult is still returned so callers can inspect body.
 var ErrHTTPStatus = errors.New("OpenAPI가 실패 HTTP 상태를 반환했습니다")
 
+var errCredentialResponse = errors.New("OpenAPI 응답에 주입한 인증키가 포함되어 결과를 반환하지 않았습니다")
+
 // SecureEndpoint constrains automatic serviceKey injection to the two government
 // gateways documented by data.go.kr. Portal pages are publisher-controlled input; treating a Swagger host
 // as trusted would let a bad spec send the account-wide key elsewhere. The
@@ -121,6 +123,12 @@ func callTrusted(ctx context.Context, f *fetch.Client, endpoint string, params m
 
 	res := &CallResult{Status: resp.Status, ContentType: resp.ContentType}
 	res.Body = decodeBody(resp.ContentType, resp.Body)
+	// A publisher can echo the injected key in an otherwise successful response.
+	// Withhold the whole result instead of turning redacted cells into evidence.
+	// Check decoded strings too: JSON/XML escaping must not bypass this boundary.
+	if echoesCredential(res.Body, key) || echoesCredential(string(resp.Body), key) || echoesCredential(res.ContentType, key) {
+		return nil, errCredentialResponse
+	}
 
 	// A just-approved API answers 403 at the gateway for a while: data.go.kr
 	// auto-approves the application instantly but takes minutes to propagate it.
@@ -156,6 +164,44 @@ func redactKey(s, key string) string {
 	s = strings.ReplaceAll(s, key, "REDACTED")
 	s = strings.ReplaceAll(s, strings.ReplaceAll(key, "+", "%2B"), "REDACTED")
 	return s
+}
+
+// This detects representations of the known injected credential, not arbitrary
+// secrets or personal information. Credential material stays inside the caller.
+func echoesCredential(value any, key string) bool {
+	if key == "" {
+		return false
+	}
+	switch v := value.(type) {
+	case string:
+		decodedKey, err := url.PathUnescape(key)
+		if err != nil {
+			decodedKey = key
+		}
+		for i := 0; i < 3; i++ {
+			if strings.Contains(v, key) || strings.Contains(v, decodedKey) {
+				return true
+			}
+			decoded, err := url.PathUnescape(v)
+			if err != nil || decoded == v {
+				break
+			}
+			v = decoded
+		}
+	case map[string]any:
+		for field, child := range v {
+			if echoesCredential(field, key) || echoesCredential(child, key) {
+				return true
+			}
+		}
+	case []any:
+		for _, child := range v {
+			if echoesCredential(child, key) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // decodeBody converts the response into a structured value: XML→map, JSON

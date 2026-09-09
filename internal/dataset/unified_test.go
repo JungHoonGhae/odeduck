@@ -138,7 +138,9 @@ func TestUnifiedInspectorRejectsUnsupportedCatalogDelivery(t *testing.T) {
 	}}}).Save(); err != nil {
 		t.Fatal(err)
 	}
-	_, err := NewUnifiedInspector(fetch.New(fetch.WithDelay(0)), "https://data.go.kr").Inspect(context.Background(), InspectionRequest{PK: pk})
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { http.NotFound(w, r) }))
+	defer srv.Close()
+	_, err := NewUnifiedInspector(fetch.New(fetch.WithDelay(0)), srv.URL).Inspect(context.Background(), InspectionRequest{PK: pk})
 	if err == nil || !strings.Contains(err.Error(), "제공형을 자동 검사할 수 없습니다") {
 		t.Fatalf("error = %v", err)
 	}
