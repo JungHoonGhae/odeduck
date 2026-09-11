@@ -25,6 +25,35 @@ go build ./...
 Unit tests must run without network access. Tests that need a real browser must skip under `go test -short ./...`.
 Live provider drift belongs in the scheduled canary workflow, not in ordinary pull-request tests.
 
+## Design and validation references
+
+The root README is for people installing and using odeduck. Keep implementation details, review contracts,
+test commands and asset-production instructions in the linked documents below.
+
+| Reference | Contents |
+| --- | --- |
+| [Product intent](INTENT.md) · [Completion plan](docs/specs/goal-driven-completion-plan.md) | Expected outcomes, requirements and remaining validation |
+| [Architecture](ARCHITECTURE.md) · [Domain language](CONTEXT.md) | Component responsibilities, execution flow and shared terminology |
+| [Validation summary](docs/validation-summary.md) | Evidence, tested scope, open limits and competitor research |
+| [Discovery specification](docs/specs/cross-domain-connection-discovery-v1.md) · [Evaluation](docs/research/connection-discovery-evaluation.md) | Candidate generation and selection contracts |
+| [Connection evidence ledger](docs/specs/connection-evidence-ledger-v1.md) · [ADRs](docs/adr/) | Provenance, assessment rules and design decisions |
+
+Goal-execution contributions should demonstrate both reaching the requested output and rejecting unsupported
+connections. Keep the tested scope clear: a sample calculation or a model review does not establish general
+autonomous completion or field verification.
+
+## README and visual assets
+
+Keep the introduction animation, application-to-query workflow and overall architecture visible in the README.
+Explain what users can do and the conditions that affect them. Put optional CLI flags and experimental settings
+in [advanced usage](docs/advanced-usage.md).
+
+The public name, tagline and logo paths come from [brand.json](docs/brand/brand.json).
+After changing them, run `go run ./scripts/sync-brand.go`; CI checks that the generated README block matches.
+
+The [visual asset guide](docs/assets/README.md) lists editable diagram sources, Pretendard fonts, style decisions
+and HTML/PNG export commands. Commit source changes and generated assets together.
+
 ## Provider adapters
 
 A provider adapter is an executable trust boundary, not a collection of guessed endpoints. New or changed adapters
@@ -55,4 +84,3 @@ selector or contract changed in the test name or pull-request body.
 - `CHANGELOG.md` is updated for a user-visible change.
 
 By contributing, you agree that your contribution is licensed under the repository's [MIT License](LICENSE).
-
