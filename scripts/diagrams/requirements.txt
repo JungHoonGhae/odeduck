@@ -1,0 +1,2 @@
+# Optional PNG exporter; HTML generation uses the Python standard library.
+playwright==1.62.0
