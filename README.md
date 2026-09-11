@@ -414,6 +414,7 @@ go build ./...
 | [INTENT.md](INTENT.md) | 사용자 문제, 기대 산출물과 완료 기준 |
 | [목표 실행·검증 계획](docs/specs/goal-driven-completion-plan.md) | 요구사항별 구현·실증 상태와 남은 과제 |
 | [아키텍처](ARCHITECTURE.md) · [도메인 용어](CONTEXT.md) | 구성요소, 데이터 흐름과 공통 언어 |
+| [시각화 원본·수정 방법](docs/assets/README.md) | 다이어그램 편집 소스, 글꼴과 HTML·PNG 재생성 |
 | [연결 발견 명세](docs/specs/cross-domain-connection-discovery-v1.md) · [연결 발견 평가](docs/research/connection-discovery-evaluation.md) | 후보 탐색·선택 계약과 실제 검색 결과 |
 | [연결 근거 장부](docs/specs/connection-evidence-ledger-v1.md) | 출처·시점·판정의 보존과 재검증 경계 |
 | [제공기관 adapter guide](docs/provider-adapters.md) · [ADR](docs/adr/) | 호출 계약과 설계 결정 |
