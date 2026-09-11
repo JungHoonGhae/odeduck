@@ -9,6 +9,11 @@ section matching a `vX.Y.Z` tag as the GitHub release notes.
 
 ### Changed
 
+- Lead the README with search, application and key-handling friction, then show
+  how one auction question can surface transaction, commercial-area and soil
+  data. Preserve the established brand and source assets, and distinguish
+  discovered connections from completed joins or simultaneous application.
+
 - Rewrite the README for people using odeduck: lead with everyday questions, setup
   and application-to-query steps. Move advanced options, verification records and
   maintainer resources to linked guides; keep the introduction and all three diagrams visible.
