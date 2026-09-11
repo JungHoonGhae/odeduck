@@ -176,17 +176,17 @@ def build_bottlenecks():
     # Manual user journey, not measured time savings or a claim of distinct keys per API.
     s = 'odeduck-manual-bottlenecks'
     b = text(72, 80, '공공데이터를 직접 찾아 쓰려면', 24, 600, MUTED)
-    b += text(72, 140, '가격 비교를 하려는데, 준비부터 막힙니다.', 40, 700)
+    b += text(72, 140, '열린 데이터, 쓰기까지는 복잡하다.', 40, 700)
     b += mascot(1096, 56, 104)
     b += edge(s, 'M424 388 H464') + edge(s, 'M816 388 H856')
 
     search = plate(72, 200, 352, 344)
     search += text(104, 248, '01  검색어부터 막힘', 28, 700)
     search += plate(100, 280, 296, 64) + icon('inspect', 116, 296, 32)
-    search += text(164, 320, '경매? 공매? 매각?', 24, 600)
+    search += text(164, 320, '무슨 검색어를 넣지?', 24, 600)
     search += edge(s, 'M348 344 V376 A8 8 0 0 1 340 384 H164 A8 8 0 0 1 156 376 V344', dashed=True)
     search += text(248, 428, '검색어 바꾸고, 다시 찾고', 24, 500, INK, 'middle')
-    search += text(248, 500, '있는 줄도 모르면 놓칩니다', 24, 700, INK, 'middle')
+    search += text(248, 500, '있는 줄도 모르면 놓치기 쉬움', 24, 700, INK, 'middle')
     b += node('search-friction', 72, 200, 352, 344, search)
 
     apply = plate(464, 200, 352, 344)
@@ -202,14 +202,14 @@ def build_bottlenecks():
     access += text(888, 248, '03  승인 후에도 설정', 28, 700)
     for y, name, label in [(284, 'key', '인증키 복사'), (348, 'inspect', '입력 방식 확인'), (412, 'call', '호출 설정')]:
         access += icon(name, 896, y, 36) + text(956, y + 28, label, 28, 600)
-    access += text(1032, 500, '첫 조회까지 직접 챙깁니다', 24, 700, INK, 'middle')
+    access += text(1032, 500, '첫 조회까지 직접 챙겨야 함', 24, 700, INK, 'middle')
     b += node('access-friction', 856, 200, 352, 344, access)
 
     b += node('repeat', 72, 584, 1136, 88,
               plate(72, 584, 1136, 88, INK)
               + text(640, 640, '자료가 하나 더 필요하면, 이 절차도 한 번 더.', 32, 700, CREAM, 'middle'))
-    write(s, '비교를 시작하기 전에 반복하는 공공데이터 이용 절차',
-          '검색어를 바꾸며 자료를 찾고, 필요한 미신청 API마다 활용신청과 승인 확인을 반복한 뒤 인증키 입력 방식과 호출을 직접 설정해야 하므로 여러 자료를 비교하기 전에 준비 작업이 쌓인다.',
+    write(s, '공공데이터를 쓰기 전에 반복하는 이용 절차',
+          '검색어를 바꾸며 자료를 찾고, 필요한 미신청 API마다 활용신청과 승인 확인을 반복한 뒤 인증키 입력 방식과 호출을 직접 설정해야 하므로 데이터를 쓰기 전에 준비 작업이 쌓인다.',
           720, b, 'manual user journey / slide-16x9 / branded variation')
 
 
