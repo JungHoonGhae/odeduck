@@ -2,9 +2,9 @@
   "displayName": "오데덕",
   "tagline": "공공데이터 덕후, 오.데.덕.",
   "acrostic": [
-    { "syllable": "오", "text": "오픈API라며." },
-    { "syllable": "데", "text": "데이터 달랬더니 신청서를 줌." },
-    { "syllable": "덕", "text": "덕후를 보냈더니 데이터를 가져옴." }
+    { "syllable": "오", "text": "오픈API라면서요." },
+    { "syllable": "데", "text": "데이터 받는데 신청서를 쓰래요." },
+    { "syllable": "덕", "text": "덕후는 이게 좋대요. 아, 그럼 얘 시키면 되겠네." }
   ],
   "logoPath": "docs/assets/brand-symbol.svg",
   "logoAlt": "흩어진 공공데이터의 연결을 찾는 오데덕 캐릭터",
