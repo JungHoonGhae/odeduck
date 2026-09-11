@@ -5,6 +5,15 @@ All notable changes to odeduck are documented here. Format follows
 [SemVer](https://semver.org/). The release workflow uses the `## [X.Y.Z]`
 section matching a `vX.Y.Z` tag as the GitHub release notes.
 
+## [Unreleased]
+
+### Changed
+
+- Guide README readers through installation, first search, agent setup and a first
+  question, with explicit checkpoints and folded advanced details. Add a Pretendard
+  goal-flow diagram that distinguishes replanning, reviewed output and incomplete
+  results, while keeping the experimental v0.19.0 boundaries visible.
+
 ## [0.19.0] - 2026-09-09
 
 Start with a goal, inspect the actual sources, execute bounded analyses and review
