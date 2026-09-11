@@ -9,7 +9,7 @@ import xml.etree.ElementTree as ET
 import re
 
 ASSETS = Path(__file__).resolve().parents[2] / 'docs/assets'
-DIAGRAMS = ('api-workflow', 'system-overview', 'goal-flow')
+DIAGRAMS = ('unexpected-connections', 'api-workflow', 'system-overview', 'goal-flow')
 
 GEOMETRY = """() => {
   const box = e => {
@@ -38,7 +38,7 @@ GEOMETRY = """() => {
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('diagrams', nargs='*', metavar='NAME',
-                        help='api-workflow, system-overview, goal-flow (default: all)')
+                        help=', '.join(DIAGRAMS) + ' (default: all)')
     parser.add_argument('--source-dir', type=Path, default=ASSETS)
     parser.add_argument('--output-dir', type=Path, default=ASSETS)
     parser.add_argument('--scale', type=int, choices=(1, 2, 3, 4), default=2)
