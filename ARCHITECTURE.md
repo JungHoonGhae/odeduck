@@ -6,6 +6,11 @@ odeduck은 대한민국 공공데이터를 **찾고 → 실제 계약을 확인�
 
 ## System at a glance
 
+![CLI와 MCP가 공유하는 카탈로그·원천 검사·신청·인증·호출 엔진과 FILE·STD, data.go.kr REST, 검증된 외부 제공기관의 접근 경로.](docs/assets/odeduck-system-overview.png)
+
+<details>
+<summary>계획기·프로토콜·로컬 상태를 포함한 상세 구성</summary>
+
 ```text
 사람 ───────────────→ Cobra CLI ───────────────┐
                          │ catalog discover    │
@@ -32,6 +37,8 @@ AI host ── stdio MCP → MCP server ───────→ local catalog
 
 local state: catalog + optional semantic index | portal session + key | provider-scoped keys
 ```
+
+</details>
 
 MCP의 주 경로는 의도적으로 작다.
 
