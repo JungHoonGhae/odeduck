@@ -40,6 +40,9 @@ def icon(name,x,y,size=64,color=INK):
       'join':'<rect x="0" y="8" width="24" height="48" rx="4"/><rect x="40" y="8" width="24" height="48" rx="4"/><path d="M0 24 H24 M40 24 H64 M12 40 H52"/><circle cx="32" cy="40" r="8" fill="currentColor"/>',
       'review':'<rect x="8" y="0" width="40" height="52" rx="8"/><path d="M16 12 H36 M16 24 H28"/><circle cx="44" cy="44" r="16"/><path d="M36 44 L44 52 L56 36"/>',
       'report':'<path d="M8 4 H44 V60 H8 Z M44 12 H56 V52 H44 M16 16 H32 M16 28 H36 M16 48 V40 M24 48 V32 M32 48 V36"/>',
+      'price':'<path d="M4 28 L32 4 L60 28 M12 24 V60 H52 V24 M24 60 V40 H40 V60"/>',
+      'shops':'<path d="M8 8 H56 L64 28 H0 Z M8 28 V60 H56 V28 M24 60 V40 H40 V60 M16 8 L12 28 M32 8 V28 M48 8 L52 28"/>',
+      'soil':'<path d="M4 40 H60 M8 48 H24 M36 48 H56 M16 60 H48 M32 40 V24 M32 28 C8 28 8 8 8 8 C32 8 32 20 32 28 M32 24 C56 24 56 4 56 4 C32 4 32 16 32 24"/>',
     }
     return f'<g aria-hidden="true" transform="translate({x} {y}) scale({size/64})" color="{color}" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">{forms[name]}</g>'
 
@@ -185,7 +188,69 @@ def build_goal():
     write(s,'근거가 부족하면 다시 찾는 목표 실행','검색·검사한 원천을 연결·계산하고 근거를 검토하며, 근거가 부족하면 예산 안에서 재탐색하고 허용된 검토를 통과하면 결과와 출처를 반환하며 더 진행할 수 없으면 미완료로 남긴다.',480,b,'goal flow / editorial')
 
 
+def build_connections():
+    # A request example grounded in the recorded auction discovery evaluation.
+    # Branches represent data roles, not simultaneous execution or verified joins.
+    s = 'odeduck-unexpected-connections'
+    b = text(72, 80, '질문은 하나, 단서는 여러 분야에.', 40, 700)
+
+    # The manual frictions stay small; the user's question is the starting point.
+    for x, name, label in [
+        (72, 'catalog', '검색어부터 고민'),
+        (464, 'apply', '서비스마다 신청'),
+        (856, 'key', '인증키 복사·설정'),
+    ]:
+        b += node('friction-' + name, x, 120, 352, 56,
+                  icon(name, x + 12, 128, 32, MUTED)
+                  + text(x + 64, 156, label, 24, 500, MUTED))
+
+    b += text(72, 212, '오데덕에는, 알고 싶은 것을 말하세요.', 20, 600)
+    for x in (248, 640, 1032):
+        b += edge(s, f'M{x} 336 V392')
+        b += edge(s, f'M{x} 552 V600')
+    b += edge(s, 'M640 664 V720')
+
+    b += node('question', 72, 232, 1136, 104,
+              plate(72, 232, 1136, 104)
+              + icon('chat', 100, 256, 48)
+              + text(176, 272, '부산 공매 부동산을 살펴보고 싶어.', 28, 700)
+              + text(176, 312, '가격 말고 놓치기 쉬운 점도 찾아줘.', 28, 700)
+              + mascot(1072, 232, 104))
+
+    for x, name, title, perspective, unexpected in [
+        (72, 'price', '아파트 실거래가', '가격을 비교할 기준', False),
+        (464, 'shops', '상권 변화', '주변 수요를 볼 단서', True),
+        (856, 'soil', '토양오염 조사', '환경을 확인할 단서', True),
+    ]:
+        fill, ink = (INK, CREAM) if unexpected else (CREAM, INK)
+        b += node(name, x, 392, 352, 160,
+                  plate(x, 392, 352, 160, fill)
+                  + text(x + 28, 424, '뜻밖의 연결 후보' if unexpected else '먼저 떠올릴 자료',
+                         16, 500, ink)
+                  + icon(name, x + 28, 448, 48, ink)
+                  + text(x + 96, 484, title, 28, 700, ink)
+                  + text(x + 28, 524, perspective, 20, 500, ink))
+
+    b += node('access', 72, 600, 1136, 64,
+              plate(72, 600, 1136, 64)
+              + icon('key', 104, 616, 32)
+              + text(160, 640, '필요한 API마다  신청 · 승인 확인 · 키 입력 · 조회', 24, 600))
+    b += node('perspectives', 72, 720, 1136, 112,
+              plate(72, 720, 1136, 112)
+              + icon('report', 104, 748, 48)
+              + text(184, 764, '함께 볼 자료 + 연결 이유 + 출처', 28, 700)
+              + text(184, 804, '가격을 넘어, 상권과 환경까지 살펴볼 관점', 20, 500, MUTED))
+    b += text(72, 880, '발견 기록을 바탕으로 한 요청 예시 · 연결 전 지역·기간·대상 확인',
+              20, 500, MUTED)
+    write(s, '한 질문에서 예상 밖의 연결까지',
+          '공매 부동산을 살펴보려는 질문에서 실거래가와 함께 부산 상권 변화, 토양오염 조사 자료를 연결 후보로 찾는다. '
+          '필요한 API는 신청과 승인 확인, 인증키 입력을 거쳐 조회하고 함께 검토할 관점과 출처를 얻는다. '
+          '가지들은 동시 실행이나 실제 데이터 결합의 완료를 뜻하지 않으며 지역·기간·대상 확인이 필요하다.',
+          928, b, 'request-to-discovery flow / doc-wide / branded variation')
+
+
 DIAGRAMS = {
+    'unexpected-connections': build_connections,
     'api-workflow': build_workflow,
     'system-overview': build_architecture,
     'goal-flow': build_goal,
@@ -196,7 +261,7 @@ def main():
     global OUT, FETCH_FONTS
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('diagrams', nargs='*', metavar='NAME',
-                        help='api-workflow, system-overview, goal-flow (default: all)')
+                        help=', '.join(DIAGRAMS) + ' (default: all)')
     parser.add_argument('--output-dir', type=Path, default=OUT,
                         help='HTML output directory (default: repository docs/assets)')
     parser.add_argument('--fetch-fonts', action='store_true',

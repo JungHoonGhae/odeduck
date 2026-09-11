@@ -1,0 +1,277 @@
+{
+  "purpose": "Source checks for the README request example. Not a new blind discovery evaluation.",
+  "records": [
+    {
+      "pk": "15126469",
+      "name": "국토교통부_아파트 매매 실거래가 자료",
+      "observedAt": "2026-09-11T15:27:14.613136+00:00",
+      "delivery": "REST",
+      "deliveries": [
+        "API"
+      ],
+      "operations": [
+        {
+          "name": "아파트 매매 실거래가 공개 자료",
+          "endpoint": "https://apis.data.go.kr/1613000/RTMSDataSvcAptTrade/getRTMSDataSvcAptTrade",
+          "params": [
+            {
+              "name": "LAWD_CD",
+              "required": "필수",
+              "sample": "",
+              "desc": "지역코드, 각 지역별 코드 행정표준코드관리시스템(www.code.go.kr)의 법정동코드 10자리 중 앞 5자리"
+            },
+            {
+              "name": "DEAL_YMD",
+              "required": "필수",
+              "sample": "",
+              "desc": "계약월, 실거래 자료의 계약년월(6자리)"
+            },
+            {
+              "name": "serviceKey",
+              "required": "필수",
+              "sample": "",
+              "desc": "공공데이터포털에서 요청하는 인증키"
+            }
+          ],
+          "contractKind": "official_swagger"
+        }
+      ],
+      "evidence": [
+        {
+          "purpose": "dataset-operation-metadata",
+          "kind": "official_catalog_file",
+          "url": "https://www.data.go.kr/data/15062804/fileData.do",
+          "stability": "documented"
+        },
+        {
+          "purpose": "detail-and-required-parameters",
+          "kind": "first_party_web_contract",
+          "url": "https://www.data.go.kr/data/15126469/openapi.do",
+          "stability": "fallback"
+        }
+      ],
+      "scope": "Metadata/operation inspection, not an authenticated API response or verified join.",
+      "approval": {
+        "dev": "자동승인",
+        "ops": "자동승인",
+        "raw": "개발단계 : 자동승인 / 운영단계 : 자동승인"
+      }
+    },
+    {
+      "pk": "15095252",
+      "name": "부산광역시_상권 변화지표정보서비스",
+      "observedAt": "2026-09-11T15:29:16.144387+00:00",
+      "delivery": "REST",
+      "deliveries": [
+        "API"
+      ],
+      "operations": [
+        {
+          "name": "부산 상권 변화지표정보",
+          "endpoint": "https://apis.data.go.kr/6260000/BusanCommercialChangeService/getCommercialChangeList",
+          "params": [
+            {
+              "name": "serviceKey",
+              "required": "필",
+              "sample": "인증키 (URL Encode)",
+              "desc": "공공데이터포털에서 받은 인증키"
+            },
+            {
+              "name": "pageNo",
+              "required": "필",
+              "sample": "1",
+              "desc": "페이지번호"
+            },
+            {
+              "name": "numOfRows",
+              "required": "필",
+              "sample": "10",
+              "desc": "한 페이지 결과 수"
+            },
+            {
+              "name": "resultType",
+              "required": "옵",
+              "sample": "json",
+              "desc": "JSON방식으로 호출 시 파라미터 resultType=json 입력"
+            }
+          ],
+          "contractKind": "first_party_web_contract"
+        }
+      ],
+      "evidence": [
+        {
+          "purpose": "dataset-operation-metadata",
+          "kind": "official_catalog_file",
+          "url": "https://www.data.go.kr/data/15062804/fileData.do",
+          "stability": "documented"
+        },
+        {
+          "purpose": "detail-and-required-parameters",
+          "kind": "first_party_web_contract",
+          "url": "https://www.data.go.kr/data/15095252/openapi.do",
+          "stability": "fallback"
+        }
+      ],
+      "scope": "Metadata/operation inspection, not an authenticated API response or verified join.",
+      "approval": {
+        "dev": "자동승인",
+        "ops": "자동승인",
+        "raw": "개발단계 : 자동승인 / 운영단계 : 자동승인"
+      }
+    },
+    {
+      "pk": "15054850",
+      "name": "부산광역시_부산지역 토양오염실태조사 초과지역현황",
+      "observedAt": "2026-09-11T15:29:19.981820+00:00",
+      "delivery": "FILE",
+      "deliveries": [
+        "API",
+        "FILE"
+      ],
+      "operations": [
+        {
+          "name": "부산광역시_부산지역 토양오염실태조사 초과지역현황_20251231",
+          "endpoint": "https://api.odcloud.kr/api/15054850/v1/uddi:04790515-dd04-4197-aac8-c08293228cb0",
+          "params": [
+            {
+              "name": "page",
+              "required": "옵션",
+              "sample": "",
+              "desc": "page index"
+            },
+            {
+              "name": "perPage",
+              "required": "옵션",
+              "sample": "",
+              "desc": "page size"
+            },
+            {
+              "name": "returnType",
+              "required": "옵션",
+              "sample": "",
+              "desc": "응답의 데이터 타입을 선택할 수 있습니다. (기본값: JSON)<br/>XML형태의 응답결과를 얻기 위해서는 XML 값으로 설정"
+            }
+          ],
+          "contractKind": "official_swagger"
+        },
+        {
+          "name": "부산광역시_부산지역 토양오염실태조사 초과지역현황_20221231",
+          "endpoint": "https://api.odcloud.kr/api/15054850/v1/uddi:586c3f06-2a9e-4877-a228-f3fd19222ea7",
+          "params": [
+            {
+              "name": "page",
+              "required": "옵션",
+              "sample": "",
+              "desc": "page index"
+            },
+            {
+              "name": "perPage",
+              "required": "옵션",
+              "sample": "",
+              "desc": "page size"
+            },
+            {
+              "name": "returnType",
+              "required": "옵션",
+              "sample": "",
+              "desc": "응답의 데이터 타입을 선택할 수 있습니다. (기본값: JSON)<br/>XML형태의 응답결과를 얻기 위해서는 XML 값으로 설정"
+            }
+          ],
+          "contractKind": "official_swagger"
+        },
+        {
+          "name": "부산광역시_부산지역 토양오염실태조사 초과지역현황_20241231",
+          "endpoint": "https://api.odcloud.kr/api/15054850/v1/uddi:8b735423-a02c-4b50-8ed0-e57b21627a35",
+          "params": [
+            {
+              "name": "page",
+              "required": "옵션",
+              "sample": "",
+              "desc": "page index"
+            },
+            {
+              "name": "perPage",
+              "required": "옵션",
+              "sample": "",
+              "desc": "page size"
+            },
+            {
+              "name": "returnType",
+              "required": "옵션",
+              "sample": "",
+              "desc": "응답의 데이터 타입을 선택할 수 있습니다. (기본값: JSON)<br/>XML형태의 응답결과를 얻기 위해서는 XML 값으로 설정"
+            }
+          ],
+          "contractKind": "official_swagger"
+        },
+        {
+          "name": "부산광역시_부산지역 토양오염실태조사 초과지역현황_20231231",
+          "endpoint": "https://api.odcloud.kr/api/15054850/v1/uddi:99661fec-568d-4b54-8427-c9f658eb0bd3",
+          "params": [
+            {
+              "name": "page",
+              "required": "옵션",
+              "sample": "",
+              "desc": "page index"
+            },
+            {
+              "name": "perPage",
+              "required": "옵션",
+              "sample": "",
+              "desc": "page size"
+            },
+            {
+              "name": "returnType",
+              "required": "옵션",
+              "sample": "",
+              "desc": "응답의 데이터 타입을 선택할 수 있습니다. (기본값: JSON)<br/>XML형태의 응답결과를 얻기 위해서는 XML 값으로 설정"
+            }
+          ],
+          "contractKind": "official_swagger"
+        }
+      ],
+      "evidence": [
+        {
+          "purpose": "operation-and-parameter-contract",
+          "kind": "official_swagger",
+          "url": "https://infuser.odcloud.kr/oas/docs?namespace=15054850/v1",
+          "stability": "documented"
+        },
+        {
+          "purpose": "detail-and-required-parameters",
+          "kind": "first_party_web_contract",
+          "url": "https://www.data.go.kr/data/15054850/fileData.do",
+          "stability": "fallback"
+        }
+      ],
+      "scope": "Metadata/operation inspection, not an authenticated API response or verified join.",
+      "fileObservation": {
+        "sha256": "8ff7d61d2032dd0d62f06fb4180e463c723efa1153ca1a2d5c347e606ba9cabd",
+        "bytes": 688,
+        "files": [
+          {
+            "name": "부산광역시_부산지역 토양오염실태조사 초과지역현황_20251231.csv",
+            "format": "CSV",
+            "columns": [
+              "연번",
+              "조사지역 종류",
+              "조사지역명",
+              "시도",
+              "시군구",
+              "읍면동",
+              "지번",
+              "토지지목",
+              "지역구분",
+              "면적(제곱미터)",
+              "조사일자",
+              "시료깊이(미터)",
+              "조사항목",
+              "오염도"
+            ],
+            "sampleRows": 5
+          }
+        ]
+      }
+    }
+  ]
+}

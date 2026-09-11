@@ -5,11 +5,12 @@ README 다이어그램의 **편집 소스·HTML·PNG·글꼴·출력 도구를 �
 
 | 그림 | 브라우저에서 열기 | README·발표 자료에 사용 | 편집할 함수 |
 | --- | --- | --- | --- |
+| 한 질문에서 예상 밖의 연결까지 | [HTML](odeduck-unexpected-connections.html) | [PNG](odeduck-unexpected-connections.png) | `build_connections()` |
 | 탐색부터 신청·호출까지 | [HTML](odeduck-api-workflow.html) | [PNG](odeduck-api-workflow.png) | `build_workflow()` |
 | 전체 아키텍처 | [HTML](odeduck-system-overview.html) | [PNG](odeduck-system-overview.png) | `build_architecture()` |
 | 목표 기반 연결·분석 | [HTML](odeduck-goal-flow.html) | [PNG](odeduck-goal-flow.png) | `build_goal()` |
 
-세 함수는 [`scripts/diagrams/build.py`](../../scripts/diagrams/build.py)에 있다.
+각 함수는 [`scripts/diagrams/build.py`](../../scripts/diagrams/build.py)에 있다.
 문구·좌표·아이콘·연결선을 여기서 수정한다. HTML에는 SVG와 Pretendard가 내장되어 있어
 다운로드한 파일을 브라우저에서 바로 열 수 있다. HTML과 PNG는 생성 결과이므로,
 수정 사항을 계속 유지하려면 편집 소스에 반영한다.
@@ -42,7 +43,7 @@ README 다이어그램의 **편집 소스·HTML·PNG·글꼴·출력 도구를 �
    ```
 
 편집 소스와 변경된 HTML·PNG를 함께 커밋한다. 한 그림만 작업할 때는 두 명령 뒤에
-`api-workflow`, `system-overview`, `goal-flow` 중 하나를 붙인다.
+`unexpected-connections`, `api-workflow`, `system-overview`, `goal-flow` 중 하나를 붙인다.
 `--help`에서 출력 폴더와 PNG 배율 옵션을 볼 수 있다.
 Windows에서는 가상환경 실행 파일이 `.venv/Scripts/python.exe`에 있다.
 
@@ -66,10 +67,12 @@ python3 scripts/diagrams/build.py --fetch-fonts
 - 활용신청·승인 확인·인증키 주입·호출, CLI/MCP의 공통 엔진, FILE/STD의 별도 관찰 경로를 보존한다.
   기관의 심의승인과 실험적 목표 실행의 한계는 README 설명과 맞춘다.
 - README에서 소개 애니메이션과 핵심 기능·전체 아키텍처를 계속 펼쳐 둔다.
+- 연결 예시는 [실제 발견 기록과 원천 확인](../research/connection-discovery-evaluation.md#readme-연결-예시--2026-09-12)에 근거한다.
+  가지는 필요한 데이터 역할을 뜻한다. 동시 실행·결합 성공·투자 판단의 완료로 표현하지 않는다.
 
 ## 기존 소개·홍보 자료
 
 [소개 GIF](odeduck-hero.gif), [영상](odeduck-hero.mp4), [포스터](odeduck-hero-poster.webp),
 [소셜 미리보기 SVG](odeduck-social-preview.svg)도 이 폴더에 보관한다.
 소개 영상의 제작 기록은 [홍보 영상 문서](../promo/odeduck-agent-explainer.md)에 있다.
-위 생성·출력 명령은 새 다이어그램 3개만 다룬다.
+위 생성·출력 명령은 목록의 다이어그램 4개만 다룬다.
