@@ -17,7 +17,7 @@ HERE = Path(__file__).resolve().parent
 OUT=ROOT/'docs/assets'
 CREAM='#F7F3EB'; INK='#151513'; MUTED='#625F57'
 font_css = (HERE / 'fonts/pretendard-dynamic.css').read_text(encoding='utf-8')
-license_text = (HERE / 'fonts/OFL.txt').read_text(encoding='utf-8').replace('--', '—')
+license_text = (HERE / 'fonts/OFL.txt').read_text(encoding='utf-8').rstrip().replace('--', '—')
 cache = HERE / 'fonts'
 FETCH_FONTS = False
 FONT_BASE_URL = 'https://raw.githubusercontent.com/orioncactus/pretendard/v1.3.9/packages/pretendard/dist/web/variable/'
