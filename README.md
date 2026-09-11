@@ -6,9 +6,9 @@
 <h1 align="center">오데덕</h1>
 
 <p align="center">
-  <strong>오</strong> — 오픈API라며.<br>
-  <strong>데</strong> — 데이터 달랬더니 신청서를 줌.<br>
-  <strong>덕</strong> — 덕후를 보냈더니 데이터를 가져옴.
+  <strong>오</strong> — 오픈API라면서요.<br>
+  <strong>데</strong> — 데이터 받는데 신청서를 쓰래요.<br>
+  <strong>덕</strong> — 덕후는 이게 좋대요. 아, 그럼 얘 시키면 되겠네.
 </p>
 
 <p align="center"><strong>공공데이터 덕후, 오.데.덕.</strong></p>
