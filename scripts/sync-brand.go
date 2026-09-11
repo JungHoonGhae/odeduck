@@ -25,16 +25,21 @@ const (
 )
 
 type brand struct {
-	DisplayName     string `json:"displayName"`
-	Tagline         string `json:"tagline"`
-	Proofline       string `json:"proofline"`
-	LogoPath        string `json:"logoPath"`
-	LogoAlt         string `json:"logoAlt"`
-	TechnicalName   string `json:"technicalName"`
-	Command         string `json:"command"`
-	Repository      string `json:"repository"`
-	ModulePath      string `json:"modulePath"`
-	ConfigDirectory string `json:"configDirectory"`
+	DisplayName     string         `json:"displayName"`
+	Tagline         string         `json:"tagline"`
+	Acrostic        []acrosticLine `json:"acrostic"`
+	LogoPath        string         `json:"logoPath"`
+	LogoAlt         string         `json:"logoAlt"`
+	TechnicalName   string         `json:"technicalName"`
+	Command         string         `json:"command"`
+	Repository      string         `json:"repository"`
+	ModulePath      string         `json:"modulePath"`
+	ConfigDirectory string         `json:"configDirectory"`
+}
+
+type acrosticLine struct {
+	Syllable string `json:"syllable"`
+	Text     string `json:"text"`
 }
 
 func main() {
@@ -88,7 +93,6 @@ func loadBrand(path string) (brand, error) {
 	fields := map[string]string{
 		"displayName":     configuration.DisplayName,
 		"tagline":         configuration.Tagline,
-		"proofline":       configuration.Proofline,
 		"logoPath":        configuration.LogoPath,
 		"logoAlt":         configuration.LogoAlt,
 		"technicalName":   configuration.TechnicalName,
@@ -101,6 +105,16 @@ func loadBrand(path string) (brand, error) {
 		if strings.TrimSpace(value) == "" {
 			return brand{}, fmt.Errorf("brand field %q is required", name)
 		}
+	}
+	var name strings.Builder
+	for _, line := range configuration.Acrostic {
+		if len([]rune(line.Syllable)) != 1 || strings.TrimSpace(line.Text) == "" {
+			return brand{}, errors.New("each acrostic line requires one syllable and nonempty text")
+		}
+		name.WriteString(line.Syllable)
+	}
+	if name.String() != configuration.DisplayName {
+		return brand{}, errors.New("acrostic syllables must spell displayName")
 	}
 	return configuration, nil
 }
@@ -149,6 +163,10 @@ func syncBlock(path, start, end string, generated []byte, check bool) error {
 
 func render(configuration brand) []byte {
 	escape := html.EscapeString
+	lines := make([]string, 0, len(configuration.Acrostic))
+	for _, line := range configuration.Acrostic {
+		lines = append(lines, fmt.Sprintf("  <strong>%s</strong> — %s", escape(line.Syllable), escape(line.Text)))
+	}
 	return []byte(fmt.Sprintf(`%s
 <p align="center">
   <img src="%s" width="190" alt="%s">
@@ -156,15 +174,18 @@ func render(configuration brand) []byte {
 
 <h1 align="center">%s</h1>
 
-<p align="center"><em>%s</em></p>
-<p align="center">%s</p>
+<p align="center">
+%s
+</p>
+
+<p align="center"><strong>%s</strong></p>
 %s`,
 		startMarker,
 		escape(configuration.LogoPath),
 		escape(configuration.LogoAlt),
 		escape(configuration.DisplayName),
+		strings.Join(lines, "<br>\n"),
 		escape(configuration.Tagline),
-		escape(configuration.Proofline),
 		endMarker,
 	))
 }

@@ -9,6 +9,10 @@ section matching a `vX.Y.Z` tag as the GitHub release notes.
 
 ### Changed
 
+- Introduce odeduck with an 오·데·덕 acrostic in the README and repository
+  description. Keep the editable copy in the brand configuration and preserve
+  the visible introduction animation and product diagrams.
+
 - Give the manual search, application and query setup bottlenecks their own README
   slide. Introduce odeduck as the helper who finds, applies for and retrieves public
   data, and explain experimental analysis with an explicitly fictional auction
