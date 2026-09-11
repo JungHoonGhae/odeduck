@@ -5,8 +5,13 @@
 
 <h1 align="center">오데덕</h1>
 
-<p align="center"><em>오픈데이터 덕후, 오데덕.</em></p>
-<p align="center">공공데이터는 오데덕에게 맡기세요. 찾고, 신청하고, 가져옵니다.</p>
+<p align="center">
+  <strong>오</strong> — 오픈API라며.<br>
+  <strong>데</strong> — 데이터 달랬더니 신청서를 줌.<br>
+  <strong>덕</strong> — 덕후를 보냈더니 데이터를 가져옴.
+</p>
+
+<p align="center"><strong>공공데이터 덕후, 오.데.덕.</strong></p>
 <!-- brand:end -->
 
 <!-- Keep the introduction animation visible. Core capabilities and architecture must also remain visible, not collapsed. -->
