@@ -9,7 +9,7 @@ import xml.etree.ElementTree as ET
 import re
 
 ASSETS = Path(__file__).resolve().parents[2] / 'docs/assets'
-DIAGRAMS = ('unexpected-connections', 'api-workflow', 'system-overview', 'goal-flow')
+DIAGRAMS = ('manual-bottlenecks', 'unexpected-connections', 'api-workflow', 'system-overview', 'goal-flow')
 
 GEOMETRY = """() => {
   const box = e => {

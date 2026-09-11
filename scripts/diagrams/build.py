@@ -172,39 +172,97 @@ def build_architecture():
     write(s,'CLI와 MCP가 공유하는 오데덕 아키텍처','사람의 CLI와 AI 에이전트의 MCP가 공통 Go 엔진의 카탈로그와 원천 검사를 사용하고, 파일·표준데이터는 직접 관찰하며 API는 신청·인증·호출을 거쳐 data.go.kr REST 또는 검증된 외부 제공기관에 접근한다.',720,b,'architecture / doc-wide')
 
 
+def build_bottlenecks():
+    # Manual user journey, not measured time savings or a claim of distinct keys per API.
+    s = 'odeduck-manual-bottlenecks'
+    b = text(72, 80, '공공데이터를 직접 찾아 쓰려면', 24, 600, MUTED)
+    b += text(72, 140, '가격 비교를 하려는데, 준비부터 막힙니다.', 40, 700)
+    b += mascot(1096, 56, 104)
+    b += edge(s, 'M424 388 H464') + edge(s, 'M816 388 H856')
+
+    search = plate(72, 200, 352, 344)
+    search += text(104, 248, '01  검색어부터 막힘', 28, 700)
+    search += plate(100, 280, 296, 64) + icon('inspect', 116, 296, 32)
+    search += text(164, 320, '경매? 공매? 매각?', 24, 600)
+    search += edge(s, 'M348 344 V376 A8 8 0 0 1 340 384 H164 A8 8 0 0 1 156 376 V344', dashed=True)
+    search += text(248, 428, '검색어 바꾸고, 다시 찾고', 24, 500, INK, 'middle')
+    search += text(248, 500, '있는 줄도 모르면 놓칩니다', 24, 700, INK, 'middle')
+    b += node('search-friction', 72, 200, 352, 344, search)
+
+    apply = plate(464, 200, 352, 344)
+    apply += text(496, 248, '02  서비스마다 반복', 28, 700)
+    for y, name in [(280, 'API A'), (340, 'API B'), (400, 'API C')]:
+        apply += icon('apply', 496, y + 8, 32)
+        apply += text(544, y + 32, name, 24, 700)
+        apply += text(636, y + 32, '신청 → 승인 확인', 20, 500)
+    apply += text(640, 500, '필요한 서비스마다 따로 신청', 24, 700, INK, 'middle')
+    b += node('application-friction', 464, 200, 352, 344, apply)
+
+    access = plate(856, 200, 352, 344)
+    access += text(888, 248, '03  승인 후에도 설정', 28, 700)
+    for y, name, label in [(284, 'key', '인증키 복사'), (348, 'inspect', '입력 방식 확인'), (412, 'call', '호출 설정')]:
+        access += icon(name, 896, y, 36) + text(956, y + 28, label, 28, 600)
+    access += text(1032, 500, '첫 조회까지 직접 챙깁니다', 24, 700, INK, 'middle')
+    b += node('access-friction', 856, 200, 352, 344, access)
+
+    b += node('repeat', 72, 584, 1136, 88,
+              plate(72, 584, 1136, 88, INK)
+              + text(640, 640, '자료가 하나 더 필요하면, 이 절차도 한 번 더.', 32, 700, CREAM, 'middle'))
+    write(s, '비교를 시작하기 전에 반복하는 공공데이터 이용 절차',
+          '검색어를 바꾸며 자료를 찾고, 필요한 미신청 API마다 활용신청과 승인 확인을 반복한 뒤 인증키 입력 방식과 호출을 직접 설정해야 하므로 여러 자료를 비교하기 전에 준비 작업이 쌓인다.',
+          720, b, 'manual user journey / slide-16x9 / branded variation')
+
+
 def build_goal():
-    # 3. Experimental goal loop: fewer words, no claim of generic autonomous completion.
-    s='odeduck-goal-flow'
-    b=text(72,72,'목표 기반 연결·분석',16,700)+text(72,128,'근거가 부족하면, 다시 찾는다.',40,700)
-    b+=plate(1024,64,184,48)+text(1116,96,'실험 기능',20,700,INK,'middle')
-    b+=edge(s,'M232 264 H416')+edge(s,'M512 264 H704')+edge(s,'M800 264 H1024')
-    b+=edge(s,'M752 224 V192 A8 8 0 0 0 744 184 H192 A8 8 0 0 0 184 192 V224',dashed=True)
-    b+=edge(s,'M752 344 V384',dashed=True)
-    b+=f'<g data-label="replan"><rect x="412" y="148" width="112" height="28" fill="{CREAM}"/>'+text(468,168,'재탐색',20,600,INK,'middle')+'</g>'
-    b+=f'<g data-label="pass"><rect x="880" y="224" width="64" height="32" fill="{CREAM}"/>'+text(912,248,'통과',20,600,INK,'middle')+'</g>'
-    for x,name,label in [(184,'inspect','검색·검사'),(464,'join','연결·계산'),(752,'review','근거 검토'),(1072,'report','결과와 출처')]:
-        b+=node(name,x-104,224,208,120,icon(name,x-36,228,72)+text(x,336,label,28,700,INK,'middle'))
-    b+=node('incomplete',668,384,168,48,plate(668,384,168,48)+text(752,416,'미완료',24,600,INK,'middle'))
-    write(s,'근거가 부족하면 다시 찾는 목표 실행','검색·검사한 원천을 연결·계산하고 근거를 검토하며, 근거가 부족하면 예산 안에서 재탐색하고 허용된 검토를 통과하면 결과와 출처를 반환하며 더 진행할 수 없으면 미완료로 남긴다.',480,b,'goal flow / editorial')
+    # Explain the output with a clearly fictional table, not an end-to-end success claim.
+    s = 'odeduck-goal-flow'
+    b = text(72, 72, '찾은 자료로 비교표 만들기 · 실험 기능', 24, 600, MUTED)
+    b += text(72, 128, '이 공매 아파트, 비슷한 거래보다 싼가?', 40, 700)
+    b += mascot(1096, 48, 104)
+    b += text(72, 176, '작동 방식을 설명하는 가상 예시', 24, 500, MUTED)
+
+    b += edge(s, 'M344 320 V368') + edge(s, 'M936 320 V368')
+    b += edge(s, 'M640 448 V504')
+    for x, name, label, fields in [
+        (72, 'price', '공매 물건', '최소입찰가 · 주소 · 면적'),
+        (664, 'catalog', '실거래 기록', '거래금액 · 주소 · 면적 · 거래일'),
+    ]:
+        b += node(name, x, 216, 544, 104,
+                  plate(x, 216, 544, 104)
+                  + icon(name, x + 24, 244, 48)
+                  + text(x + 96, 260, label, 32, 700)
+                  + text(x + 96, 300, fields, 24, 500, MUTED))
+
+    b += node('match', 72, 368, 1136, 80,
+              plate(72, 368, 1136, 80, INK)
+              + icon('join', 100, 388, 40, CREAM)
+              + text(176, 420, '단지 · 면적 · 거래 시점을 맞춰, 비교할 거래를 고릅니다', 28, 700, CREAM))
+
+    table = plate(72, 504, 1136, 216)
+    for x, label in [(104, '공매 물건'), (344, '최소입찰가'), (608, '비교 거래가'), (904, '자료 확인')]:
+        table += text(x, 548, label, 24, 600, MUTED)
+    table += f'<path d="M96 568 H1184 M96 640 H1184" stroke="{MUTED}" stroke-width="1"/>'
+    for y, values in [(616, ['물건 A', '3억 원', '3.4억 원', '비교 자료 있음']),
+                      (688, ['물건 B', '2억 원', '—', '비교 자료 부족'])]:
+        for x, value in zip([104, 344, 608, 904], values):
+            table += text(x, y, value, 28, 700)
+    b += node('comparison', 72, 504, 1136, 216, table)
+    b += text(72, 768, '표와 함께  사용한 출처 · 비교 조건 · 확인하지 못한 부분을 남깁니다', 28, 600)
+    b += text(72, 816, '맞는 자료가 없으면 다시 찾고, 끝내 찾지 못한 부분은 미완료로 남깁니다.', 24, 500, MUTED)
+    write(s, '공매 가격과 실거래가로 비교표를 만드는 실험 기능',
+          '설명용 가상 예시에서 공매 물건과 실거래 기록의 단지·면적·거래 시점을 맞춰 가격을 나란히 놓고, 비교에 쓴 출처와 조건 및 맞는 거래를 찾지 못한 물건을 함께 표시하며 부족한 자료는 다시 찾거나 미완료로 남긴다.',
+          864, b, 'data comparison / doc-wide / fictional worked example')
 
 
 def build_connections():
     # A request example grounded in the recorded auction discovery evaluation.
     # Branches represent data roles, not simultaneous execution or verified joins.
     s = 'odeduck-unexpected-connections'
-    b = text(72, 80, '질문은 하나, 단서는 여러 분야에.', 40, 700)
+    b = text(72, 80, '공공데이터는 오데덕에게 맡기세요.', 40, 700)
+    b += mascot(1096, 40, 104)
 
-    # The manual frictions stay small; the user's question is the starting point.
-    for x, name, label in [
-        (72, 'catalog', '검색어부터 고민'),
-        (464, 'apply', '서비스마다 신청'),
-        (856, 'key', '인증키 복사·설정'),
-    ]:
-        b += node('friction-' + name, x, 120, 352, 56,
-                  icon(name, x + 12, 128, 32, MUTED)
-                  + text(x + 64, 156, label, 24, 500, MUTED))
-
-    b += text(72, 212, '오데덕에는, 알고 싶은 것을 말하세요.', 20, 600)
+    # Pain now has its own first slide; this slide starts with the user's goal.
+    b += text(72, 144, '자료 이름을 몰라도, 이렇게 맡겨보세요.', 28, 600)
     for x in (248, 640, 1032):
         b += edge(s, f'M{x} 336 V392')
         b += edge(s, f'M{x} 552 V600')
@@ -213,9 +271,8 @@ def build_connections():
     b += node('question', 72, 232, 1136, 104,
               plate(72, 232, 1136, 104)
               + icon('chat', 100, 256, 48)
-              + text(176, 272, '부산 공매 부동산을 살펴보고 싶어.', 28, 700)
-              + text(176, 312, '가격 말고 놓치기 쉬운 점도 찾아줘.', 28, 700)
-              + mascot(1072, 232, 104))
+              + text(176, 272, '싸게 나온 부산 공매 부동산, 정말 싼 걸까?', 28, 700)
+              + text(176, 312, '비교할 가격과 놓치기 쉬운 위험을 찾아줘.', 28, 700))
 
     for x, name, title, perspective, unexpected in [
         (72, 'price', '아파트 실거래가', '가격을 비교할 기준', False),
@@ -234,7 +291,7 @@ def build_connections():
     b += node('access', 72, 600, 1136, 64,
               plate(72, 600, 1136, 64)
               + icon('key', 104, 616, 32)
-              + text(160, 640, '필요한 API마다  신청 · 승인 확인 · 키 입력 · 조회', 24, 600))
+              + text(160, 640, '오데덕이  활용신청 · 승인 확인 · 인증키 자동 입력 · 조회', 28, 600))
     b += node('perspectives', 72, 720, 1136, 112,
               plate(72, 720, 1136, 112)
               + icon('report', 104, 748, 48)
@@ -250,6 +307,7 @@ def build_connections():
 
 
 DIAGRAMS = {
+    'manual-bottlenecks': build_bottlenecks,
     'unexpected-connections': build_connections,
     'api-workflow': build_workflow,
     'system-overview': build_architecture,
