@@ -1,7 +1,7 @@
 {
   "displayName": "오데덕",
   "tagline": "오픈데이터 덕후, 오데덕.",
-  "proofline": "질문에서 서로 먼 데이터를 찾고, 활용신청부터 호출까지 잇는 CLI + MCP입니다.",
+  "proofline": "질문에서 서로 먼 데이터를 찾고, 활용신청부터 데이터 조회까지 이어갑니다.",
   "logoPath": "docs/assets/brand-symbol.svg",
   "logoAlt": "흩어진 공공데이터의 연결을 찾는 오데덕 캐릭터",
   "technicalName": "odeduck",

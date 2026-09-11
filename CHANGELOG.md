@@ -9,6 +9,10 @@ section matching a `vX.Y.Z` tag as the GitHub release notes.
 
 ### Changed
 
+- Rewrite the README for people using odeduck: lead with everyday questions, setup
+  and application-to-query steps. Move advanced options, verification records and
+  maintainer resources to linked guides; keep the introduction and all three diagrams visible.
+
 - Put automatic application, approval checking, key injection and API calling back
   in the main README reading path. Add a shared CLI/MCP architecture overview and
   redraw the goal loop using the existing cream-and-ink illustration style,
