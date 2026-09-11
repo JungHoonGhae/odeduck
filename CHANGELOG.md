@@ -9,6 +9,11 @@ section matching a `vX.Y.Z` tag as the GitHub release notes.
 
 ### Changed
 
+- Give the manual search, application and query setup bottlenecks their own README
+  slide. Introduce odeduck as the helper who finds, applies for and retrieves public
+  data, and explain experimental analysis with an explicitly fictional auction
+  price comparison instead of an abstract execution loop.
+
 - Lead the README with search, application and key-handling friction, then show
   how one auction question can surface transaction, commercial-area and soil
   data. Preserve the established brand and source assets, and distinguish
