@@ -14,6 +14,11 @@ section matching a `vX.Y.Z` tag as the GitHub release notes.
   goal-flow diagram that distinguishes replanning, reviewed output and incomplete
   results, while keeping the experimental v0.19.0 boundaries visible.
 
+### Fixed
+
+- Keep the introduction animation visible below the README brand header without
+  requiring readers to open a disclosure section.
+
 ## [0.19.0] - 2026-09-09
 
 Start with a goal, inspect the actual sources, execute bounded analyses and review

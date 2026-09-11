@@ -9,17 +9,13 @@
 <p align="center">키워드를 몰라도 질문에서 출발해, 서로 먼 공공데이터를 찾고 연결하는 CLI + MCP입니다.</p>
 <!-- brand:end -->
 
-<details>
-<summary>오데덕 소개 영상 보기</summary>
-
+<!-- Always show the introduction animation; do not collapse or remove this block. -->
 <p align="center">
   <a href="docs/assets/odeduck-hero.mp4"><img src="docs/assets/odeduck-hero.gif" width="800" alt="안경을 쓰지 않은 아주 작은 오데덕이 거대한 캐비닛 사이를 뛰어다니며 서로 떨어진 공공데이터를 찾아 하나의 연결망으로 잇는 애니메이션"></a>
 </p>
 <p align="center">
   <sub>서로 상관없어 보이는 조각도, 함께 보면 질문의 나머지가 된다. · <a href="docs/assets/odeduck-hero.mp4">원본 영상</a></sub>
 </p>
-
-</details>
 
 <p align="center">
   <img src="https://img.shields.io/badge/works%20with-Codex%20%C2%B7%20Claude%20%C2%B7%20Gemini%20%C2%B7%20Cursor-111111?style=flat-square" alt="Works with Codex, Claude, Gemini, and Cursor">
