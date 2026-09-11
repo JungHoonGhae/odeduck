@@ -9,6 +9,11 @@ section matching a `vX.Y.Z` tag as the GitHub release notes.
 
 ### Changed
 
+- Put automatic application, approval checking, key injection and API calling back
+  in the main README reading path. Add a shared CLI/MCP architecture overview and
+  redraw the goal loop using the existing cream-and-ink illustration style,
+  Pretendard labels and the original character, with fewer words inside diagrams.
+
 - Guide README readers through installation, first search, agent setup and a first
   question, with explicit checkpoints and folded advanced details. Add a Pretendard
   goal-flow diagram that distinguishes replanning, reviewed output and incomplete
