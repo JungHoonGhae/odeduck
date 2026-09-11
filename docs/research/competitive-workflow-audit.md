@@ -4,6 +4,63 @@
 대상: 공개 GitHub 저장소와 공공데이터포털의 공식 페이지
 판정 기준: README의 표현보다 해당 커밋의 MCP tool 등록, 검색 구현, 인증키 주입, HTTP 호출 코드를 우선했다.
 
+## 2026-09-12 재확인
+
+README 개편을 위해 공개 MCP와 CLI의 최신 기본 브랜치를 다시 조회하고, 아래 커밋의 문서와
+검색·구조 조회·키 처리 코드를 읽었다. 경쟁 도구를 설치하거나 개인 키로 호출하지 않았다.
+원격 서비스의 현재 가용성, 공개하지 않은 기능, 전체 시장의 부재까지 검증한 결과는 아니다.
+
+**사전 준비된 목록과 파일 지원이 다른 MCP에 없다는 가정은 틀리다.** 목록에 FILE 항목이 있는 것,
+실파일에서 미리 관측한 구조를 보여주는 것, 요청 시 파일을 열어 일부 값을 읽는 것을 구분해야 한다.
+
+| 도구 · 확인 커밋 | 목록 준비와 검색 | 파일 관련 범위 | 활용신청·호출 |
+| --- | --- | --- | --- |
+| Public Data Lens · `3e210af` | 월간 목록 기반 서비스. 소스 설치는 최초 목록 빌드 필요. FTS5/BM25 검색 | 미리 적재한 파일 관측의 컬럼·유형·허용된 예시값 조회. 해당 관측이 없으면 `NOT_COLLECTED` | 발견·판정 도구. 확인한 도구 목록에 신청 제출·범용 API 호출 없음 |
+| Korea Public Data Catalog MCP · `10f82a2` | 96,056건 압축 목록을 저장소·배포에 포함. FTS5/BM25 검색 | FILE 항목의 메타데이터. 기본 공개 모드는 파일 다운로드와 실제 값 제공을 하지 않음 | 기본 공개 모드는 검색·설명·조합 제안이며 신청·호출 없음 |
+| FieldCure PublicData MCP · `33b5448` | 목록조회서비스 API로 제목 `LIKE` 검색. 해당 서비스부터 사용자가 사전 신청 | 확인한 도구는 API 탐색·명세·호출 | 개별 API 활용신청은 사용자 몫. 제공받은 키를 자동 주입해 호출 |
+| Public Data Opportunity MCP · `1a6f18a` | 기본은 샘플 목록. 실제 목록의 compact 변환·로딩 지원. 문자열 포함 점수로 검색 | 파일 형식과 제공 방식 등 목록 메타데이터 | 공식 이용 경로 안내. 범용 자동 신청·API 호출 제외 |
+| KPubData CLI · `25f9560` | 내장 provider의 등록 데이터셋 목록·검색. 정규화 문자열·단어 겹침으로 점수 계산 | CLI의 CSV 저장은 조회 결과 출력 기능이며 공공 파일 원본 탐색·검사와 구분 | 데이터셋 상세·조회·raw 호출. 키는 사용자가 환경변수·옵션으로 제공 |
+| JeHwanYoo data-go-kr CLI · `43ca466` | 사용자가 endpoint·서비스명·설정을 지정. 목록 탐색 없음 | 확인한 기능은 API 요청·결과 출력 | 키·인증 방식·요청 파라미터를 준비해 호출 |
+
+확인한 검색 경로는 문자열·단어 기반이었다. 이것은 자연어 입력이나 AI의 검색어 선택이 불가능하다는
+뜻이 아니다. 자연어를 받는 인터페이스와 임베딩을 사용하는 검색 구현을 같은 것으로 판정하지 않았다.
+
+### 이번에 읽은 근거
+
+- Public Data Lens: [README](https://github.com/hike-lab/public-data-lens/blob/3e210af3911ea7e215e59111a3b145c9322f5522/README.md),
+  [검색과 파일 구조 조회](https://github.com/hike-lab/public-data-lens/blob/3e210af3911ea7e215e59111a3b145c9322f5522/apps/server/datanav/api/service.py#L125),
+  [파일 프로파일 적재](https://github.com/hike-lab/public-data-lens/blob/3e210af3911ea7e215e59111a3b145c9322f5522/apps/server/datanav/observe/ingest.py#L108).
+- Korea Public Data Catalog MCP: [배포 목록·실제 값 제외 범위](https://github.com/obundh/korea-public-data-catalog-mcp/blob/10f82a28e06276360b5c35007d48c77c816e379f/README.md),
+  [검색 구현](https://github.com/obundh/korea-public-data-catalog-mcp/blob/10f82a28e06276360b5c35007d48c77c816e379f/src/public-data-inventory.ts#L2434).
+- FieldCure: [사전 신청과 키 준비](https://github.com/fieldcure/fieldcure-mcp-publicdata/blob/33b5448a590d910a7fab908dec26912ef3a654d3/README.md#L38),
+  [제목 검색·키 주입 호출](https://github.com/fieldcure/fieldcure-mcp-publicdata/blob/33b5448a590d910a7fab908dec26912ef3a654d3/src/FieldCure.Mcp.PublicData.Kr/Services/PublicDataHttpClient.cs#L47).
+- Public Data Opportunity MCP: [목록 준비와 제외 범위](https://github.com/capitalparser/public-data-opportunity-mcp/blob/1a6f18a87a69655f59204684d4f2364bf2ce39e4/README.md),
+  [검색 점수](https://github.com/capitalparser/public-data-opportunity-mcp/blob/1a6f18a87a69655f59204684d4f2364bf2ce39e4/src/catalog/search.ts#L16).
+- KPubData: [CLI 사용 범위](https://github.com/yeongseon/kpubdata/blob/25f95601d03e77010aecf538780098d9d0128342/docs/cli.md),
+  [검색 점수](https://github.com/yeongseon/kpubdata/blob/25f95601d03e77010aecf538780098d9d0128342/src/kpubdata/catalog.py#L95),
+  [사용자 키 설정](https://github.com/yeongseon/kpubdata/blob/25f95601d03e77010aecf538780098d9d0128342/src/kpubdata/config.py).
+- JeHwanYoo data-go-kr: [필수 설정과 명령](https://github.com/JeHwanYoo/data-go-kr/blob/43ca466e409ae1dc148ef7e9dd276553cbbdd2d3/README.md#L25).
+
+### 오데덕 문구에 반영할 차이
+
+오데덕은 미리 준비한 API·FILE·LINK 목록, AI의 목표별 검색어 선택과 선택형 의미 검색, 실제 API 계약과
+지원 파일의 제한된 표본 확인, data.go.kr 활용신청·승인 확인·키 재사용·실제 호출을 CLI와 MCP의 같은
+흐름에서 제공한다. **이번에 확인한 대안에서는 이 조합을 같은 범위로 제공하는 구현을 찾지 못했다.**
+개별 기능의 최초·독점이나 시장 전체의 유일성을 뜻하지 않는다.
+
+공개 소개에서는 다음처럼 사용자가 덜 챙겨도 되는 일로 설명한다.
+
+- 검색어·공식 명칭을 먼저 외우는 대신 하려는 일을 말하고 관련 자료를 찾는다.
+- 설치 후 목록부터 수집하지 않고 첫 검색을 한다. 원본 데이터 전체를 미리 저장했다는 뜻은 아니다.
+- API 명세와 지원되는 파일의 내용까지 확인한다. 목록에 파일이 있다는 사실만으로 검사 완료라고 하지 않는다.
+- 검색 후 사람이 포털로 돌아가던 활용신청과 키 준비를 실제 조회까지 이어 맡긴다.
+
+뜻이 가까운 설명을 찾는 선택 기능은 로컬 Ollama와 `catalog semantic-build` 준비가 필요하다.
+기본 설치에 전체 의미 인덱스나 모든 파일 원본이 포함됐다고 쓰지 않는다.
+정부 SSO 로그인은 사람이 하며 기관 심의는 기다린다. 실험적 `solve`의 자동 신청 제외 범위도 유지한다.
+
+아래는 2026-08-31 당시의 상세 감사 기록이다.
+
 ## 결론
 
 사용자 가설은 절반만 맞다. **범용 `검색 → 상세 → 호출` MCP는 이미 있다.** FieldCure는 이 세 도구를 명시적으로 제공한다. 그러나 검색은 의미 검색이 아니라 입력 문자열을 공공 카탈로그의 제목 `LIKE` 조건으로 그대로 보내며, 목록조회서비스와 호출 대상 API의 활용신청은 사용자가 포털에서 먼저 해야 한다.
