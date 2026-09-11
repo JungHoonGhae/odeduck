@@ -6,10 +6,10 @@
 <h1 align="center">오데덕</h1>
 
 <p align="center"><em>오픈데이터 덕후, 오데덕.</em></p>
-<p align="center">키워드를 몰라도 질문에서 출발해, 서로 먼 공공데이터를 찾고 연결하는 CLI + MCP입니다.</p>
+<p align="center">질문에서 서로 먼 데이터를 찾고, 활용신청부터 호출까지 잇는 CLI + MCP입니다.</p>
 <!-- brand:end -->
 
-<!-- Always show the introduction animation; do not collapse or remove this block. -->
+<!-- Keep the introduction animation visible. Core capabilities and architecture must also remain visible, not collapsed. -->
 <p align="center">
   <a href="docs/assets/odeduck-hero.mp4"><img src="docs/assets/odeduck-hero.gif" width="800" alt="안경을 쓰지 않은 아주 작은 오데덕이 거대한 캐비닛 사이를 뛰어다니며 서로 떨어진 공공데이터를 찾아 하나의 연결망으로 잇는 애니메이션"></a>
 </p>
@@ -29,9 +29,18 @@
 
 ---
 
-**첫 검색은 로그인·API 키·AI 없이 시작할 수 있습니다.** 설치한 뒤 `건축물`을 검색해 보세요.
+**키워드를 몰라도 질문에서 시작합니다.** 서로 다른 분야의 데이터를 찾고, 필요한 API의 활용신청부터 첫 호출까지 잇습니다.
 
-[빠른 시작](#빠른-시작) · [지원 범위](#지금-쓸-수-있는-범위) · [실험적 목표 실행](#목표에서-결과까지-실행하기--experimental) · [검증 결과](#확인한-결과와-남은-검증)
+[핵심 기능](#탐색부터-신청호출까지) · [빠른 시작](#빠른-시작) · [전체 아키텍처](#전체-아키텍처) · [지원 범위](#지금-쓸-수-있는-범위) · [검증 결과](#확인한-결과와-남은-검증)
+
+## 탐색부터 신청·호출까지
+
+![에이전트가 데이터를 탐색하고 검사하며, 사람의 로그인 한 번 이후 오데덕이 필요한 활용신청·승인 확인·인증키 주입·호출을 잇는 흐름.](docs/assets/odeduck-api-workflow.png)
+
+사람은 `odeduck login`으로 정부 SSO 로그인을 한 번 마친다. 이후 MCP 에이전트가 **활용신청 제출 → 승인 확인 → 계정 키 재사용 → 실제 호출**을 이어 간다. 인증키를 직접 복사해 모델에 전달할 필요가 없다.
+
+자동 신청은 **data.go.kr REST**가 대상이며 MCP host의 도구 승인 정책을 따른다. 심의형 API는 기관 승인을 기다린다.
+외부 제공기관은 검증된 adapter와 별도 키를 사용한다. 아래 실험적 `solve`는 자동 활용신청을 하지 않는다.
 
 ## 빠른 시작
 
@@ -40,7 +49,7 @@
 
 ### 1. 설치하기
 
-릴리스에는 검증된 카탈로그가 포함되어 있다. 첫 검색에는 data.go.kr 로그인이나 API 키가 필요 없다.
+릴리스에는 검증된 카탈로그가 포함되어 있다. **첫 검색에는 로그인·API 키·AI 호출이 필요 없다.**
 
 macOS·Linux:
 
@@ -138,11 +147,9 @@ gemini mcp add --scope user odeduck odeduck mcp
 이 단계에서 확인할 것은 **데이터 후보와 출처**다. 에이전트가 검색어를 정해 후보를 찾고 실제
 명세와 파일을 검사한다. 결과를 연결·계산하는 기능은 [실험적 목표 실행](#목표에서-결과까지-실행하기--experimental)에서 확인한다.
 
-<details>
-<summary>선택: CLI로 직접 자료 검사·신청·호출하기</summary>
+## 활용신청과 첫 호출
 
-### 필요한 자료를 검사하고 API 호출하기
-
+MCP에서는 에이전트가 검사 결과에 따라 `apply`와 `call_api`를 이어 간다. 직접 실행하려면 아래 CLI 명령을 사용한다.
 고른 데이터의 `PK`는 검색 결과에서 확인한다.
 
 ```sh
@@ -167,7 +174,15 @@ odeduck call --pk <PK> --op <OPERATION> --param <NAME>=<VALUE>
 | `LINK` | SafetyKorea·FoodSafetyKorea·VWorld 등 검증된 adapter로 호출. 미지원 기관은 공식 경로 안내 |
 | `FILE` | 지원되는 다운로드 자산에서 CSV·SHP의 DBF·XLSX 컬럼과 제한된 표본을 관찰 |
 
-</details>
+
+## 전체 아키텍처
+
+![사람의 CLI와 AI 에이전트의 MCP가 공통 Go 엔진의 카탈로그·원천 검사를 사용한다. 파일·표준데이터는 직접 관찰하고, API는 신청·인증·호출 경로에서 data.go.kr REST와 검증된 외부 제공기관으로 나뉜다.](docs/assets/odeduck-system-overview.png)
+
+CLI와 MCP는 **같은 Go 백엔드**를 사용한다. 탐색은 카탈로그의 키워드·선택형 의미 검색을 조합하며,
+실제 계약 검사·신청·인증키 처리·호출은 공통 모듈이 맡는다. 파일·표준데이터 관찰은 API 신청 경로와 분리된다.
+
+[모듈별 책임과 실행 흐름](ARCHITECTURE.md) · [도메인 용어](CONTEXT.md)
 
 ## 지금 쓸 수 있는 범위
 
@@ -258,7 +273,7 @@ MCP에서는 `advance_goal`로 host가 같은 실행기를 진행한다.
 
 ![목표를 역할별로 탐색하고 원천을 검사해 조회·연결·계산한다. 필수 출력과 근거가 부족하면 예산 안에서 재탐색하며, 허용된 검토를 통과한 결과 또는 미완료 사유를 반환한다.](docs/assets/odeduck-goal-flow.png)
 
-그림의 폭염 질문은 실행 흐름을 설명하는 예시다. 전체 자동 완주를 검증한 사례는 아니다.
+지원하는 연산과 허용된 검토 안에서의 실행 흐름이다. 분야 간 자율 완주를 검증한 성공 사례를 뜻하지 않는다.
 [다이어그램 원본](docs/assets/odeduck-goal-flow.html)
 
 설치·로그인된 Codex·Claude·Gemini 중 하나와 로컬 Ollama가 필요하다. Cursor는 `solve`의 계획기로
