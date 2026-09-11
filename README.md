@@ -6,8 +6,11 @@
 <h1 align="center">오데덕</h1>
 
 <p align="center"><em>오픈데이터 덕후, 오데덕.</em></p>
-<p align="center">흩어진 9만 6천 개 공공데이터를 가로질러 서로 무관해 보이던 단서를 연결하고, 신청·인증·호출까지 대신해 필요한 답을 찾아주는 오픈데이터 덕후입니다.</p>
+<p align="center">키워드를 몰라도 질문에서 출발해, 서로 먼 공공데이터를 찾고 연결하는 CLI + MCP입니다.</p>
 <!-- brand:end -->
+
+<details>
+<summary>오데덕 소개 영상 보기</summary>
 
 <p align="center">
   <a href="docs/assets/odeduck-hero.mp4"><img src="docs/assets/odeduck-hero.gif" width="800" alt="안경을 쓰지 않은 아주 작은 오데덕이 거대한 캐비닛 사이를 뛰어다니며 서로 떨어진 공공데이터를 찾아 하나의 연결망으로 잇는 애니메이션"></a>
@@ -16,221 +19,103 @@
   <sub>서로 상관없어 보이는 조각도, 함께 보면 질문의 나머지가 된다. · <a href="docs/assets/odeduck-hero.mp4">원본 영상</a></sub>
 </p>
 
+</details>
+
 <p align="center">
   <img src="https://img.shields.io/badge/works%20with-Codex%20%C2%B7%20Claude%20%C2%B7%20Gemini%20%C2%B7%20Cursor-111111?style=flat-square" alt="Works with Codex, Claude, Gemini, and Cursor">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-111111?style=flat-square" alt="MIT license"></a>
 </p>
 
 <p align="center">
-  <strong>데이터 96,000+개 &middot; 실계정 전체 흐름 4종 &middot; 실호출 점검 11개</strong><br>
-  <sub>REST·LINK·FILE을 함께 찾고 실제 명세와 파일을 검사해 활용신청부터 첫 호출까지 잇는다.</sub>
+  <strong>데이터 96,000+개 &middot; 실계정 신청·호출 4종 &middot; 제공기관 canary 11개</strong><br>
+  <sub>data.go.kr의 API·파일·외부 링크를 함께 탐색하고, 활용신청부터 첫 호출까지 잇는다.</sub>
 </p>
 
 ---
 
-양말 한 짝이 사라지면 서랍만 뒤져서는 찾기 어렵다. 세탁기 뒤, 소파 밑, 어제 입은 바지까지 생활의
-맥락을 따라가야 한다. 데이터도 같다. 인구에 관한 질문의 나머지 한 짝이 상권이나 교통 데이터에 있을
-수 있다.
+**첫 검색은 로그인·API 키·AI 없이 시작할 수 있습니다.** 설치한 뒤 `건축물`을 검색해 보세요.
 
-**오데덕은 공공데이터에서 그 짝을 찾는다.** 질문을 여러 분야로 나누고 함께 볼 데이터를 찾은 뒤 실제
-명세와 컬럼으로 확인한다. 연결 근거가 부족하면 정답처럼 꾸미지 않고 후보에서 멈춘다.
-
-스티브 잡스가 [2005년 스탠퍼드 졸업 연설](https://news.stanford.edu/stories/2005/06/youve-got-find-love-jobs-says)에서
-캘리그래피와 매킨토시 타이포그래피를 두고 말한 `connecting the dots`처럼, 당시에는 상관없어 보이는
-점도 나중에는 하나의 맥락이 될 수 있다. 오데덕은 그 관점을 공공데이터 탐색에 적용한다.
-
-## 기존 도구는 어디에서 멈췄나
-
-data.go.kr 관련 공개 도구 10개를 실제 도구 등록과 호출 코드로 비교했다. 검색→상세→호출을 지원하는
-도구는 있었지만 활용신청 제출과 승인 확인까지 처리한 구현은 없었다.
-
-<p align="center">
-  <img src="docs/assets/odeduck-before-after.svg" width="900" alt="감사한 기존 도구들은 키워드, FTS, 고정 도메인처럼 서로 다른 탐색과 호출 범위를 가졌지만 활용신청과 승인 확인은 모두 사람에게 돌려보냈다. odeduck은 질문을 인구, 매출, 점포, 위험 같은 분야별 축으로 나눠 발견하고 실제 명세와 컬럼 검사, data.go.kr REST 활용신청, 승인과 키 확인, 인증 호출까지 잇는다.">
-</p>
-
-오데덕은 **다른 분야의 데이터를 한 질문의 후보로 모으고 실제 명세와 파일을 검사한 뒤 기존 도구가
-사람에게 돌려보내던 신청·승인·키·호출까지 잇는다.** 비교 대상과 판정 근거는
-[경쟁 워크플로 감사](docs/research/competitive-workflow-audit.md)에 공개했다.
-
-## 질문은 하나인데, 답은 한 분야에 있지 않다
-
-이 질문에 답하고 싶다고 해보자.
-
-> 서울에서 작은 가게를 열고 싶어. 사람들이 늘기 시작한 동네와 덜 붐비는 업종을 검토할 자료를 찾아줘.
-
-### 직접 찾으면
-
-공공데이터포털에서는 생활인구·매출·점포·개폐업·공실을 따로 검색하고 상세페이지마다 파일과 API를
-확인해야 한다. API라면 활용신청서를 쓰고 승인과 키도 기다린다.
-
-### 오데덕에게 맡기면
-
-```text
-"서울에서 작은 가게를 열고 싶어. 사람들이 늘기 시작한 동네와 덜 붐비는 업종을 검토할 자료를 찾아줘."
-
-catalog_search → inspect_dataset ─┬─ FILE: 실제 파일과 컬럼 관찰
-                                  ├─ REST: (apply) → call_api
-                                  └─ LINK: 검증된 adapter 또는 공식 경로 안내
-```
-
-AI가 질문을 생활인구·업종별 매출·점포 생존·개폐업으로 나누면, 오데덕은 약 9.6만 개의 API·파일·외부
-링크에서 후보를 찾고 실제 명세와 컬럼을 검사한다. REST는 필요할 때 활용신청과 호출까지 이어 주고
-검증되지 않은 외부 제공기관은 공식 경로를 안내한 뒤 멈춘다.
-
-성공할 가게를 대신 골라주지는 않는다. 어떤 데이터로 아이디어를 검토할 수 있는지, 어디까지 연결해
-확인했는지를 보여준다.
+[빠른 시작](#빠른-시작) · [지원 범위](#지금-쓸-수-있는-범위) · [실험적 목표 실행](#목표에서-결과까지-실행하기--experimental) · [검증 결과](#확인한-결과와-남은-검증)
 
 ## 빠른 시작
 
-### v0.19.0: 목표에서 실제 표본 조합까지 (experimental)
+**설치 → 첫 검색 → 에이전트 등록 → 질문**, 네 단계다. 명령 입력과 설정은 약 3분이며 다운로드 대기 시간은 환경에 따라 달라진다.
+이미 설치했다면 [2번 첫 검색](#2-첫-검색-실행하기)부터 시작한다.
 
-v0.19.0에 포함된 실험적 기능이다. 아래 설치를 마친 뒤 사용할 수 있으며 범용 목표 완주를 보장하지 않는다.
+### 1. 설치하기
 
-```sh
-odeduck catalog semantic-build
-odeduck solve "폭염 때 어르신이 쉴 곳을 찾는 데 도움이 될 데이터를 서로 연결해줘"
-```
+릴리스에는 검증된 카탈로그가 포함되어 있다. 첫 검색에는 data.go.kr 로그인이나 API 키가 필요 없다.
 
-설치·로그인된 Codex·Claude·Gemini가 목표를 역할별로 나누고, 검색·검사·표본·결합을 반복한다.
-실패하면 다른 데이터나 중간 코드 대응표를 탐색한다. 기본 32단계이며 agent CLI의 호출 비용과 한도가
-적용된다. MCP에서는 같은 동작을 `advance_goal`로 host가 진행한다. 별도 검토 모델은 명시한 서버 시작 설정이 있을 때만 호출한다.
-
-외부 CLI 계획기에는 기본적으로 원천 값을 보내지 않는다. 선택한 행·필드를 근거로 읽게 하려면
-`--agent=claude --share-evidence`처럼 수신 모델 하나를 명시한다. 자동 모델 전환은 허용하지 않는다.
-MCP에서는 서버를 `mcp --share-goal-evidence`로 시작해야 하며 모델이 tool 입력으로 켤 수 없다.
-세션당 최대 8개/64 KiB의 선택 근거만 허용한다. 개인정보·전송 권한은 사용자가 확인해야 하며,
-이 설정은 기존 MCP 실행 결과나 `call_api` 원문 출력을 차단하는 기능이 아니다.
-
-실제 결합은 API·직접 CSV·ZIP 내부 CSV·XLSX 셀 범위·포털 STD의 제한된 표본을 지원한다. 먼저 필수 역할·범위·출력을 고정하고,
-빠진 항목이 있으면 부분 결과로 남겨 탐색을 계속한다. 한 원천의 필드 조회·집계도 가능하며 결합은 선택 연산이다.
-`sample_executed`는 표본 실행 결과이며, 필수 요구 충족이나 의미 검증과는 별개다.
-직접 CSV는 선택적으로 전체를 순차 검사하고, 관측한 좌표를 기준으로 전체 일치 레코드의 최근접 후보를
-계산할 수 있다. 이 구면 거리는 실제 이동 경로나 현재 접근 가능성을 뜻하지 않는다.
-전체 CSV 검사에서는 `sample.whereIn`으로 여러 지역·연령처럼 정확한 값 목록을 함께 고를 수 있다.
-파일 전체 검사와 일치 행의 실제 보관, 요청한 집단 전체의 확보는 각각 구분해 보고한다.
-검사한 FILE의 등록된 공식 HTML 설명은 `sample`의 `delivery:"document"`로 별도 관측할 수 있다.
-선택 공개한 원문만 `composition.support`로 해석 검토에 연결하며 계산 행이나 모집단 증거로 자동
-승격하지 않는다. 현재 지원은 행안부 월간 통계 도움말과 등록된 KOSIS 공식 답변이며 임의 URL·PDF는
-지원하지 않는다. [보조 문서 읽기 계약](docs/specs/source-document-acquisition-v1.md)에 범위를 명시했다.
-출력 형식이 맞아도 지역·식별자·시간의 의미가 검증되지 않으면 `review_required`로 남기고 같은 목표·예산
-안에서 추가 근거와 대안을 찾는다. 제한된 원천 보고는 CLI의 `--review-source-reports`(명시한 agent와
-`--share-evidence` 필수), MCP의 `--review-goals-with=claude`와 `--share-goal-evidence`로 별도 검토를
-켤 수 있다. typed 관계·계산은 CLI `--review-analyses` 또는 MCP 시작 설정 `--review-goal-analyses`로
-추가 허용한다. 원래 질문·출력별 지지와 관계·기간·측정·범위를 통과해야 성공 종료한다. 모델 검토이지
-현장·사람 검증은 아니며 공간·인과·사업 가설 및 범용 목표 완주는 미완료다. 결과와 검토는 실행 revision에 묶인다.
-[원천 보고 검토의 범위와 공개 정책](docs/specs/goal-source-report-review-v1.md)을 확인할 수 있다.
-의미 검색이 쓰이지 않으면 기본적으로 멈추며, 자동 활용신청은 하지 않는다.
-[실행 계약과 한계](docs/specs/goal-driven-composition-v1.md)를 확인할 수 있다.
-
-### 릴리스: 로그인 없는 첫 검색
-
-릴리스에는 검증된 카탈로그가 포함되어 있어 로그인이나 API 키 없이 바로 검색할 수 있다.
+macOS·Linux:
 
 ```sh
 curl -fsSL https://github.com/JungHoonGhae/odeduck/releases/download/v0.19.0/install.sh | sh
-
-odeduck catalog search \
-  "서울에서 작은 가게 후보를 좁힐 자료" \
-  --concept 생활인구 \
-  --concept 추정매출 \
-  --concept "상권 점포" \
-  --concept "상권 개폐업" \
-  --limit 8 --semantic=false -f table
 ```
 
-이 검색은 로컬에서만 실행된다. 고른 데이터는 `odeduck inspect <PK> --observe`로 실제 명세와 컬럼을
-확인한다. 활용신청과 호출이 필요할 때만 `odeduck login`으로 data.go.kr에 한 번 로그인한다.
-
-검색축을 직접 적는 대신 설치된 Codex·Claude·Gemini·Cursor에 질문을 나눠 달라고 할 수도 있다.
-
-```sh
-odeduck catalog discover \
-  "장마철에도 매출이 덜 흔들릴 동네 카페 후보를 찾고 싶어. 어떤 데이터를 같이 봐야 하는지 찾아줘." \
-  --connections --limit 12 --semantic=false -f table
-```
-
-실행 결과에는 분야별 후보, 예상 결합키, 검증 전 한계가 함께 표시된다. 의미 검색이 반드시 필요하면
-로컬 Ollama 인덱스를 만든 뒤 `--require-semantic`을 사용한다. 인덱스나 Ollama에 문제가 있으면 일반
-검색으로 조용히 대체하지 않고 실패한다.
-
-<p align="center">
-  <img src="docs/assets/odeduck-linkedin-demo.svg" width="900" alt="실제 catalog discover 실행에서 강수 비교군, 시간대별 유동인구, 침수 기록을 서로 다른 연결 후보로 찾고 각 데이터의 PK와 예상 결합키, 검증 전 한계를 표시한 결과">
-</p>
-<p align="center">
-  <sub>v0.16.0 · 2026-09-03 · <code>catalog discover --connections</code> · data.go.kr 로그인·API 키·Ollama 없이 실행 · <a href="docs/research/launch-readiness-linkedin-geeknews-2026-09.md">실행 조건과 후보 PK</a></sub>
-</p>
-
-## 검증 수치
-
-그럴듯한 데모 대신 실제 계정과 실제 포털에서 확인했다.
-
-| 확인한 것 | 결과 |
-| --- | --- |
-| 통합 카탈로그 | 2026-09-02 릴리스 기준 96,683개 노드. REST·LINK·FILE과 복수 제공형 보존 |
-| 실계정 전체 흐름 | 온비드 공매·나라장터 입찰·공영도매시장 경매·중소기업 지원사업 데이터 4종의 활용신청→승인→호출 |
-| 외부 제공기관 | SafetyKorea·FoodSafetyKorea·VWorld의 형식이 고정된 호출, 서울 열린데이터광장 계약 검사 |
-| 변경 감시 | 제공기관 어댑터 4개, 실호출 점검 11개, 주간 CI |
-| 실패 경계 | 미지원 LINK·불안전한 전송·불충분한 결합 근거에서 멈춤 |
-
-비교 방법과 근거는 [경쟁 워크플로 조사](docs/research/competitive-workflow-audit.md)에 있다.
-
-## 동작 방식
-
-오데덕은 검색 1위를 정답이라고 부르지 않는다. 다음 단계를 차례로 밟는다.
-
-```text
-1. 무슨 데이터가 필요한가?     → 질문을 서로 다른 역할의 검색축으로 나눈다
-2. 이름이 틀렸을 수 있나?       → 96,000+개 통합 카탈로그를 함께 뒤진다
-3. 정말 쓸 수 있나?             → API 명세와 FILE의 실제 컬럼을 본다
-4. 권한이 필요한가?              → 활용신청·승인·provider 키를 처리한다
-5. 서로 연결되는가?              → 필드·범위·값 교집합을 확인한다
-6. 근거가 부족한가?              → 억지로 엮지 않고 멈춘다
-```
-
-탐색은 넓게 한다. 주장은 좁게 한다.
-
-data.go.kr REST는 정부 SSO 로그인 한 번 뒤 신청→승인 확인→키 획득→호출을 잇는다. 자동승인 후
-게이트웨이 반영이 늦으면 `call --wait 10m`이 새 키를 만들거나 재신청하지 않고 기다린다.
-
-자연어 검색은 데이터를 발견하는 장치이지, 상관관계나 인과관계를 자동으로 증명하는 장치가 아니다.
-전체 계약은 [교차 데이터 연결 발견 명세](docs/specs/cross-domain-connection-discovery-v1.md), 실제 평가는
-[연결 발견 평가](docs/research/connection-discovery-evaluation.md)에 있다.
-
-검증한 연결은 MCP의 `record_connection_assessment`로 로컬 append-only 장부에 남길 수 있다. 장부에는
-공식 출처, field namespace와 grain, 요청·프로필 해시, 표본 집계만 저장하고 API 응답 원문이나 인증정보는
-저장하지 않는다. `sample_verified`는 같은 MCP 세션에서 최근 `call_api`가 만든 두 단일-key profile과
-집계가 정확히 일치할 때만 허용되며, 근거가 부족하면 `structurally_verified`, `blocked` 또는 `rejected`로
-남는다. 자세한 저장·판정 계약은 [연결 근거 장부 명세](docs/specs/connection-evidence-ledger-v1.md)를 본다.
-
-구성요소, 데이터 흐름, 로컬 상태와 신뢰 경계는 [아키텍처 문서](ARCHITECTURE.md)에 정리했다.
-
-## 설치와 에이전트 연결
-
-Windows:
+<details>
+<summary>Windows 설치 명령</summary>
 
 ```powershell
 irm https://github.com/JungHoonGhae/odeduck/releases/download/v0.19.0/install.ps1 | iex
 ```
 
-macOS·Linux 설치 명령은 위 빠른 시작에 있다. 설치 스크립트는 checksum을 검증하고 같은 릴리스의
-카탈로그 스냅샷을 함께 설치한다. Go 1.26.6 이상에서는 소스로 설치할 수도 있다.
+</details>
+
+### 2. 첫 검색 실행하기
+
+아래 명령을 그대로 실행한다. data.go.kr 로그인·API 키·AI 호출이 필요 없다.
+
+```sh
+odeduck catalog search "건축물" --limit 5 --semantic=false -f table
+```
+
+**데이터 목록이 나오면 첫 검색 성공이다.** 다른 자료를 찾으려면 `건축물`만 원하는 검색어로 바꾼다.
+
+키워드를 직접 정하기 어렵다면 다음 단계에서 에이전트에 목표를 말한다.
+
+<details>
+<summary>Go 소스 설치와 카탈로그 동기화</summary>
+
+Go 1.26.6 이상:
 
 ```sh
 go install github.com/JungHoonGhae/odeduck/cmd/odeduck@latest
 odeduck catalog sync
 ```
 
-소스 설치에는 릴리스의 prebuilt 카탈로그가 포함되지 않으므로 첫 검색 전에 한 번 동기화한다.
+릴리스 설치기는 checksum을 검증하고 같은 릴리스의 카탈로그 스냅샷을 설치한다.
+소스 설치에는 이 prebuilt 카탈로그가 포함되지 않으므로 첫 검색 전에 한 번 동기화한다.
+전체 동기화의 웹 보강은 수십 분 걸릴 수 있다. 빠른 월간 CSV 목록만 필요하면
+`odeduck catalog sync --source official-file`을 사용한다. 이 빠른 목록에는 일부 API·FILE 복수
+제공형이 빠질 수 있으므로, 완전한 제공형 탐색에는 릴리스 카탈로그를 권장한다.
 
-### AI 에이전트에 연결
+</details>
+
+### 3. 에이전트에 등록하기
+
+Codex를 사용한다면 아래 명령 하나로 등록한다.
 
 ```sh
 codex mcp add odeduck -- odeduck mcp
+```
+
+<details>
+<summary>Claude·Gemini 등록 명령</summary>
+
+사용하는 에이전트의 명령 하나만 실행한다.
+
+```sh
+# Claude
 claude mcp add odeduck -- odeduck mcp
+
+# Gemini
 gemini mcp add --scope user odeduck odeduck mcp
 ```
 
-Cursor·Claude Desktop처럼 JSON 설정을 쓰는 호스트:
+</details>
+
+<details>
+<summary>Cursor·Claude Desktop 등 JSON 설정</summary>
 
 ```json
 {
@@ -243,93 +128,293 @@ Cursor·Claude Desktop처럼 JSON 설정을 쓰는 호스트:
 }
 ```
 
-등록 뒤에는 새 세션을 열거나 클라이언트를 재시작하고 `/mcp` 또는 `codex mcp list`에서 `odeduck`이
-활성화됐는지 확인한다.
+</details>
 
-이제 데이터 이름 대신 궁금한 것을 말하면 된다.
+`/mcp` 또는 `codex mcp list`에서 **`odeduck` 등록을 확인하면 설정 완료다.**
 
-```text
-서울에서 새 가게 후보를 좁힐 생활인구·매출·점포·폐업 자료를 함께 찾아줘.
-식재료 원가 변화를 검토할 가격·반입량·작황 자료를 함께 찾아줘.
-빈집과 방문객 변화로 지역 사업을 검토할 인구이동·관광·소비 자료를 찾아줘.
-```
+### 4. 목표 말하기
 
-## CLI
+에이전트에서 새 대화를 연다. 등록이 반영되지 않았다면 클라이언트를 재시작한다.
+아래 질문을 붙여 넣는다.
+
+> 장마철에도 매출이 덜 흔들릴 동네 카페 후보를 찾고 싶어. 어떤 데이터를 같이 봐야 하는지 찾아줘.
+
+이 단계에서 확인할 것은 **데이터 후보와 출처**다. 에이전트가 검색어를 정해 후보를 찾고 실제
+명세와 파일을 검사한다. 결과를 연결·계산하는 기능은 [실험적 목표 실행](#목표에서-결과까지-실행하기--experimental)에서 확인한다.
+
+<details>
+<summary>선택: CLI로 직접 자료 검사·신청·호출하기</summary>
+
+### 필요한 자료를 검사하고 API 호출하기
+
+고른 데이터의 `PK`는 검색 결과에서 확인한다.
 
 ```sh
-# 브라우저가 한 번 열린다. data.go.kr에 로그인한다.
-odeduck login
-
-# 정확한 데이터 이름을 몰라도 된다.
-odeduck catalog discover "지역 소멸로 생길 사업 기회"
-
-# API 명세 또는 FILE의 실제 자산·컬럼을 확인한다.
 odeduck inspect <PK> --observe
 
-# API가 필요하면 활용신청한다. CLI는 제출 전 y/N을 묻는다.
-odeduck apply <PK> --purpose "지역 사업 기회 분석" --category research
+# 활용신청·인증 호출이 필요할 때 data.go.kr에 한 번 로그인한다.
+odeduck login
 
-# 엔드포인트와 serviceKey를 직접 다루지 않고 호출한다.
-odeduck call --pk <PK> --param numOfRows=5
+# 신청이 필요한 API만 실행한다. CLI는 제출 전 y/N을 묻는다.
+odeduck apply <PK> --purpose "공공데이터 비교 분석" --category research
+
+# 검사 결과에 맞는 operation과 필수 파라미터를 사용한다.
+odeduck call --pk <PK> --op <OPERATION> --param <NAME>=<VALUE>
 ```
 
-## 다 같은 데이터가 아니다
+`call`은 인증키를 내부에서 넣는다. 자동승인 후 게이트웨이 반영이 늦으면 `--wait 10m`으로
+새 키 발급이나 재신청 없이 기다릴 수 있다.
 
-| 유형 | odeduck이 하는 일 |
+| 제공형 | 취득 방식 |
 | --- | --- |
-| `REST` | 포털의 공식 operation과 필수 파라미터를 확인하고 신청·호출 |
-| `LINK` | SafetyKorea·FoodSafetyKorea·VWorld 등 검증된 adapter만 typed 호출 |
-| `FILE` | 다운로드 링크만 보여주지 않고 CSV·DBF·XLSX의 작은 표본과 실제 스키마를 관찰 |
+| `REST` | 포털의 공식 operation·필수 파라미터·승인 상태를 확인해 호출 |
+| `LINK` | SafetyKorea·FoodSafetyKorea·VWorld 등 검증된 adapter로 호출. 미지원 기관은 공식 경로 안내 |
+| `FILE` | 지원되는 다운로드 자산에서 CSV·SHP의 DBF·XLSX 컬럼과 제한된 표본을 관찰 |
 
-API처럼 보이는 링크라고 엔드포인트를 지어내지 않는다. 파일이라고 사람에게 다운로드를 떠넘기지도 않는다.
-검증된 계약이 없는 제공기관은 공식 경로를 알려 주고 멈춘다.
+</details>
 
-## 마법은 아니다
+## 지금 쓸 수 있는 범위
 
-- 정부 SSO 로그인과 심의승인을 우회하지 않는다.
-- 모든 LINK 제공기관을 하나의 키로 부르지 않는다.
-- 연결 후보는 실제 필드·범위·값 교집합을 확인하기 전까지 후보다.
-- 활용신청 자동화는 포털 HTML에 의존한다. 포털이 바뀌면 깨질 수 있고 `odeduck doctor`와 실호출 점검이 이를 감시한다.
-- data.go.kr 밖의 이용조건은 각 제공기관 정책을 따른다.
+| 범위 | 현재 상태 |
+| --- | --- |
+| 데이터 탐색·검사 | 약 9.6만 건의 카탈로그에서 API·FILE·LINK를 함께 검색. API 계약과 지원되는 파일의 실제 컬럼 확인 |
+| 활용신청·호출 | data.go.kr 로그인 한 번 뒤 신청·승인 확인·계정 키 재사용·호출. 외부 제공기관은 검증된 adapter와 별도 키 사용 |
+| 목표 기반 분석 | v0.19.0의 실험적 `solve`·MCP `advance_goal`. 원천 조회, 제한된 연결·계산, 추가 탐색과 결과 검토 |
+| 전체 목표 완주 | 미완료. 분야 간 자율 완주, 일반적인 공간·인과·사업 가설 검증, 프로세스 재개와 장기 근거 재사용은 남은 과제 |
 
-## 보안
+후보 발견, 표본 계산, 질문 전체에 대한 답은 서로 다른 단계다. 가능한 질문에서 실제 산출물에 도달하는 것과
+잘못된 연결을 거르는 것을 함께 검증한다. 요구사항별 상태는
+[목표 실행·검증 계획](docs/specs/goal-driven-completion-plan.md)에서 확인할 수 있다.
 
-`odeduck login`은 로그인이 끝나면 브라우저를 닫고 세션을 운영체제의 사용자 설정 디렉터리에 저장한다.
-인증키는 MCP 입력·출력이나 로그에 내보내지 않고 호출 직전에만 넣는다. `odeduck logout`은 세션,
-data.go.kr 키, provider 키와 Chrome 프로파일을 지운다.
+<details>
+<summary>어떤 질문에 쓰는 도구인가요? — 사용 예시와 제품 목표</summary>
 
-세션과 키는 파일 권한으로 접근을 막지만 암호화되지는 않는다. 공용 머신에서는 쓰지 않는 편이 좋다.
-MCP의 `apply`는 확인 대화 없이 실제 활용신청을 만들 수 있다. 직접 확인하고 싶다면 제출 전 `y/N`을
-묻는 CLI를 쓰면 된다.
+### 키워드를 몰라도, 질문에서 시작한다
 
-`catalog discover`는 선택된 Codex·Claude·Gemini·Cursor에 자연어 목표를 전달해 검색 계획을 만든다.
-로그인 토큰은 읽거나 저장하지 않지만 목표 자체는 해당 AI 제공자에게 전송되므로 개인정보나 미공개
-사업계획은 넣지 않는다. Cursor는 격리된 초기 검색 계획에만 사용하고 실제 카탈로그 메타데이터는 보내지
-않는다.
+“어떤 데이터를 찾아야 하지?”가 첫 번째 벽인 사람이 있다. 필요한 자료의 이름을 알아도
+인구·교통·시설처럼 서로 다른 분야에 흩어져 있으면 한 질문에 함께 쓰기 어렵다.
 
-보안 경계와 남는 위험은 [ADR](docs/adr/)과 [provider adapter guide](docs/provider-adapters.md)에 있다.
+오데덕은 data.go.kr의 API·파일·외부 링크를 함께 찾고 실제 명세와 파일을 검사한다.
+필요한 API의 활용신청·승인 확인·인증키 사용·호출도 이어 준다. CLI와 MCP는 같은 기능을 사용한다.
 
-## 개발
+**오데덕이 이루려는 목표는 서로 먼 데이터를 연결해, 사용자가 원하는 결과와 그 근거까지 얻는 것이다.**
+비교표나 계산 결과에는 사용한 원천과 기준 시점이 따라야 한다. 가설에는 가정과 확인할 점이 남아야 한다.
+처음 찾은 자료로 답하기 어렵다면 다른 원천이나 중간 대응표를 찾아 같은 질문을 계속 풀어간다.
 
-새 제공기관 어댑터, 재현 가능한 교차 데이터 질문, 실패 사례를 환영한다. 어댑터는 공식 문서,
-고정된 인증 범위, 계약 테스트와 실호출 점검이 있어야 호출 가능 상태가 된다.
+현재는 검색·검사·신청·호출을 제공하며 목표 기반 연결·분석은 실험 단계다.
+구현 방향과 완료 기준은 [INTENT.md](INTENT.md)에 있다.
+
+### 질문은 하나인데, 필요한 데이터는 여러 곳에 있다
+
+아래는 오데덕이 완성하려는 사용 예시다. 각 질문의 전체 자동 실행을 검증한 성공 사례는 아니다.
+
+| 이루려는 일 | 함께 살펴볼 데이터의 역할 | 기대하는 산출물 |
+| --- | --- | --- |
+| 동네 가게 후보를 비교하고 싶다 | 생활인구·업종별 매출·점포 변화·교통 접근성 | 같은 지역·기간으로 비교한 표와 추가 확인 사항 |
+| 폭염 때 어르신이 쉴 곳을 검토하고 싶다 | 고령 인구·쉼터 위치와 운영정보·주변 교통 | 지역별 비교와 현장 확인이 필요한 항목 |
+| 식재료 원가가 왜 달라졌는지 검토하고 싶다 | 가격·반입량·작황·기상 | 시점별 비교와 원인을 설명할 가설·반증 자료 |
+
+함께 볼 자료는 질문과 실제 관측에 따라 달라진다. 이름이 같은 지역도 서로 다른 곳일 수 있다.
+지번별 사용량은 건물 하나의 사용량과 다를 수 있다. 식별자·기간·관측 단위가 맞는지 확인해야
+그 데이터로 무엇을 말할 수 있는지 정할 수 있다.
+
+결과에는 무엇을 연결했는지, 어떤 계산을 했는지, 무엇이 빠졌는지가 남아야 한다.
+한 자료만으로 충분한 질문에는 그 자료를 조회·집계한다.
+
+</details>
+
+## CLI에서 목표로 탐색하기
+
+검색어를 직접 정하기 어려우면 `catalog discover`에 질문을 전달한다. 설치·로그인된
+Codex·Claude·Gemini·Cursor 중 하나가 검색 계획을 만든다.
 
 ```sh
-go test ./...
+odeduck catalog discover \
+  "장마철에도 매출이 덜 흔들릴 동네 카페 후보를 찾고 싶어. 어떤 데이터를 같이 봐야 하는지 찾아줘." \
+  --connections --limit 12 --semantic=false -f table
+```
+
+<details>
+<summary>실제 검색 예시: 강수·유동인구·침수 기록을 함께 찾은 결과</summary>
+
+아래는 실제 실행에서 찾은 연결 후보다. 강수 비교군·유동인구·침수 기록을 함께 제시했고
+예상 결합키와 검증 전 한계를 남겼다. 매출 안정성이나 실제 데이터 결합을 입증한 결과는 아니다.
+
+<p align="center">
+  <img src="docs/assets/odeduck-linkedin-demo.svg" width="900" alt="실제 catalog discover 실행에서 강수 비교군, 시간대별 유동인구, 침수 기록을 서로 다른 연결 후보로 찾고 각 데이터의 PK와 예상 결합키, 검증 전 한계를 표시한 결과">
+</p>
+<p align="center">
+  <sub>v0.16.0 · 2026-09-03 · <code>catalog discover --connections</code> · data.go.kr 로그인·API 키·Ollama 없이 실행 · <a href="docs/research/launch-readiness-linkedin-geeknews-2026-09.md">실행 조건과 후보 PK</a></sub>
+</p>
+
+</details>
+
+`--semantic=false`는 Ollama 없이 실행하는 검색이다. 의미 검색을 함께 쓰려면 로컬 Ollama를
+실행한 상태에서 `odeduck catalog semantic-build`로 인덱스를 만든다. 이후 `--semantic=false`를 빼면 된다.
+의미 검색이 반드시 필요한 조사에는 `--require-semantic`을 사용한다. 인덱스나 Ollama에 문제가 있으면
+일반 검색으로 조용히 대체하지 않고 실패한다.
+
+## 목표에서 결과까지 실행하기 — experimental
+
+v0.19.0의 `solve`는 목표를 역할·범위·필수 출력으로 나누고 검색·검사·취득·연결·계산을 반복한다.
+결과와 근거를 검토하다 빠진 자료가 드러나면 같은 목표와 예산 안에서 대안을 찾는다.
+MCP에서는 `advance_goal`로 host가 같은 실행기를 진행한다.
+
+![목표를 역할별로 탐색하고 원천을 검사해 조회·연결·계산한다. 필수 출력과 근거가 부족하면 예산 안에서 재탐색하며, 허용된 검토를 통과한 결과 또는 미완료 사유를 반환한다.](docs/assets/odeduck-goal-flow.png)
+
+그림의 폭염 질문은 실행 흐름을 설명하는 예시다. 전체 자동 완주를 검증한 사례는 아니다.
+[다이어그램 원본](docs/assets/odeduck-goal-flow.html)
+
+설치·로그인된 Codex·Claude·Gemini 중 하나와 로컬 Ollama가 필요하다. Cursor는 `solve`의 계획기로
+지원하지 않는다. 아래 명령은 실험 기능을 실행하는 예시이며 목표 완주를 보장하지 않는다.
+
+```sh
+odeduck catalog semantic-build
+odeduck solve "폭염 때 어르신이 쉴 곳을 찾는 데 도움이 될 데이터를 서로 연결해줘"
+```
+
+**실행 뒤에는 JSON의 결과·근거·미완료 사유를 확인한다.** 결과가 만들어져도 질문 전체가 해결됐다는 뜻은 아니다.
+
+- **실행 한도:** 기본 32단계. agent CLI의 비용·호출 한도가 적용된다.
+- **취득 조건:** 의미 검색이 실제로 쓰이지 않으면 기본적으로 멈춘다. 자동 활용신청은 하지 않는다.
+- **계산 범위:** API·CSV·ZIP 내부 CSV·XLSX·포털 STD의 제한된 표본을 조회·연결·집계한다.
+- **완료 조건:** 필수 출력과 지역·식별자·기간의 의미가 충족돼야 한다. 필요한 검토가 끝나지 않으면 미완료로 반환하고 CLI는 실패 코드로 종료한다.
+
+원천 값 공유와 별도 모델 검토는 **기본으로 꺼져 있다.** 완료 검토를 사용하려면 아래 설정을 명시적으로 켜야 한다.
+이는 모델 검토이며 현장·사람 검증을 뜻하지 않는다.
+
+<details>
+<summary>원천 공유와 별도 모델 검토 설정</summary>
+
+외부 CLI 계획기에는 기본적으로 원천 값을 보내지 않는다. 선택한 행·필드를 근거로 읽게 하려면
+`--agent=claude --share-evidence`처럼 수신 모델 하나를 명시한다. 자동 모델 전환은 허용하지 않는다.
+MCP에서는 서버를 `mcp --share-goal-evidence`로 시작해야 하며 모델이 tool 입력으로 켤 수 없다.
+세션당 최대 8개/64 KiB의 선택 근거만 허용한다. 개인정보·전송 권한은 사용자가 확인해야 하며,
+이 설정은 기존 MCP 실행 결과나 `call_api` 원문 출력을 차단하는 기능이 아니다.
+
+출력 형식이 맞아도 지역·식별자·시간의 의미가 검증되지 않으면 `review_required`로 남기고 같은 목표·예산
+안에서 추가 근거와 대안을 찾는다. 제한된 원천 보고는 CLI의 `--review-source-reports`(명시한 agent와
+`--share-evidence` 필수), MCP의 `--review-goals-with=claude`와 `--share-goal-evidence`로 별도 검토를
+켤 수 있다. typed 관계·계산은 CLI `--review-analyses` 또는 MCP 시작 설정 `--review-goal-analyses`로
+추가 허용한다. 원래 질문·출력별 지지와 관계·기간·측정·범위를 통과해야 성공 종료한다. 모델 검토이지
+현장·사람 검증은 아니며 공간·인과·사업 가설 및 범용 목표 완주는 미완료다. 결과와 검토는 실행 revision에 묶인다.
+[원천 보고 검토의 범위와 공개 정책](docs/specs/goal-source-report-review-v1.md)을 확인할 수 있다.
+
+</details>
+
+<details>
+<summary>지원 연산과 원천 추적 범위</summary>
+
+실제 결합은 API·직접 CSV·ZIP 내부 CSV·XLSX 셀 범위·포털 STD의 제한된 표본을 지원한다. 먼저 필수 역할·범위·출력을 고정하고,
+빠진 항목이 있으면 부분 결과로 남겨 탐색을 계속한다. 한 원천의 필드 조회·집계도 가능하며 결합은 선택 연산이다.
+`sample_executed`는 표본 실행 결과이며, 필수 요구 충족이나 의미 검증과는 별개다.
+
+출처, 요청 조건, 원본 위치와 연결하지 못한 기록을 추적한다. 원천에 적힌 값, 계산 결과, 해석과 가설은 구분한다.
+직접 CSV는 선택적으로 전체를 순차 검사하고, 관측한 좌표를 기준으로 전체 일치 레코드의 최근접 후보를
+계산할 수 있다. 이 구면 거리는 실제 이동 경로나 현재 접근 가능성을 뜻하지 않는다.
+전체 CSV 검사에서는 `sample.whereIn`으로 여러 지역·연령처럼 정확한 값 목록을 함께 고를 수 있다.
+파일 전체 검사와 일치 행의 실제 보관, 요청한 집단 전체의 확보는 각각 구분해 보고한다.
+
+검사한 FILE의 등록된 공식 HTML 설명은 `sample`의 `delivery:"document"`로 별도 관측할 수 있다.
+선택 공개한 원문만 `composition.support`로 해석 검토에 연결하며 계산 행이나 모집단 증거로 자동
+승격하지 않는다. 현재 지원은 행안부 월간 통계 도움말과 등록된 KOSIS 공식 답변이며 임의 URL·PDF는
+지원하지 않는다. [보조 문서 읽기 계약](docs/specs/source-document-acquisition-v1.md)에 범위를 명시했다.
+[실행 계약과 한계](docs/specs/goal-driven-composition-v1.md)를 확인할 수 있다.
+
+</details>
+
+<details>
+<summary>연결 판정을 장부에 남기는 조건</summary>
+
+연결 판정은 MCP의 `record_connection_assessment`로 로컬 장부에 남길 수 있다. 출처·필드·관측 시점·
+표본 집계를 보존하며 API 응답 원문이나 인증정보는 저장하지 않는다. `sample_verified`는 같은 MCP
+세션의 최근 `call_api` profile 영수증과 일치해야 한다. `solve`·`advance_goal`은 장부에 자동 기록하지 않는다.
+저장·판정 조건은 [연결 근거 장부 명세](docs/specs/connection-evidence-ledger-v1.md)에 있다.
+
+</details>
+
+## 확인한 결과와 남은 검증
+
+| 확인한 것 | 근거와 적용 범위 |
+| --- | --- |
+| 통합 카탈로그 | 2026-09-02 릴리스 기준 96,683개 노드. REST·LINK·FILE과 복수 제공형 보존 |
+| 실계정 신청·호출 | 온비드 공매·나라장터 입찰·공영도매시장 경매·중소기업 지원사업 데이터 4종의 활용신청→승인→호출 |
+| 외부 제공기관·변경 감시 | SafetyKorea·FoodSafetyKorea·VWorld 호출. 서울 열린데이터광장은 HTTPS 부재로 호출 차단. adapter 4개·canary 11개를 주간 CI로 검사 |
+| 원천 보고 검토 | 두 개발 사례의 마지막 12회에서 승인 기대 6회·보류 기대 6회가 일치. 사전 선택한 원천·절차의 검증 |
+| 전체 목표 완주 | 미완료. 사전 선택한 원천의 검토 결과를 분야 간 자율 완주의 증거로 사용하지 않음 |
+
+원천 보고 검토의 [전체 시도·실패 기록](docs/research/source-report-review-validation-2026-09-08.md)를
+함께 공개했다. 사전 선택한 자료로 얻은 검토 결과와 키워드·PK 없이 목표에 도달하는 능력은 구분한다.
+분야 간 자율 완주와 공간·인과·사업 가설의 검증은 아직 끝나지 않았다.
+
+<details>
+<summary>기존 공개 도구와 비교한 범위</summary>
+
+data.go.kr 관련 공개 도구 10개를 고정한 소스 revision의 도구 등록과 호출 코드로 비교했다.
+검색→상세→호출을 지원하는 도구가 있었다. 조사한 구현에서는 활용신청 제출과 승인 확인을 사람이 맡았다.
+
+<p align="center">
+  <img src="docs/assets/odeduck-before-after.svg" width="900" alt="조사한 공개 도구의 탐색·호출 범위와 오데덕의 목표 기반 검색·검사·활용신청·승인 확인·호출 흐름 비교">
+</p>
+
+오데덕은 목표 기반 카탈로그 탐색, API·FILE·LINK 검사, 활용신청·승인·키 재사용·실호출을 한 흐름에
+묶는다. 이 비교는 범용 목표 완주나 분석 정확도의 우위를 입증하지 않는다.
+비교 대상·시점·판정 근거는 [경쟁 워크플로 감사](docs/research/competitive-workflow-audit.md)와
+[경쟁·수요 교차 검증](docs/research/competitor-and-demand-cross-validation-2026.md)에 있다.
+
+</details>
+
+## 인증과 데이터 취급
+
+`odeduck login`은 사람이 정부 SSO 로그인을 마치면 쿠키를 저장하고 브라우저를 닫는다.
+정부 SSO나 제공기관의 심의승인을 우회하지 않는다. data.go.kr의 계정 키와 외부 provider 키는 구분하며
+확인한 호출 범위에서만 사용한다. 인증키는 MCP 입력·출력이나 로그에 내보내지 않는다.
+
+세션과 키는 운영체제의 사용자 설정 디렉터리에 파일 권한으로 보호해 저장하며 암호화되지는 않는다.
+`odeduck logout`은 세션, data.go.kr 키, provider 키와 Chrome 프로파일을 지운다.
+
+MCP의 `apply`는 확인 대화 없이 실제 활용신청을 만들 수 있다. 제출 전에 직접 확인하려면
+`y/N`을 묻는 CLI를 사용한다. 포털 HTML 변경은 `odeduck doctor`와 실호출 점검으로 감시한다.
+
+`catalog discover`와 `solve`는 자연어 목표를 선택한 AI 제공자에게 전달한다. `discover`는
+해당 에이전트의 로그인 토큰을 읽거나 저장하지 않는다. Cursor는 격리된 초기 검색 계획에만 사용하며
+실제 카탈로그 메타데이터를 보내지 않는다. 미공개 정보를 목표에 포함하기 전에 전송 범위를 확인해야 한다.
+
+목표 실행기의 선택 근거 공개 설정과 일반 MCP 응답은 별개다. `call_api`의 원문 결과는 MCP host가
+받는다. 원천 데이터의 이용조건과 전송 권한은 각 제공기관 정책을 따른다.
+자세한 경계는 [ADR](docs/adr/)과 [provider adapter guide](docs/provider-adapters.md)에 있다.
+
+## 개발과 기여
+
+원래 질문, 기대하는 결과, 실제 원천과 실패 지점을 함께 남긴 사례를 환영한다.
+목표 실행을 개선할 때는 가능한 질문의 산출물과 잘못된 연결을 차단하는 사례를 함께 검증한다.
+새 제공기관 adapter에는 공식 문서, 고정된 인증 범위, 계약 테스트와 실호출 점검이 필요하다.
+
+```sh
+go mod tidy -diff
+go run ./scripts/sync-brand.go --check
 go vet ./...
+go test ./...
 go build ./...
 ```
 
-전체 구조는 [아키텍처 문서](ARCHITECTURE.md), 구현 규칙은
-[provider adapter guide](docs/provider-adapters.md), 설계 결정은 [ADR](docs/adr/)에서 시작한다.
-처음 기여한다면 [기여 가이드](CONTRIBUTING.md)를, 보안 문제라면 공개 이슈를 만들기 전에
-[보안 정책](SECURITY.md)을 먼저 읽는다.
-사용법 질문과 재현 가능한 공개데이터 질문은 [Discussions](https://github.com/JungHoonGhae/odeduck/discussions)에
-남길 수 있다.
+| 문서 | 내용 |
+| --- | --- |
+| [INTENT.md](INTENT.md) | 사용자 문제, 기대 산출물과 완료 기준 |
+| [목표 실행·검증 계획](docs/specs/goal-driven-completion-plan.md) | 요구사항별 구현·실증 상태와 남은 과제 |
+| [아키텍처](ARCHITECTURE.md) · [도메인 용어](CONTEXT.md) | 구성요소, 데이터 흐름과 공통 언어 |
+| [연결 발견 명세](docs/specs/cross-domain-connection-discovery-v1.md) · [연결 발견 평가](docs/research/connection-discovery-evaluation.md) | 후보 탐색·선택 계약과 실제 검색 결과 |
+| [연결 근거 장부](docs/specs/connection-evidence-ledger-v1.md) | 출처·시점·판정의 보존과 재검증 경계 |
+| [제공기관 adapter guide](docs/provider-adapters.md) · [ADR](docs/adr/) | 호출 계약과 설계 결정 |
 
-공개 이름·문구·로고 경로는 [`docs/brand/brand.json`](docs/brand/brand.json)이 기준이다. 값을 바꾼 뒤
-`go run ./scripts/sync-brand.go`를 실행하면 위 브랜드 블록이 갱신되고 CI는 `--check`로 동기화를 확인한다.
+처음 기여한다면 [기여 가이드](CONTRIBUTING.md)를, 보안 문제라면 공개 이슈를 만들기 전에
+[보안 정책](SECURITY.md)을 읽는다. 사용법 질문과 재현 가능한 공개데이터 질문은
+[Discussions](https://github.com/JungHoonGhae/odeduck/discussions)에 남길 수 있다.
+
+공개 이름·문구·로고 경로는 [`docs/brand/brand.json`](docs/brand/brand.json)이 기준이다.
+값을 바꾼 뒤 `go run ./scripts/sync-brand.go`를 실행하면 README 상단이 갱신된다.
+CI는 `--check`로 동기화를 확인한다.
 
 ## 라이선스
 
-[MIT](LICENSE). 데이터의 짝을 찾는 데 가장 짧은 라이선스.
+[MIT](LICENSE).
