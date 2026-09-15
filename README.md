@@ -1,3 +1,5 @@
+> 이 README는 오데덕이 직접 안내하는 설정이라, 일부러 반말로 썼습니다. 편하게 읽어주세요.
+
 <!-- brand:start -->
 <p align="center">
   <img src="docs/assets/brand-symbol.svg" width="190" alt="흩어진 공공데이터의 연결을 찾는 오데덕 캐릭터">
@@ -16,10 +18,10 @@
 
 <!-- Keep the introduction animation visible. Core capabilities and architecture must also remain visible, not collapsed. -->
 <p align="center">
-  <a href="docs/assets/odeduck-hero.mp4"><img src="docs/assets/odeduck-hero.gif" width="800" alt="거대한 캐비닛 사이를 뛰어다니는 오데덕. 좌측 하단에 빼꼼 로고와 붓글씨 오.데.덕., 이런 건 덕후 시켜."></a>
+  <a href="docs/assets/odeduck-hero.mp4"><img src="docs/assets/odeduck-hero.gif" width="800" alt="거대한 캐비닛 사이를 뛰어다니는 오데덕. 좌측 하단에 투명한 빼꼼 로고, 궁서체 오.데.덕., GitHub 주소가 세로로 배치되어 있다."></a>
 </p>
 <p align="center">
-  <sub>찾고, 신청하고, 가져오는 일. 이런 건 덕후 시켜. · <a href="docs/assets/odeduck-hero.mp4">영상 다운로드</a></sub>
+  <sub><a href="docs/assets/odeduck-hero.mp4">영상 다운로드</a> · <a href="docs/assets/odeduck-hero-brand.svg">투명 벡터 로고</a></sub>
 </p>
 
 <p align="center">

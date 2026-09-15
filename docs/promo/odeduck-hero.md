@@ -19,16 +19,18 @@
 | 파일 | 용도 |
 | --- | --- |
 | `docs/assets/odeduck-hero.gif` | README 자동 재생 히어로 |
-| `docs/assets/odeduck-hero.mp4` | 로고·붓글씨를 합성한 10초, 16:9, 720p H.264 영상. LinkedIn 업로드 겸용 |
+| `docs/assets/odeduck-hero.mp4` | 로고·궁서체를 합성한 10초, 16:9, 720p H.264 영상. LinkedIn 업로드 겸용 |
 | `docs/assets/odeduck-hero-poster.webp` | 정적 포스터·영상 폴백 |
 | `docs/assets/odeduck-hero-source.mp4` | 합성 전 최초 생성 영상. 다시 출력할 때 사용 |
+| `docs/assets/odeduck-hero-brand.svg` | 투명 배경의 벡터 로고·제목·GitHub 주소 |
 
 Higgsfield Seedance 2.0 Mini로 만든 최초 영상은 source 파일로 보존한다. 영상 속 뛰어다니는 캐릭터는
-수정하지 않았다. 좌측 하단에 기존 안경 쓴 빼꼼 로고와 `오.데.덕.`, `이런 건 덕후 시켜.`를 합성했다.
-서랍 위에서도 잘 읽히도록 따뜻한 아이보리의 반투명 바탕을 사용한다. 음성은 없다.
+수정하지 않았다. 좌측 하단에 기존 안경 쓴 빼꼼 로고, `오.데.덕.`, GitHub 주소를 위에서 아래로 배치했다.
+배경 박스와 부제는 없다. 서랍 위에서도 글자를 읽을 수 있도록 글자 모양의 얇은 외곽선만 사용한다.
+로고와 글자는 SVG 경로이며, 영상 합성 시에만 투명 RGBA로 변환한다. 음성은 없다.
 
-글꼴은 NHN의 **나눔손글씨 붓 / Nanum Brush Script**, SIL Open Font License 1.1이다.
-공식 배포본을 변경 없이 사용하며 [글꼴·라이선스·출처](../../scripts/promo/fonts/)를 함께 보관한다.
+글꼴은 개인·기업에 무료 사용과 재배포가 허용된 **조선궁서체**다.
+TTF를 변경 없이 사용하며 [글꼴·이용 조건·출처](../../scripts/promo/fonts/)를 함께 보관한다.
 영상에 들어가는 문구는 [브랜드 설정](../brand/brand.json)에서 관리한다.
 
 정확한 제품 주장은 README의 카탈로그 수치, 경쟁 워크플로 감사, 실제 명세·컬럼 검증 설명이 맡고,
@@ -36,9 +38,10 @@ Higgsfield Seedance 2.0 Mini로 만든 최초 영상은 source 파일로 보존�
 
 ## 다시 출력하기
 
-저장소 루트에서 Python 3와 FFmpeg(drawtext, libx264, libwebp 포함)를 사용한다.
+저장소 루트에서 Python 3, fontTools, ImageMagick(SVG 지원), FFmpeg(libx264, libwebp 포함)를 사용한다.
 
 ```sh
+python3 -m pip install -r scripts/promo/requirements.txt
 python3 scripts/promo/render.py
 # 다른 FFmpeg 실행 파일 사용:
 python3 scripts/promo/render.py --ffmpeg /path/to/ffmpeg
