@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Overlay the existing logo and licensed brush lettering on the hero video."""
+"""Composite the transparent vector logo, title and URL on the hero video."""
 
 import argparse
-import json
 from pathlib import Path
 import shutil
 import subprocess
+import sys
 import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -17,7 +17,7 @@ def run(ffmpeg, *args):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--ffmpeg", default=shutil.which("ffmpeg"), help="FFmpeg with drawtext, libx264 and libwebp")
+    parser.add_argument("--ffmpeg", default=shutil.which("ffmpeg"), help="FFmpeg with libx264 and libwebp")
     parser.add_argument("--source", type=Path, default=ROOT / "docs/assets/odeduck-hero-source.mp4")
     parser.add_argument("--output", type=Path, default=ROOT / "docs/assets")
     args = parser.parse_args()
@@ -29,27 +29,16 @@ def main():
     movie = output / "odeduck-hero.mp4"
     if source == movie:
         parser.error("The source must be the unbranded original, not the output video")
-    brand = json.loads((ROOT / "docs/brand/brand.json").read_text())
-    font = "scripts/promo/fonts/NanumBrushScript-Regular.ttf"
-
-    # Only the transparent margins of the existing 2048px logo are cropped.
-    # No redraw, recoloring or modification to the running character.
+    subprocess.run([sys.executable, ROOT / "scripts/promo/build_overlay.py"], check=True)
+    # SVG remains editable vector artwork; only the video compositor needs RGBA.
     with tempfile.TemporaryDirectory(prefix="odeduck-render-") as temporary:
-        title = Path(temporary) / "title.txt"
-        subtitle = Path(temporary) / "subtitle.txt"
-        title.write_text(brand["videoTitle"])
-        subtitle.write_text(brand["videoSubtitle"])
-        graph = (
-            "[0:v]drawbox=x=24:y=550:w=344:h=146:color=0xefe5d3@0.94:t=fill[bg];"
-            "[1:v]crop=787:1208:627:424,scale=-1:126[logo];"
-            "[bg][logo]overlay=40:560,"
-            f"drawtext=fontfile={font}:textfile={title}:expansion=none:"
-            "fontsize=78:fontcolor=0x151513:x=139:y=555,"
-            f"drawtext=fontfile={font}:textfile={subtitle}:expansion=none:"
-            "fontsize=34:fontcolor=0x353026:x=141:y=644[v]"
-        )
-        run(args.ffmpeg, "-i", source, "-i", ROOT / "docs/assets/brand-symbol-2048.png",
-            "-filter_complex", graph, "-map", "[v]", "-an", "-c:v", "libx264",
+        overlay = Path(temporary) / "overlay.png"
+        subprocess.run(["magick", "-background", "none", "-density", "288",
+                        ROOT / "docs/assets/odeduck-hero-brand.svg", "-resize", "960x678",
+                        "PNG32:" + str(overlay)], check=True)
+        run(args.ffmpeg, "-i", source, "-i", overlay,
+            "-filter_complex", "[1:v]scale=320:226:flags=lanczos[brand];[0:v][brand]overlay=24:466[v]",
+            "-map", "[v]", "-an", "-c:v", "libx264",
             "-preset", "slow", "-crf", "18", "-pix_fmt", "yuv420p", "-movflags", "+faststart", movie)
 
     run(args.ffmpeg, "-i", movie, "-filter_complex",
