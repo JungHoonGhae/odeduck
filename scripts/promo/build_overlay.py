@@ -15,8 +15,7 @@ ET.register_namespace("", NS)
 def lettering(font, text, size, baseline):
     cmap, glyphs = font.getBestCmap(), font.getGlyphSet()
     scale = size / font["head"].unitsPerEm
-    width = sum(font["hmtx"].metrics[cmap[ord(c)]][0] for c in text) * scale
-    x, paths = 160 - width / 2, []
+    x, paths = 4, []
     for char in text:
         name = cmap[ord(char)]
         pen = SVGPathPen(glyphs)
@@ -30,14 +29,14 @@ def lettering(font, text, size, baseline):
 def main():
     brand = json.loads((ROOT / "docs/brand/brand.json").read_text())
     font = TTFont(ROOT / "scripts/promo/fonts/ChosunGs.TTF")
-    svg = ET.Element(f"{{{NS}}}svg", {"width": "320", "height": "226", "viewBox": "0 0 320 226", "role": "img"})
+    svg = ET.Element(f"{{{NS}}}svg", {"width": "260", "height": "150", "viewBox": "0 0 260 150", "role": "img"})
     ET.SubElement(svg, f"{{{NS}}}title").text = brand["videoTitle"] + " " + brand["videoUrl"]
-    ET.SubElement(svg, f"{{{NS}}}desc").text = "기존 벡터 로고 아래에 조선궁서체 제목과 GitHub 주소. 배경 없음. 서체 저작권: (주)조선일보사."
-    logo = ET.SubElement(svg, f"{{{NS}}}g", {"transform": "translate(126 0) scale(0.08640406607369759) translate(-627 -424)"})
+    ET.SubElement(svg, f"{{{NS}}}desc").text = "작은 벡터 로고 아래에 조선궁서체 제목과 GitHub 주소를 왼쪽 정렬. 배경 없음. 서체 저작권: (주)조선일보사."
+    logo = ET.SubElement(svg, f"{{{NS}}}g", {"transform": "translate(4 0) scale(0.055299) translate(-627 -424)"})
     for child in ET.parse(ROOT / brand["logoPath"]).getroot():
         if child.tag == f"{{{NS}}}g":
             logo.append(child)
-    for text, size, baseline, outline in [(brand["videoTitle"], 52, 166, "2"), (brand["videoUrl"], 17, 217, "1.4")]:
+    for text, size, baseline, outline in [(brand["videoTitle"], 36, 104, "1.2"), (brand["videoUrl"], 14, 142, "1")]:
         paths = lettering(font, text, size, baseline)
         # A thin letter-shaped outline; no background rectangle or raster images.
         for attrs in [{"fill": "#151513", "stroke": "#f7f3eb", "stroke-width": outline, "stroke-linejoin": "round"}, {"fill": "#151513"}]:

@@ -34,10 +34,10 @@ def main():
     with tempfile.TemporaryDirectory(prefix="odeduck-render-") as temporary:
         overlay = Path(temporary) / "overlay.png"
         subprocess.run(["magick", "-background", "none", "-density", "288",
-                        ROOT / "docs/assets/odeduck-hero-brand.svg", "-resize", "960x678",
+                        ROOT / "docs/assets/odeduck-hero-brand.svg", "-resize", "780x450",
                         "PNG32:" + str(overlay)], check=True)
         run(args.ffmpeg, "-i", source, "-i", overlay,
-            "-filter_complex", "[1:v]scale=320:226:flags=lanczos[brand];[0:v][brand]overlay=24:466[v]",
+            "-filter_complex", "[1:v]scale=260:150:flags=lanczos[brand];[0:v][brand]overlay=24:546[v]",
             "-map", "[v]", "-an", "-c:v", "libx264",
             "-preset", "slow", "-crf", "18", "-pix_fmt", "yuv420p", "-movflags", "+faststart", movie)
 
