@@ -1,11 +1,13 @@
 {
   "displayName": "오데덕",
   "tagline": "공공데이터 덕후, 오.데.덕.",
-  "acrostic": [
-    { "syllable": "오", "text": "오픈API라며." },
-    { "syllable": "데", "text": "데이터 받는데 신청서를 쓰래." },
-    { "syllable": "덕", "text": "덕후는 이게 좋대. 그럼 얘 시켜." }
+  "introduction": [
+    "공공데이터는 열려 있습니다.",
+    "찾고, 신청하고, 가져오는 건",
+    "이 덕후가 합니다."
   ],
+  "videoTitle": "오.데.덕.",
+  "videoSubtitle": "이런 건 덕후 시켜.",
   "logoPath": "docs/assets/brand-symbol.svg",
   "logoAlt": "흩어진 공공데이터의 연결을 찾는 오데덕 캐릭터",
   "technicalName": "odeduck",

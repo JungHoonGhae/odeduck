@@ -19,12 +19,33 @@
 | 파일 | 용도 |
 | --- | --- |
 | `docs/assets/odeduck-hero.gif` | README 자동 재생 히어로 |
-| `docs/assets/odeduck-hero.mp4` | 10초, 16:9, 720p 원본 |
+| `docs/assets/odeduck-hero.mp4` | 로고·붓글씨를 합성한 10초, 16:9, 720p H.264 영상. LinkedIn 업로드 겸용 |
 | `docs/assets/odeduck-hero-poster.webp` | 정적 포스터·영상 폴백 |
+| `docs/assets/odeduck-hero-source.mp4` | 합성 전 최초 생성 영상. 다시 출력할 때 사용 |
 
-Higgsfield Seedance 2.0 Mini로 만든 최초 원본을 그대로 사용하며, 안경을 합성하는 후속 편집은 적용하지
-않는다. 음성과 자막도 넣지 않았다. 정확한 제품 주장은 README의 카탈로그 수치, 경쟁 워크플로 감사,
-실제 명세·컬럼 검증 설명이 맡고, 이 애니메이션은 그 앞에서 오데덕의 성격과 역할만 전달한다.
+Higgsfield Seedance 2.0 Mini로 만든 최초 영상은 source 파일로 보존한다. 영상 속 뛰어다니는 캐릭터는
+수정하지 않았다. 좌측 하단에 기존 안경 쓴 빼꼼 로고와 `오.데.덕.`, `이런 건 덕후 시켜.`를 합성했다.
+서랍 위에서도 잘 읽히도록 따뜻한 아이보리의 반투명 바탕을 사용한다. 음성은 없다.
 
-대안 시안과 생성 기록은 Git에서 제외된 로컬 `promo-studio/`에 보존한다. 공개 README에는 위 원본만
-노출한다.
+글꼴은 NHN의 **나눔손글씨 붓 / Nanum Brush Script**, SIL Open Font License 1.1이다.
+공식 배포본을 변경 없이 사용하며 [글꼴·라이선스·출처](../../scripts/promo/fonts/)를 함께 보관한다.
+영상에 들어가는 문구는 [브랜드 설정](../brand/brand.json)에서 관리한다.
+
+정확한 제품 주장은 README의 카탈로그 수치, 경쟁 워크플로 감사, 실제 명세·컬럼 검증 설명이 맡고,
+이 애니메이션은 그 앞에서 오데덕의 성격과 역할을 전달한다.
+
+## 다시 출력하기
+
+저장소 루트에서 Python 3와 FFmpeg(drawtext, libx264, libwebp 포함)를 사용한다.
+
+```sh
+python3 scripts/promo/render.py
+# 다른 FFmpeg 실행 파일 사용:
+python3 scripts/promo/render.py --ffmpeg /path/to/ffmpeg
+```
+
+원본과 브랜드 설정으로 MP4, 무한 반복 GIF(800px, 10fps, 64색), 포스터를 함께 만든다.
+GIF는 README 자동 재생용이고, LinkedIn에는 `odeduck-hero.mp4`를 업로드한다.
+
+대안 시안과 생성 기록은 Git에서 제외된 로컬 `promo-studio/`에 보존한다. README에는 로고가 들어간
+최종 GIF와 MP4를 노출한다. LinkedIn 공개 글은 [게시글 초안](linkedin-launch.md)에 있다.

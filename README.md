@@ -6,9 +6,9 @@
 <h1 align="center">오데덕</h1>
 
 <p align="center">
-  <strong>오</strong> — 오픈API라며.<br>
-  <strong>데</strong> — 데이터 받는데 신청서를 쓰래.<br>
-  <strong>덕</strong> — 덕후는 이게 좋대. 그럼 얘 시켜.
+  공공데이터는 열려 있습니다.<br>
+  찾고, 신청하고, 가져오는 건<br>
+  이 덕후가 합니다.
 </p>
 
 <p align="center"><strong>공공데이터 덕후, 오.데.덕.</strong></p>
@@ -16,10 +16,10 @@
 
 <!-- Keep the introduction animation visible. Core capabilities and architecture must also remain visible, not collapsed. -->
 <p align="center">
-  <a href="docs/assets/odeduck-hero.mp4"><img src="docs/assets/odeduck-hero.gif" width="800" alt="안경을 쓰지 않은 아주 작은 오데덕이 거대한 캐비닛 사이를 뛰어다니며 서로 떨어진 공공데이터를 찾아 하나의 연결망으로 잇는 애니메이션"></a>
+  <a href="docs/assets/odeduck-hero.mp4"><img src="docs/assets/odeduck-hero.gif" width="800" alt="거대한 캐비닛 사이를 뛰어다니는 오데덕. 좌측 하단에 빼꼼 로고와 붓글씨 오.데.덕., 이런 건 덕후 시켜."></a>
 </p>
 <p align="center">
-  <sub>찾고, 신청하고, 가져오는 일. 오데덕한테 맡겨. · <a href="docs/assets/odeduck-hero.mp4">원본 영상</a></sub>
+  <sub>찾고, 신청하고, 가져오는 일. 이런 건 덕후 시켜. · <a href="docs/assets/odeduck-hero.mp4">영상 다운로드</a></sub>
 </p>
 
 <p align="center">
