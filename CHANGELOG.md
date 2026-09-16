@@ -7,50 +7,38 @@ section matching a `vX.Y.Z` tag as the GitHub release notes.
 
 ## [Unreleased]
 
-### Added
+## [0.19.1] - 2026-09-16
 
-- Installable `skills/odeduck` routes sourced report and comparison goals to `solve` /
-  `advance_goal`, and dataset access to inspection, application and authenticated calls.
-  Setup follows the latest stable release; execution follows the installed runtime's help and MCP guide.
-
-### Changed
-
-- Position odeduck as the local control plane for agent-driven Korean public-data
-  work. Make goal execution a primary README entry point alongside its access and
-  execution foundation, with current completion limits and supporting evidence visible.
-
-- Introduce odeduck with an 오·데·덕 acrostic in the README and a short one-line
-  repository description. Keep the README copy in the brand configuration and preserve
-  the visible introduction animation and product diagrams.
-
-- Give the manual search, application and query setup bottlenecks their own README
-  slide. Introduce odeduck as the helper who finds, applies for and retrieves public
-  data, and explain experimental analysis with an explicitly fictional auction
-  price comparison instead of an abstract execution loop.
-
-- Lead the README with search, application and key-handling friction, then show
-  how one auction question can surface transaction, commercial-area and soil
-  data. Preserve the established brand and source assets, and distinguish
-  discovered connections from completed joins or simultaneous application.
-
-- Rewrite the README for people using odeduck: lead with everyday questions, setup
-  and application-to-query steps. Move advanced options, verification records and
-  maintainer resources to linked guides; keep the introduction and all three diagrams visible.
-
-- Put automatic application, approval checking, key injection and API calling back
-  in the main README reading path. Add a shared CLI/MCP architecture overview and
-  redraw the goal loop using the existing cream-and-ink illustration style,
-  Pretendard labels and the original character, with fewer words inside diagrams.
-
-- Guide README readers through installation, first search, agent setup and a first
-  question, with explicit checkpoints and folded advanced details. Add a Pretendard
-  goal-flow diagram that distinguishes replanning, reviewed output and incomplete
-  results, while keeping the experimental v0.19.0 boundaries visible.
+로그인 상태 확인과 자동 활용신청 흐름을 개선하고, 사용자용 Agent Skill과 확장 가능한 개발 지침을 정리했습니다.
 
 ### Fixed
 
-- Keep the introduction animation visible below the README brand header without
-  requiring readers to open a disclosure section.
+- `login`은 저장된 세션을 먼저 검증하고, 유효하면 브라우저를 다시 열지 않습니다.
+  활용신청용 headless 브라우저도 저장된 세션을 확인한 뒤 시작합니다.
+- `status`는 세션 없음·만료 시 실패 상태를 반환합니다. 포털 통신 장애와 페이지 형식 변경을
+  로그인 실패로 바꾸지 않으며, `applications`도 원래 오류를 보존합니다.
+- MCP 가이드와 사용자용 Skill은 신청 전에 로그인·기존 승인 상태를 확인하도록 안내합니다.
+  오류 응답에 동반된 빈 신청 목록을 미신청 상태로 해석하지 않고, 로그인 후 원래 작업을 이어갑니다.
+
+### Added
+
+- 설치 가능한 `odeduck` Agent Skill을 제공합니다. 보고·비교·계산은 `solve` / `advance_goal`로,
+  개별 데이터 조회는 검색·검사·신청·호출로 연결합니다. 실행 조건은 설치된 CLI/MCP에서 확인합니다.
+- `catalog validate-release --snapshot`으로 배포 카탈로그를 로컬 설치 상태 변경 없이 검사합니다.
+  별도 `Catalog refresh` 작업은 검증된 카탈로그만 독립적으로 발행합니다.
+
+### Changed
+
+- 사업 검증·데이터 설계용 Skill은 짧은 진입 문서와 작업별 상세 문서로 나눴습니다.
+  새 기능의 지침·실행 계약·평가 자료를 추가할 위치를 명시하고, 특정 제품 버전에 고정하지 않습니다.
+- README를 한국어 사용자 중심으로 정리하고, 오데덕을 공공데이터 탐색부터 실행까지 연결하는
+  오픈소스 플랫폼으로 소개합니다. 실데이터로 확인한 공개 파일·활용신청 사례를 홍보 문서에 담았습니다.
+- 코드 릴리스는 검증된 기존 카탈로그를 재사용합니다. 체크섬·구조·제공형 범위·대표 검색 질의를
+  다시 검사하고, 수집 날짜와 압축 파일은 보존하며 출처 태그·해시를 `catalog-source.json`에 동봉합니다.
+  카탈로그 재사용은 최신 데이터 수집을 의미하지 않습니다.
+
+목표 실행의 기존 지원 범위와 승인 조건은 유지됩니다. `solve` 내부 자동 활용신청이나 범용 목표 완주가
+완료됐다는 의미는 아닙니다.
 
 ## [0.19.0] - 2026-09-09
 

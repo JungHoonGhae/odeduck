@@ -5,6 +5,7 @@ import (
 	"compress/gzip"
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -335,6 +336,67 @@ func TestCatalogInstallSnapshotCommandInstallsValidatedPrebuilt(t *testing.T) {
 	}
 	if loaded.Source != catalog.SourceOfficial || len(loaded.Entries) != 1 || loaded.Entries[0].PK != "15000001" {
 		t.Fatalf("installed snapshot = %+v", loaded)
+	}
+}
+
+func TestCatalogValidateReleaseSnapshotWithoutInstalling(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, ".config"))
+	t.Setenv("APPDATA", filepath.Join(home, "AppData", "Roaming"))
+	golden, err := catalog.DefaultReleaseGoldenSet()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var entries []catalog.Entry
+	for _, item := range golden.Cases {
+		entries = append(entries, catalog.Entry{PK: item.ExpectedPK, Title: item.Query, SvcType: item.ExpectedSvcType})
+	}
+	for _, tc := range []struct {
+		name    string
+		entries []catalog.Entry
+		corrupt bool
+		wantErr bool
+	}{
+		{name: "validated file without local catalogue", entries: entries},
+		{name: "missing golden result", entries: entries[:len(entries)-1], wantErr: true},
+		{name: "invalid archive", corrupt: true, wantErr: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var compressed bytes.Buffer
+			zw := gzip.NewWriter(&compressed)
+			if err := json.NewEncoder(zw).Encode(&catalog.Catalog{
+				SyncedAt: time.Now(), Type: "ALL", Source: catalog.SourceCombined, Entries: tc.entries,
+			}); err != nil {
+				t.Fatal(err)
+			}
+			if err := zw.Close(); err != nil {
+				t.Fatal(err)
+			}
+			body := compressed.Bytes()
+			if tc.corrupt {
+				body = []byte("not gzip")
+			}
+			path := filepath.Join(t.TempDir(), "catalog.json.gz")
+			if err := os.WriteFile(path, body, 0600); err != nil {
+				t.Fatal(err)
+			}
+			cmd := catalogValidateReleaseCmd()
+			cmd.SetArgs([]string{"--snapshot", path})
+			var stdout bytes.Buffer
+			cmd.SetOut(&stdout)
+			cmd.SetErr(&bytes.Buffer{})
+			err := cmd.Execute()
+			if (err != nil) != tc.wantErr {
+				t.Fatalf("validation error = %v, want error %v; output=%s", err, tc.wantErr, stdout.String())
+			}
+			if !tc.wantErr && !strings.Contains(stdout.String(), `"passed": true`) {
+				t.Fatalf("missing successful quality report: %s", stdout.String())
+			}
+			if _, err := catalog.Load(); !errors.Is(err, catalog.ErrNotSynced) {
+				t.Fatalf("validation must not install a catalogue: %v", err)
+			}
+		})
 	}
 }
 

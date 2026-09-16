@@ -110,6 +110,8 @@ Go CLI + MCP. 사람은 정부 SSO 로그인 한 번만 하고 이후 포털 작
   이전 kvote verbatim 이식이 세션탈취 표면을 열어뒀던 것을 닫음.
 - 배포: goreleaser가 바이너리·카탈로그·checksum·install.sh/ps1을 같은 릴리스에 묶는다. 설치기는 공개
   GitHub HTTPS 다운로드와 인증된 private preview를 모두 지원하며, 공개 Homebrew 배포는 중단했다.
+  코드 릴리스는 검증된 카탈로그를 재사용하고 전체 수집은 수동 `Catalog refresh` 작업으로 분리한다.
+  원천 선택·검증 실패 시 조치는 `docs/adr/0001-html-scraping-over-api-discovery.md`의 배포 절차를 따른다.
 
 ## Testing
 

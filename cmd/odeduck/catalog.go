@@ -45,7 +45,8 @@ func catalogCmd() *cobra.Command {
 즉시 처리합니다. 포털은 키워드 검색만 제공하므로, 카탈로그가 없으면 "이런 데이터가
 있나?"를 확인하려면 검색어를 하나씩 추측해 볼 수밖에 없습니다.
 
-  odeduck catalog sync            전체 목록 수집 (수십 초)
+  odeduck catalog sync            전체 목록 갱신 (웹 보강 시 수십 분)
+  odeduck catalog sync --source official-file  빠른 월간 CSV 목록 (일부 복수 제공형 제외)
   odeduck catalog discover <목표> Codex·Claude·Gemini·Cursor로 검색축 생성 후 탐색
   odeduck catalog sync --if-stale 오래됐을 때만 수집 — cron/CI 로 주기 갱신할 때
   odeduck catalog semantic-build  Ollama 의미 벡터 인덱스 생성(선택)
@@ -117,7 +118,8 @@ func catalogSyncCmd() *cobra.Command {
 		Short: "포털에서 전체 목록을 받아 로컬 카탈로그 갱신",
 		Long: `공식 목록조회 API를 우선 사용해 전체 오픈API와 파일데이터 카탈로그를 갱신합니다.
 기본 auto는 계정 인증키로 공식 API를 시도하고, 해당 API가 기관 전용이라 사용할 수 없으면
-공개 월간 목록 CSV를 한 번 스트리밍합니다. 둘 다 실패할 때만 포털 웹 수집으로 fallback합니다.
+공개 월간 목록 CSV에 웹 제공형을 보강합니다. 웹 보강이 실패하면 CSV-only로 fallback합니다.
+빠른 CSV 목록만 필요하면 --source official-file을 사용하세요. 전체 웹 보강은 수십 분 걸릴 수 있습니다.
 릴리즈 snapshot은 --source official-file+web으로 로그인·secret 없이 재현할 수 있습니다.
 
 --if-stale 은 카탈로그가 아직 신선하면 아무것도 하지 않고 성공합니다. 갱신 주기를
@@ -527,12 +529,30 @@ func catalogInfoCmd() *cobra.Command {
 }
 
 func catalogValidateReleaseCmd() *cobra.Command {
-	return &cobra.Command{
+	var snapshot string
+	command := &cobra.Command{
 		Use:    "validate-release",
 		Short:  "사람이 검수한 대표 검색 질의로 snapshot 회귀 검사",
 		Hidden: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			cat, err := loadCatalog(cmd)
+			var cat *catalog.Catalog
+			var err error
+			if snapshot == "" {
+				cat, err = loadCatalog(cmd)
+			} else {
+				file, openErr := os.Open(snapshot)
+				if openErr != nil {
+					return openErr
+				}
+				cat, err = catalog.ReadSnapshot(file)
+				closeErr := file.Close()
+				if err == nil {
+					err = closeErr
+				}
+				if err == nil && cat.Stale() {
+					fmt.Fprintf(cmd.ErrOrStderr(), "⚠ 배포 카탈로그가 %.0f일 전 것입니다 — Catalog refresh 작업으로 갱신하세요.\n", cat.Age().Hours()/24)
+				}
+			}
 			if err != nil {
 				return err
 			}
@@ -550,6 +570,8 @@ func catalogValidateReleaseCmd() *cobra.Command {
 			return nil
 		},
 	}
+	command.Flags().StringVar(&snapshot, "snapshot", "", "로컬 상태를 바꾸지 않고 지정한 catalog.json.gz 검사")
+	return command
 }
 
 // loadCatalog reads the catalogue and nudges when it is old, so a stale snapshot

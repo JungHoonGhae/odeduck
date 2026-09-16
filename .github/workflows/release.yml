@@ -4,6 +4,11 @@ on:
   push:
     tags: ["v*"]
   workflow_dispatch:
+    inputs:
+      catalog_source_tag:
+        description: "Optional published catalogue/app tag to reuse (empty selects latest catalogue)"
+        type: string
+        required: false
 
 permissions:
   contents: write
@@ -43,36 +48,16 @@ jobs:
           go test ./...
           go build ./...
 
-      - name: Build official prebuilt catalogue
+      - name: Reuse and verify published catalogue
         shell: bash
         env:
-          XDG_CONFIG_HOME: ${{ runner.temp }}/odeduck-release-config
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CATALOG_SOURCE_TAG: ${{ inputs.catalog_source_tag }}
         run: |
           set -euo pipefail
-          go run ./cmd/odeduck catalog sync --source official-file+web --type ALL --per-page 1000 --delay 100ms
-          catalog_file="$XDG_CONFIG_HOME/odeduck/catalog.json"
-          jq '{
-            source, type, total: (.entries | length),
-            api: ([.entries[] | select((.dataTypes // []) | index("API"))] | length),
-            file: ([.entries[] | select((.dataTypes // []) | index("FILE"))] | length),
-            dual: ([.entries[] | select(((.dataTypes // []) | index("API")) and ((.dataTypes // []) | index("FILE")))] | length),
-            rest: ([.entries[] | select(.svcType == "REST")] | length),
-            link: ([.entries[] | select(.svcType == "LINK")] | length),
-            unknown: ([.entries[] | select((.svcType // "") == "")] | length),
-            officialContracts: ([.entries[] | select(.officialApi != null)] | length)
-          }' "$catalog_file" | tee "$RUNNER_TEMP/catalog-coverage.json"
-          test "$(jq '
-            .source == "official-file+web" and .type == "ALL" and
-            .total > 90000 and .api > 11000 and .file > 80000 and
-            .dual > 50000 and
-            .rest > 6000 and .link > 3500 and .unknown < 500 and
-            .officialContracts > 11000
-          ' "$RUNNER_TEMP/catalog-coverage.json")" = true
-          go run ./cmd/odeduck catalog validate-release --format json \
-            | tee "$RUNNER_TEMP/catalog-search-quality.json"
-          test "$(jq '.passed and ([.cases[].passed] | all)' "$RUNNER_TEMP/catalog-search-quality.json")" = true
-          mkdir -p release-assets
-          gzip -n -9 -c "$catalog_file" > release-assets/odeduck-catalog.json.gz
+          go build -o "$RUNNER_TEMP/odeduck-catalog" ./cmd/odeduck
+          sh scripts/prepare-release-catalog.sh "$RUNNER_TEMP/odeduck-catalog" release-assets "$CATALOG_SOURCE_TAG"
+          jq . release-assets/catalog-source.json >> "$GITHUB_STEP_SUMMARY"
 
       # CHANGELOG.md 의 해당 버전 섹션을 릴리즈 노트로 사용 (없으면 커밋 로그 폴백).
       - name: Extract release notes from CHANGELOG

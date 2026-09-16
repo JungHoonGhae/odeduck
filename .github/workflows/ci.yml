@@ -31,6 +31,8 @@ jobs:
       - name: Test shell installer
         run: |
           sh -n ./scripts/verify-public-release.sh
+          sh -n ./scripts/prepare-release-catalog.sh
+          sh -n ./scripts/validate-release-catalog.sh
           ./scripts/test-install.sh
           ./scripts/test-public-release.sh
 

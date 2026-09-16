@@ -1,0 +1,55 @@
+name: Catalog refresh
+
+# Full portal collection is an explicit maintenance operation, not a release gate.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: catalog-refresh
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    if: github.repository == 'JungHoonGhae/odeduck' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+
+      - name: Collect and validate catalogue
+        shell: bash
+        env:
+          XDG_CONFIG_HOME: ${{ runner.temp }}/odeduck-catalog-config
+        run: |
+          set -euo pipefail
+          go build -o "$RUNNER_TEMP/odeduck-catalog" ./cmd/odeduck
+          "$RUNNER_TEMP/odeduck-catalog" catalog sync --source official-file+web --type ALL --per-page 1000 --delay 100ms
+          mkdir -p "$RUNNER_TEMP/catalog-assets"
+          gzip -n -9 -c "$XDG_CONFIG_HOME/odeduck/catalog.json" > "$RUNNER_TEMP/catalog-assets/odeduck-catalog.json.gz"
+          sh scripts/validate-release-catalog.sh "$RUNNER_TEMP/odeduck-catalog" "$RUNNER_TEMP/catalog-assets/odeduck-catalog.json.gz"
+          cd "$RUNNER_TEMP/catalog-assets"
+          sha256sum odeduck-catalog.json.gz > checksums.txt
+
+      - name: Publish independent catalogue snapshot
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          catalog_tag="catalog-$(date -u +%Y%m%d)-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          gh release create "$catalog_tag" \
+            "$RUNNER_TEMP/catalog-assets/odeduck-catalog.json.gz" "$RUNNER_TEMP/catalog-assets/checksums.txt" \
+            --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --draft --prerelease --latest=false \
+            --title "Catalogue $catalog_tag" \
+            --notes "Validated catalogue data only; not an odeduck application release. Original collection time is retained in the snapshot."
+          # Readers ignore drafts, so an interrupted upload cannot become a source.
+          gh release edit "$catalog_tag" --repo "$GITHUB_REPOSITORY" --draft=false --latest=false
+          printf 'Published catalogue: %s\n' "$catalog_tag" >> "$GITHUB_STEP_SUMMARY"

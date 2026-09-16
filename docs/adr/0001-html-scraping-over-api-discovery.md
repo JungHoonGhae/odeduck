@@ -37,10 +37,11 @@ verification found its application restricted to administrative/public-sector
 accounts. The portal also publishes a public monthly 목록개방현황 CSV (PK
 `15062804`): 96,110 rows streamed in 22 seconds without login or a secret. It
 accurately classified 7,176 REST and 4,778 LINK lists, but omitted many
-portal-generated API+FILE alternatives. Release packaging therefore joins that
+portal-generated API+FILE alternatives. Catalogue refresh therefore joins that
 official file with the current web delivery discovery, rejects exports below
 90,000 nodes or per-type coverage thresholds, and includes the composite gzip
-artifact in the release checksum. `catalog sync --source official` remains a
+artifact in the release checksum. Code releases reuse that validated artifact.
+`catalog sync --source official` remains a
 fail-closed richer option for approved institutional keys; `official-file` is
 the fast public source and `official-file+web` is the release-quality source.
 Installers validate
@@ -59,6 +60,33 @@ The release gate checks API/FILE and REST/LINK coverage plus unknown-type and
 official-contract counts; total row count alone is not accepted as completeness.
 Required/optional flags and sample parameter values are not present in the bulk
 API, so the detail-page contract remains a labelled fallback for those facts.
+
+### Catalogue refresh and code release (2026-09-09)
+
+Full collection is independent of application packaging: v0.19.0 spent 18m09s
+collecting and validating the composite catalogue, without building any semantic
+index. Code changes alone do not justify repeating that portal traffic.
+
+Run the manual [Catalog refresh workflow](../../.github/workflows/catalog-refresh.yml)
+on `main` when the catalogue needs updating. It applies the same offline structure,
+coverage and golden-query gate used by releases, then publishes a uniquely tagged
+catalogue-only prerelease. Publication stays draft until asset upload completes;
+it does not change the latest application release used by installers.
+
+The [Release workflow](../../.github/workflows/release.yml) selects the latest
+published catalogue-only snapshot, or a stable application snapshot when no
+independent catalogue exists yet. Its manual `catalog_source_tag` input can pin
+a published source for reproducibility or recovery. Drafts, application previews
+and the application tag being packaged are excluded. The source SHA-256 must
+match, and the current binary rechecks the exact archive without installing it.
+`catalog-source.json` records the selected tag and hash alongside the release.
+
+Reuse preserves both compressed bytes and the original collection time. The
+existing 14-day staleness warning still applies; reuse is not a freshness claim.
+An unavailable or incompatible source fails the release rather than silently
+starting full collection or accepting reduced coverage. Refresh separately or
+pin another compatible published source, then retry. Semantic index refresh is
+unchanged and remains an optional, incremental local operation.
 
 For an individual FILE node, `/catalog/{pk}/fileData.json` supplies official
 Schema.org metadata but omits the actual download identifier, historical asset

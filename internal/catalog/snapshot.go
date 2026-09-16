@@ -51,6 +51,13 @@ func ValidateSnapshot(compressed io.Reader) (InstallResult, error) {
 	return result, nil
 }
 
+// ReadSnapshot validates and reads a packaged catalogue without accessing local
+// state. Release checks use the candidate bytes, never an installed catalogue.
+func ReadSnapshot(compressed io.Reader) (*Catalog, error) {
+	candidate, _, err := readPrebuiltSnapshot(compressed)
+	return candidate, err
+}
+
 func readPrebuiltSnapshot(compressed io.Reader) (*Catalog, InstallResult, error) {
 	zr, err := gzip.NewReader(compressed)
 	if err != nil {
