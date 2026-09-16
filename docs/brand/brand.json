@@ -13,9 +13,9 @@
   "technicalName": "odeduck",
   "command": "odeduck",
   "repository": "JungHoonGhae/odeduck",
-  "repositoryDescription": "공공데이터 덕후, 오데덕. AI 에이전트가 자료 탐색·자동 활용신청·인증·호출부터 목표에 맞는 분석과 근거 확인까지 이어가도록 돕는 오픈소스 CLI·MCP.",
+  "repositoryDescription": "공공데이터 덕후, 오데덕. AI 에이전트가 목표에 맞는 자료를 찾고, 자동 활용신청·수집·연결·분석을 거쳐 결과와 근거를 만들도록 돕는 오픈소스 실행 플랫폼.",
   "modulePath": "github.com/JungHoonGhae/odeduck",
   "configDirectory": "odeduck",
   "positioning": "공공데이터 탐색부터 자동 활용신청·분석까지",
-  "summary": "AI 에이전트가 필요한 자료를 찾고, 데이터를 가져와 결과와 근거를 만들도록 돕습니다."
+  "summary": "목표에 맞는 자료 탐색과 접근권한 확보, 데이터 수집·연결·분석을 하나의 흐름으로 이어갑니다."
 }
