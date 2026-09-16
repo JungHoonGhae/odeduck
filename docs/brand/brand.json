@@ -14,5 +14,7 @@
   "command": "odeduck",
   "repository": "JungHoonGhae/odeduck",
   "modulePath": "github.com/JungHoonGhae/odeduck",
-  "configDirectory": "odeduck"
+  "configDirectory": "odeduck",
+  "positioning": "The open-source control plane for Korean public data.",
+  "summary": "Give AI agents a local runtime for public-data goals: discovery, API access, queries, analysis, and source evidence."
 }

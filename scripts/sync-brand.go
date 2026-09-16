@@ -26,6 +26,8 @@ const (
 
 type brand struct {
 	DisplayName     string   `json:"displayName"`
+	Positioning     string   `json:"positioning"`
+	Summary         string   `json:"summary"`
 	Tagline         string   `json:"tagline"`
 	Introduction    []string `json:"introduction"`
 	LogoPath        string   `json:"logoPath"`
@@ -87,6 +89,8 @@ func loadBrand(path string) (brand, error) {
 	}
 	fields := map[string]string{
 		"displayName":     configuration.DisplayName,
+		"positioning":     configuration.Positioning,
+		"summary":         configuration.Summary,
 		"tagline":         configuration.Tagline,
 		"logoPath":        configuration.LogoPath,
 		"logoAlt":         configuration.LogoAlt,
@@ -162,10 +166,14 @@ func render(configuration brand) []byte {
 	}
 	return []byte(fmt.Sprintf(`%s
 <p align="center">
-  <img src="%s" width="190" alt="%s">
+  <img src="%s" width="140" alt="%s">
 </p>
 
-<h1 align="center">%s</h1>
+<h1 align="center">%s · %s</h1>
+
+<p align="center"><strong>%s</strong><br>
+  %s
+</p>
 
 <p align="center">
 %s
@@ -177,6 +185,9 @@ func render(configuration brand) []byte {
 		escape(configuration.LogoPath),
 		escape(configuration.LogoAlt),
 		escape(configuration.DisplayName),
+		escape(configuration.TechnicalName),
+		escape(configuration.Positioning),
+		escape(configuration.Summary),
 		strings.Join(lines, "<br>\n"),
 		escape(configuration.Tagline),
 		endMarker,

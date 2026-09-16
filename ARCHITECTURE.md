@@ -1,8 +1,24 @@
 # Architecture
 
-odeduck은 대한민국 공공데이터를 **찾고 → 실제 계약을 확인하고 → 필요한 권한을 신청하고 → 첫 호출까지
-검증하는** 로컬 컨트롤 플레인이다. CLI와 MCP가 같은 도메인 모듈을 사용하며, 모델은 검색 계획을
-도울 수 있지만 카탈로그 순위·자격증명·API 호출의 최종 경계는 결정론적인 Go 코드가 맡는다.
+odeduck은 AI 에이전트가 대한민국 공공데이터로 **목표에 필요한 산출물과 근거를 만드는** 로컬 컨트롤
+플레인이다. `solve`·`advance_goal`의 공통 목표 실행기가 탐색·관측·계산·재탐색·결과 평가를 잇는다.
+그 기반인 계약 검사·활용신청·승인 확인·인증 호출은 개별 CLI·MCP 도구로도 사용할 수 있다.
+CLI와 MCP가 같은 도메인 모듈을 사용하며, 모델은 계획과 해석을 돕고 카탈로그 순위·자격증명·
+실제 취득·계산의 실행 경계는 결정론적인 Go 코드가 맡는다. 목표 실행의 일반적 완주는 아직 검증 중이다.
+
+## Agent entry points
+
+| 계층 | 책임 |
+| --- | --- |
+| [사용자용 Skill](skills/odeduck/SKILL.md) | 요청한 산출물에 따라 목표 실행 또는 개별 검색·호출로 진입. 설치된 런타임의 계약을 읽음 |
+| CLI / MCP | 동일한 도메인 실행기를 터미널 또는 에이전트에 노출 |
+| `solve` / `advance_goal` | 목표·역할·출력 계약, 탐색·취득·계산·재계획과 결과 평가를 관리 |
+| 검사·접근·호출 모듈 | 실제 원천 계약, 세션·키 취급, 활용신청·승인 확인·취득과 검증을 수행 |
+
+사용자용 Skill은 선택 진입점이며 런타임의 권한이나 검증을 대체하지 않는다. `.agents/skills/`는 이
+저장소를 개발·검토하는 에이전트용이다. 현재 목표 실행기는 활용신청을 자동 제출하지 않으며 필요한
+API 접근은 일반 `apply` 경로로 준비한다. 완료 조건과 남은 검증은 [INTENT](INTENT.md)와
+[실행·검증 계획](docs/specs/goal-driven-completion-plan.md)을 따른다.
 
 ## System at a glance
 
@@ -236,6 +252,10 @@ odeduck은 지원 범위를 넓히는 것보다 실패를 명시하는 쪽을 �
 - 네트워크 응답과 FILE 관찰은 크기·형식·archive shape를 제한한다.
 
 ## Distribution
+
+[`skills/odeduck/`](skills/odeduck/)은 실행 바이너리와 독립적으로 설치 가능한 사용자용 Agent Skill이다.
+버전별 스키마를 내장하지 않고 설치된 CLI help와 MCP guide를 기준으로 실행한다.
+[설치·갱신 안내](docs/agent-skills.md)에 배포 경로와 로컬 검증 방법을 둔다.
 
 [`.goreleaser.yaml`](.goreleaser.yaml)은 `odeduck`을 macOS·Linux·Windows의 amd64/arm64로 빌드한다.
 
