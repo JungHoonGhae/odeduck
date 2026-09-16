@@ -64,6 +64,12 @@ skill setup uses the latest stable release URL, while validation records retain 
 After changing the skill, check discovery with `npx skills add ./skills/odeduck --list` and install it into a
 temporary project to verify that its referenced files travel with it. See [the skill guide](docs/agent-skills.md).
 
+## Maintainer skills
+
+Keep `.agents/skills/*/SKILL.md` as short task routers. Add specialized procedures to the relevant
+`references/` file, with a new skill only for an independent trigger and workflow. Runtime capabilities
+belong to the CLI/MCP contracts. See [extension guidance](docs/agent-skills.md#개발용-skills를-확장할-때).
+
 ## Provider adapters
 
 A provider adapter is an executable trust boundary, not a collection of guessed endpoints. New or changed adapters

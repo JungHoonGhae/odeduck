@@ -152,10 +152,14 @@ AI가 선택한 OpenAPI의 활용신청을 실제 제출한다. purpose에는 �
 - data.go.kr REST에만 사용한다. LINK는 apply로 보내지 않고 contract.applicationUrl의 제공기관별
   신청 절차를 따른다. FILE은 활용신청 없이 공식 다운로드 경로를 확인한다. 서버도 제출 직전에
   API 유형을 다시 확인해 LINK 신청을 차단한다.
-- 이미 신청한 API는 다시 신청하지 말고 list_applications로 승인 상태를 확인한다.
+- 신청 전에 list_applications로 로그인 세션과 기존 승인 상태를 확인한다. 도구 응답의 isError를
+  먼저 확인하며, 오류와 함께 온 빈 applications를 신청 내역이 없다는 뜻으로 해석하지 않는다.
+  세션이 없거나 만료됐으면 odeduck login을 실행해 사람이 SSO를 완료하도록 요청한 뒤 다시 확인한다.
+  통신·페이지 오류는 재로그인으로 처리하지 않는다. 이미 승인된 API는 다시 신청하지 않는다.
 - 개발단계 자동승인이면 신청 결과를 확인한 뒤 3단계 call_api로 바로 이어간다.
-- 로그인 세션이 없으면 사람에게 ` + "`odeduck login`" + `을 안내한다. 로그인 이후에는 브라우저 조작,
-  인증키 복사, 신청 폼 입력을 AI가 대신한다.
+- 로그인과 조회는 같은 실행 환경에서 이어간다. 로컬 로그인 후 MCP가 계속 세션 없음으로 응답하면
+  서버의 실행 환경·설정 경로를 확인하거나 로그인한 CLI로 이어간다. 쿠키·키를 대화로 옮기지 않는다.
+  로그인 이후에는 오데덕이 신청 폼을 처리하고 인증키를 내부에서 조회·주입한다.
 
 ### 3. call_api(pk, op, params, profileFields?)
 inspect_dataset에서 확인한 REST/LINK pk·op·params로 승인된 API를 호출한다. MCP 입력에는 raw endpoint와

@@ -435,7 +435,7 @@ func New(deps Deps) *mcp.Server {
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "list_applications",
 		Annotations: readOnlyAnnotations("보조 · 활용신청 현황", true),
-		Description: "보조 계정 도구. call_api 가 미승인 오류를 반환했을 때 내 활용신청 상태·인증키 만료일을 확인한다. 로그인 세션 필요.",
+		Description: "계정 확인 도구. 활용신청 전에 로그인 세션과 기존 신청·승인 상태를 확인하고, call_api 미승인 오류도 진단한다. 세션 없음·만료 오류면 사람이 odeduck login을 마친 뒤 다시 확인한다. 통신 오류를 세션 없음으로 해석하지 않는다.",
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, _ emptyIn) (*mcp.CallToolResult, *appsOut, error) {
 		apps, err := portal.Applications(ctx)
 		if err != nil {

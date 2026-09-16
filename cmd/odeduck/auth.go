@@ -15,7 +15,8 @@ func loginCmd() *cobra.Command {
 	c := &cobra.Command{
 		Use:   "login",
 		Short: "브라우저로 data.go.kr 로그인 후 세션 저장",
-		Long: `브라우저 창을 띄워 data.go.kr 에 로그인합니다. 로그인이 끝나면 odeduck 이
+		Long: `저장된 로그인 세션을 먼저 확인하고, 유효하면 그대로 사용합니다.
+세션이 없거나 만료됐을 때 브라우저 창을 띄워 data.go.kr 에 로그인합니다. 로그인이 끝나면 odeduck 이
 검증된 세션 쿠키를 저장하고 기본적으로 브라우저를 닫습니다. 이후 apply/applications
 등은 저장된 세션을 자동 갱신하며 창 없이 동작합니다. 브라우저를 계속 열어 두려면
 --keep-browser를 사용하세요. 키체인 비밀번호는 묻지 않습니다.`,
@@ -65,14 +66,19 @@ func logoutAll(ctx context.Context, portalCleanup func(context.Context) error, p
 }
 
 func statusCmd() *cobra.Command {
+	return statusCmdWith(portal.CheckSession)
+}
+
+func statusCmdWith(check func(context.Context) error) *cobra.Command {
 	return &cobra.Command{
 		Use:   "status",
 		Short: "로그인 세션 상태 확인",
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			_, err := portal.Applications(cmd.Context())
-			if err != nil {
-				fmt.Fprintln(cmd.ErrOrStderr(), "세션 없음 — `odeduck login` 을 실행하세요.")
-				return nil
+			if err := check(cmd.Context()); err != nil {
+				if errors.Is(err, portal.ErrNotLoggedIn) {
+					return err
+				}
+				return fmt.Errorf("로그인 상태 확인 실패: %w", err)
 			}
 			fmt.Fprintln(cmd.ErrOrStderr(), "✅ 세션이 살아있습니다.")
 			return nil

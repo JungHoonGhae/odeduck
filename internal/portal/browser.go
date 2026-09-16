@@ -2,6 +2,7 @@ package portal
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"path/filepath"
@@ -20,10 +21,9 @@ var BaseURL = "https://www.data.go.kr"
 // LoginTimeout bounds the interactive login wait.
 const LoginTimeout = 5 * time.Minute
 
-// Login ensures a live, authenticated browser session exists. It launches (or
-// reuses) odeduck's detached Chrome, opens the login page, and waits until the
-// session can actually load an authenticated page. The browser is left running
-// so later commands re-attach to it. progress receives status lines (may be nil).
+// Login reuses a verified saved session before opening an interactive browser.
+// A missing or expired session needs a human login. keepBrowser explicitly
+// requests the browser workflow for debugging. progress may be nil.
 func Login(ctx context.Context, progress io.Writer, keepBrowser bool) error {
 	release, err := acquireSessionOperation(ctx)
 	if err != nil {
@@ -33,6 +33,14 @@ func Login(ctx context.Context, progress io.Writer, keepBrowser bool) error {
 	logln := func(format string, a ...any) {
 		if progress != nil {
 			fmt.Fprintf(progress, format+"\n", a...)
+		}
+	}
+	if !keepBrowser {
+		if _, err := verifiedSavedPage(ctx); err == nil {
+			logln("✅ 기존 로그인 세션이 유효합니다 — 다시 로그인할 필요가 없습니다.")
+			return nil
+		} else if !errors.Is(err, ErrNotLoggedIn) {
+			return fmt.Errorf("로그인 상태 확인 실패: %w", err)
 		}
 	}
 
@@ -177,32 +185,29 @@ func Applications(ctx context.Context) ([]Application, error) {
 		return nil, err
 	}
 	defer release()
-	if sess, serr := loadSession(); serr == nil {
-		if page, herr := getAuthed(ctx, sess, AccountListPath); herr == nil && isAuthed(page.HTML, page.Location) {
-			if perr := persistSessionRefresh(page); perr != nil {
-				return nil, fmt.Errorf("세션 자동 갱신 저장 실패: %w", perr)
+	page, err := verifiedSavedPage(ctx)
+	if err == nil {
+		sess := page.Session
+		// Reuse the authenticated first page; do not probe and fetch it twice.
+		return collectApplicationPages(page.HTML, func(pageIndex int) (string, error) {
+			more, merr := getAuthed(ctx, sess, fmt.Sprintf("%s?pageIndex=%d", AccountListPath, pageIndex))
+			if merr != nil {
+				return "", merr
 			}
-			sess = page.Session
-			// The portal paginates at 10; without this the 11th application
-			// onward vanishes silently, and an agent asking "did I already apply
-			// for this?" gets a wrong answer.
-			return collectApplicationPages(page.HTML, func(pageIndex int) (string, error) {
-				more, merr := getAuthed(ctx, sess, fmt.Sprintf("%s?pageIndex=%d", AccountListPath, pageIndex))
-				if merr != nil {
-					return "", merr
-				}
-				if !isAuthed(more.HTML, more.Location) {
-					return "", ErrNotLoggedIn
-				}
-				if perr := persistSessionRefresh(more); perr != nil {
-					return "", fmt.Errorf("세션 자동 갱신 저장 실패: %w", perr)
-				}
-				sess = more.Session
-				return more.HTML, nil
-			})
-		}
-		// Session expired or insufficient — fall through to the browser, if any.
+			if !isAuthed(more.HTML, more.Location) {
+				return "", fmt.Errorf("활용신청 현황 페이지 형식을 확인할 수 없습니다")
+			}
+			if perr := persistSessionRefresh(more); perr != nil {
+				return "", fmt.Errorf("세션 자동 갱신 저장 실패: %w", perr)
+			}
+			sess = more.Session
+			return more.HTML, nil
+		})
 	}
+	if !errors.Is(err, ErrNotLoggedIn) {
+		return nil, err
+	}
+	// A missing or expired saved session can fall back to an existing browser.
 
 	st, err := loadState()
 	if err != nil {

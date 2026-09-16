@@ -127,17 +127,16 @@ Go CLI + MCP. 사람은 정부 SSO 로그인 한 번만 하고 이후 포털 작
 목표 기반 탐색·연결 아키텍처의 사용자 의도는 @INTENT.md 에 있다. 해당 기능을 변경하거나 완료를
 판정할 때 `docs/specs/goal-driven-completion-plan.md`의 요구사항별 검증 근거까지 확인한다.
 
-### Business opportunity research
+### 작업별 개발 Skills
 
-수익화, 사업 후보, 구매자 문제, 시장 선택, 경쟁 또는 GTM을 조사할 때는
-`.agents/skills/odeduck-business-harness/SKILL.md`를 따른다. 아이데이션의 근거 있는 가설과 상업적
-검증을 구분하고, 사용자 요청 단계에 맞는 대안·데이터 근거·반증 기준을 적용한다.
+| 작업 | 진입점 |
+| --- | --- |
+| 사업 후보·구매자·대체재·수익화 가설 검증 | `.agents/skills/odeduck-business-harness/SKILL.md` |
+| 목표 실행·검색·데이터 연결 설계, 결과 정확도·완주 검증 | `.agents/skills/odeduck-graph-engineering/SKILL.md` |
 
-### Graph engineering
-
-목표 기반 탐색·분석, 의미 검색·교차 데이터 발견, 온톨로지, entity resolution 또는 연결 근거를
-설계·검토할 때는 `.agents/skills/odeduck-graph-engineering/SKILL.md`를 따른다. 후보 발견과
-식별·provenance·시간에 근거한 연결 검증을 구분하고, `INTENT.md`의 산출물까지 확인한다.
+각 진입점에서 현재 작업에 필요한 reference만 읽는다. 일반 사용은 `skills/odeduck/`으로 안내한다.
+스킬을 확장할 때는 [개발용 Skill 확장 기준](docs/agent-skills.md#개발용-skills를-확장할-때)에 따라
+저장소 원칙·개발 판단·제품 실행 계약의 소유 위치를 유지한다.
 
 ### Issue tracker
 

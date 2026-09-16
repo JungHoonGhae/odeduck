@@ -391,9 +391,9 @@ func browserForApply(ctx context.Context) (*daemonState, *Session, error) {
 	if st, err := loadState(); err == nil && browserUsable(st.Port) {
 		return st, nil, nil
 	}
-	sess, err := loadSession()
+	page, err := verifiedSavedPage(ctx)
 	if err != nil {
-		return nil, nil, ErrNotLoggedIn
+		return nil, nil, err
 	}
 	cmd, port, profile, err := launchHeadless()
 	if err != nil {
@@ -419,7 +419,7 @@ func browserForApply(ctx context.Context) (*daemonState, *Session, error) {
 	// browsers. Reap each child when cleanup closes it so exited Chrome processes
 	// do not accumulate as zombies.
 	go func() { _ = cmd.Wait() }()
-	return state, sess, nil
+	return state, page.Session, nil
 }
 
 // injectSession sets the saved cookies on a fresh browser so it is authenticated
