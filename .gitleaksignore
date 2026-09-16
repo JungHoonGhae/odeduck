@@ -31,3 +31,15 @@ b596cc84d51b2189a7ed5aa7339ff56e24ea9c66:proto-cdp-origin/main.go:generic-api-ke
 # Frozen Korean province-label vocabulary ID in a scope-token regression test,
 # not an API credential. Keep this exception tied to the original commit/line.
 57e9200e441eaa95f3705f7a3268da1cd2998825:internal/goalwork/scope_vocabulary_test.go:generic-api-key:165
+
+# The same reviewed dummy provider keys after the Claude-attribution history
+# cleanup. Retain the old fingerprints for preserved release tags.
+5282b52dd3b02fb3f86cc36e3b2dd9db546059de:internal/apicall/external_call_test.go:generic-api-key:226
+5282b52dd3b02fb3f86cc36e3b2dd9db546059de:internal/apicall/external_call_test.go:generic-api-key:243
+5282b52dd3b02fb3f86cc36e3b2dd9db546059de:internal/apicall/external_call_test.go:generic-api-key:319
+5282b52dd3b02fb3f86cc36e3b2dd9db546059de:internal/apicall/external_call_test.go:generic-api-key:466
+5282b52dd3b02fb3f86cc36e3b2dd9db546059de:internal/apicall/external_call_test.go:generic-api-key:467
+5282b52dd3b02fb3f86cc36e3b2dd9db546059de:internal/apicall/external_call_test.go:generic-api-key:509
+5282b52dd3b02fb3f86cc36e3b2dd9db546059de:internal/apicall/external_call_test.go:generic-api-key:518
+5282b52dd3b02fb3f86cc36e3b2dd9db546059de:internal/apicall/external_call_test.go:generic-api-key:563
+5282b52dd3b02fb3f86cc36e3b2dd9db546059de:internal/apicall/external_call_test.go:generic-api-key:630
