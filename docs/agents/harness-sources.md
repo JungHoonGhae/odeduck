@@ -6,6 +6,25 @@
 하네스 실행에는 아래 저장소, 패키지 또는 서비스가 필요하지 않다. 외부 스킬 원문을 설치하거나 호출하는
 대신 오대덕의 계약과 검증 단계에 맞게 원칙을 다시 작성했다.
 
+## 사용자용 Skill 배포 구조 — 2026-09-16
+
+사용자 요청으로 gstack과 Matt Pocock의 설치·구성·갱신 방식을 검토했다. 외부 원본은 수정하거나
+프로젝트에 설치하지 않았다. 아래에서 채택한 부분은 `skills/odeduck/`과 [사용 안내](../agent-skills.md)에 반영했다.
+
+| 원천 | 확인한 구조 | 오데덕에 적용한 범위 |
+| --- | --- | --- |
+| [gstack 설치 안내](https://github.com/garrytan/gstack/blob/85b8c038fc0002a1549789ea018e924c1d335de4/README.md) · [session update](https://github.com/garrytan/gstack/blob/85b8c038fc0002a1549789ea018e924c1d335de4/bin/gstack-session-update) | Skill과 실행 도구를 함께 배포하고, team mode의 SessionStart hook이 명시된 `auto_upgrade` 설정 아래 갱신한다. 시간 제한·잠금·실패 처리가 별도 구현이다. | 버전별 실행 계약은 런타임에서 읽고 설치·갱신은 별도 절차로 둔다. 단순 `latest` URL을 자동 업데이트라고 설명하지 않는다. 전용 hook·상태 저장·자동 교체 구현은 도입하지 않았다. |
+| [Matt Pocock 설치 안내](https://github.com/mattpocock/skills/blob/959a8e9f1edc3adbe2f7e3054bb6fbefa6696260/README.md) · [plugin manifest](https://github.com/mattpocock/skills/blob/959a8e9f1edc3adbe2f7e3054bb6fbefa6696260/.claude-plugin/plugin.json) | 작은 조합 가능한 Skill. `skills.sh`로 설치한 파일은 명시적으로 갱신하며, Claude의 관리형 플러그인은 별도 배포 경로다. | 사용자용 Skill을 개발용 하네스와 분리하고, 짧은 진입·판단 원칙에서 필요한 reference만 읽는다. `--skill odeduck`으로 사용자용 항목만 설치하고, 현재 경로의 갱신 의미를 명시한다. |
+| [Skills CLI](https://github.com/vercel-labs/skills#install-a-skill) · [update 구현](https://github.com/vercel-labs/skills/blob/main/src/update.ts) | GitHub·로컬 경로 발견, 특정 Skill 설치, 이름별 `update`, 로컬 경로의 원격 버전 추적 제외 | 자체 설치 관리자를 추가하지 않고 기존 배포 도구를 사용한다. 임시 프로젝트 설치로 Skill과 reference 동봉을 확인한다. |
+
+실제 최신 CLI help와 [명령 라우팅](https://github.com/vercel-labs/skills/blob/main/src/cli.ts)을 확인했다.
+현재 `check`는 `update`와 같은 구현으로 전달되므로 읽기 전용 사전 점검으로 안내하지 않는다.
+문서의 갱신 명령은 `update odeduck --project`이며 전역 설치는 `--global`을 사용한다.
+
+`solve`·`advance_goal`은 보고·비교·계산 요청의 주요 진입점으로 유지한다. 배포 구조를 정리했다고
+범용 목표 완주나 자동 신청 통합이 완료된 것으로 바꾸지 않는다. 원천 공유·결과 검토 권한과
+실행·완료 계약은 실행 중인 CLI/MCP가 제공한다.
+
 ## Credits and licenses
 
 아래 프로젝트의 아이디어와 공개 지침을 참고했다. 원문을 프로젝트에 vendor하지 않았고 실행 의존성도

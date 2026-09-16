@@ -7,7 +7,17 @@ section matching a `vX.Y.Z` tag as the GitHub release notes.
 
 ## [Unreleased]
 
+### Added
+
+- Installable `skills/odeduck` routes sourced report and comparison goals to `solve` /
+  `advance_goal`, and dataset access to inspection, application and authenticated calls.
+  Setup follows the latest stable release; execution follows the installed runtime's help and MCP guide.
+
 ### Changed
+
+- Position odeduck as the local control plane for agent-driven Korean public-data
+  work. Make goal execution a primary README entry point alongside its access and
+  execution foundation, with current completion limits and supporting evidence visible.
 
 - Introduce odeduck with an 오·데·덕 acrostic in the README and a short one-line
   repository description. Keep the README copy in the brand configuration and preserve

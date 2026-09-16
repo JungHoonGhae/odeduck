@@ -54,6 +54,16 @@ After changing them, run `go run ./scripts/sync-brand.go`; CI checks that the ge
 The [visual asset guide](docs/assets/README.md) lists editable diagram sources, Pretendard fonts, style decisions
 and HTML/PNG export commands. Commit source changes and generated assets together.
 
+## User-facing Agent Skill
+
+[`skills/odeduck/`](skills/odeduck/) is the installable product skill. Keep it self-contained and route report,
+comparison and calculation requests to goal execution. `.agents/skills/` contains maintainer guidance and
+is not a runtime dependency. The installed CLI help and MCP guide own version-specific execution contracts;
+skill setup uses the latest stable release URL, while validation records retain their tested revisions.
+
+After changing the skill, check discovery with `npx skills add ./skills/odeduck --list` and install it into a
+temporary project to verify that its referenced files travel with it. See [the skill guide](docs/agent-skills.md).
+
 ## Provider adapters
 
 A provider adapter is an executable trust boundary, not a collection of guessed endpoints. New or changed adapters
