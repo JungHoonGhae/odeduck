@@ -16,6 +16,6 @@
   "repositoryDescription": "공공데이터 덕후, 오데덕. AI 에이전트가 자료 탐색·자동 활용신청·인증·호출부터 목표에 맞는 분석과 근거 확인까지 이어가도록 돕는 오픈소스 CLI·MCP.",
   "modulePath": "github.com/JungHoonGhae/odeduck",
   "configDirectory": "odeduck",
-  "positioning": "The open-source control plane for Korean public data.",
-  "summary": "Give AI agents a local runtime for public-data goals: discovery, API access, queries, analysis, and source evidence."
+  "positioning": "공공데이터 탐색부터 자동 활용신청·분석까지",
+  "summary": "AI 에이전트가 필요한 자료를 찾고, 데이터를 가져와 결과와 근거를 만들도록 돕습니다."
 }
