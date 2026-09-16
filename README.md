@@ -39,10 +39,7 @@
 
 <!-- Keep the introduction animation visible. Core capabilities and architecture must also remain visible, not collapsed. -->
 <p align="center">
-  <a href="docs/assets/odeduck-hero.mp4"><img src="docs/assets/odeduck-hero.gif" width="800" alt="거대한 캐비닛 사이를 뛰어다니는 오데덕. 좌측 하단에 투명한 빼꼼 로고, 궁서체 오.데.덕., GitHub 주소가 세로로 배치되어 있다."></a>
-</p>
-<p align="center">
-  <sub><a href="docs/assets/odeduck-hero.mp4">영상 다운로드</a> · <a href="docs/assets/odeduck-hero-brand.svg">투명 벡터 로고</a></sub>
+  <img src="docs/assets/odeduck-hero.gif" width="800" alt="거대한 캐비닛 사이를 뛰어다니는 오데덕. 좌측 하단에 투명한 빼꼼 로고, 궁서체 오.데.덕., GitHub 주소가 세로로 배치되어 있다.">
 </p>
 
 ---
