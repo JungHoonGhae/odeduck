@@ -1,7 +1,7 @@
 #!/bin/sh
 # odeduck 설치 스크립트 (macOS/Linux)
 #
-#   curl -fsSL https://github.com/JungHoonGhae/odeduck/releases/download/v0.19.0/install.sh | sh
+#   curl -fsSL https://github.com/JungHoonGhae/odeduck/releases/latest/download/install.sh | sh
 #
 # 환경변수:
 #   INSTALL_DIR     설치 위치 (기본 /usr/local/bin)

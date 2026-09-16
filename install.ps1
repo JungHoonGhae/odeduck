@@ -1,6 +1,6 @@
 # odeduck installer (Windows PowerShell)
 #
-#   irm https://github.com/JungHoonGhae/odeduck/releases/download/v0.19.0/install.ps1 | iex
+#   irm https://github.com/JungHoonGhae/odeduck/releases/latest/download/install.ps1 | iex
 #
 # Environment variables:
 #   $env:ODEDUCK_VERSION  pin a version (e.g. v0.19.0, default: latest)

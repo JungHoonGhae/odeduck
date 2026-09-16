@@ -5,13 +5,14 @@ ROOT=$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)
 TEST_ROOT=$(mktemp -d)
 trap 'rm -rf "$TEST_ROOT"' EXIT
 
-project_version=$(tr -d '\r\n' < "$ROOT/VERSION")
-release_base="https://github.com/JungHoonGhae/odeduck/releases/download/v${project_version}"
+release_base="https://github.com/JungHoonGhae/odeduck/releases/latest/download"
 grep -Fq "$release_base/install.sh" "$ROOT/README.md"
 grep -Fq "$release_base/install.ps1" "$ROOT/README.md"
 grep -Fq "$release_base/install.sh" "$ROOT/docs/promo/launch-kit.md"
 grep -Fq "$release_base/install.sh" "$ROOT/install.sh"
 grep -Fq "$release_base/install.ps1" "$ROOT/install.ps1"
+grep -Fq "$release_base/install.sh" "$ROOT/skills/odeduck/references/setup.md"
+grep -Fq "$release_base/install.ps1" "$ROOT/skills/odeduck/references/setup.md"
 
 make_binary() {
     destination="$1"
