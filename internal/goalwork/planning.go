@@ -19,7 +19,8 @@ func PlanningBrief() string { return planningBrief }
 // PlanningSection reads the engine-owned reference, without duplicating contracts.
 func PlanningSection(topic string) (string, error) {
 	var out strings.Builder
-	for _, block := range strings.Split(planningGuide, "<!-- topic: ") {
+	reference := strings.ReplaceAll(planningGuide, "\r\n", "\n")
+	for _, block := range strings.Split(reference, "<!-- topic: ") {
 		tag, body, found := strings.Cut(block, " -->\n")
 		if found && tag == topic {
 			out.WriteString(body)

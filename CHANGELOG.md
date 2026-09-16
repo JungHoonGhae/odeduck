@@ -7,9 +7,10 @@ section matching a `vX.Y.Z` tag as the GitHub release notes.
 
 ## [Unreleased]
 
-## [0.21.0] - 2026-09-16
+## [0.21.1] - 2026-09-16
 
 현재 연결된 AI로 목표를 실행하고, 반복해서 전달하던 지침과 상태를 줄였습니다.
+`v0.21.0` 배포는 Windows CI의 줄바꿈 문제로 공개 전에 중단했습니다. 상세 topic은 LF·CRLF 모두 지원합니다.
 
 ### Changed
 

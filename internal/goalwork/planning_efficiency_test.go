@@ -36,3 +36,15 @@ func TestReadGuidePreservesGoalAndReviewBoundary(t *testing.T) {
 		t.Fatal("reading help cleared review state")
 	}
 }
+
+func TestGuideTopicsAcceptWindowsCheckoutLineEndings(t *testing.T) {
+	original := planningGuide
+	t.Cleanup(func() { planningGuide = original })
+	planningGuide = strings.ReplaceAll(strings.ReplaceAll(original, "\r\n", "\n"), "\n", "\r\n")
+	for _, topic := range []string{"start", "sample", "files", "documents", "compose", "relations", "scope", "evidence", "review", "recovery"} {
+		text, err := PlanningSection(topic)
+		if err != nil || strings.TrimSpace(text) == "" {
+			t.Fatalf("Windows topic %s: %v", topic, err)
+		}
+	}
+}
