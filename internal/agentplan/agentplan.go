@@ -210,7 +210,10 @@ func invokeProvider(ctx context.Context, prompt string, candidate resolvedProvid
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
-	if err := cmd.Run(); err != nil {
+	started := time.Now()
+	runErr := cmd.Run()
+	recordProviderUsage(ctx, candidate.provider, prompt, stdout.Bytes(), time.Since(started), runErr != nil)
+	if err := runErr; err != nil {
 		if errors.Is(callCtx.Err(), context.DeadlineExceeded) {
 			return stdout.Bytes(), fmt.Errorf("%s 검색 계획이 3분 안에 끝나지 않았습니다", candidate.provider)
 		}

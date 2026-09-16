@@ -11,6 +11,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/JungHoonGhae/odeduck/internal/goalwork"
+	"github.com/JungHoonGhae/odeduck/internal/modelusage"
 )
 
 // CheckGoalPlanner resolves the same candidates used by PlanGoal without a
@@ -46,6 +47,7 @@ func CheckGoalPlanner(requested string) (goalwork.RuntimeCheck, error) {
 // PlanGoal proposes one action without tool access. The shared goal engine, not
 // this subprocess, acquires rows, enforces budgets and computes the artifact.
 func PlanGoal(ctx context.Context, view goalwork.View, requested string) (goalwork.Decision, string, error) {
+	ctx = modelusage.WithStage(ctx, "planning")
 	if recipient := view.Policy.EvidenceRecipient; recipient != "" &&
 		(recipient != requested || (recipient != ProviderCodex && recipient != ProviderClaude && recipient != ProviderGemini)) {
 		return goalwork.Decision{}, "", fmt.Errorf("evidence recipient requires its exact CLI provider; automatic fallback and recipient changes are forbidden")
@@ -115,7 +117,7 @@ func goalPrompt(view goalwork.View) (string, error) {
 	}
 	return "You plan one data.go.kr goal-discovery action. Return ONE JSON object, no tools, code execution, URLs or fabricated data.\n" +
 		"The full sample/artifact is never external planning input. Only authorized evidence packets for this fixed provider are included.\n\n" +
-		goalwork.PlanningGuide() + "\nSTATE_JSON:\n" + string(b), nil
+		goalwork.PlanningInstructions(view) + "\nSTATE_JSON:\n" + string(b), nil
 }
 
 func decodeGoalDecision(output []byte) (goalwork.Decision, error) {

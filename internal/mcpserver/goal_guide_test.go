@@ -17,7 +17,7 @@ func TestGoalResourceDeliversSharedContractWithMCPFraming(t *testing.T) {
 		t.Fatalf("goal guide resource: %+v %v", read, err)
 	}
 	text := read.Contents[0].Text
-	if strings.Count(text, goalwork.PlanningGuide()) != 1 {
+	if strings.Count(text, goalwork.PlanningBrief()) != 1 {
 		t.Fatal("resource omitted or duplicated the engine-owned planning contract")
 	}
 	for _, required := range []string{"sessionId", "state.revision", "decision", "--review-with", "MCP host", "기존 사용자 Artifact", "catalog_search", "record_connection_assessment", "call_api"} {

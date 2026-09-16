@@ -61,7 +61,7 @@ func TestMCPComparisonUsesOriginalRevisionsAndExplicitComputedDisclosure(t *test
 	client := connectTestClient(t, s)
 	call := func(args map[string]any) goalOut {
 		t.Helper()
-		res, err := client.CallTool(context.Background(), &mcp.CallToolParams{Name: "goal", Arguments: args})
+		res, err := client.CallTool(context.Background(), &mcp.CallToolParams{Name: "goal", Arguments: goalTestFull(args)})
 		if err != nil || res.IsError {
 			if res != nil && len(res.Content) > 0 {
 				t.Logf("MCP response: %+v", res.Content[0])

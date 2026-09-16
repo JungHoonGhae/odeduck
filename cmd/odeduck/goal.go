@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+
 	"github.com/JungHoonGhae/odeduck/internal/goalwork"
 	"github.com/spf13/cobra"
 )
@@ -22,20 +23,22 @@ func goalCommand(run goalRunner) *cobra.Command {
 	cmd.Long = `이루려는 목표를 입력하면 필요한 자료를 발견하고, 실제 원천을 읽어 분석·연결한 결과와 근거를 만듭니다.
 검사·실행 결과가 부족하면 대안을 탐색합니다. 목표 충족 여부는 같은 실행기가 검사합니다.
 
---review-with codex|claude|gemini는 계획과 별도 결과 검토에 사용할 수신자를 고정합니다.
+단독 CLI는 --agent auto|codex|claude|gemini로 계획 모델을 사용합니다.
+별도 검토 없이도 계산 결과와 미검증 항목을 반환하며, 독립 검토 완료로 표시하지 않습니다.
+선택형 --review-with codex|claude|gemini는 계획과 별도 결과 검토의 수신자를 고정합니다.
 선택한 원천 값과 요청 범위를 해당 제공자의 계획·검토 요청에 전송하도록 허용합니다.
 기존 근거 크기·호출 횟수 제한, 인증키 보호, 공간·인과·현장 판단의 검토 제한은 유지합니다.
 자료·접근권한이 부족하면 결과와 함께 미완료 이유를 반환합니다. JSON으로 출력합니다.
 
-예: odeduck goal "사람들이 잘 모르는 흥미로운 사실을 발견해 근거와 함께 설명해주세요" --review-with codex`
+예: odeduck goal "사람들이 잘 모르는 흥미로운 사실을 발견해 근거와 함께 설명해주세요" --agent codex`
 	var reviewer string
 	cmd.Flags().StringVar(&reviewer, "review-with", "", "계획·별도 검토 수신자 및 선택 근거 전송 허용: codex | claude | gemini")
-	for _, name := range []string{"agent", "share-evidence", "review-source-reports", "review-analyses", "review-full-scope"} {
+	for _, name := range []string{"share-evidence", "review-source-reports", "review-analyses", "review-full-scope"} {
 		_ = cmd.Flags().MarkHidden(name)
 	}
 	cmd.PreRunE = func(cmd *cobra.Command, _ []string) error {
 		if reviewer == "" {
-			return fmt.Errorf("목표 완료 검토 설정이 필요합니다. --review-with codex|claude|gemini로 계획·검토 수신자와 선택 원천 값 전송을 허용하세요. 모델 호출 전 중단했습니다")
+			return nil
 		}
 		if reviewer != "codex" && reviewer != "claude" && reviewer != "gemini" {
 			return fmt.Errorf("--review-with must be codex, claude or gemini; no automatic recipient fallback")

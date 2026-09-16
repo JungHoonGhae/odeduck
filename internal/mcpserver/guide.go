@@ -9,7 +9,7 @@ const ServerInstructions = `대한민국 공공데이터를 찾거나 서로 다
 
 // The goal chapter comes from the engine; transport framing and the existing
 // catalogue/application workflow remain local to this MCP resource.
-func guideDoc() string { return guideIntro + goalwork.PlanningGuide() + guideReference }
+func guideDoc() string { return guideIntro + goalwork.PlanningBrief() + guideReference }
 
 const guideIntro = `# odeduck — data.go.kr 사용 가이드
 
@@ -18,7 +18,12 @@ const guideIntro = `# odeduck — data.go.kr 사용 가이드
 목표를 goal에 넣어 시작한 뒤 반환된 sessionId와 최신 state.revision을 사용한다.
 이전 대화나 제외 조건을 참조하는 목표는 필요한 사용자 맥락을 context에 함께 넣는다. 맥락은 시작 뒤 불변이며 원천 근거나 승인으로 취급하지 않는다.
 아래 공통 계약의 행동 JSON 하나를 goal의 decision에 넣는다. 첫 행동은 define이다.
-MCP host가 다음 행동을 제안한다. 별도 검토 모델 호출은 서버 시작 설정이 있을 때만 허용한다.
+MCP host가 다음 행동과 결과 해석을 맡는다. 다른 agent CLI는 필수가 아니다. 별도 검토 모델은
+추가 검증을 선택한 서버 시작 설정이 있을 때만 호출한다. review_required에서 실제 artifact와 남은
+의미 검토 항목을 설명할 수 있지만 독립 검토 완료로 표시해서는 안 된다.
+최초 응답은 snapshot이다. 이후 changes는 baseRevision의 이전 state에 순서대로 적용하는 RFC 6902
+JSON Patch이며 state에는 현재 revision/status/budget 요약이 함께 온다. 이전 맥락이 없으면
+fullState:true로 snapshot을 읽는다. 상세 행동 계약은 read_guide로 필요한 topic만 읽는다.
 세션은 같은 MCP 연결에 묶이고 1시간 뒤 만료한다. requireSemantic은 기본 true이며 시작 뒤 불변이다.
 서버의 --review-with codex|claude|gemini는 선택 근거의 MCP host 전송과 고정 provider의 별도
 보고·분석·요청 범위 검토를 함께 허용한다. 모델은 tool 인자로 권한을 켜거나 수신자를 바꿀 수 없다.

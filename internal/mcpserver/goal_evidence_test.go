@@ -48,7 +48,7 @@ func TestGoalMCPEvidenceUsesTrustedServerPolicy(t *testing.T) {
 			client := connectTestClient(t, s)
 			call := func(args map[string]any) goalOut {
 				t.Helper()
-				r, err := client.CallTool(context.Background(), &mcp.CallToolParams{Name: "goal", Arguments: args})
+				r, err := client.CallTool(context.Background(), &mcp.CallToolParams{Name: "goal", Arguments: goalTestFull(args)})
 				if err != nil || r.IsError {
 					t.Fatalf("MCP call: %+v %v", r, err)
 				}

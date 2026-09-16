@@ -35,7 +35,7 @@ npx skills add ./skills/odeduck
 검색·검사는 로그인 없이 시작할 수 있다. 활용신청·인증 조회에 로그인 세션이 필요하면
 `odeduck login`으로 정부 SSO를 직접 마친다. 신청은 계정에 실제 기록을 남기므로 에이전트의 승인
 정책이 적용되며, 기관 심의는 기다려야 한다. 파일·외부 제공기관 자료는 검사된 제공형에 맞게 처리한다.
-목표 실행의 의미 검색·결과 검토에는 별도 준비가 필요하다. `goal` 자체의 자동 신청은 현재 지원하지
+목표 실행의 의미 검색은 별도 준비가 필요하다. MCP는 host AI를 쓰며 별도 모델 검토는 선택 사항이다. `goal` 자체의 자동 신청은 현재 지원하지
 않으므로 필요한 접근권한은 일반 신청 경로로 마련한다. [목표 실행 설정](advanced-usage.md#목표에서-결과까지-실행하기--experimental)을 참고한다.
 
 ## 실행 구조
@@ -70,7 +70,7 @@ npx skills add ./skills/odeduck
 | 기존 작업의 전문 판단 기준 | 해당 Skill의 reference |
 | 기존 Skill 안의 별도 작업 절차 | 새 reference와 진입 표의 행 |
 | 독립적인 호출 시점·도구·절차를 가진 작업 | 새 Skill |
-| 제품 계획기의 실제 탐색·재계획 행동 | `internal/goalwork/planning-guide.md`와 전달 경로 |
+| 제품 계획기의 실제 탐색·재계획 행동 | `internal/goalwork/planning-brief.md`·상세 guide topic과 전달 경로 |
 | 명령·도구 인자·지원 기능·권한·완료 상태 | CLI/MCP 실행 코드와 런타임 가이드 |
 | 특정 원천의 정답·실패·평가 수치 | 해당 계약·fixture·평가 기록 |
 

@@ -74,18 +74,32 @@ CLI와 MCP 모두 `goal`을 사용합니다. 사용자가 목표를 말하면 �
 
 ### 실행 준비와 명령
 
-설치·로그인된 Codex·Claude·Gemini 중 하나와 로컬 Ollama 의미 검색을 준비합니다.
-`--review-with` 하나로 계획과 별도 검토의 수신자를 고정하고, 선택 원천 값의 전송을 허용합니다.
-수신자를 지정하지 않으면 모델 호출 전에 설정 방법을 안내하며 멈춥니다. 자동 제공자 전환은 없습니다.
+MCP에서는 현재 연결된 AI가 계획과 결과 해석을 맡습니다. 별도 Codex·Claude·Gemini CLI를
+설치하거나 또 다른 모델을 실행할 필요가 없습니다. 로컬 의미 검색은 목표 실행 전에 준비합니다.
 
 ```sh
 odeduck catalog semantic-build
-odeduck goal "사람들이 잘 모르는 흥미로운 사실을 발견하고, 원문과 출처를 확인해주세요" --review-with codex
+odeduck mcp
 ```
 
-MCP에서는 연결할 때 같은 설정을 적용합니다. 선택 근거는 연결된 host와 지정한 검토 제공자에 전달됩니다.
+선택한 원문 셀을 host가 더 읽어야 한다면 서버 시작 시 `--share-goal-evidence`를 사용합니다.
+이 설정만으로 별도 모델을 호출하지는 않습니다. 기본 계산 결과 반환과 선택 원문 공개는 구분합니다.
+
+단독 CLI에는 대화 중인 host가 없으므로 설치·로그인된 계획 모델이 필요합니다.
 
 ```sh
+odeduck goal "사람들이 잘 모르는 흥미로운 사실을 발견하고, 원문과 출처를 확인해주세요" --agent codex
+```
+
+별도 검토가 없으면 계산 결과와 `review_required`를 반환하고 추가 계획 호출을 멈춥니다.
+종료 코드는 목표 전체가 독립 검토를 마치지 않았음을 나타냅니다. 호출자는 artifact와 남은 조건을
+검토해야 하며, 실패 코드만 보고 실제 산출물이 없다고 판단하면 안 됩니다.
+
+추가 모델 검토를 원할 때만 고정 수신자를 명시합니다. 선택 원천 값도 해당 수신자에게 전달됩니다.
+
+```sh
+odeduck goal "목표" --review-with codex
+# MCP에서도 추가 검토가 필요한 경우에만 사용합니다.
 odeduck mcp --review-with codex
 ```
 
@@ -110,8 +124,20 @@ MCP tool의 인자로 이 권한을 켤 수 없고, 기존 `call_api`·실행 �
 충족돼야 `output_ready`가 됩니다. 일반적인 모든 목표의 자율 완주는 계속 개발·검증 중입니다.
 [검토 범위](specs/goal-source-report-review-v1.md)와 [제품 의도](../INTENT.md)는 유지합니다.
 
-기존 `solve` 명령과 세분화된 검토 플래그는 호환용으로 남습니다. 새 사용은 `goal`과 `--review-with`로
-통일합니다. MCP의 이전 `advance_goal` 호출자는 새 서버에 다시 연결해 `goal` 스키마를 사용해야 합니다.
+기존 `solve` 명령과 세분화된 검토 플래그는 호환용으로 남습니다. 새 사용은 `goal`을 사용하고,
+별도 검토가 필요할 때만 `--review-with`를 추가합니다. MCP의 이전 `advance_goal` 호출자는 새 서버에 다시 연결해 `goal` 스키마를 사용해야 합니다.
+
+### 반복 입력과 사용량
+
+기본 지침은 짧게 전달하고 `read_guide`로 필요한 상세 topic을 읽습니다. MCP는 처음에 전체 snapshot,
+이후에는 `baseRevision` 기준 RFC 6902 `changes`를 반환합니다. 변경을 이전 state에 적용하며,
+맥락을 잃으면 `sessionId`와 `fullState:true`로 전체 상태를 다시 읽습니다. 기존 클라이언트도
+`fullState:true`로 전체 응답을 유지할 수 있습니다. 한도·출처·검토 판정은 동일합니다.
+
+JSON의 `modelUsage`는 오데덕이 **추가로 실행한 모델**의 호출별 입력·출력·캐시 토큰과 전송 바이트를
+기록합니다. 현재 Codex·Claude의 보고 형식을 인식하며, 미지원 형식은 `unreportedCalls`에 표시합니다.
+캐시 토큰은 입력 토큰에 포함된 부분이며 다시 더하지 않습니다. 바이트 수는 토큰·과금액이 아닙니다.
+MCP host의 모델 사용량과 로컬 임베딩은 포함되지 않으므로 호출 0을 전체 AI 비용 0으로 해석하면 안 됩니다.
 
 <details>
 <summary>지원 연산과 원천 추적 범위</summary>

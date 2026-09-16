@@ -38,18 +38,25 @@ second agent through `catalog discover`.
 required output, geography and period. If it refers to prior conversation, pass the relevant user context
 using the running interface's context field; do not expect an isolated planner or reviewer to remember this chat.
 Context is not source evidence or a permission grant. For MCP, use the running guide's session/revision and action
-contract. Define required roles and outputs, then inspect actual sources, acquire observations, compose
+contract. Read detailed guide topics only for the action needed. Apply returned state changes to the
+previous revision; if that context is unavailable, request the runtime's full snapshot before continuing.
+Define required roles and outputs, then inspect actual sources, acquire observations, compose
 and execute. Use returned gaps to seek missing evidence, another source or a justified crosswalk within
 the same goal. A report request is not complete when only dataset links have been found.
 
 Use the runtime's supported actions and completion status. In the current contract, `sample_executed`
-means a bounded computation ran; `review_required` still needs evidence or authorized review.
+means a bounded computation ran; `review_required` still needs semantic assessment. The MCP host can
+interpret the actual artifact and explain its source support and limitations without installing or starting
+another agent CLI. This is not independent review and cannot set output_ready. Seek genuinely missing
+evidence; do not loop just to obtain an unavailable review flag.
 Report the artifact, source support and unresolved requirements separately. Keep partial progress when
 completion is blocked rather than relabeling it as success or abandoning the requested output early.
 
 Check the runtime's semantic-search and model prerequisites. Read the installed `goal --help` before
 launching a CLI planner. Current goal checks catalogue and semantic prerequisites before model planning.
-Use the runtime's consolidated review option to fix the recipient and authorized evidence scope; do not silently enable it.
+Independent model review is optional. Use the runtime's review option only when that additional review
+and recipient are authorized; do not silently enable it. A standalone CLI needs a planning model and can
+return an artifact with unresolved review, without another evaluator call.
 On older installations, use the goal-execution command advertised by their own schema/help.
 Goal execution currently does not submit access applications itself: resolve a selected API's missing
 access through the [ordinary access workflow](references/access.md) and follow the runtime's continuation guidance.

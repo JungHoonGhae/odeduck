@@ -69,7 +69,7 @@ odeduck://guide 리소스에 사용 순서가 있습니다. 호출·계정 기�
 	cmd.Flags().BoolVar(&reviewAnalyses, "review-goal-analyses", false, "typed 관계·계산 검토를 추가 허용; 검토 provider/선택 근거 공개 필수, 모델 tool argument로 변경 불가")
 	cmd.Flags().BoolVar(&reviewFullScope, "review-goal-full-scope", false, "원천 기반 전체 요청 범위의 추가 검토; --review-goal-analyses 필수, 모집단 인증 아님")
 	cmd.Flags().StringVar(&reviewWith, "review-with", "", "선택 원천 값을 MCP host와 고정 검토 provider에 전송하여 보고·분석·요청 범위를 검토: codex | claude | gemini")
-	for _, name := range []string{"share-goal-evidence", "review-goals-with", "review-goal-analyses", "review-goal-full-scope"} {
+	for _, name := range []string{"review-goals-with", "review-goal-analyses", "review-goal-full-scope"} {
 		_ = cmd.Flags().MarkHidden(name)
 	}
 	return cmd

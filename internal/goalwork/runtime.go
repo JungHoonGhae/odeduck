@@ -71,8 +71,8 @@ type Environment struct {
 }
 
 func runtimeFor(policy Policy, deps Dependencies) Runtime {
-	hash := sha256.Sum256([]byte(PlanningGuide()))
-	r := Runtime{Build: version.String(), GuideSHA256: hex.EncodeToString(hash[:]), Status: "not_checked", Actions: []string{"define", "compose", "execute", "abstain"}}
+	hash := sha256.Sum256([]byte(PlanningBrief() + PlanningGuide()))
+	r := Runtime{Build: version.String(), GuideSHA256: hex.EncodeToString(hash[:]), Status: "not_checked", Actions: []string{"read_guide", "define", "compose", "execute", "abstain"}}
 	identity, err := processIdentity, processIdentityError
 	r.Executable, r.BinarySHA256 = identity.path, identity.hash
 	if err != nil {

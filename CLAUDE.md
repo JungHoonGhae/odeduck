@@ -5,6 +5,10 @@ Go CLI + MCP. 사람은 정부 SSO 로그인 한 번만 하고 이후 포털 작
 
 ## 현재 상태 (2026-09-16)
 
+- MCP 목표 실행은 연결된 host가 판단하며 별도 agent CLI는 필요하지 않다. 상세 지침은 `read_guide`로
+  필요한 topic만 읽고, 상태는 기본적으로 변경분을 반환한다(`fullState:true`로 snapshot 복구).
+  `modelUsage`는 추가 모델 호출만 기록하며 host 사용량은 포함하지 않는다. 별도 검토는 선택 사항이고
+  `review_required`와 독립 검토된 `output_ready`를 구분한다.
 - 현재 개발은 `INTENT.md`의 요청에 따라 재개했다. CLI/MCP의 기본 목표 실행 이름은 `goal`이다.
   `--review-with`는 고정된 수신자에게 선택 근거를 보내 보고·분석·요청 범위를 검토하도록 명시한다.
   실제 실행 전 카탈로그·의미 검색을 점검하고, 검색 환경 복구 후 같은 목표의 `retry_search`를 지원한다.

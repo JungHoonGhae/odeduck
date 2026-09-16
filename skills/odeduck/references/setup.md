@@ -62,7 +62,8 @@ For Cursor or Claude Desktop, merge this entry into the host's existing MCP conf
 ```
 
 Start a new agent conversation or restart the host if the tools are not visible. Verify that the odeduck
-tools are listed before claiming MCP is connected. CLI use remains available without MCP.
+tools are listed before claiming MCP is connected. MCP uses the host AI and does not require another
+Codex, Claude or Gemini CLI. Separate model review is optional. CLI use remains available without MCP.
 
 ## 3. Log in when an authenticated operation needs it
 

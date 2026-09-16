@@ -3,11 +3,14 @@ package goalwork
 import (
 	"context"
 	"errors"
+
+	"github.com/JungHoonGhae/odeduck/internal/modelusage"
 )
 
 // Run is the standalone planning loop. MCP drives Advance directly using the
 // host model; both callers use the same state transitions and computed output.
 func Run(ctx context.Context, e *Engine, next func(context.Context, View) (Decision, error), progress func(View)) (View, error) {
+	ctx = modelusage.WithRecorder(ctx, e.modelUsage.Record)
 	if _, err := e.Preflight(ctx); err != nil {
 		return e.View(), err
 	}

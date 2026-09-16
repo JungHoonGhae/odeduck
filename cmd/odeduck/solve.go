@@ -98,7 +98,14 @@ func runGoalRequest(ctx context.Context, request goalwork.Request, policy goalwo
 	if err != nil {
 		return goalwork.View{}, err
 	}
+	return runGoalEngine(ctx, e, provider, progress)
+}
+
+func runGoalEngine(ctx context.Context, e *goalwork.Engine, provider string, progress func(goalwork.View)) (goalwork.View, error) {
 	return goalwork.Run(ctx, e, func(ctx context.Context, v goalwork.View) (goalwork.Decision, error) {
+		if v.Status == "review_required" && v.Policy.ReviewRecipient == "" {
+			return goalwork.Decision{}, fmt.Errorf("계산 결과를 반환합니다. 별도 모델 검토는 실행하지 않았습니다. 호출자가 artifact·evaluation·출처·범위를 검토하세요")
+		}
 		d, used, err := agentplan.PlanGoal(ctx, v, provider)
 		if err == nil {
 			provider = used

@@ -11,6 +11,7 @@ import (
 	"unicode"
 
 	"github.com/JungHoonGhae/odeduck/internal/goalwork"
+	"github.com/JungHoonGhae/odeduck/internal/modelusage"
 )
 
 //go:embed source-review-guide.md
@@ -32,6 +33,7 @@ type GoalReviewResponse struct {
 // sees neither planner history nor oracle labels. This is a model judgement,
 // not an independent source of truth or a human review.
 func ReviewGoal(ctx context.Context, in goalwork.ReviewInput, requested string) (GoalReviewResponse, error) {
+	ctx = modelusage.WithStage(ctx, "review")
 	if in.Recipient == "" || in.Recipient != requested || (requested != ProviderClaude && requested != ProviderCodex && requested != ProviderGemini) {
 		return GoalReviewResponse{}, fmt.Errorf("review recipient requires its exact authorized CLI provider; no fallback")
 	}

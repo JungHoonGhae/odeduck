@@ -15,6 +15,7 @@ import (
 
 	"github.com/JungHoonGhae/odeduck/internal/catalog"
 	"github.com/JungHoonGhae/odeduck/internal/dataset"
+	"github.com/JungHoonGhae/odeduck/internal/modelusage"
 )
 
 // Policy is fixed by the trusted caller at start; planner decisions cannot change it.
@@ -118,9 +119,10 @@ type Acquired struct {
 	Document       *dataset.DocumentProvenance
 }
 type Decision struct {
+	Topic         string           `json:"topic,omitempty"`       // read_guide only; local instruction reference
 	FileHistory   bool             `json:"fileHistory,omitempty"` // inspect only: list advertised historical FILE editions
 	FileVersion   string           `json:"fileVersion,omitempty"` // inspect only: exact edition ID from prior history inspection
-	Action        string           `json:"action"`                // define | search | retry_search | inspect | layout | sample | retry_sample | read_evidence | compose | execute | review_result | abstain
+	Action        string           `json:"action"`                // read_guide | define | search | retry_search | inspect | layout | sample | retry_sample | read_evidence | compose | execute | review_result | abstain
 	RetryOf       int              `json:"retryOf,omitempty"`     // latest failed sample/search revision; never a replacement request
 	Contract      *GoalContract    `json:"contract,omitempty"`
 	Query         string           `json:"query,omitempty"`
@@ -212,6 +214,8 @@ type SampleAttempt struct {
 	ObservationID string        `json:"observationId,omitempty"`
 }
 type View struct {
+	ModelUsage      modelusage.Summary  `json:"modelUsage"`
+	GuideTopic      string              `json:"guideTopic,omitempty"`
 	Context         string              `json:"context,omitempty"`
 	Runtime         Runtime             `json:"runtime"`
 	PlannerFeedback string              `json:"plannerFeedback,omitempty"` // transient caller diagnostic, not source evidence
@@ -252,6 +256,7 @@ type Budget struct {
 // Engine serializes each action and returns detached views. Rows are immutable,
 // private, bounded session memory; only explicitly allowed selections enter planning.
 type Engine struct {
+	modelUsage                  modelusage.Tracker
 	mu                          sync.Mutex
 	deps                        Dependencies
 	state                       View
@@ -319,6 +324,7 @@ func (e *Engine) PlanningView() View {
 }
 func (e *Engine) snapshot(planning bool) View {
 	v := e.state
+	v.ModelUsage = e.modelUsage.Snapshot()
 	v.Budget = Budget{LayoutsRemaining: 6 - e.layouts, SearchesRemaining: maxSearches - len(v.Searches), InspectionsRemaining: 12 - e.inspections, SamplesRemaining: 8 - e.samples, CompositionsRemaining: 6 - len(v.Compositions), CandidatesRemaining: maxCandidates - len(v.Nodes), SampleBytesRemaining: (8 << 20) - e.bytes}
 	if v.Policy.EvidenceRecipient != "" {
 		v.Budget.EvidencePacketsRemaining = maxEvidencePackets - len(v.Evidence)
@@ -328,6 +334,7 @@ func (e *Engine) snapshot(planning bool) View {
 		v.Budget.ReviewsRemaining = 3 - len(v.Reviews)
 	}
 	if planning {
+		v.ModelUsage.Records = nil
 		v.Artifact = nil
 	}
 	b, _ := json.Marshal(v)
@@ -371,6 +378,7 @@ func (e *Engine) allowReplayCorrection() bool {
 // session-local gaps for replanning. Revision, replay and terminal-state errors do
 // not consume another step. Context cancellation is propagated after recording.
 func (e *Engine) Advance(ctx context.Context, revision int, d Decision) (View, error) {
+	ctx = modelusage.WithRecorder(ctx, e.modelUsage.Record)
 	if _, err := e.Preflight(ctx); err != nil {
 		return e.View(), err
 	}
@@ -423,6 +431,8 @@ func (e *Engine) Advance(ctx context.Context, revision int, d Decision) (View, e
 	// and changed prose must not create a second observation of the same request.
 	keyDecision := Decision{Action: d.Action}
 	switch d.Action {
+	case "read_guide":
+		keyDecision.Topic = d.Topic
 	case "define":
 		keyDecision.Contract = d.Contract
 	case "retry_search":
@@ -451,16 +461,22 @@ func (e *Engine) Advance(ctx context.Context, revision int, d Decision) (View, e
 		keyDecision.Reason = digest(e.state.Evidence) // new evidence may justify another bounded review
 	}
 	key := digest(keyDecision)
-	if e.seen[key] {
+	if d.Action != "read_guide" && e.seen[key] {
 		return e.snapshot(false), fmt.Errorf("%w; change the request or composition using recorded gaps", ErrActionAlreadyAttempted)
 	}
 	if err := ctx.Err(); err != nil {
 		return e.snapshot(false), err
 	}
-	e.seen[key] = true
+	if d.Action != "read_guide" {
+		e.seen[key] = true
+	}
 	e.state.Revision++
+	priorStatus := e.state.Status
 	e.state.Status = "exploring"
 	err = e.act(ctx, d)
+	if d.Action == "read_guide" {
+		e.state.Status = priorStatus
+	}
 	if err != nil {
 		target := d.PK
 		if d.Action == "search" || d.Action == "retry_search" {
@@ -487,6 +503,17 @@ func (e *Engine) Advance(ctx context.Context, revision int, d Decision) (View, e
 }
 
 func (e *Engine) act(ctx context.Context, d Decision) error {
+	if d.Topic != "" && d.Action != "read_guide" {
+		return fmt.Errorf("topic is only valid for read_guide")
+	}
+	if d.Action == "read_guide" {
+		if _, err := PlanningSection(d.Topic); err != nil {
+			return err
+		}
+		e.state.GuideTopic = d.Topic
+		return nil
+	}
+
 	if e.state.Contract == nil && d.Action != "define" && d.Action != "abstain" {
 		return fmt.Errorf("define the goal contract before searching: preserve required roles, output, region, period and coverage")
 	}

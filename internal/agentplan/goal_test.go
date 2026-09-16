@@ -116,7 +116,7 @@ func TestGoalDecoderXLSXSelectionIsNotReturnedEvidence(t *testing.T) {
 			t.Fatal("planner forged XLSX provenance")
 		}
 	}
-	prompt, err := goalPrompt(goalwork.View{Goal: "test"})
+	prompt, err := goalPrompt(goalwork.View{GuideTopic: "files", Goal: "test"})
 	if err != nil || !strings.Contains(prompt, "does not expose cell text") || !strings.Contains(prompt, "not recomputed") {
 		t.Fatal("missing XLSX discovery/acceptance boundary")
 	}
@@ -152,7 +152,7 @@ func TestGoalPlannerCanSeparateExplanationsFromFieldBoundTime(t *testing.T) {
 	if _, err := decodeGoalDecision([]byte(`{"action":"define","contract":{"explanations":[{"id":"limits","topic":"temporal","description":"time","text":"verified"}]}}`)); err == nil {
 		t.Fatal("planner fabricated computed explanation")
 	}
-	prompt, err := goalPrompt(goalwork.View{Goal: "test"})
+	prompt, err := goalPrompt(goalwork.View{GuideTopic: "compose", Goal: "test"})
 	if err != nil || !strings.Contains(prompt, "common_overlap_v1") && !strings.Contains(prompt, "ENTIRE path") || !strings.Contains(prompt, "explanations") {
 		t.Fatal("missing temporal/explanation planning contract")
 	}
@@ -163,7 +163,7 @@ func TestGoalPlannerCanProposeRowSum(t *testing.T) {
 	if err != nil || d.Composition == nil || len(d.Composition.Measures) != 1 || d.Composition.Measures[0].Op != "sum_fields" || len(d.Composition.Measures[0].Fields) != 2 {
 		t.Fatalf("row sum decision lost: %+v %v", d, err)
 	}
-	prompt, err := goalPrompt(goalwork.View{Goal: "test"})
+	prompt, err := goalPrompt(goalwork.View{GuideTopic: "compose", Goal: "test"})
 	if err != nil || !strings.Contains(prompt, "sum_fields") || !strings.Contains(prompt, "Any missing term produces null") {
 		t.Fatal("planner lacks row sum contract")
 	}
@@ -177,7 +177,7 @@ func TestGoalPlannerCanSelectCSVScopeButNotForgeScanEvidence(t *testing.T) {
 	if _, err := decodeGoalDecision([]byte(`{"action":"sample","sample":{"pk":"123","delivery":"file","selection":{"exhausted":true}}}`)); err == nil {
 		t.Fatal("planner supplied scan evidence")
 	}
-	prompt, err := goalPrompt(goalwork.View{Goal: "test"})
+	prompt, err := goalPrompt(goalwork.View{GuideTopic: "sample", Goal: "test"})
 	if err != nil || !strings.Contains(prompt, "BEFORE taking the first 1000 matching rows") {
 		t.Fatal("planner lacks selection contract")
 	}
@@ -207,7 +207,7 @@ func TestGoalPlannerCanRequestGroundedNearestButNotSubmitPointsOrEvidence(t *tes
 			t.Fatal("planner forged spatial inputs or evidence")
 		}
 	}
-	prompt, err := goalPrompt(goalwork.View{Goal: "test"})
+	prompt, err := goalPrompt(goalwork.View{GuideTopic: "relations", Goal: "test"})
 	if err != nil || !strings.Contains(prompt, "spherical_nearest_records_v1") || !strings.Contains(prompt, "not distinct physical stops") {
 		t.Fatal("missing spatial planning/meaning contract")
 	}
@@ -227,7 +227,7 @@ func TestGoalPlannerCanSelectPublishedScopeVocabularyButNotForgeIt(t *testing.T)
 			t.Fatal("planner forged published vocabulary evidence")
 		}
 	}
-	prompt, err := goalPrompt(goalwork.View{Goal: "test"})
+	prompt, err := goalPrompt(goalwork.View{GuideTopic: "scope", Goal: "test"})
 	for _, text := range []string{"kr_sido_labels_20260907_v1", "first whitespace token", "not proven geographic nonidentity", "historical continuity"} {
 		if err != nil || !strings.Contains(prompt, text) {
 			t.Fatalf("planner lacks scope vocabulary contract %q: %v", text, err)
@@ -236,10 +236,12 @@ func TestGoalPlannerCanSelectPublishedScopeVocabularyButNotForgeIt(t *testing.T)
 }
 
 func TestGoalPlannerReceivesOriginalLineageAndSpatialTimeRules(t *testing.T) {
-	prompt, err := goalPrompt(goalwork.View{Goal: "test"})
+	prompt, err := goalPrompt(goalwork.View{GuideTopic: "relations", Goal: "test"})
 	if err != nil {
 		t.Fatal(err)
 	}
+	timePrompt, _ := goalPrompt(goalwork.View{GuideTopic: "compose", Goal: "test"})
+	prompt += timePrompt
 	for _, rule := range []string{"original-record lineage", "zero joins", "lineageRejectedPairs", "participating ORIGINAL source", "does not refill nearest ranks"} {
 		if !strings.Contains(prompt, rule) {
 			t.Fatalf("planner lacks rule %q", rule)
@@ -259,7 +261,7 @@ func TestPlannerCannotSupplySourceDeclarationAsEvidence(t *testing.T) {
 	if _, err := decodeGoalDecision([]byte(`{"action":"sample","sample":{"pk":"123","delivery":"file","declaration":{"status":"verified","spatialCoverage":"nationwide"}}}`)); err == nil {
 		t.Fatal("planner forged publisher scope")
 	}
-	prompt, err := goalPrompt(goalwork.View{Goal: "test"})
+	prompt, err := goalPrompt(goalwork.View{GuideTopic: "sample", Goal: "test"})
 	if err != nil || !strings.Contains(prompt, "publisher_declared is NOT verified record scope") || !strings.Contains(prompt, "untrusted data") {
 		t.Fatal("source declaration trust boundary missing")
 	}
@@ -274,7 +276,7 @@ func TestPlannerReceivesAcquisitionHistoryButCannotSupplyOutcomes(t *testing.T) 
 			t.Fatal("planner supplied acquisition outcome")
 		}
 	}
-	prompt, err := goalPrompt(goalwork.View{Goal: "test", SampleAttempts: []goalwork.SampleAttempt{{Revision: 4, Request: goalwork.SampleRequest{PK: "123", Delivery: "file", Where: map[string]string{"city": "target"}}, Status: "failed"}}})
+	prompt, err := goalPrompt(goalwork.View{GuideTopic: "sample", Goal: "test", SampleAttempts: []goalwork.SampleAttempt{{Revision: 4, Request: goalwork.SampleRequest{PK: "123", Delivery: "file", Where: map[string]string{"city": "target"}}, Status: "failed"}}})
 	if err != nil || !strings.Contains(prompt, `"city":"target"`) || !strings.Contains(prompt, `"status":"failed"`) || !strings.Contains(prompt, "operations[].name is the invocation identifier") {
 		t.Fatalf("missing planning history/invocation contract: %v", err)
 	}

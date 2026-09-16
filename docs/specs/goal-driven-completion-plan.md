@@ -15,6 +15,14 @@ Status: product incomplete; development resumed by user request on 2026-09-16.
 무힌트 23단계 abstained, 맥락 전달 수정 뒤 원천 재취득·고정 계산의 18단계 output_ready를 구분해
 기록했다. I4/I9의 복구·동일 계약과 I1의 대화 맥락 전달을 보완한 근거이며 I1–I10 전체 완료가 아니다.
 
+### 반복 입력과 모델 의존성 개선
+
+추가 사용자 요청에 따라 MCP host 중심의 기본 경로와 선택형 별도 검토를 명확히 했다. 기본 지침의
+상세 topic 분리, MCP 변경분 전달·snapshot 복구, 자식 모델 사용량 계측을 추가했다.
+[비용 관련 검증](../research/goal-efficiency-validation-2026-09-16.md)은 지침/응답 바이트 감소와
+실제 한 번의 모델 usage 수신을 입증한다. 총 과금·범용 완주·기본 검색 대비 우월성의 증거는 아니다.
+review_required를 output_ready로 승격하거나 아래 완료 기준을 낮추지 않았다.
+
 ## 과거 마감 범위 — 2026-09-09
 
 사용자는 현재 등록된 Wayfinder 티켓만 마무리하고 정리하도록 범위를 고정했다.

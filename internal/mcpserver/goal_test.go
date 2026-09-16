@@ -25,7 +25,7 @@ func TestGoalToolKeepsStateBoundToMCPSession(t *testing.T) {
 	b := connectTestClient(t, s)
 	call := func(client *mcp.ClientSession, args map[string]any) *mcp.CallToolResult {
 		t.Helper()
-		res, err := client.CallTool(context.Background(), &mcp.CallToolParams{Name: "goal", Arguments: args})
+		res, err := client.CallTool(context.Background(), &mcp.CallToolParams{Name: "goal", Arguments: goalTestFull(args)})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -78,7 +78,7 @@ func TestGoalToolProducesSameArtifactAsStandaloneEngine(t *testing.T) {
 	client := connectTestClient(t, server)
 	invoke := func(args map[string]any) goalOut {
 		t.Helper()
-		res, err := client.CallTool(context.Background(), &mcp.CallToolParams{Name: "goal", Arguments: args})
+		res, err := client.CallTool(context.Background(), &mcp.CallToolParams{Name: "goal", Arguments: goalTestFull(args)})
 		if err != nil || res.IsError {
 			t.Fatalf("%+v %v", res, err)
 		}

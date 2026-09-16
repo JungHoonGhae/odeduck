@@ -34,7 +34,7 @@ func TestGoalMCPRetryIsSessionBoundAndRetainsFailedEvidence(t *testing.T) {
 	a, b := connectTestClient(t, s), connectTestClient(t, s)
 	call := func(client *mcp.ClientSession, args map[string]any) (goalOut, bool) {
 		t.Helper()
-		res, err := client.CallTool(context.Background(), &mcp.CallToolParams{Name: "goal", Arguments: args})
+		res, err := client.CallTool(context.Background(), &mcp.CallToolParams{Name: "goal", Arguments: goalTestFull(args)})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -90,7 +90,7 @@ func TestGoalMCPSemanticRecoveryRetainsSessionAndBudgets(t *testing.T) {
 	a, b := connectTestClient(t, s), connectTestClient(t, s)
 	call := func(client *mcp.ClientSession, args map[string]any) (goalOut, bool) {
 		t.Helper()
-		res, err := client.CallTool(context.Background(), &mcp.CallToolParams{Name: "goal", Arguments: args})
+		res, err := client.CallTool(context.Background(), &mcp.CallToolParams{Name: "goal", Arguments: goalTestFull(args)})
 		if err != nil {
 			t.Fatal(err)
 		}

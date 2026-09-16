@@ -32,7 +32,7 @@ func TestGoalMCPSingleSourceAnalysisMatchesActualEngine(t *testing.T) {
 	client := connectTestClient(t, s)
 	call := func(args map[string]any) goalOut {
 		t.Helper()
-		r, err := client.CallTool(ctx, &mcp.CallToolParams{Name: "goal", Arguments: args})
+		r, err := client.CallTool(ctx, &mcp.CallToolParams{Name: "goal", Arguments: goalTestFull(args)})
 		if err != nil || r.IsError || len(r.Content) != 1 {
 			t.Fatalf("MCP result: %+v %v", r, err)
 		}
@@ -94,7 +94,7 @@ func TestGoalMCPSourceReductionPreservesPrecisionAndOrigin(t *testing.T) {
 	client := connectTestClient(t, s)
 	call := func(args map[string]any) goalOut {
 		t.Helper()
-		r, err := client.CallTool(ctx, &mcp.CallToolParams{Name: "goal", Arguments: args})
+		r, err := client.CallTool(ctx, &mcp.CallToolParams{Name: "goal", Arguments: goalTestFull(args)})
 		if err != nil || r.IsError {
 			t.Fatalf("MCP reduction: %v %+v", err, r)
 		}
@@ -187,7 +187,7 @@ func TestGoalMCPAnalysisReviewUsesTrustedPolicyAndActualCalculation(t *testing.T
 		client := connectTestClient(t, s)
 		call := func(args map[string]any) goalOut {
 			t.Helper()
-			r, err := client.CallTool(ctx, &mcp.CallToolParams{Name: "goal", Arguments: args})
+			r, err := client.CallTool(ctx, &mcp.CallToolParams{Name: "goal", Arguments: goalTestFull(args)})
 			if err != nil || r.IsError {
 				t.Fatalf("MCP analysis: %v %+v", err, r)
 			}
@@ -274,7 +274,7 @@ func TestGoalMCPReusesOriginalCellsWithOneSelectedPacket(t *testing.T) {
 	client := connectTestClient(t, s)
 	call := func(args map[string]any) goalOut {
 		t.Helper()
-		r, err := client.CallTool(ctx, &mcp.CallToolParams{Name: "goal", Arguments: args})
+		r, err := client.CallTool(ctx, &mcp.CallToolParams{Name: "goal", Arguments: goalTestFull(args)})
 		if err != nil || r.IsError {
 			t.Fatalf("MCP reuse: %v %+v", err, r)
 		}

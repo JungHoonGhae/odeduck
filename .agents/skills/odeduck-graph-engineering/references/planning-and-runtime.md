@@ -6,7 +6,8 @@
 
 이 스킬은 개발 에이전트의 작업 지침이다. 제품 에이전트의 탐색·재계획 행동을 바꾸는 작업에서는
 실제 입력을 추적한다. CLI 계획기와 MCP guide가 공유하는 실행 지침은
-`internal/goalwork/planning-guide.md`이며, `goalwork.PlanningGuide()`가 두 경로에 전달한다.
+`internal/goalwork/planning-brief.md`이며 상세 계약은 `planning-guide.md`의 topic으로 나눈다.
+기본 안내와 요청한 상세 topic만 두 경로에 전달한다.
 관련 지침을 바꿀 때는 해당 action의 실행 계약·권한과 두 경로의 전달 테스트를 함께 확인한다.
 지침 전달, 모델의 실제 선택, 최종 산출물의 정확도는 별도의 검증 결과다.
 

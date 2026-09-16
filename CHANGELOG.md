@@ -7,6 +7,33 @@ section matching a `vX.Y.Z` tag as the GitHub release notes.
 
 ## [Unreleased]
 
+## [0.21.0] - 2026-09-16
+
+현재 연결된 AI로 목표를 실행하고, 반복해서 전달하던 지침과 상태를 줄였습니다.
+
+### Changed
+
+- MCP 기본 경로는 연결된 host가 계획·해석하며 다른 agent CLI 설치가 필요하지 않습니다.
+  별도 모델 검토는 선택 사항입니다. 단독 CLI `goal`은 `--review-with` 없이 계획 모델을 사용할 수 있고,
+  검토 미설정 상태에서 계산 결과를 얻으면 추가 계획 호출 없이 artifact와 미검증 항목을 반환합니다.
+- 기본 계획 지침은 약 54 KB에서 5.9 KB로 줄이고 `read_guide`로 필요한 상세 topic을 읽습니다.
+  원천·연산·권한의 상세 계약과 결정적 검증은 유지합니다.
+- MCP `goal`은 최초 snapshot 뒤 상태 변경분을 반환합니다. RFC 6902 `changes`를 이전 state에
+  적용하며 `baseRevision`을 확인합니다. 맥락 복구·기존 전체 상태 소비자는 `fullState:true`를 사용합니다.
+
+### Added
+
+- `modelUsage`: 실제 자식 모델 호출별 바이트·시간과 provider 보고 입력·출력·캐시 토큰을 기록합니다.
+  현재 Codex·Claude 보고 형식을 지원하며 미보고는 별도로 표시합니다. MCP host 추론·임베딩은 포함하지 않습니다.
+
+### Validation and limits
+
+- 동일한 계산 fixture에서 전체 응답 대비 변경분 전달은 약 45% 작았습니다. 지침은 89% 작아졌습니다.
+  토큰·과금액이 같은 비율로 줄었다는 의미는 아닙니다. [검증 기록](docs/research/goal-efficiency-validation-2026-09-16.md).
+- 기본 경로의 `review_required`를 독립 검토된 `output_ready`로 변경하지 않습니다. CLI는 미검토
+  결과가 있더라도 목표 미완료 종료 코드를 유지하므로 JSON의 artifact와 evaluation도 확인해야 합니다.
+- 단독 CLI에는 계획 모델이 필요합니다. CLI의 행동별 모델 호출, 프로세스 재개, INTENT 전체 완주는 남아 있습니다.
+
 ## [0.20.0] - 2026-09-16
 
 목표를 말하면 필요한 공공데이터를 발견하고 결과와 근거까지 만드는 흐름을 `goal`로 통일했습니다.

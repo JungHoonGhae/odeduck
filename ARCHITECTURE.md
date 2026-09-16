@@ -102,9 +102,11 @@ provider, 검색 정책을 유지하며 Bridge 선택지와 단계별 폴백·Ab
 
 ### 1.5. Goal execution
 
-`odeduck goal "목표" --review-with codex`와 MCP `goal`은 [`internal/goalwork`](internal/goalwork)의 동일한
+`odeduck goal "목표" --agent codex`와 MCP `goal`은 [`internal/goalwork`](internal/goalwork)의 동일한
 Start/Advance interface를 사용한다. CLI 계획은 tool-free Codex·Claude·Gemini가, MCP 계획은 host가
-다음 행동을 제안한다. 별도 결과 검토는 명시한 시작 설정이 있을 때만 고정된 모델을 호출한다.
+다음 행동을 제안한다. MCP는 다른 agent CLI 설치 없이 사용할 수 있다. 별도 결과 검토는 선택형
+`--review-with` 설정이 있을 때만 고정된 모델을 호출한다. 검토가 없으면 실제 artifact와 남은 의미 검토
+항목을 반환하며 `output_ready`로 승격하지 않는다. 단독 CLI는 이 지점에서 추가 계획 호출 없이 멈춘다.
 Request는 원문 목표와 선택적인 사용자 대화 맥락을 분리해 고정한다. 같은 context가 계획과 별도 검토에
 전달되며 원천 근거나 권한으로 승격되지 않는다. 근거 검토 입력의 기존 크기 제한에도 포함된다.
 고정 Anchor 없이 역할별 후보와 여러 Composition을 보존한다. 사용자 문장을 검색어 하나로 줄이지 않고
@@ -114,8 +116,17 @@ Request는 원문 목표와 선택적인 사용자 대화 맥락을 분리해 �
 
 의미 검색 실패는 strict 정책을 유지한 채 중단한다. 환경 복구 후 retry_search는 원래 검색어·역할을
 재사용하고 같은 목표·실패 이력·만료·누적 예산을 유지한다. 프로세스가 끝난 뒤의 영속 재개는 아직 미지원이다.
-상세 행동 안내는 Goal Engine의 [정적 계획 계약](internal/goalwork/planning-guide.md) 하나를
-CLI prompt와 MCP resource가 공유한다. 각 adapter는 전달·출력·신뢰된 시작 설정만 덧붙인다.
+CLI prompt와 MCP resource는 짧은 [기본 안내](internal/goalwork/planning-brief.md)를 공유한다.
+`read_guide`는 [상세 계약](internal/goalwork/planning-guide.md)의 요청한 topic만 읽으며 행동 예산을
+공유한다. 단독 계획기에는 최근 요청한 상세 topic만 추가한다. 기존 원천·계산·권한 계약은 보존한다.
+
+MCP는 최초 상태를 snapshot으로, 이후 행동은 직전 revision에 대한 RFC 6902 JSON Patch로 반환한다.
+수신자는 changes를 이전 state에 순서대로 적용한다. 맥락을 잃거나 기존 전체 상태 형식이 필요하면
+`fullState:true`로 현재 snapshot을 읽는다. 숫자 원문·null·누락은 그대로 보존하며 완료 판정은 바꾸지 않는다.
+
+`modelUsage`는 오데덕이 실행한 자식 모델 호출의 입력·출력·캐시 토큰, 바이트 수와 시간을 기록한다.
+provider가 보고하지 않은 토큰은 0으로 추정하지 않고 unreportedCalls로 남긴다. MCP host의 추론과
+로컬 embedding 사용량은 집계 범위 밖이다. 원문 prompt·응답·인증정보는 usage에 저장하지 않는다.
 
 ```text
 goal → define(필수 역할·범위·출력) → search → inspect → sample → compose → execute
@@ -132,7 +143,7 @@ module이 revision·중복 억제·예산·실제 원천 획득·실행 결과�
 실행은 복합키 exact/trim inner join, projection, groupBy+count/sum이며 tuple을 보존한다. null은
 결합되지 않고 중복 expansion과 빈 전체 경로는 실패한다. 원문 행은 세션 메모리에만 두며 외부 CLI
 planner에는 기본적으로 컬럼·타입·해시·오류만 보낸다. CLI의 --review-with로 단일 제공자와 선택 근거 전송을 명시하면
-공통 read_evidence가 선택한 행·필드만 원본 주소와 함께 전달한다. MCP도 --review-with로
+공통 read_evidence가 선택한 행·필드만 원본 주소와 함께 전달한다. MCP는 `--share-goal-evidence`로 host에만 선택 근거를 제공하거나 `--review-with`로 별도 검토까지 허용한다.
 서버 시작 시 상한을 정하고 모델 입력으로 바꾸지 못한다. 선택 근거는 셀·packet·세션 누적 예산과
 만료를 적용하며 전체 Artifact는 외부 CLI 계획 입력에서 계속 제외한다. 기존 MCP Artifact/call_api
 원문 반환은 별개다. [공개·재사용 신뢰 경계](docs/adr/0007-selected-evidence-and-reuse.md)를 따른다.

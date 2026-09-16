@@ -33,7 +33,7 @@ func TestGoalGuideCLIHelper(t *testing.T) {
 	}
 	input, err := io.ReadAll(os.Stdin)
 	text := string(input)
-	if err != nil || strings.Count(text, goalwork.PlanningGuide()) != 1 {
+	if err != nil || strings.Count(text, goalwork.PlanningBrief()) != 1 {
 		os.Exit(2)
 	}
 	for _, required := range []string{"Return ONE JSON object", "no tools, code execution", "never external planning input", "STATE_JSON:", `"goal":"compare source evidence"`} {
