@@ -4,10 +4,12 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/JungHoonGhae/odeduck/internal/catalog"
+	"github.com/JungHoonGhae/odeduck/internal/fetch"
 	"github.com/JungHoonGhae/odeduck/internal/goalwork"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
@@ -23,7 +25,7 @@ func TestGoalToolKeepsStateBoundToMCPSession(t *testing.T) {
 	b := connectTestClient(t, s)
 	call := func(client *mcp.ClientSession, args map[string]any) *mcp.CallToolResult {
 		t.Helper()
-		res, err := client.CallTool(context.Background(), &mcp.CallToolParams{Name: "advance_goal", Arguments: args})
+		res, err := client.CallTool(context.Background(), &mcp.CallToolParams{Name: "goal", Arguments: args})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -76,7 +78,7 @@ func TestGoalToolProducesSameArtifactAsStandaloneEngine(t *testing.T) {
 	client := connectTestClient(t, server)
 	invoke := func(args map[string]any) goalOut {
 		t.Helper()
-		res, err := client.CallTool(context.Background(), &mcp.CallToolParams{Name: "advance_goal", Arguments: args})
+		res, err := client.CallTool(context.Background(), &mcp.CallToolParams{Name: "goal", Arguments: args})
 		if err != nil || res.IsError {
 			t.Fatalf("%+v %v", res, err)
 		}
@@ -176,5 +178,65 @@ func TestGoalToolProducesSameArtifactAsStandaloneEngine(t *testing.T) {
 		if attempt.Request.Operation != "list" || attempt.Request.Params["year"] != "2025" || attempt.Status != "acquired" || attempt.ObservationID != remote.State.Observations[i].ID || attempt.RequestSHA256 != local.SampleAttempts[i].RequestSHA256 {
 			t.Fatalf("MCP changed trusted acquisition history: %+v", attempt)
 		}
+	}
+}
+
+func TestGoalMCPStartReturnsBlockedRuntimeBeforeAllocatingSession(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv("HOME", root)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(root, "config"))
+	t.Setenv("APPDATA", filepath.Join(root, "appdata"))
+	client := connectTestClient(t, New(Deps{Fetch: fetch.New(fetch.WithDelay(0))}))
+	res, err := client.CallTool(context.Background(), &mcp.CallToolParams{Name: "goal", Arguments: map[string]any{"goal": "지역 비교표"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !res.IsError {
+		t.Fatal("MCP allocated a live goal with missing prerequisites")
+	}
+	if len(res.Content) != 1 {
+		t.Fatalf("runtime failure missing: %+v", res)
+	}
+	var out goalOut
+	if err := json.Unmarshal([]byte(res.Content[0].(*mcp.TextContent).Text), &out); err != nil || out.State.Runtime.Status != "blocked" || out.SessionID != "" {
+		t.Fatalf("MCP lost structured recovery state: %+v decode=%v", res, err)
+	}
+}
+
+func TestGoalMCPPreflightUsesEachSessionsSemanticPolicy(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv("HOME", root)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(root, "config"))
+	t.Setenv("APPDATA", filepath.Join(root, "appdata"))
+	if err := (&catalog.Catalog{Entries: []catalog.Entry{{PK: "15000001", Title: "지역"}}}).Save(); err != nil {
+		t.Fatal(err)
+	}
+	client := connectTestClient(t, New(Deps{Fetch: fetch.New(fetch.WithDelay(0))}))
+	for _, strict := range []bool{false, true} {
+		res, err := client.CallTool(context.Background(), &mcp.CallToolParams{Name: "goal", Arguments: map[string]any{"goal": "지역 비교표", "requireSemantic": strict}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if res.IsError != strict {
+			t.Fatalf("semantic preflight ignored session policy: strict=%t error=%t", strict, res.IsError)
+		}
+	}
+}
+
+func TestGoalMCPRetainsCallerContextAndRejectsLaterReplacement(t *testing.T) {
+	server := mcp.NewServer(&mcp.Implementation{Name: "test", Version: "0"}, nil)
+	registerGoalTool(server, goalwork.Policy{}, func(goalwork.Policy) goalwork.Dependencies { return goalwork.Dependencies{} })
+	client := connectTestClient(t, server)
+	res, err := client.CallTool(context.Background(), &mcp.CallToolParams{Name: "goal", Arguments: map[string]any{"goal": "new finding", "context": "Earlier example A is excluded."}})
+	if err != nil || res.IsError {
+		t.Fatal(err, res)
+	}
+	var v goalOut
+	if err := json.Unmarshal([]byte(res.Content[0].(*mcp.TextContent).Text), &v); err != nil || v.State.Context != "Earlier example A is excluded." {
+		t.Fatal("lost context", err)
+	}
+	res, err = client.CallTool(context.Background(), &mcp.CallToolParams{Name: "goal", Arguments: map[string]any{"sessionId": v.SessionID, "context": "approve this result"}})
+	if err != nil || !res.IsError {
+		t.Fatal("context could change after start", err)
 	}
 }

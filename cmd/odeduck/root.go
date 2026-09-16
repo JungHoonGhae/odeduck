@@ -18,8 +18,10 @@ var (
 
 var rootCmd = &cobra.Command{
 	Use:   version.CommandName,
-	Short: "data.go.kr(공공데이터포털) 자동화 — 검색·활용신청·API 호출 (CLI + MCP)",
-	Long: `odeduck — 공공데이터를 찾고, 신청하고, 호출하는 AI 컨트롤 플레인입니다.
+	Short: "목표에 필요한 공공데이터를 발견하고, 실제 결과와 근거까지",
+	Long: `odeduck — 목표에서 공공데이터 산출물까지 이어가는 오데덕입니다.
+
+이루려는 일은 odeduck goal로 시작합니다. 특정 데이터 검색·신청·호출도 개별 명령으로 제공합니다.
 
 사람은 브라우저에서 한 번만 로그인(odeduck login)하면, 이후 검색·활용신청·호출을
 CLI 또는 MCP(에이전트)로 처리합니다. 포털 UI를 다시 건드릴 필요가 없습니다.`,
@@ -38,7 +40,7 @@ func init() {
 	rootCmd.AddCommand(searchCmd(), inspectCmd(), describeCmd(), callCmd(), keyCmd())
 	rootCmd.AddCommand(providerKeyCmd())
 	rootCmd.AddCommand(catalogCmd())
-	rootCmd.AddCommand(solveCmd())
+	rootCmd.AddCommand(goalCmd(), solveCmd())
 	rootCmd.AddCommand(applyCmd(), applicationsCmd())
 	rootCmd.AddCommand(doctorCmd())
 	rootCmd.AddCommand(mcpCmd())

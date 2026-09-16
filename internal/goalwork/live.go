@@ -38,6 +38,41 @@ func LiveDependencies(client *fetch.Client, base string, caller Caller, searcher
 		return projectInspection(pk, res), nil
 	}
 	return Dependencies{
+		Preflight: func(ctx context.Context) (Environment, error) {
+			once.Do(func() { cat, loadErr = catalog.Load() })
+			env := Environment{}
+			if loadErr != nil {
+				env.Checks = append(env.Checks, RuntimeCheck{Name: "catalog", Status: "blocked", Detail: loadErr.Error()})
+				return env, loadErr
+			}
+			env.CatalogRevision, env.CatalogEntries = digest(cat), len(cat.Entries)
+			if len(cat.Entries) == 0 {
+				err := fmt.Errorf("catalog is empty; install a release snapshot or run odeduck catalog sync")
+				env.Checks = append(env.Checks, RuntimeCheck{Name: "catalog", Status: "blocked", Detail: err.Error()})
+				return env, err
+			}
+			env.Checks = append(env.Checks, RuntimeCheck{Name: "catalog", Status: "checked", Detail: "snapshot pinned for this goal; source availability and freshness require inspection"})
+			if !policy.RequireSemantic {
+				env.Checks = append(env.Checks, RuntimeCheck{Name: "semantic", Status: "not_required", Detail: "lexical degradation explicitly permitted; actual search use is reported per search"})
+				return env, nil
+			}
+			// A constant, non-user probe exercises the actual index and embedder.
+			// Its candidates never enter the goal or its discovery accounting.
+			probe, err := searcher.Search(ctx, cat, catalog.QueryPlan{Intent: "공공데이터", Limit: 1}, catalog.SearchOptions{Semantic: true, RequireSemantic: true})
+			if err == nil && (probe.Semantic == nil || probe.Semantic.Status != "used") {
+				err = fmt.Errorf("required semantic retrieval was not used; rebuild with odeduck catalog semantic-build")
+			}
+			check := RuntimeCheck{Name: "semantic", Status: "checked", Detail: "index and query embedding exercised; not a goal search"}
+			if probe.Semantic != nil {
+				check.Detail += "; model=" + probe.Semantic.Model
+			}
+			if err != nil {
+				check.Status, check.Detail = "blocked", err.Error()
+			}
+			env.Checks = append(env.Checks, check)
+			return env, err
+		},
+
 		Search: func(ctx context.Context, query string) (catalog.Result, error) {
 			once.Do(func() { cat, loadErr = catalog.Load() })
 			if loadErr != nil {

@@ -38,6 +38,7 @@ var ErrActionAlreadyAttempted = errors.New("action already attempted")
 // Dependencies are acquisition seams, not planner authority. Implementations
 // must use catalogued PKs and official inspected contracts, never arbitrary URLs.
 type Dependencies struct {
+	Preflight          func(context.Context) (Environment, error)
 	Review             func(context.Context, ReviewInput) (ReviewAssessment, error) // trusted startup adapter; separate tool-free context
 	Search             func(context.Context, string) (catalog.Result, error)
 	Inspect            func(context.Context, string) (Inspection, error)
@@ -119,8 +120,8 @@ type Acquired struct {
 type Decision struct {
 	FileHistory   bool             `json:"fileHistory,omitempty"` // inspect only: list advertised historical FILE editions
 	FileVersion   string           `json:"fileVersion,omitempty"` // inspect only: exact edition ID from prior history inspection
-	Action        string           `json:"action"`                // define | search | inspect | layout | sample | retry_sample | read_evidence | compose | execute | review_result | abstain
-	RetryOf       int              `json:"retryOf,omitempty"`     // latest failed SampleAttempt revision; never a replacement request
+	Action        string           `json:"action"`                // define | search | retry_search | inspect | layout | sample | retry_sample | read_evidence | compose | execute | review_result | abstain
+	RetryOf       int              `json:"retryOf,omitempty"`     // latest failed sample/search revision; never a replacement request
 	Contract      *GoalContract    `json:"contract,omitempty"`
 	Query         string           `json:"query,omitempty"`
 	Role          string           `json:"role,omitempty"`
@@ -211,6 +212,8 @@ type SampleAttempt struct {
 	ObservationID string        `json:"observationId,omitempty"`
 }
 type View struct {
+	Context         string              `json:"context,omitempty"`
+	Runtime         Runtime             `json:"runtime"`
 	PlannerFeedback string              `json:"plannerFeedback,omitempty"` // transient caller diagnostic, not source evidence
 	Goal            string              `json:"goal"`
 	Contract        *GoalContract       `json:"contract,omitempty"`
@@ -261,7 +264,23 @@ type Engine struct {
 	replayCorrectionUsed        bool
 }
 
+// Request keeps the user's goal separate from relevant conversation context.
+// Context is not source evidence, authorization or an evaluator verdict.
+type Request struct {
+	Goal    string `json:"goal"`
+	Context string `json:"context,omitempty"`
+}
+
 func Start(goal string, policy Policy, deps Dependencies) (*Engine, error) {
+	return StartRequest(Request{Goal: goal}, policy, deps)
+}
+
+func StartRequest(request Request, policy Policy, deps Dependencies) (*Engine, error) {
+	goal := request.Goal
+	if len(request.Context) > 8000 || !utf8.ValidString(request.Context) || credentialText(request.Context) {
+		return nil, fmt.Errorf("goal context must be valid UTF-8, at most 8000 bytes, without credential material")
+	}
+
 	goal = strings.TrimSpace(goal)
 	if len(goal) == 0 || len(goal) > 4000 {
 		return nil, fmt.Errorf("goal must contain 1–4000 bytes")
@@ -288,7 +307,7 @@ func Start(goal string, policy Policy, deps Dependencies) (*Engine, error) {
 	if policy.ReviewFullScope && !policy.ReviewAnalyses {
 		return nil, fmt.Errorf("full-scope review requires authorized analysis review")
 	}
-	return &Engine{deps: deps, state: View{Goal: goal, Status: "exploring", Policy: policy, ExpiresAt: time.Now().UTC().Add(time.Hour)}, rows: map[string][]Row{}, requests: map[string]SampleRequest{}, seen: map[string]bool{}}, nil
+	return &Engine{deps: deps, state: View{Context: request.Context, Runtime: runtimeFor(policy, deps), Goal: goal, Status: "exploring", Policy: policy, ExpiresAt: time.Now().UTC().Add(time.Hour)}, rows: map[string][]Row{}, requests: map[string]SampleRequest{}, seen: map[string]bool{}}, nil
 }
 
 func (e *Engine) View() View { e.mu.Lock(); defer e.mu.Unlock(); e.expire(); return e.snapshot(false) }
@@ -352,13 +371,16 @@ func (e *Engine) allowReplayCorrection() bool {
 // session-local gaps for replanning. Revision, replay and terminal-state errors do
 // not consume another step. Context cancellation is propagated after recording.
 func (e *Engine) Advance(ctx context.Context, revision int, d Decision) (View, error) {
+	if _, err := e.Preflight(ctx); err != nil {
+		return e.View(), err
+	}
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	e.expire()
 	if revision != e.state.Revision {
 		return e.snapshot(false), fmt.Errorf("stale revision: expected %d", e.state.Revision)
 	}
-	if !canAdvance(e.state.Status) {
+	if !canAdvance(e.state.Status) && !(e.state.Status == "blocked" && d.Action == "retry_search") {
 		return e.snapshot(false), fmt.Errorf("goal is %s", e.state.Status)
 	}
 	if d.Action == "compose" && d.Composition != nil {
@@ -388,8 +410,14 @@ func (e *Engine) Advance(ctx context.Context, revision int, d Decision) (View, e
 			return e.snapshot(false), err
 		}
 		d.Sample = &request
+	} else if d.Action == "retry_search" {
+		search, err := e.retrySearch(d)
+		if err != nil {
+			return e.snapshot(false), err
+		}
+		d.Query, d.Role = search.Query, search.Role
 	} else if d.RetryOf != 0 {
-		return e.snapshot(false), fmt.Errorf("retryOf is valid only for retry_sample")
+		return e.snapshot(false), fmt.Errorf("retryOf is valid only for retry_sample or retry_search")
 	}
 	// Only acquisition/execution inputs identify an action. Irrelevant fields
 	// and changed prose must not create a second observation of the same request.
@@ -397,6 +425,8 @@ func (e *Engine) Advance(ctx context.Context, revision int, d Decision) (View, e
 	switch d.Action {
 	case "define":
 		keyDecision.Contract = d.Contract
+	case "retry_search":
+		keyDecision.RetryOf = d.RetryOf
 	case "search":
 		keyDecision.Query = strings.TrimSpace(d.Query)
 		keyDecision.Role = strings.TrimSpace(d.Role)
@@ -433,7 +463,7 @@ func (e *Engine) Advance(ctx context.Context, revision int, d Decision) (View, e
 	err = e.act(ctx, d)
 	if err != nil {
 		target := d.PK
-		if d.Action == "search" {
+		if d.Action == "search" || d.Action == "retry_search" {
 			target = bounded(d.Query, 500)
 		}
 		if d.Sample != nil {
@@ -450,7 +480,7 @@ func (e *Engine) Advance(ctx context.Context, revision int, d Decision) (View, e
 	// Acquisition can finish after the deadline. Purge retained values before
 	// returning this action's snapshot, including failure and cancellation paths.
 	e.expire()
-	if canAdvance(e.state.Status) && e.state.Revision >= e.state.Policy.MaxRounds {
+	if (canAdvance(e.state.Status) || e.state.Status == "blocked") && e.state.Revision >= e.state.Policy.MaxRounds {
 		e.state.Status = "budget_exhausted"
 	}
 	return e.snapshot(false), ctx.Err()
@@ -473,7 +503,7 @@ func (e *Engine) act(ctx context.Context, d Decision) error {
 		}
 		e.state.Contract = d.Contract
 		return nil
-	case "search":
+	case "search", "retry_search":
 		if strings.TrimSpace(d.Query) == "" || len(d.Query) > 500 {
 			return fmt.Errorf("search.query must be nonempty and at most 500 UTF-8 bytes; got %d bytes. Use one short Korean catalogue phrase", len(d.Query))
 		}

@@ -16,7 +16,7 @@ import (
 
 type solveRunner func(context.Context, string, goalwork.Policy, string, func(goalwork.View)) (goalwork.View, error)
 
-func solveCmd() *cobra.Command { return solveCommand(runGoal) }
+func solveCmd() *cobra.Command { c := solveCommand(runGoal); c.Hidden = true; return c }
 
 func solveCommand(run solveRunner) *cobra.Command {
 	var provider string
@@ -30,7 +30,7 @@ func solveCommand(run solveRunner) *cobra.Command {
 		Long: "키워드를 몰라도 목표를 입력하면 설치된 tool-free agent가 데이터 역할을 추론하고 검색·검사·표본 결합을 반복합니다. 실패하면 대안이나 코드 대응표를 탐색합니다. 관측한 한 원천의 조회·집계도 가능하며 결합은 선택 연산입니다. API/CSV·ZIP·XLSX/STD의 sample_executed는 표본 실행 결과입니다. review_required에서도 같은 목표·예산·만료 안에서 추가 근거와 대안을 찾습니다. 판정의 executionRevision은 해당 결과를 만든 실행을 가리킵니다. 선택형 --review-source-reports는 별도 모델이 원천 보고의 출력별 지지와 원래 목표 적합성을 검토합니다. --review-analyses는 관계·계산의 단위·기간·범위 검토를 추가합니다. 모두 기본 꺼짐이며 명시적 agent와 근거 공개가 필요합니다. 공간·인과·사업 가설·현장 검증은 승인하지 않습니다. 미완료 결과는 실패 코드로 반환합니다. 자동 활용신청은 하지 않습니다. JSON만 출력합니다.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if flagFormat != "json" {
-				return fmt.Errorf("solve outputs a structured JSON artifact; use --format json")
+				return fmt.Errorf("%s outputs a structured JSON artifact; use --format json", cmd.Name())
 			}
 			if rounds < 1 || rounds > 64 {
 				return fmt.Errorf("max-rounds must be 1–64")
@@ -90,16 +90,11 @@ func solveCommand(run solveRunner) *cobra.Command {
 }
 
 func runGoal(ctx context.Context, goal string, policy goalwork.Policy, provider string, progress func(goalwork.View)) (goalwork.View, error) {
-	client := newFetchClient()
-	caller := apicall.NewDatasetCaller(client, flagBaseURL, providerauth.Source{})
-	deps := goalwork.LiveDependencies(client, flagBaseURL, caller, catalog.Searcher{}, policy)
-	if policy.ReviewRecipient != "" {
-		deps.Review = func(ctx context.Context, in goalwork.ReviewInput) (goalwork.ReviewAssessment, error) {
-			response, err := agentplan.ReviewGoal(ctx, in, policy.ReviewRecipient)
-			return response.Assessment, err
-		}
-	}
-	e, err := goalwork.Start(goal, policy, deps)
+	return runGoalRequest(ctx, goalwork.Request{Goal: goal}, policy, provider, progress)
+}
+
+func runGoalRequest(ctx context.Context, request goalwork.Request, policy goalwork.Policy, provider string, progress func(goalwork.View)) (goalwork.View, error) {
+	e, err := prepareGoalRequest(request, policy, provider)
 	if err != nil {
 		return goalwork.View{}, err
 	}
@@ -110,4 +105,27 @@ func runGoal(ctx context.Context, goal string, policy goalwork.Policy, provider 
 		}
 		return d, err
 	}, progress)
+}
+
+func prepareGoalRequest(request goalwork.Request, policy goalwork.Policy, provider string) (*goalwork.Engine, error) {
+	client := newFetchClient()
+	caller := apicall.NewDatasetCaller(client, flagBaseURL, providerauth.Source{})
+	deps := goalwork.LiveDependencies(client, flagBaseURL, caller, catalog.Searcher{}, policy)
+	acquisitionCheck := deps.Preflight
+	deps.Preflight = func(ctx context.Context) (goalwork.Environment, error) {
+		env, err := acquisitionCheck(ctx)
+		check, plannerErr := agentplan.CheckGoalPlanner(provider)
+		env.Checks = append(env.Checks, check)
+		if err != nil {
+			return env, err
+		}
+		return env, plannerErr
+	}
+	if policy.ReviewRecipient != "" {
+		deps.Review = func(ctx context.Context, in goalwork.ReviewInput) (goalwork.ReviewAssessment, error) {
+			response, err := agentplan.ReviewGoal(ctx, in, policy.ReviewRecipient)
+			return response.Assessment, err
+		}
+	}
+	return goalwork.StartRequest(request, policy, deps)
 }

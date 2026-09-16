@@ -31,7 +31,7 @@ func TestGoalMCPReplansScopeUsingPublishedVocabulary(t *testing.T) {
 	client := connectTestClient(t, s)
 	call := func(args map[string]any) goalOut {
 		t.Helper()
-		r, err := client.CallTool(context.Background(), &mcp.CallToolParams{Name: "advance_goal", Arguments: args})
+		r, err := client.CallTool(context.Background(), &mcp.CallToolParams{Name: "goal", Arguments: args})
 		if err != nil || r.IsError {
 			t.Fatalf("MCP scope call failed: %v %+v", err, r)
 		}

@@ -143,4 +143,4 @@ if ($NewUserPath -ne $UserPath) {
 
 Write-Host ""
 Write-Host "Installed to $InstallDir\odeduck.exe"
-Write-Host "Next: odeduck login"
+Write-Host "Next: odeduck goal --help (goal execution); odeduck mcp --help (AI app); odeduck login (authenticated API access)"

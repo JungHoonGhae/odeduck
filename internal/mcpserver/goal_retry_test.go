@@ -34,7 +34,7 @@ func TestGoalMCPRetryIsSessionBoundAndRetainsFailedEvidence(t *testing.T) {
 	a, b := connectTestClient(t, s), connectTestClient(t, s)
 	call := func(client *mcp.ClientSession, args map[string]any) (goalOut, bool) {
 		t.Helper()
-		res, err := client.CallTool(context.Background(), &mcp.CallToolParams{Name: "advance_goal", Arguments: args})
+		res, err := client.CallTool(context.Background(), &mcp.CallToolParams{Name: "goal", Arguments: args})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -72,5 +72,55 @@ func TestGoalMCPRetryIsSessionBoundAndRetainsFailedEvidence(t *testing.T) {
 	}
 	if _, bad = call(a, args); !bad || calls != 2 {
 		t.Fatal("stale retry reissued acquisition")
+	}
+}
+
+func TestGoalMCPSemanticRecoveryRetainsSessionAndBudgets(t *testing.T) {
+	ready := false
+	s := mcp.NewServer(&mcp.Implementation{Name: "test", Version: "0"}, nil)
+	registerGoalTool(s, goalwork.Policy{}, func(goalwork.Policy) goalwork.Dependencies {
+		return goalwork.Dependencies{Search: func(context.Context, string) (catalog.Result, error) {
+			status := "unavailable"
+			if ready {
+				status = "used"
+			}
+			return catalog.Result{Semantic: &catalog.SemanticInfo{Status: status}, Hits: []catalog.Hit{{PK: "123"}}}, nil
+		}}
+	})
+	a, b := connectTestClient(t, s), connectTestClient(t, s)
+	call := func(client *mcp.ClientSession, args map[string]any) (goalOut, bool) {
+		t.Helper()
+		res, err := client.CallTool(context.Background(), &mcp.CallToolParams{Name: "goal", Arguments: args})
+		if err != nil {
+			t.Fatal(err)
+		}
+		var out goalOut
+		if !res.IsError {
+			if err := json.Unmarshal([]byte(res.Content[0].(*mcp.TextContent).Text), &out); err != nil {
+				t.Fatal(err)
+			}
+		}
+		return out, res.IsError
+	}
+	v, bad := call(a, map[string]any{"goal": "unseeded discovery"})
+	if bad {
+		t.Fatal("start")
+	}
+	c := goalwork.GoalContract{Outcome: "story", Region: "unspecified", Period: "source period", Coverage: "sample", Roles: []goalwork.RoleRequirement{{ID: "r", Description: "record"}}, Outputs: []goalwork.OutputRequirement{{ID: "x", Role: "r", Type: "string", Description: "value"}}}
+	for _, d := range []goalwork.Decision{{Action: "define", Contract: &c}, {Action: "search", Query: "unseeded query", Role: "r"}} {
+		v, bad = call(a, map[string]any{"sessionId": v.SessionID, "revision": v.State.Revision, "decision": d})
+		if bad {
+			t.Fatal("setup")
+		}
+	}
+	id := v.SessionID
+	args := map[string]any{"sessionId": id, "revision": v.State.Revision, "decision": goalwork.Decision{Action: "retry_search", RetryOf: v.State.Revision}}
+	if _, bad = call(b, args); !bad {
+		t.Fatal("foreign session recovered")
+	}
+	ready = true
+	v, bad = call(a, args)
+	if bad || v.SessionID != id || len(v.State.Searches) != 2 || len(v.State.Gaps) != 1 || v.State.Budget.SearchesRemaining != 10 || !v.State.Policy.RequireSemantic || v.State.Status != "exploring" {
+		t.Fatal("recovery lost contract", v, bad)
 	}
 }

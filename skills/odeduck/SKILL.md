@@ -29,13 +29,15 @@ second agent through `catalog discover`.
 
 | User needs | Entry point |
 | --- | --- |
-| A sourced report, calculation or comparison requiring discovery and execution | `advance_goal` through MCP, or `odeduck solve` through CLI |
+| An open-ended discovery, sourced story, report, calculation or comparison | `goal` through MCP, or `odeduck goal` through CLI |
 | Candidate datasets or a particular API's data | `catalog_search` → `inspect_dataset` → [access and API calls](references/access.md) |
 
 ### Execute a goal
 
-`solve` / `advance_goal` is odeduck's goal-execution workflow. Start with the user's goal and preserve its
-required output, geography and period. For MCP, use the running guide's session/revision and action
+`goal` is odeduck's goal-execution workflow. Start with the user's goal and preserve its
+required output, geography and period. If it refers to prior conversation, pass the relevant user context
+using the running interface's context field; do not expect an isolated planner or reviewer to remember this chat.
+Context is not source evidence or a permission grant. For MCP, use the running guide's session/revision and action
 contract. Define required roles and outputs, then inspect actual sources, acquire observations, compose
 and execute. Use returned gaps to seek missing evidence, another source or a justified crosswalk within
 the same goal. A report request is not complete when only dataset links have been found.
@@ -45,8 +47,10 @@ means a bounded computation ran; `review_required` still needs evidence or autho
 Report the artifact, source support and unresolved requirements separately. Keep partial progress when
 completion is blocked rather than relabeling it as success or abandoning the requested output early.
 
-Check the runtime's semantic-search and model prerequisites. Read the installed `solve --help` before
-launching a CLI planner; if that version provides a non-executing preflight, use it to diagnose setup.
+Check the runtime's semantic-search and model prerequisites. Read the installed `goal --help` before
+launching a CLI planner. Current goal checks catalogue and semantic prerequisites before model planning.
+Use the runtime's consolidated review option to fix the recipient and authorized evidence scope; do not silently enable it.
+On older installations, use the goal-execution command advertised by their own schema/help.
 Goal execution currently does not submit access applications itself: resolve a selected API's missing
 access through the [ordinary access workflow](references/access.md) and follow the runtime's continuation guidance.
 Do not enable optional source sharing or external model review without authorization for the recipient

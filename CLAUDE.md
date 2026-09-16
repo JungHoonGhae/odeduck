@@ -3,8 +3,12 @@
 data.go.kr(공공데이터포털)의 OpenAPI **활용신청·인증키 발급·호출을 AI 에이전트가 대신**하게 하는
 Go CLI + MCP. 사람은 정부 SSO 로그인 한 번만 하고 이후 포털 작업을 에이전트가 잇는 것이 핵심.
 
-## 현재 상태 (2026-09-09)
+## 현재 상태 (2026-09-16)
 
+- 현재 개발은 `INTENT.md`의 요청에 따라 재개했다. CLI/MCP의 기본 목표 실행 이름은 `goal`이다.
+  `--review-with`는 고정된 수신자에게 선택 근거를 보내 보고·분석·요청 범위를 검토하도록 명시한다.
+  실제 실행 전 카탈로그·의미 검색을 점검하고, 검색 환경 복구 후 같은 목표의 `retry_search`를 지원한다.
+  전체 INTENT 완료나 프로세스 재개를 뜻하지 않는다. 기존 `solve`는 CLI 호환 명령이다.
 - v0.19.0은 실험적 `solve`·MCP `advance_goal`을 공통 목표 실행기로 제공한다. API·CSV·ZIP·XLSX·STD
   관측, 과거 FILE 버전·등록된 보조 문서·월간 export, 선택 근거·선집계·미대응 결과·비교 근거를 지원한다.
   명시한 수신자와 공개 권한 아래 별도 모델이 제한된 원천 보고·관계·계산·원천 인용 설명을 검토한다.
@@ -49,7 +53,7 @@ Go CLI + MCP. 사람은 정부 SSO 로그인 한 번만 하고 이후 포털 작
   typed 호출. 포털 명세를 임의로 추론하지 않으며, 외부 provider는 공식 계약·exact credential scope·
   typed operation registry가 있을 때만 호출한다. (kvote 국정수행 PDF 교훈.)
 - **인터페이스**: CLI(사람) + MCP(에이전트), 같은 백엔드. kvote 패턴.
-- **MCP tools**: catalog_search → inspect_dataset → apply(필요시) → call_api →
+- **MCP tools**: 발견·분석·보고서처럼 산출물을 요구하는 요청은 `goal`로 시작한다. 개별 자료 접근은 catalog_search → inspect_dataset → apply(필요시) → call_api →
   record_connection_assessment. `describe_api`는 API-only 호환 surface이고 search_datasets,
   list_applications, list_connection_assessments는 보조 도구다. 인증키는 call_api 내부에서만
   사용하며 모델 컨텍스트로 반환하지 않는다.

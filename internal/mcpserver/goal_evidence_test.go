@@ -48,7 +48,7 @@ func TestGoalMCPEvidenceUsesTrustedServerPolicy(t *testing.T) {
 			client := connectTestClient(t, s)
 			call := func(args map[string]any) goalOut {
 				t.Helper()
-				r, err := client.CallTool(context.Background(), &mcp.CallToolParams{Name: "advance_goal", Arguments: args})
+				r, err := client.CallTool(context.Background(), &mcp.CallToolParams{Name: "goal", Arguments: args})
 				if err != nil || r.IsError {
 					t.Fatalf("MCP call: %+v %v", r, err)
 				}
@@ -65,7 +65,7 @@ func TestGoalMCPEvidenceUsesTrustedServerPolicy(t *testing.T) {
 				return out
 			}
 			// A tool argument cannot set the trusted server's disclosure policy.
-			bad, err := client.CallTool(context.Background(), &mcp.CallToolParams{Name: "advance_goal", Arguments: map[string]any{"goal": "fixture", "evidenceRecipient": "mcp_host"}})
+			bad, err := client.CallTool(context.Background(), &mcp.CallToolParams{Name: "goal", Arguments: map[string]any{"goal": "fixture", "evidenceRecipient": "mcp_host"}})
 			if err == nil && !bad.IsError {
 				t.Fatal("model-controlled disclosure authority was accepted")
 			}
@@ -99,12 +99,12 @@ func TestGoalMCPEvidenceUsesTrustedServerPolicy(t *testing.T) {
 			} else if len(v.State.Evidence) != 0 || len(v.State.Gaps) != 1 || !strings.Contains(v.State.Gaps[0].Detail, "disabled") {
 				t.Fatal("MCP default disclosure was not blocked")
 			}
-			bad, err = client.CallTool(context.Background(), &mcp.CallToolParams{Name: "advance_goal", Arguments: map[string]any{"goal": "fixture", "reviewRecipient": "claude"}})
+			bad, err = client.CallTool(context.Background(), &mcp.CallToolParams{Name: "goal", Arguments: map[string]any{"goal": "fixture", "reviewRecipient": "claude"}})
 			if err == nil && !bad.IsError {
 				t.Fatal("model-controlled review authority was accepted")
 			}
 			other := connectTestClient(t, s)
-			foreign, err := other.CallTool(context.Background(), &mcp.CallToolParams{Name: "advance_goal", Arguments: map[string]any{"sessionId": v.SessionID}})
+			foreign, err := other.CallTool(context.Background(), &mcp.CallToolParams{Name: "goal", Arguments: map[string]any{"sessionId": v.SessionID}})
 			if err == nil && !foreign.IsError {
 				t.Fatal("another MCP session read retained evidence")
 			}

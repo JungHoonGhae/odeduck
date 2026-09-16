@@ -13,6 +13,7 @@ const SourceReportReviewMethod = "independent_model_source_report_v1"
 // ReviewInput is created only from the current executed artifact and already
 // disclosed evidence. It carries no planner history or prior judgements.
 type ReviewInput struct {
+	Context   string                 `json:"context,omitempty"`
 	Recipient string                 `json:"recipient"`
 	Goal      string                 `json:"goal"`
 	Contract  GoalContract           `json:"contract"`
@@ -255,7 +256,7 @@ func (e *Engine) sourceReviewInput(id string) (ReviewInput, error) {
 		if err != nil || digest(projected) != digest(a.Rows) {
 			continue
 		}
-		in := ReviewInput{Recipient: e.state.Policy.ReviewRecipient, Goal: e.state.Goal, Contract: *e.state.Contract, Artifact: *a, Evidence: packet}
+		in := ReviewInput{Context: e.state.Context, Recipient: e.state.Policy.ReviewRecipient, Goal: e.state.Goal, Contract: *e.state.Contract, Artifact: *a, Evidence: packet}
 		return detachReviewInput(in)
 	}
 	return ReviewInput{}, fmt.Errorf("read one evidence packet covering every retained source row and all output/time/selection fields before review; do not shrink the original goal")

@@ -17,16 +17,28 @@ func mcpCommand(serve func(context.Context, mcpserver.Deps) error) *cobra.Comman
 	var reviewProvider string
 	var reviewAnalyses bool
 	var reviewFullScope bool
+	var reviewWith string
 	cmd := &cobra.Command{
 		Use:   "mcp",
-		Short: "MCP 서버 실행 — 검색→상세→AI 활용신청→호출",
+		Short: "MCP 서버 실행 — 목표에서 데이터·검증된 산출물까지",
 		Long: `odeduck 을 Model Context Protocol 서버로 노출합니다(stdio).
-핵심 tool 은 catalog_search → inspect_dataset → (미승인 시 apply) → call_api 흐름이며,
+목표 기반 요청은 goal로 시작합니다. 특정 데이터 접근에는 catalog_search → inspect_dataset → (미승인 시 apply) → call_api를 사용하며,
 AI가 데이터 발견뿐 아니라 활용신청·승인 확인·실제 호출까지 이어갑니다.
 search_datasets / list_applications 는 최신성·계정 확인을 위한 보조 tool 입니다. 인증키는 모델에
 노출하지 않고 call_api 내부에서만 주입합니다.
 odeduck://guide 리소스에 사용 순서가 있습니다. 호출·계정 기능은 로그인 세션 전제입니다.`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
+			if reviewWith != "" {
+				if reviewWith != "codex" && reviewWith != "claude" && reviewWith != "gemini" {
+					return fmt.Errorf("--review-with must be codex, claude or gemini")
+				}
+				for _, name := range []string{"share-goal-evidence", "review-goals-with", "review-goal-analyses", "review-goal-full-scope"} {
+					if cmd.Flags().Changed(name) {
+						return fmt.Errorf("do not combine --review-with with legacy --%s", name)
+					}
+				}
+				shareEvidence, reviewAnalyses, reviewFullScope, reviewProvider = true, true, true, reviewWith
+			}
 			if reviewFullScope && !reviewAnalyses {
 				return fmt.Errorf("--review-goal-full-scope requires --review-goal-analyses and its disclosure/provider settings")
 			}
@@ -56,5 +68,9 @@ odeduck://guide 리소스에 사용 순서가 있습니다. 호출·계정 기�
 	cmd.Flags().StringVar(&reviewProvider, "review-goals-with", "", "원천 보고의 별도 검토 provider: codex|claude|gemini; 선택 근거 외부 전송을 추가 허용, 기본 off")
 	cmd.Flags().BoolVar(&reviewAnalyses, "review-goal-analyses", false, "typed 관계·계산 검토를 추가 허용; 검토 provider/선택 근거 공개 필수, 모델 tool argument로 변경 불가")
 	cmd.Flags().BoolVar(&reviewFullScope, "review-goal-full-scope", false, "원천 기반 전체 요청 범위의 추가 검토; --review-goal-analyses 필수, 모집단 인증 아님")
+	cmd.Flags().StringVar(&reviewWith, "review-with", "", "선택 원천 값을 MCP host와 고정 검토 provider에 전송하여 보고·분석·요청 범위를 검토: codex | claude | gemini")
+	for _, name := range []string{"share-goal-evidence", "review-goals-with", "review-goal-analyses", "review-goal-full-scope"} {
+		_ = cmd.Flags().MarkHidden(name)
+	}
 	return cmd
 }

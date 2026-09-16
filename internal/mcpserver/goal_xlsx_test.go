@@ -36,7 +36,7 @@ func TestGoalMCPXLSXSelectionAndProvenanceUseSharedContract(t *testing.T) {
 	client := connectTestClient(t, s)
 	call := func(args map[string]any) goalOut {
 		t.Helper()
-		res, err := client.CallTool(context.Background(), &mcp.CallToolParams{Name: "advance_goal", Arguments: args})
+		res, err := client.CallTool(context.Background(), &mcp.CallToolParams{Name: "goal", Arguments: args})
 		if err != nil || res.IsError {
 			t.Fatalf("MCP failure: %+v %v", res, err)
 		}

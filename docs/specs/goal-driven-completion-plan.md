@@ -1,12 +1,21 @@
 # Goal-driven completion plan
 
-Status: product incomplete; current Wayfinder work limited to already registered tickets by the user on 2026-09-09.
+Status: product incomplete; development resumed by user request on 2026-09-16.
 
 의도의 단일 소스는 [INTENT.md](../../INTENT.md)다. 이 문서는 요구사항별 완료 근거와 재개 조건을
 관리한다. 현재 구현에 맞춰 의도나 성공 조건을 축소하지 않는다. 도메인 용어는
 [CONTEXT.md](../../CONTEXT.md), 제품 실행 계약은 [composition spec](goal-driven-composition-v1.md)에 둔다.
 
-## 이번 마감 범위 — 2026-09-09
+## 재개 범위 — 2026-09-16
+
+사용자가 INTENT.md에 맞춘 고도화와 무힌트 실제 목표 검증을 요청했다. 9월 9일의 신규 작업 중단은
+아래 과거 마감에만 적용한다. 이번 변경은 CLI/MCP `goal` 통합, 목표 우선 라우팅, 명시적인 검토 수신자
+설정 통합, 실행 전 환경 점검, 의미 검색 복구 후 같은 목표 재시도를 다룬다. I1–I10의 완료 기준과
+기존 실패 분모는 유지한다. [이번 실행·회귀 검증](../research/goal-entrypoint-validation-2026-09-16.md)에
+무힌트 23단계 abstained, 맥락 전달 수정 뒤 원천 재취득·고정 계산의 18단계 output_ready를 구분해
+기록했다. I4/I9의 복구·동일 계약과 I1의 대화 맥락 전달을 보완한 근거이며 I1–I10 전체 완료가 아니다.
+
+## 과거 마감 범위 — 2026-09-09
 
 사용자는 현재 등록된 Wayfinder 티켓만 마무리하고 정리하도록 범위를 고정했다.
 [현재 지도](https://github.com/JungHoonGhae/odeduck/issues/40)에서 범위 고정 당시 열려 있던

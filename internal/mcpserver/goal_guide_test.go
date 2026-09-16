@@ -20,7 +20,7 @@ func TestGoalResourceDeliversSharedContractWithMCPFraming(t *testing.T) {
 	if strings.Count(text, goalwork.PlanningGuide()) != 1 {
 		t.Fatal("resource omitted or duplicated the engine-owned planning contract")
 	}
-	for _, required := range []string{"sessionId", "state.revision", "decision", "--share-goal-evidence", "mcp_host", "기존 사용자 Artifact", "catalog_search", "record_connection_assessment", "call_api"} {
+	for _, required := range []string{"sessionId", "state.revision", "decision", "--review-with", "MCP host", "기존 사용자 Artifact", "catalog_search", "record_connection_assessment", "call_api"} {
 		if !strings.Contains(text, required) {
 			t.Fatalf("resource omitted transport or existing workflow: %s", required)
 		}
@@ -33,7 +33,7 @@ func TestGoalResourceDeliversSharedContractWithMCPFraming(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, tool := range listed.Tools {
-		if tool.Name == "advance_goal" {
+		if tool.Name == "goal" {
 			if !strings.Contains(tool.Description, "odeduck://guide") {
 				t.Fatal("goal tool does not route the host to its detailed contract")
 			}

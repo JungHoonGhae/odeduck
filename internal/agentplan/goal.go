@@ -5,12 +5,43 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"path/filepath"
 	"strings"
 	"time"
 	"unicode/utf8"
 
 	"github.com/JungHoonGhae/odeduck/internal/goalwork"
 )
+
+// CheckGoalPlanner resolves the same candidates used by PlanGoal without a
+// model/authentication request. Presence is not proof of provider login/quota.
+func CheckGoalPlanner(requested string) (goalwork.RuntimeCheck, error) {
+	check := goalwork.RuntimeCheck{Name: "planner", Status: "blocked"}
+	providers, _, err := resolveProviders(requested)
+	if err == nil {
+		var available []string
+		for _, p := range providers {
+			if p.provider == ProviderCursor {
+				continue
+			}
+			absolute, pathErr := filepath.Abs(p.executable)
+			if pathErr != nil {
+				continue
+			}
+			available = append(available, p.provider+"="+absolute)
+		}
+		if len(available) == 0 {
+			err = ErrUntrustedMetadataIsolation
+		} else {
+			check.Status = "checked"
+			check.Detail = strings.Join(available, "; ") + "; executable presence only, authentication/quota not checked; resolved again on invocation"
+		}
+	}
+	if err != nil {
+		check.Detail = err.Error()
+	}
+	return check, err
+}
 
 // PlanGoal proposes one action without tool access. The shared goal engine, not
 // this subprocess, acquires rows, enforces budgets and computes the artifact.

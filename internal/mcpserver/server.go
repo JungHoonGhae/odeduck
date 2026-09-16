@@ -488,20 +488,30 @@ func New(deps Deps) *mcp.Server {
 		}}}, nil
 	})
 
-	// Reuse one catalog snapshot across bounded goal sessions. Each engine
-	// enforces its immutable semantic policy before admitting any candidates.
-	goalDeps := goalwork.LiveDependencies(deps.Fetch, base, caller, catalog.Searcher{Index: deps.SemanticIndex, Embedder: deps.Embedder}, goalwork.Policy{})
-	if deps.GoalReviewProvider != "" {
-		goalDeps.Review = func(ctx context.Context, in goalwork.ReviewInput) (goalwork.ReviewAssessment, error) {
-			response, err := agentplan.ReviewGoal(ctx, in, deps.GoalReviewProvider)
-			return response.Assessment, err
-		}
-	}
 	goalPolicy := goalwork.Policy{ReviewRecipient: deps.GoalReviewProvider, ReviewAnalyses: deps.ReviewGoalAnalyses, ReviewFullScope: deps.ReviewGoalFullScope}
 	if deps.ShareGoalEvidence {
 		goalPolicy.EvidenceRecipient = "mcp_host"
 	}
-	registerGoalTool(s, goalPolicy, func(goalwork.Policy) goalwork.Dependencies {
+	registerGoalTool(s, goalPolicy, func(policy goalwork.Policy) goalwork.Dependencies {
+		// Pin a snapshot per goal, with this session's exact semantic policy.
+		goalDeps := goalwork.LiveDependencies(deps.Fetch, base, caller, catalog.Searcher{Index: deps.SemanticIndex, Embedder: deps.Embedder}, policy)
+		if deps.GoalReviewProvider != "" {
+			goalDeps.Review = func(ctx context.Context, in goalwork.ReviewInput) (goalwork.ReviewAssessment, error) {
+				response, err := agentplan.ReviewGoal(ctx, in, deps.GoalReviewProvider)
+				return response.Assessment, err
+			}
+			acquisitionCheck := goalDeps.Preflight
+			goalDeps.Preflight = func(ctx context.Context) (goalwork.Environment, error) {
+				env, err := acquisitionCheck(ctx)
+				check, reviewerErr := agentplan.CheckGoalPlanner(deps.GoalReviewProvider)
+				check.Name = "reviewer"
+				env.Checks = append(env.Checks, check)
+				if err != nil {
+					return env, err
+				}
+				return env, reviewerErr
+			}
+		}
 		return goalDeps
 	})
 	return s

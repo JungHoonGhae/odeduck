@@ -89,9 +89,9 @@ main() {
     echo "Installed: $("${INSTALL_DIR}/${BINARY}" version 2>/dev/null || echo "$BINARY")"
     echo ""
     echo "Next steps:"
-    echo "  odeduck login                                 # 브라우저 1회 로그인"
-    echo "  odeduck search 대기오염 --type api -f table    # 데이터셋 검색"
-    echo "  odeduck apply <pk> --purpose ... --category research"
+    echo "  odeduck goal --help    # 목표 실행과 검토 모델 설정"
+    echo "  odeduck mcp --help     # AI 앱에서 같은 목표 실행기 사용"
+    echo "  odeduck login          # 인증 API를 쓸 때 브라우저 로그인"
 }
 
 latest_version() {

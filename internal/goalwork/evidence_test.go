@@ -99,12 +99,12 @@ func TestSelectedEvidenceRejectsUnauthorizedStaleAndOversizedSelections(t *testi
 		rows                                []int
 		message                             string
 	}{
-		{"default private", "", "name", "private", "current", []int{1}, "disabled"},
-		{"stale", "claude", "name", "private", "old", []int{1}, "rowsSha256"},
-		{"outside", "claude", "name", "private", "current", []int{2}, "positions"},
-		{"duplicate rows", "claude", "name", "private", "current", []int{1, 1}, "distinct"},
-		{"credential field", "claude", "serviceKey", "private", "current", []int{1}, "credential"},
-		{"credential Korean field", "claude", "일반인증키", "private", "current", []int{1}, "credential"},
+		{"default private", "", "name", "UNAUTHORIZED_SOURCE_CELL", "current", []int{1}, "disabled"},
+		{"stale", "claude", "name", "UNAUTHORIZED_SOURCE_CELL", "old", []int{1}, "rowsSha256"},
+		{"outside", "claude", "name", "UNAUTHORIZED_SOURCE_CELL", "current", []int{2}, "positions"},
+		{"duplicate rows", "claude", "name", "UNAUTHORIZED_SOURCE_CELL", "current", []int{1, 1}, "distinct"},
+		{"credential field", "claude", "serviceKey", "UNAUTHORIZED_SOURCE_CELL", "current", []int{1}, "credential"},
+		{"credential Korean field", "claude", "일반인증키", "UNAUTHORIZED_SOURCE_CELL", "current", []int{1}, "credential"},
 		{"credential URL", "claude", "name", "serviceKey%3Dfixture-secret-key-value", "current", []int{1}, "credential"},
 		{"credential JSON", "claude", "name", `{"api_key":"fixture-secret-key-value"}`, "current", []int{1}, "credential"},
 		{"oversized cell", "claude", "name", strings.Repeat("x", 2047), "current", []int{1}, "2048"},

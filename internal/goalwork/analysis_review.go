@@ -149,7 +149,7 @@ func (e *Engine) analysisReviewInput(ctx context.Context, id string, sourceConte
 	if err != nil || digest(replayedUnmatched) != digest(a.Unmatched) {
 		return ReviewInput{}, fmt.Errorf("unmatched result cannot be reproduced from disclosed source values")
 	}
-	in := ReviewInput{Recipient: e.state.Policy.ReviewRecipient, Goal: e.state.Goal, Contract: *e.state.Contract, Artifact: *a, Evidence: packets[0], Analysis: &AnalysisReviewContext{Method: "engine_relational_replay_v3", OutputSHA256: digest(a.Rows), AdditionalEvidence: packets[1:]}}
+	in := ReviewInput{Context: e.state.Context, Recipient: e.state.Policy.ReviewRecipient, Goal: e.state.Goal, Contract: *e.state.Contract, Artifact: *a, Evidence: packets[0], Analysis: &AnalysisReviewContext{Method: "engine_relational_replay_v3", OutputSHA256: digest(a.Rows), AdditionalEvidence: packets[1:]}}
 	in.Analysis.SourceContext = sourceContext
 	in.Analysis.FullScope = a.Evaluation.FullScope
 	in.Artifact.Sources = slices.Clone(a.Sources)

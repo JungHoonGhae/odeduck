@@ -8,6 +8,9 @@ import (
 // Run is the standalone planning loop. MCP drives Advance directly using the
 // host model; both callers use the same state transitions and computed output.
 func Run(ctx context.Context, e *Engine, next func(context.Context, View) (Decision, error), progress func(View)) (View, error) {
+	if _, err := e.Preflight(ctx); err != nil {
+		return e.View(), err
+	}
 	feedback := ""
 	for {
 		view := e.PlanningView()

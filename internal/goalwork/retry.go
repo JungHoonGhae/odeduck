@@ -84,3 +84,27 @@ func (e *Engine) retryRequest(d Decision) (SampleRequest, error) {
 	}
 	return cloneSampleRequest(target.Request), nil
 }
+
+func (e *Engine) retrySearch(d Decision) (SearchRecord, error) {
+	if d.RetryOf <= 0 || d.Sample != nil || d.Layout != nil || d.Contract != nil || d.Composition != nil || d.Evidence != nil || d.Query != "" || d.Role != "" || d.PK != "" || d.CompositionID != "" || d.FileHistory || d.FileVersion != "" || len(d.Reason) > 1000 {
+		return SearchRecord{}, fmt.Errorf("retry_search accepts only retryOf and an optional bounded reason; the engine reuses the retained query and role")
+	}
+	if e.state.Status != "blocked" || len(e.state.Gaps) == 0 || len(e.state.Searches) == 0 || !e.state.Policy.RequireSemantic {
+		return SearchRecord{}, fmt.Errorf("retry_search requires a blocked semantic search in this goal")
+	}
+	gap := e.state.Gaps[len(e.state.Gaps)-1]
+	last := e.state.Searches[len(e.state.Searches)-1]
+	if gap.Revision != d.RetryOf || gap.Revision != e.state.Revision || (gap.Action != "search" && gap.Action != "retry_search") || (last.Semantic != nil && last.Semantic.Status == "used") {
+		return SearchRecord{}, fmt.Errorf("retryOf must identify the latest blocked semantic search")
+	}
+	count := 0
+	for _, s := range e.state.Searches {
+		if s.Query == last.Query && s.Role == last.Role {
+			count++
+		}
+	}
+	if count >= 3 || len(e.state.Searches) >= maxSearches || e.state.Revision >= e.state.Policy.MaxRounds {
+		return SearchRecord{}, fmt.Errorf("search retry budget exhausted: at most 3 attempts per request within the original search/round limits")
+	}
+	return last, nil
+}

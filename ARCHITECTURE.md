@@ -1,7 +1,7 @@
 # Architecture
 
 odeduck은 AI 에이전트가 대한민국 공공데이터로 **목표에 필요한 산출물과 근거를 만드는** 로컬 컨트롤
-플레인이다. `solve`·`advance_goal`의 공통 목표 실행기가 탐색·관측·계산·재탐색·결과 평가를 잇는다.
+플레인이다. `goal`의 공통 목표 실행기가 탐색·관측·계산·재탐색·결과 평가를 잇는다.
 그 기반인 계약 검사·활용신청·승인 확인·인증 호출은 개별 CLI·MCP 도구로도 사용할 수 있다.
 CLI와 MCP가 같은 도메인 모듈을 사용하며, 모델은 계획과 해석을 돕고 카탈로그 순위·자격증명·
 실제 취득·계산의 실행 경계는 결정론적인 Go 코드가 맡는다. 목표 실행의 일반적 완주는 아직 검증 중이다.
@@ -12,7 +12,7 @@ CLI와 MCP가 같은 도메인 모듈을 사용하며, 모델은 계획과 해�
 | --- | --- |
 | [사용자용 Skill](skills/odeduck/SKILL.md) | 요청한 산출물에 따라 목표 실행 또는 개별 검색·호출로 진입. 설치된 런타임의 계약을 읽음 |
 | CLI / MCP | 동일한 도메인 실행기를 터미널 또는 에이전트에 노출 |
-| `solve` / `advance_goal` | 목표·역할·출력 계약, 탐색·취득·계산·재계획과 결과 평가를 관리 |
+| `goal` | 목표·역할·출력 계약, 탐색·취득·계산·재계획과 결과 평가를 관리 |
 | 검사·접근·호출 모듈 | 실제 원천 계약, 세션·키 취급, 활용신청·승인 확인·취득과 검증을 수행 |
 
 사용자용 Skill은 선택 진입점이며 런타임의 권한이나 검증을 대체하지 않는다. `.agents/skills/`는 이
@@ -100,12 +100,20 @@ provider, 검색 정책을 유지하며 Bridge 선택지와 단계별 폴백·Ab
 수로 꺼낸 뒤, 실제 PK가 명시적으로 선택되고 역할·연결 계약을 통과한 조합만 `candidate` 카드가 된다.
 필드, grain, 값 교집합을 검사하기 전에는 join이나 사업성을 검증했다고 표시하지 않는다.
 
-### 1.5. Goal-driven composition (experimental)
+### 1.5. Goal execution
 
-`odeduck solve "목표"`와 MCP `advance_goal`은 [`internal/goalwork`](internal/goalwork)의 동일한
+`odeduck goal "목표" --review-with codex`와 MCP `goal`은 [`internal/goalwork`](internal/goalwork)의 동일한
 Start/Advance interface를 사용한다. CLI 계획은 tool-free Codex·Claude·Gemini가, MCP 계획은 host가
 다음 행동을 제안한다. 별도 결과 검토는 명시한 시작 설정이 있을 때만 고정된 모델을 호출한다.
-고정 Anchor 없이 역할별 후보와 여러 Composition을 보존한다.
+Request는 원문 목표와 선택적인 사용자 대화 맥락을 분리해 고정한다. 같은 context가 계획과 별도 검토에
+전달되며 원천 근거나 권한으로 승격되지 않는다. 근거 검토 입력의 기존 크기 제한에도 포함된다.
+고정 Anchor 없이 역할별 후보와 여러 Composition을 보존한다. 사용자 문장을 검색어 하나로 줄이지 않고
+독립적인 탐색 가설을 만든 뒤 실제 후보와 관측으로 수정한다. 실행 전 Preflight는 동일한 카탈로그와
+의미 검색 경로를 점검하며, 탐색 예산·후보로 세지 않는다. Runtime은 실행 중인 빌드·바이너리 해시·
+계획 계약 해시·현재 허용 행동을 노출한다. 스킬에 버전을 복제하지 않는다.
+
+의미 검색 실패는 strict 정책을 유지한 채 중단한다. 환경 복구 후 retry_search는 원래 검색어·역할을
+재사용하고 같은 목표·실패 이력·만료·누적 예산을 유지한다. 프로세스가 끝난 뒤의 영속 재개는 아직 미지원이다.
 상세 행동 안내는 Goal Engine의 [정적 계획 계약](internal/goalwork/planning-guide.md) 하나를
 CLI prompt와 MCP resource가 공유한다. 각 adapter는 전달·출력·신뢰된 시작 설정만 덧붙인다.
 
@@ -123,8 +131,8 @@ module이 revision·중복 억제·예산·실제 원천 획득·실행 결과�
 
 실행은 복합키 exact/trim inner join, projection, groupBy+count/sum이며 tuple을 보존한다. null은
 결합되지 않고 중복 expansion과 빈 전체 경로는 실패한다. 원문 행은 세션 메모리에만 두며 외부 CLI
-planner에는 기본적으로 컬럼·타입·해시·오류만 보낸다. 명시한 단일 agent에 --share-evidence를 켜면
-공통 read_evidence가 선택한 행·필드만 원본 주소와 함께 전달한다. MCP는 --share-goal-evidence로
+planner에는 기본적으로 컬럼·타입·해시·오류만 보낸다. CLI의 --review-with로 단일 제공자와 선택 근거 전송을 명시하면
+공통 read_evidence가 선택한 행·필드만 원본 주소와 함께 전달한다. MCP도 --review-with로
 서버 시작 시 상한을 정하고 모델 입력으로 바꾸지 못한다. 선택 근거는 셀·packet·세션 누적 예산과
 만료를 적용하며 전체 Artifact는 외부 CLI 계획 입력에서 계속 제외한다. 기존 MCP Artifact/call_api
 원문 반환은 별개다. [공개·재사용 신뢰 경계](docs/adr/0007-selected-evidence-and-reuse.md)를 따른다.

@@ -69,3 +69,23 @@ func TestMCPCommandFixesEvidencePolicyAtServerStartup(t *testing.T) {
 		})
 	}
 }
+
+func TestMCPUnifiedReviewKeepsExplicitStartupBoundary(t *testing.T) {
+	for _, args := range [][]string{{"--review-with=codex"}, {"--review-with=auto"}, {"--review-with=codex", "--share-goal-evidence"}} {
+		called := false
+		cmd := mcpCommand(func(_ context.Context, d mcpserver.Deps) error {
+			called = true
+			if d.GoalReviewProvider != "codex" || !d.ShareGoalEvidence || !d.ReviewGoalAnalyses || !d.ReviewGoalFullScope {
+				t.Fatal("unified setting lost boundary", d)
+			}
+			return nil
+		})
+		cmd.SetArgs(args)
+		cmd.SetErr(&bytes.Buffer{})
+		err := cmd.Execute()
+		valid := len(args) == 1 && args[0] == "--review-with=codex"
+		if (err == nil) != valid || called != valid {
+			t.Fatal(args, err)
+		}
+	}
+}

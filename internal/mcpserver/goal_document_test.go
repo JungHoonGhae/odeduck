@@ -45,7 +45,7 @@ func TestMCPDocumentSelectionUsesActualInspectionAndEvidenceContract(t *testing.
 	client := connectTestClient(t, New(Deps{Fetch: f, ShareGoalEvidence: true}))
 	call := func(args map[string]any) goalOut {
 		t.Helper()
-		r, err := client.CallTool(context.Background(), &mcp.CallToolParams{Name: "advance_goal", Arguments: args})
+		r, err := client.CallTool(context.Background(), &mcp.CallToolParams{Name: "goal", Arguments: args})
 		if err != nil || r.IsError {
 			t.Fatalf("MCP: %+v %v", r, err)
 		}
