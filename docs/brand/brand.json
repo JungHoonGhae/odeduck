@@ -13,6 +13,7 @@
   "technicalName": "odeduck",
   "command": "odeduck",
   "repository": "JungHoonGhae/odeduck",
+  "repositoryDescription": "Open-source control plane for Korean public data. Goal-driven discovery, API access, execution and source evidence for AI agents. CLI + MCP.",
   "modulePath": "github.com/JungHoonGhae/odeduck",
   "configDirectory": "odeduck",
   "positioning": "The open-source control plane for Korean public data.",
