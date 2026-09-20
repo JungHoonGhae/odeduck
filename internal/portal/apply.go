@@ -247,7 +247,7 @@ var ErrFormUnreachable = errors.New("신청 폼에 접근하지 못했습니다"
 func fillAndSubmit(tctx context.Context, pk, purpose, category string,
 	confirm func(ApplySummary) bool, dialog func() string) (*ApplyResult, error) {
 	// 폼 채우기 + 요약 추출. fill=true 이므로 실제로 값이 채워진다.
-	fillJS := applyFormJS(purpose, category, true)
+	fillJS := guardedApplyFillJS(purpose, category)
 
 	var raw string
 	if err := chromedp.Run(tctx, chromedp.Evaluate(fillJS, &raw)); err != nil {
@@ -277,14 +277,27 @@ func fillAndSubmit(tctx context.Context, pk, purpose, category string,
 
 	// 제출: 폼의 fn_save() 가 검증 → confirm("신청하시겠습니까?") → AJAX POST.
 	// confirm/완료 알림은 위 dialog 리스너가 모두 수락한다.
-	if err := chromedp.Run(tctx, chromedp.Evaluate(`(function(){ try{ fn_save(); return 'ok'; }catch(e){ return ''+e; } })()`, nil)); err != nil {
-		return nil, fmt.Errorf("제출 호출 실패: %w", err)
+	var submitted string
+	if err := chromedp.Run(tctx, chromedp.Evaluate(guardedApplySubmitJS, &submitted)); err != nil {
+		return nil, fmt.Errorf("제출 결과를 확인할 수 없습니다 — 신청내역 확인 후 재시도하세요: %w", err)
 	}
-	time.Sleep(4 * time.Second) // confirm 수락 + POST + 처리 대기
-
-	// 성공 판정 = 목록(ground truth)에 반영됐는지. 폼은 AJAX 제출이라 위치로는
-	// 판별이 안 되므로 활용신청 현황을 다시 읽어 데이터명이 나타났는지 확인한다.
-	dlg := dialog()
+	if submitted == "changed" {
+		return nil, fmt.Errorf("확인 이후 신청 폼이 변경되었습니다 — 제출하지 않았습니다")
+	}
+	if submitted != "submitted" {
+		return nil, fmt.Errorf("제출 결과가 불확실합니다 — 신청내역 확인 후 재시도하세요")
+	}
+	dlg, waitErr := waitApplyDialog(tctx, dialog, 15*time.Second)
+	if tctx.Err() != nil {
+		return nil, fmt.Errorf("제출 확인이 중단되었습니다 — 신청내역 확인 후 재시도하세요: %w", tctx.Err())
+	}
+	if isApplySuccessDialog(dlg) {
+		return &ApplyResult{Submitted: true, Message: "신청 완료 (포털 성공 응답; 신청내역 반영 대기 중)"}, nil
+	}
+	if waitErr == nil && dlg != "" {
+		return &ApplyResult{Submitted: false, Message: "제출이 반영되지 않았습니다: " + strings.ReplaceAll(dlg, "\n", " ")}, nil
+	}
+	// No terminal dialog: inspect the account list without resubmitting.
 
 	if listHTML, _, lerr := probeListLenient(tctx); lerr == nil {
 		if apps, perr := parseApplications(listHTML); perr == nil {
@@ -295,20 +308,7 @@ func fillAndSubmit(tctx context.Context, pk, purpose, category string,
 			}
 		}
 	}
-	// The account list is eventually consistent: production showed the portal's
-	// success alert immediately but the reused tab still rendered the old list.
-	// The alert comes from this form's fn_save response, so its exact message is a
-	// valid success signal when list propagation lags. Keep the match narrow to
-	// avoid treating validation or unrelated "completed" dialogs as submission.
-	if isApplySuccessDialog(dlg) {
-		return &ApplyResult{Submitted: true, Message: "신청 완료 (포털 성공 응답; 신청내역 반영 대기 중)"}, nil
-	}
-	// 목록에 없으면 거부(검증 실패 등). dialog 메시지를 사유로.
-	msg := "제출이 반영되지 않았습니다"
-	if dlg != "" && !strings.Contains(dlg, "신청하시겠습니까") {
-		msg += ": " + strings.ReplaceAll(dlg, "\n", " ")
-	}
-	return &ApplyResult{Submitted: false, Message: msg}, nil
+	return nil, fmt.Errorf("제출 결과를 제한시간 내 확인하지 못했습니다 — 신청내역 확인 후 재시도하세요")
 }
 
 func sameApplicationTitle(applicationTitle, dataName string) bool {
