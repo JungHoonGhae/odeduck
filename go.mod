@@ -1,6 +1,6 @@
 module github.com/JungHoonGhae/odeduck
 
-go 1.26.6
+go 1.26.10
 
 require (
 	github.com/PuerkitoBio/goquery v1.12.0
@@ -8,10 +8,10 @@ require (
 	github.com/chromedp/chromedp v0.15.1
 	github.com/modelcontextprotocol/go-sdk v1.6.1
 	github.com/spf13/cobra v1.10.2
-	golang.org/x/net v0.56.0
-	golang.org/x/sys v0.46.0
-	golang.org/x/term v0.44.0
-	golang.org/x/text v0.39.0
+	golang.org/x/net v0.62.0
+	golang.org/x/sys v0.49.0
+	golang.org/x/term v0.47.0
+	golang.org/x/text v0.43.0
 )
 
 require (
